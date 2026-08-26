@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const absolutePinScenario: ChessScenario = {
+  id: 'absolute-pin',
+  title: 'The Absolute Pin! 🧲',
+  subtitle: 'Glue an enemy piece in place so it cannot legally move!',
+  category: 'tactical_patterns',
+  difficulty: 'intermediate',
+  targetAgeGroup: '11-15',
+  icon: '🧲',
+  description: 'An "Absolute Pin" happens when a piece shields its King. It is completely frozen because exposing the King to check is illegal!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'pin-step-1',
+      stepNumber: 1,
+      instruction: 'Move your light-squared Bishop to b5 to pin Black’s c6 Knight against their King on e8!',
+      conceptExplanation: 'When a piece is pinned to the King, it cannot move even if attacked!',
+      hint: 'Move your Bishop from f1 diagonally to b5.',
+      setupFen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3',
+      highlightSquares: ['f1', 'b5'],
+      threatSquares: ['c6', 'e8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'f1', to: 'b5' }],
+      opponentResponse: {
+        from: 'a7',
+        to: 'a6',
+        delayMs: 500,
+        dialogue: 'My knight is frozen! I must kick your bishop with a6!',
+      },
+      explanationOnSuccess: 'Pinned tight! The Black Knight cannot move an inch without exposing the King!',
+    },
+    {
+      id: 'pin-step-2',
+      stepNumber: 2,
+      instruction: 'Black attacked your Bishop with a6! Strike the pinned Knight directly: capture on c6 with your Bishop!',
+      conceptExplanation: 'When you have a pinned piece, putting maximum pressure on it wins material!',
+      hint: 'Capture the Knight on c6 with your Bishop on b5.',
+      setupFen: 'r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4',
+      highlightSquares: ['b5', 'c6'],
+      threatSquares: ['c6'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'b5', to: 'c6' }],
+      explanationOnSuccess: 'Check! The pinned Knight fell, ruining Black’s pawn structure!',
+    },
+  ],
+};

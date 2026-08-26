@@ -1,0 +1,40 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const bishopDiagonalsScenario: ChessScenario = {
+  id: 'bishop-diagonals',
+  title: 'The Diagonal Bishop! ♝',
+  subtitle: 'Glide across diagonals and snipe targets from afar!',
+  category: 'fundamentals',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '♝',
+  description: 'Bishops slice across the board on diagonals and stay on their assigned square color forever!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'bishop-step-1',
+      stepNumber: 1,
+      instruction: 'Develop your light-squared Bishop from f1 to the active c4 square!',
+      conceptExplanation: 'Bishops love long, open diagonals. From c4, your Bishop eyes down Black’s weak f7 square!',
+      hint: 'Move the Bishop from f1 diagonally to c4.',
+      setupFen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+      highlightSquares: ['f1', 'c4'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'f1', to: 'c4' }],
+      explanationOnSuccess: 'Beautiful diagonal slice! Your Bishop is now commanding the center!',
+    },
+    {
+      id: 'bishop-step-2',
+      stepNumber: 2,
+      instruction: 'Black’s Knight on f6 is hanging! Capture the Knight with your Bishop from c4 to f7... wait, capture the piece on f7!',
+      conceptExplanation: 'Look for pieces that are under attack by your long-range sniper Bishop!',
+      hint: 'Slide the Bishop from c4 all the way to f7 with check!',
+      setupFen: 'r1bqk2r/pppp1ppp/2n5/4p3/2B1n3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 0 4',
+      highlightSquares: ['c4', 'f7'],
+      threatSquares: ['f7'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'c4', to: 'f7' }],
+      explanationOnSuccess: 'Check! Your Bishop delivered a crushing attack right at the Black King!',
+    },
+  ],
+};

@@ -1,0 +1,41 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const enPassantScenario: ChessScenario = {
+  id: 'en-passant-secret',
+  title: 'En Passant: The Secret Pawn Capture! ⚡',
+  subtitle: 'Catch an enemy pawn that tried to sprint right past you!',
+  category: 'special_moves',
+  difficulty: 'intermediate',
+  targetAgeGroup: '11-15',
+  icon: '⚡',
+  description: 'When an enemy pawn jumps two squares past your pawn, you can capture it diagonally "in passing" as if it had only moved one square!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'en-passant-step-1',
+      stepNumber: 1,
+      instruction: 'Black’s d-pawn just leaped two squares from d7 to d5! Capture it En Passant by moving your e5 pawn to d6!',
+      conceptExplanation: 'En Passant can only be played immediately on the turn after the enemy pawn makes its two-square leap!',
+      hint: 'Move your White pawn on e5 diagonally into the empty d6 square behind the Black pawn.',
+      setupFen: 'rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2',
+      highlightSquares: ['e5', 'd6'],
+      threatSquares: ['d5'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e5', to: 'd6' }],
+      explanationOnSuccess: 'Zap! You captured the sneaking pawn out of thin air using En Passant!',
+    },
+    {
+      id: 'en-passant-step-2',
+      stepNumber: 2,
+      instruction: 'Black tried it again on the kingside with f7 to f5! Capture on f6 En Passant with your g5 pawn!',
+      conceptExplanation: 'En Passant works on both sides of the board whenever you have a pawn on the 5th rank!',
+      hint: 'Move your pawn on g5 diagonally to f6.',
+      setupFen: 'rnbqkbnr/ppp1p1pp/3P4/5pP1/8/8/PPPP1P1P/RNBQKBNR w KQkq f6 0 3',
+      highlightSquares: ['g5', 'f6'],
+      threatSquares: ['f5'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'g5', to: 'f6' }],
+      explanationOnSuccess: 'Double En Passant mastery! You now know chess’s most surprising secret rule!',
+    },
+  ],
+};

@@ -1,0 +1,40 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const kingSafetyScenario: ChessScenario = {
+  id: 'king-safety',
+  title: 'King Safety & Royalty! ♚',
+  subtitle: 'Protect your most precious piece and step out of danger!',
+  category: 'fundamentals',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '♚',
+  description: 'The King can only move one square in any direction. When attacked with Check, you must defend or flee immediately!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'king-step-1',
+      stepNumber: 1,
+      instruction: 'The Black Rook is checking your King along the e-file! Step your King to the safe f1 square!',
+      conceptExplanation: 'When in check, you must move out of check, block the check, or capture the checking piece.',
+      hint: 'Move your King from e1 one step right to f1.',
+      setupFen: '5k2/8/8/4r3/8/8/4P3/4K3 w - - 0 1',
+      highlightSquares: ['e1', 'f1'],
+      threatSquares: ['e5'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e1', to: 'f1' }],
+      explanationOnSuccess: 'Safe and sound! The King escaped the laser beam of the Black Rook!',
+    },
+    {
+      id: 'king-step-2',
+      stepNumber: 2,
+      instruction: 'March your King forward to f2 to help defend your pawns!',
+      conceptExplanation: 'In the endgame, the King transforms into an active warrior piece!',
+      hint: 'Move your King from f1 one square forward to f2.',
+      setupFen: '5k2/8/8/8/4r3/8/4P3/5K2 w - - 1 2',
+      highlightSquares: ['f1', 'f2'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'f1', to: 'f2' }],
+      explanationOnSuccess: 'Great step! The King is ready to support the team!',
+    },
+  ],
+};

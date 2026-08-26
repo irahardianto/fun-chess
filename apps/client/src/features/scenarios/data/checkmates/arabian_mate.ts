@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const arabianMateScenario: ChessScenario = {
+  id: 'arabian-mate',
+  title: 'The Ancient Arabian Checkmate! 🌙',
+  subtitle: 'Master the 1,000-year-old Knight and Rook corner checkmate pattern!',
+  category: 'checkmate_families',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🌙',
+  description: 'Recorded over a thousand years ago, the "Arabian Mate" pairs a Knight and Rook in the corner: the Knight on f6 defends the Rook on h7 and guards the g8 escape square!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'arabian-step-1',
+      stepNumber: 1,
+      instruction: 'Slide your Rook from b1 up to the 7th rank on b7 to set up the Arabian net!',
+      conceptExplanation: 'Rooks on the 7th rank combine with a Knight on f6 to create an inescapable mating net against the cornered King.',
+      hint: 'Move your White Rook from b1 straight up to b7.',
+      setupFen: '7k/7p/5N2/8/8/8/5PPP/1R4K1 w - - 0 1',
+      highlightSquares: ['b1', 'b7'],
+      threatSquares: ['h7'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'b1', to: 'b7' }],
+      opponentResponse: {
+        from: 'h7',
+        to: 'h6',
+        delayMs: 500,
+        dialogue: 'Trying to create an escape window by pushing h6!',
+      },
+      explanationOnSuccess: 'Trap set! Your Rook and Knight are locked in attack position!',
+    },
+    {
+      id: 'arabian-step-2',
+      stepNumber: 2,
+      instruction: 'Deliver the historic Arabian Checkmate! Slide your Rook from b7 all the way across to h7!',
+      conceptExplanation: 'Your Knight on f6 defends the Rook on h7 and blocks the King from escaping to g8. The King is completely trapped!',
+      hint: 'Move your Rook from b7 over to h7 for checkmate.',
+      setupFen: '7k/1R6/5N1p/8/8/8/5PPP/6K1 w - - 0 2',
+      highlightSquares: ['b7', 'h7'],
+      threatSquares: ['h8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'b7', to: 'h7' }],
+      explanationOnSuccess: 'Checkmate! You executed the ancient Arabian Mate with master precision!',
+    },
+  ],
+};

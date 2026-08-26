@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const anastasiaMateScenario: ChessScenario = {
+  id: 'anastasia-mate',
+  title: 'Anastasia’s Royal Checkmate! 🐎',
+  subtitle: 'Trap the castled King against the board edge with Knight and Rook!',
+  category: 'checkmate_families',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🐎',
+  description: 'In "Anastasia’s Mate", a Knight on e7 walls off the King’s escape squares on g8 and g6, setting up a crushing Queen sacrifice and a finishing Rook checkmate along the open h-file!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'anastasia-step-1',
+      stepNumber: 1,
+      instruction: 'Your Knight on e7 has Black’s King locked against the rim! Sacrifice your Queen by capturing the pawn on h7 with check!',
+      conceptExplanation: 'Sacrificing the Queen strips away the King’s pawn shelter and drags the King onto the wide-open h-file!',
+      hint: 'Capture the pawn on h7 with your Queen on h5.',
+      setupFen: '5rk1/4Nppp/8/7Q/8/6P1/5PKP/R7 w - - 0 1',
+      highlightSquares: ['h5', 'h7'],
+      threatSquares: ['g8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'h5', to: 'h7' }],
+      opponentResponse: {
+        from: 'g8',
+        to: 'h7',
+        delayMs: 500,
+        dialogue: 'I have to capture your Queen with my King!',
+      },
+      explanationOnSuccess: 'Queen sacrificed! The h-file is blown wide open for your Rook!',
+    },
+    {
+      id: 'anastasia-step-2',
+      stepNumber: 2,
+      instruction: 'Now deliver the final checkmate! Slide your Rook from a1 all the way across the first rank to h1!',
+      conceptExplanation: 'Your Knight on e7 covers g8 and g6, while your Rook on h1 controls the entire h-file. The King has nowhere to run!',
+      hint: 'Move your Rook from a1 to h1.',
+      setupFen: '5r2/4Nppk/8/8/8/6P1/5PKP/R7 w - - 0 2',
+      highlightSquares: ['a1', 'h1'],
+      threatSquares: ['h7'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'a1', to: 'h1' }],
+      explanationOnSuccess: 'Checkmate! You executed the historic Anastasia’s Mate with absolute perfection!',
+    },
+  ],
+};

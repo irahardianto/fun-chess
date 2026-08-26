@@ -1,0 +1,46 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const scholarsMateDefenseScenario: ChessScenario = {
+  id: 'scholars-mate-defense',
+  title: "Defending Scholar's Mate! 🛡️",
+  subtitle: 'Shut down the early Queen attack and gain a winning lead in development!',
+  category: 'checkmate_patterns',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🛡️',
+  description: "Don't let opponents surprise you with Scholar's Mate! Learn the rock-solid shield defense that kicks the Queen and secures your King.",
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'scholar-def-step-1',
+      stepNumber: 1,
+      instruction: 'White brought their Queen to h5 threatening Qxf7#! Push your g7 pawn to g6 to block the Queen and kick her away!',
+      conceptExplanation: 'g6 cuts off the Queen’s diagonal ray to f7 and forces her to waste time running away!',
+      hint: 'Move your Black pawn from g7 forward one square to g6.',
+      setupFen: 'r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 1 3',
+      highlightSquares: ['g7', 'g6'],
+      threatSquares: ['h5'],
+      playerColor: 'b',
+      allowedMoves: [{ from: 'g7', to: 'g6' }],
+      opponentResponse: {
+        from: 'h5',
+        to: 'f3',
+        delayMs: 500,
+        dialogue: 'I retreat my Queen to f3 and still attack f7!',
+      },
+      explanationOnSuccess: 'Great shield! You blocked the threat and chased the Queen away!',
+    },
+    {
+      id: 'scholar-def-step-2',
+      stepNumber: 2,
+      instruction: 'White’s Queen moved to f3 to try for Qxf7# again! Jump your Knight from g8 to f6 to block the file and develop!',
+      conceptExplanation: 'Nf6 blocks the Queen’s line of sight on f3 completely and develops a minor piece toward the center!',
+      hint: 'Move your Black Knight from g8 to f6.',
+      setupFen: 'r1bqkbnr/pppp1p1p/2n3p1/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR b KQkq - 1 4',
+      highlightSquares: ['g8', 'f6'],
+      playerColor: 'b',
+      allowedMoves: [{ from: 'g8', to: 'f6' }],
+      explanationOnSuccess: 'Total lockdown! White’s attack is completely foiled, and Black has superior development!',
+    },
+  ],
+};

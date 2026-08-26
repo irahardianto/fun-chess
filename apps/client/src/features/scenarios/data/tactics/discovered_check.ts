@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const discoveredCheckScenario: ChessScenario = {
+  id: 'discovered-check',
+  title: 'Discovered Check & Double Attack! 💥',
+  subtitle: 'Unleash a hidden laser by moving the piece in front!',
+  category: 'tactical_patterns',
+  difficulty: 'intermediate',
+  targetAgeGroup: '11-15',
+  icon: '💥',
+  description: 'A "Discovered Check" happens when moving one of your pieces uncovers a check from a Rook, Bishop, or Queen hiding right behind it!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'discovered-step-1',
+      stepNumber: 1,
+      instruction: 'Move your Bishop from e4 to c6! This unmasks the Rook on e1 to check the King, while your Bishop delivers a second check!',
+      conceptExplanation: 'When you deliver a Double Check, the opponent King CANNOT block or capture—it is forced to run away!',
+      hint: 'Jump your Bishop from e4 diagonally to c6.',
+      setupFen: '4k3/8/8/8/q3B3/8/8/4R1K1 w - - 0 1',
+      highlightSquares: ['e4', 'c6'],
+      threatSquares: ['e8', 'a4'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e4', to: 'c6' }],
+      opponentResponse: {
+        from: 'e8',
+        to: 'f8',
+        delayMs: 500,
+        dialogue: 'Double check! My King must run to f8!',
+      },
+      explanationOnSuccess: 'Boom! Double check left Black completely paralyzed and forced their King to flee!',
+    },
+    {
+      id: 'discovered-step-2',
+      stepNumber: 2,
+      instruction: 'The Black King fled to f8! Now scoop up the unprotected Black Queen on a4 with your Bishop on c6!',
+      conceptExplanation: 'Because the opponent was forced to move their King, your Bishop is free to capture the prize!',
+      hint: 'Capture the Queen on a4 using your Bishop on c6.',
+      setupFen: '5k2/8/2B5/8/q7/8/8/4R1K1 w - - 1 2',
+      highlightSquares: ['c6', 'a4'],
+      threatSquares: ['a4'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'c6', to: 'a4' }],
+      explanationOnSuccess: 'Grand prize captured! You executed the devastating discovered attack with mastery!',
+    },
+  ],
+};

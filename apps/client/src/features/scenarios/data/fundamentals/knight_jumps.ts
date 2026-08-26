@@ -1,0 +1,40 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const knightJumpsScenario: ChessScenario = {
+  id: 'knight-jumps',
+  title: 'The Jumping Knight! ♞',
+  subtitle: 'Master the magic L-shape jump over other pieces!',
+  category: 'fundamentals',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '♞',
+  description: 'Knights are the only pieces in chess that can jump over friends and enemies alike!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'knight-step-1',
+      stepNumber: 1,
+      instruction: 'Jump your White Knight from g1 over your pawns to the active f3 square!',
+      conceptExplanation: 'The Knight moves in an "L-shape": 2 squares in one direction, then 1 square to the side!',
+      hint: 'Tap the Knight on g1 and move it to f3.',
+      setupFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      highlightSquares: ['g1', 'f3'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'g1', to: 'f3' }],
+      explanationOnSuccess: 'Neigh! Your knight hopped straight into action in the center!',
+    },
+    {
+      id: 'knight-step-2',
+      stepNumber: 2,
+      instruction: 'Black left a pawn unprotected on e5! Jump your Knight from f3 to e5 to capture it!',
+      conceptExplanation: 'Knights capture whatever is on their final destination square.',
+      hint: 'Select the Knight on f3 and leap to e5.',
+      setupFen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 2',
+      highlightSquares: ['f3', 'e5'],
+      threatSquares: ['e5'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'f3', to: 'e5' }],
+      explanationOnSuccess: 'Awesome capture! The Knight snatched the free pawn!',
+    },
+  ],
+};

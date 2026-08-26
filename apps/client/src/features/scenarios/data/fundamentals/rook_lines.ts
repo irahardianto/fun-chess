@@ -1,0 +1,40 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const rookLinesScenario: ChessScenario = {
+  id: 'rook-lines',
+  title: 'The Straight Rook! ♜',
+  subtitle: 'Dominate open ranks and files with your castle tower!',
+  category: 'fundamentals',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '♜',
+  description: 'Rooks move in straight horizontal ranks and vertical files with mighty power!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'rook-step-1',
+      stepNumber: 1,
+      instruction: 'Seize the open e-file! Move your Rook from e1 to e7 to penetrate deep into Black’s camp!',
+      conceptExplanation: 'Rooks thrive on open files where no friendly pawns block their highway.',
+      hint: 'Slide the Rook on e1 straight up the board to e7.',
+      setupFen: '4k3/4p3/8/8/8/8/8/4R1K1 w - - 0 1',
+      highlightSquares: ['e1', 'e7'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e1', to: 'e7' }],
+      explanationOnSuccess: 'Boom! Rooks on the 7th rank are legendary monsters in chess!',
+    },
+    {
+      id: 'rook-step-2',
+      stepNumber: 2,
+      instruction: 'Capture the undefended Black pawn on b7 with your Rook on e7!',
+      conceptExplanation: 'Once on the 7th rank, the Rook can sweep horizontally across to gobble enemy pawns!',
+      hint: 'Slide your Rook from e7 sideways along the 7th rank to b7.',
+      setupFen: '4k3/1p2R3/8/8/8/8/8/6K1 w - - 0 2',
+      highlightSquares: ['e7', 'b7'],
+      threatSquares: ['b7'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e7', to: 'b7' }],
+      explanationOnSuccess: 'Gobbled up! Your Rook cleaned up the pawn like a champion vacuum!',
+    },
+  ],
+};

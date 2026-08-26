@@ -1,0 +1,56 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const knightOutpostsScenario: ChessScenario = {
+  id: 'knight-outposts',
+  title: 'The Unstoppable Knight Outpost! 🏰',
+  subtitle: 'Plant your Knight on a permanent stronghold deep in enemy territory!',
+  category: 'intermediate_tactics',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🏰',
+  description: 'An "Outpost" is a central hole in the opponent’s camp protected by your pawn that enemy pawns can never kick away. Knights become superpowers on outposts!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'outpost-step-1',
+      stepNumber: 1,
+      instruction: 'Jump your White Knight into the juicy d5 hole! Because Black’s c-pawn and e-pawn advanced, no pawn can ever chase your Knight away!',
+      conceptExplanation: 'Look for squares on the 5th or 6th rank defended by your friendly pawn where enemy pawns cannot attack.',
+      hint: 'Move your Knight from c3 into the central outpost on d5.',
+      setupFen: 'r1bqk2r/pp2bppp/2np1n2/2p1p3/2P1P3/2N2N2/PP1PBPPP/R1BQK2R w KQkq - 0 1',
+      highlightSquares: ['c3', 'd5'],
+      threatSquares: ['d5'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'c3', to: 'd5' }],
+      opponentResponse: {
+        from: 'f6',
+        to: 'd5',
+        delayMs: 500,
+        dialogue: 'That Knight on d5 is way too strong! I have to trade it off!',
+      },
+      explanationOnSuccess: 'Great outpost invasion! Black felt so threatened they were forced to trade their active Knight!',
+    },
+    {
+      id: 'outpost-step-2',
+      stepNumber: 2,
+      instruction: 'Black traded their Knight! Recapture on d5 with your e4 pawn to claim space and kick Black’s Knight on c6!',
+      conceptExplanation: 'Recapturing towards the center creates a powerful passed pawn wedge that paralyzes the opponent’s pieces!',
+      hint: 'Capture the Knight on d5 with your pawn on e4.',
+      setupFen: 'r1bqk2r/pp2bppp/2np4/2pnp3/2P1P3/5N2/PP1PBPPP/R1BQK2R w KQkq - 0 2',
+      highlightSquares: ['e4', 'd5'],
+      threatSquares: ['c6'],
+      playerColor: 'w',
+      allowedMoves: [
+        { from: 'e4', to: 'd5' },
+        { from: 'c4', to: 'd5' },
+      ],
+      opponentResponse: {
+        from: 'c6',
+        to: 'b8',
+        delayMs: 500,
+        dialogue: 'My Knight is under attack, retreating to b8!',
+      },
+      explanationOnSuccess: 'Territory secured! Your pawn wedge controls the board and leaves Black cramped and passive!',
+    },
+  ],
+};

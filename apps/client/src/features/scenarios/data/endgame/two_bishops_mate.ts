@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const twoBishopsMateScenario: ChessScenario = {
+  id: 'two-bishops-mate',
+  title: 'The Two Bishops Dance! 💃',
+  subtitle: 'Coordinate your light and dark Bishops side-by-side to deliver corner checkmate!',
+  category: 'endgame_conversions',
+  difficulty: 'advanced',
+  targetAgeGroup: '11-15',
+  icon: '💃',
+  description: 'Two Bishops work in perfect harmony like a bulldozer, slicing adjacent diagonals to herd the enemy King into the corner for a clean checkmate!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'bishops-step-1',
+      stepNumber: 1,
+      instruction: 'Cut the corner! Slide your dark-squared Bishop from d2 to c3 to deliver check and force the King into the corner pocket on a2!',
+      conceptExplanation: 'The Bishops work as a team: one checks the King while the other seals the escape diagonals.',
+      hint: 'Move your Bishop from d2 to c3.',
+      setupFen: '8/8/8/8/4B3/8/2KB4/k7 w - - 0 1',
+      highlightSquares: ['d2', 'c3'],
+      threatSquares: ['a1'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'd2', to: 'c3' }],
+      opponentResponse: {
+        from: 'a1',
+        to: 'a2',
+        delayMs: 500,
+        dialogue: 'Check from the dark Bishop! Forced to step to a2!',
+      },
+      explanationOnSuccess: 'Dark Bishop struck! The King was pushed to the final square!',
+    },
+    {
+      id: 'bishops-step-2',
+      stepNumber: 2,
+      instruction: 'Deliver the Two Bishops Checkmate! Slide your light-squared Bishop from e4 to d5!',
+      conceptExplanation: 'Your light Bishop on d5 delivers check along the long diagonal while your dark Bishop on c3 and King on c2 seal all escape squares!',
+      hint: 'Move your Bishop from e4 to d5.',
+      setupFen: '8/8/8/8/4B3/2B5/k1K5/8 w - - 1 2',
+      highlightSquares: ['e4', 'd5'],
+      threatSquares: ['a2'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e4', to: 'd5' }],
+      explanationOnSuccess: 'Checkmate! You executed the Two Bishops Checkmate with supreme harmony!',
+    },
+  ],
+};

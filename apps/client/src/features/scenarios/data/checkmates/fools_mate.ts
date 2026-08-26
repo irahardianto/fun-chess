@@ -1,0 +1,46 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const foolsMateScenario: ChessScenario = {
+  id: 'fools-mate',
+  title: "Fool's Mate: The 2-Move Checkmate! 🃏",
+  subtitle: 'Punish terrible early pawn moves with the fastest checkmate in all of chess!',
+  category: 'checkmate_patterns',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '🃏',
+  description: "Fool's Mate takes only 2 moves! When White carelessly weakens their King diagonal with f3 and g4, Black's Queen strikes with instant victory.",
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'fools-step-1',
+      stepNumber: 1,
+      instruction: 'White opened the game with the awful move 1. f3. Claim the center by pushing your Black pawn from e7 to e5!',
+      conceptExplanation: 'Never open the game with the f-pawn—it leaves your King’s diagonal wide open to sniper Queen attacks!',
+      hint: 'Move your Black pawn from e7 to e5.',
+      setupFen: 'rnbqkbnr/pppppppp/8/8/8/5P2/PPPPP1PP/RNBQKBNR b KQkq - 0 1',
+      highlightSquares: ['e7', 'e5'],
+      playerColor: 'b',
+      allowedMoves: [{ from: 'e7', to: 'e5' }],
+      opponentResponse: {
+        from: 'g2',
+        to: 'g4',
+        delayMs: 500,
+        dialogue: 'I push my pawn to g4! What can possibly go wrong?',
+      },
+      explanationOnSuccess: 'Solid opening! White just committed the ultimate blunder: 2. g4!',
+    },
+    {
+      id: 'fools-step-2',
+      stepNumber: 2,
+      instruction: 'White blundered with g4! Slide your Queen diagonally from d8 to h4 to deliver Fool’s Mate!',
+      conceptExplanation: 'Qh4# is checkmate because White has no pieces that can block the diagonal, cannot capture the Queen, and the King has no escape squares!',
+      hint: 'Slide your Black Queen from d8 all the way to h4.',
+      setupFen: 'rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2',
+      highlightSquares: ['d8', 'h4'],
+      threatSquares: ['e1'],
+      playerColor: 'b',
+      allowedMoves: [{ from: 'd8', to: 'h4' }],
+      explanationOnSuccess: "Checkmate! 🃏 That is Fool's Mate — the fastest checkmate possible in chess!",
+    },
+  ],
+};

@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const vukovicMateScenario: ChessScenario = {
+  id: 'vukovic-mate',
+  title: 'Vukovic’s Master Checkmate! 🎯',
+  subtitle: 'Coordinate Rook, Knight, and King on the edge of the board to seal the net!',
+  category: 'checkmate_families',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🎯',
+  description: 'Named after the legendary chess author Vladimir Vuković, this mating net coordinates a Rook on the 7th/8th rank, a Knight covering flight squares, and a supporting King!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'vukovic-step-1',
+      stepNumber: 1,
+      instruction: 'Jump your Knight from e7 to g6 with check! Your King on f6 walls off the 7th rank, forcing Black’s King to step to g8.',
+      conceptExplanation: 'Triangulating with your King and Knight traps the enemy King against the edge with no room to breathe.',
+      hint: 'Move your Knight from e7 to g6.',
+      setupFen: '7k/R3N3/5K2/8/8/8/8/8 w - - 0 1',
+      highlightSquares: ['e7', 'g6'],
+      threatSquares: ['h8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e7', to: 'g6' }],
+      opponentResponse: {
+        from: 'h8',
+        to: 'g8',
+        delayMs: 500,
+        dialogue: 'Check from the Knight! My King must step to g8!',
+      },
+      explanationOnSuccess: 'King cornered! The Knight on g6 covers key escape squares!',
+    },
+    {
+      id: 'vukovic-step-2',
+      stepNumber: 2,
+      instruction: 'Now deliver the final checkmate! Slide your Rook from a7 straight up to a8!',
+      conceptExplanation: 'Your Rook on a8 controls the 8th rank, while your Knight on g7 covers f8 and h8, and your King on f6 covers f7 and h7!',
+      hint: 'Slide your Rook on a7 all the way up to a8.',
+      setupFen: '6k1/R5N1/5K2/8/8/8/8/8 w - - 1 2',
+      highlightSquares: ['a7', 'a8'],
+      threatSquares: ['g8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'a7', to: 'a8' }],
+      explanationOnSuccess: 'Checkmate! You executed Vukovic’s Master Checkmate with precision!',
+    },
+  ],
+};

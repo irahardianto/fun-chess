@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const discoveredDoubleCheckScenario: ChessScenario = {
+  id: 'discovered-double-check',
+  title: 'Double Check Dynamite! 💥',
+  subtitle: 'Unleash two checks at once — the enemy King has zero options but to flee!',
+  category: 'intermediate_tactics',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '💥',
+  description: 'A "Double Check" occurs when moving a piece delivers check while simultaneously opening a laser check from a Rook, Bishop, or Queen behind it. The King CANNOT block or capture either piece—it must run!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'double-check-step-1',
+      stepNumber: 1,
+      instruction: 'Jump your Knight from e4 to d6! Your Knight delivers check, and your Rook on e1 delivers a second simultaneous check!',
+      conceptExplanation: 'Because two pieces check at the exact same instant, Black cannot block both and cannot capture both. King retreat is mandatory!',
+      hint: 'Move your White Knight from e4 to d6.',
+      setupFen: '4k3/5ppp/8/q7/4N3/8/5PPP/4R1K1 w - - 0 1',
+      highlightSquares: ['e4', 'd6'],
+      threatSquares: ['e8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e4', to: 'd6' }],
+      opponentResponse: {
+        from: 'e8',
+        to: 'f8',
+        delayMs: 500,
+        dialogue: 'Double check! I cannot block or capture, my King must run to f8!',
+      },
+      explanationOnSuccess: 'Double check detonated! Black was completely paralyzed and forced to run!',
+    },
+    {
+      id: 'double-check-step-2',
+      stepNumber: 2,
+      instruction: 'The Black King is trapped on f8! Deliver the final blow by sliding your Rook from e1 straight up to e8 for Checkmate!',
+      conceptExplanation: 'Your Knight on d6 protects the Rook on e8 while the Rook seals the entire back rank and e-file!',
+      hint: 'Slide your Rook on e1 all the way up to e8.',
+      setupFen: '5k2/5ppp/3N4/q7/8/8/5PPP/4R1K1 w - - 1 2',
+      highlightSquares: ['e1', 'e8'],
+      threatSquares: ['f8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e1', to: 'e8' }],
+      explanationOnSuccess: 'Checkmate! The Knight and Rook worked in perfect harmony to close the trap!',
+    },
+  ],
+};

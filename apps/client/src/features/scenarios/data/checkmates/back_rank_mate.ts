@@ -1,0 +1,40 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const backRankMateScenario: ChessScenario = {
+  id: 'back-rank-mate',
+  title: 'Back-Rank Checkmate! 🧱',
+  subtitle: 'Trap the enemy King behind its own wall of pawns!',
+  category: 'checkmate_patterns',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '🧱',
+  description: 'When the King is castled behind its pawns without an escape window ("luft"), an invading Rook or Queen on the 8th rank delivers an instant checkmate!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'back-rank-step-1',
+      stepNumber: 1,
+      instruction: 'The Black King is trapped behind its pawns on f7, g7, and h7! Slide your Rook from d1 all the way to d8 for Checkmate!',
+      conceptExplanation: 'Because Black’s own pawns block every forward escape square, the King has nowhere to run!',
+      hint: 'Move your White Rook on d1 straight up to d8.',
+      setupFen: '6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1',
+      highlightSquares: ['d1', 'd8'],
+      threatSquares: ['g8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'd1', to: 'd8' }],
+      explanationOnSuccess: 'Brick wall checkmate! Black was suffocated by their own friendly pawns!',
+    },
+    {
+      id: 'back-rank-step-2',
+      stepNumber: 2,
+      instruction: 'Now learn the prevention! As Black, push your h7 pawn to h6 to give your King a vital escape window ("luft")!',
+      conceptExplanation: 'Always create "luft" (German for air) so your King can step out of back-rank danger!',
+      hint: 'Move your Black pawn from h7 to h6.',
+      setupFen: '6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 1',
+      highlightSquares: ['h7', 'h6'],
+      playerColor: 'b',
+      allowedMoves: [{ from: 'h7', to: 'h6' }],
+      explanationOnSuccess: 'Breathing room created! Your King now has a safe escape hatch on h7!',
+    },
+  ],
+};

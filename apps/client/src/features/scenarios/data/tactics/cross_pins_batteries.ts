@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const crossPinsBatteriesScenario: ChessScenario = {
+  id: 'cross-pins-batteries',
+  title: 'Cross-Pins & Heavy Batteries! ⚡',
+  subtitle: 'Stack Queen and Bishop on the same diagonal to blast through defenses!',
+  category: 'intermediate_tactics',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '⚡',
+  description: 'A "Battery" aligns two powerful pieces (like Queen + Bishop or Queen + Rook) on the same laser beam to multiply their attacking firepower!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'battery-step-1',
+      stepNumber: 1,
+      instruction: 'Your Queen on d3 and Bishop on c2 form a deadly battery aimed at h7! Push your pawn to e5 to kick away Black’s Knight defending h7!',
+      conceptExplanation: 'When a defender guards the target of your battery, remove or chase away the guard with a forcing pawn push!',
+      hint: 'Push your pawn from e4 forward to e5.',
+      setupFen: 'r1bq1rk1/ppp2ppp/2n2n2/8/4P3/3Q4/PPB2PPP/RNB2RK1 w - - 0 1',
+      highlightSquares: ['e4', 'e5'],
+      threatSquares: ['f6'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e4', to: 'e5' }],
+      opponentResponse: {
+        from: 'f6',
+        to: 'd5',
+        delayMs: 500,
+        dialogue: 'My Knight is under attack, leaping to the d5 outpost!',
+      },
+      explanationOnSuccess: 'Defender evicted! With the Knight gone, the h7 square is completely undefended!',
+    },
+    {
+      id: 'battery-step-2',
+      stepNumber: 2,
+      instruction: 'The path is clear! Launch your Queen from d3 straight to h7 to capture the pawn and deliver Checkmate!',
+      conceptExplanation: 'Your Bishop on c2 backs up your Queen on h7, leaving Black’s King trapped against its own pieces on f8 and f7!',
+      hint: 'Fly your Queen from d3 up to h7 and deliver checkmate.',
+      setupFen: 'r1bq1rk1/ppp2ppp/2n5/3nP3/8/3Q4/PPB2PPP/RNB2RK1 w - - 1 2',
+      highlightSquares: ['d3', 'h7'],
+      threatSquares: ['g8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'd3', to: 'h7' }],
+      explanationOnSuccess: 'Checkmate! The Queen + Bishop battery struck with unstoppable laser power!',
+    },
+  ],
+};

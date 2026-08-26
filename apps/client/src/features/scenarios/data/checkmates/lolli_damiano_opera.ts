@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const lolliDamianoOperaScenario: ChessScenario = {
+  id: 'lolli-damiano-opera',
+  title: 'Paul Morphy’s Famous Opera Mate! 🎭',
+  subtitle: 'Execute the most celebrated Queen sacrifice and Rook checkmate in chess history!',
+  category: 'checkmate_families',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🎭',
+  description: 'Played by the American prodigy Paul Morphy at the Paris Opera House in 1858, the "Opera Mate" finishes with a mind-blowing Queen sacrifice followed by a back-rank Rook checkmate supported by a Bishop on g5!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'opera-step-1',
+      stepNumber: 1,
+      instruction: 'Play Morphy’s immortal Queen sacrifice! Launch your Queen from b4 all the way to b8 with check!',
+      conceptExplanation: 'The Queen sacrifice deflects the Black Rook away from the d-file, opening the entire file for your Rook on d1!',
+      hint: 'Slide your Queen from b4 up to b8.',
+      setupFen: '3rkb1r/p4ppp/4p3/4P1B1/1Q6/8/PP3PPP/2KR4 w k - 0 1',
+      highlightSquares: ['b4', 'b8'],
+      threatSquares: ['e8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'b4', to: 'b8' }],
+      opponentResponse: {
+        from: 'd8',
+        to: 'b8',
+        delayMs: 500,
+        dialogue: 'A Queen sacrifice at the Opera! I must capture on b8 with my Rook!',
+      },
+      explanationOnSuccess: 'Immortal sacrifice! The Black Rook was deflected off the d-file!',
+    },
+    {
+      id: 'opera-step-2',
+      stepNumber: 2,
+      instruction: 'Deliver the Opera Checkmate! Slide your Rook from d1 all the way up to d8 for Checkmate!',
+      conceptExplanation: 'Your Bishop on g5 protects your Rook on d8, sealing every square around Black’s King!',
+      hint: 'Move your Rook from d1 straight up to d8.',
+      setupFen: '1r2kb1r/p4ppp/4p3/4P1B1/8/8/PP3PPP/2KR4 w k - 0 2',
+      highlightSquares: ['d1', 'd8'],
+      threatSquares: ['e8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'd1', to: 'd8' }],
+      explanationOnSuccess: 'Checkmate! You recreated Paul Morphy’s immortal masterpiece at the Paris Opera!',
+    },
+  ],
+};

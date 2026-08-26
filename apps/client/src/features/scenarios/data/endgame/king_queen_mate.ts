@@ -1,0 +1,46 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const kingQueenMateScenario: ChessScenario = {
+  id: 'king-queen-mate',
+  title: 'King + Queen Checkmate: Kiss of Death! 👑',
+  subtitle: 'Coordinate your King and Queen to deliver the ultimate checkmate on the edge!',
+  category: 'endgame_basics',
+  difficulty: 'intermediate',
+  targetAgeGroup: '11-15',
+  icon: '👑',
+  description: 'Learn the "Kiss of Death" checkmate: the Queen lands directly on the square in front of the enemy King, supported by your King.',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'kq-step-1',
+      stepNumber: 1,
+      instruction: 'The Black King is trapped on the edge (h8). Step your White King from f6 to g6 to prepare the final blow!',
+      conceptExplanation: 'A Queen cannot deliver checkmate all alone—she needs the King’s close support to prevent the enemy King from capturing her!',
+      hint: 'Move your King on f6 to g6.',
+      setupFen: '7k/Q7/5K2/8/8/8/8/8 w - - 0 1',
+      highlightSquares: ['f6', 'g6'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'f6', to: 'g6' }],
+      opponentResponse: {
+        from: 'h8',
+        to: 'g8',
+        delayMs: 500,
+        dialogue: 'I am trapped on the back rank! Moving to g8...',
+      },
+      explanationOnSuccess: 'Perfect support! The White King guards the key squares on the 7th and 8th ranks!',
+    },
+    {
+      id: 'kq-step-2',
+      stepNumber: 2,
+      instruction: 'The Black King is on g8! Move your Queen from a7 over to g7 for the "Kiss of Death" Checkmate!',
+      conceptExplanation: 'Qg7# is checkmate because the Queen is protected by your King on g6, and the enemy King has nowhere to escape!',
+      hint: 'Slide your Queen from a7 along the 7th rank to g7.',
+      setupFen: '6k1/Q7/6K1/8/8/8/8/8 w - - 1 2',
+      highlightSquares: ['a7', 'g7'],
+      threatSquares: ['g8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'a7', to: 'g7' }],
+      explanationOnSuccess: 'Checkmate! 👑 That is the famous "Kiss of Death" checkmate!',
+    },
+  ],
+};

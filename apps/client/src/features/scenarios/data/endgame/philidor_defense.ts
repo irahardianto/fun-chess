@@ -1,0 +1,46 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const philidorDefenseScenario: ChessScenario = {
+  id: 'philidor-defense',
+  title: 'The Philidor Defensive Wall! 🛡️',
+  subtitle: 'Hold the 6th rank with your Rook to force an ironclad theoretical draw!',
+  category: 'endgame_conversions',
+  difficulty: 'advanced',
+  targetAgeGroup: '11-15',
+  icon: '🛡️',
+  description: 'Discovered by François-André Danican Philidor in 1777, the "Philidor Defense" is the premier method to hold a draw when defending a Rook and Pawn endgame: hold the 6th rank, then drop to the 1st rank for infinite checks!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'philidor-step-1',
+      stepNumber: 1,
+      instruction: 'Hold the 6th rank! Slide your Black Rook from b6 across to h6 to stop the White King from invading the 6th rank.',
+      conceptExplanation: 'By cutting off the 6th rank, the opponent’s King cannot march forward to support their pawn.',
+      hint: 'Move your Black Rook from b6 over to h6.',
+      setupFen: '4k3/R7/1r6/3KP3/8/8/8/8 b - - 0 1',
+      highlightSquares: ['b6', 'h6'],
+      threatSquares: ['e6'],
+      playerColor: 'b',
+      allowedMoves: [{ from: 'b6', to: 'h6' }],
+      opponentResponse: {
+        from: 'e5',
+        to: 'e6',
+        delayMs: 500,
+        dialogue: 'Since my King cannot advance, I will push my pawn to e6!',
+      },
+      explanationOnSuccess: '6th rank held! White was forced to push the pawn to e6!',
+    },
+    {
+      id: 'philidor-step-2',
+      stepNumber: 2,
+      instruction: 'The pawn pushed! Now drop your Rook all the way down from h6 to h1 to prepare infinite checks from behind!',
+      conceptExplanation: 'Because the pawn pushed forward, White’s King has no shelter left. Your Rook can now deliver endless vertical checks from behind.',
+      hint: 'Drop your Rook from h6 all the way down to h1.',
+      setupFen: '4k3/R7/4P2r/3K4/8/8/8/8 b - - 0 2',
+      highlightSquares: ['h6', 'h1'],
+      playerColor: 'b',
+      allowedMoves: [{ from: 'h6', to: 'h1' }],
+      explanationOnSuccess: 'Masterful drawing technique! You executed the world-renowned Philidor Defense!',
+    },
+  ],
+};

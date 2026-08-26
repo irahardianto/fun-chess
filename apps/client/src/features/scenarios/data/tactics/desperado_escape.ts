@@ -1,0 +1,53 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const desperadoEscapeScenario: ChessScenario = {
+  id: 'desperado-escape',
+  title: 'The Wild Desperado! 🤠',
+  subtitle: 'When your piece is doomed, sell its life as dearly as possible!',
+  category: 'intermediate_tactics',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🤠',
+  description: 'A "Desperado" is a trapped piece destined to be captured that wreaks as much havoc as possible before going down—grabbing enemy pieces or inflicting damage on the way out!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'desperado-step-1',
+      stepNumber: 1,
+      instruction: 'Your Bishop on e7 is trapped and attacked by both the Black King and Rook! Don’t lose it for nothing—capture the Black Knight on f6 as a Desperado!',
+      conceptExplanation: 'When a piece cannot escape, look for the most valuable enemy piece you can capture before your piece is lost.',
+      hint: 'Capture the Knight on f6 with your Bishop on e7.',
+      setupFen: '4rk2/ppp1Bppp/5n2/8/8/8/5PPP/4R1K1 w - - 0 1',
+      highlightSquares: ['e7', 'f6'],
+      threatSquares: ['f6'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e7', to: 'f6' }],
+      opponentResponse: {
+        from: 'g7',
+        to: 'f6',
+        delayMs: 500,
+        dialogue: 'Ouch! You took my Knight, I have to recapture with my pawn!',
+      },
+      explanationOnSuccess: 'Desperado strike! You turned a lost Bishop into an even trade while shattering Black’s pawn structure!',
+    },
+    {
+      id: 'desperado-step-2',
+      stepNumber: 2,
+      instruction: 'Now simplify into a winning endgame! Trade Rooks by capturing on e8 with your Rook on e1!',
+      conceptExplanation: 'Trading active enemy pieces when your opponent has damaged pawns makes the endgame smooth and easy to win!',
+      hint: 'Capture the Black Rook on e8 with your Rook on e1.',
+      setupFen: '4rk2/ppp2p1p/5p2/8/8/8/5PPP/4R1K1 w - - 0 2',
+      highlightSquares: ['e1', 'e8'],
+      threatSquares: ['e8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e1', to: 'e8' }],
+      opponentResponse: {
+        from: 'f8',
+        to: 'e8',
+        delayMs: 500,
+        dialogue: 'Recapturing on e8 with my King!',
+      },
+      explanationOnSuccess: 'Clean conversion! You saved the day with a heroic Desperado sacrifice!',
+    },
+  ],
+};

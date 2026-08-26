@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const deflectionDecoyScenario: ChessScenario = {
+  id: 'deflection-decoy',
+  title: 'Deflection & Decoy Magic! 🎭',
+  subtitle: 'Lure the enemy back-rank defender away with a shocking Queen sacrifice!',
+  category: 'intermediate_tactics',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🎭',
+  description: 'A "Deflection" forces a key enemy defender to abandon its critical guard duty, while a "Decoy" baits a piece directly into a tactical trap!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'deflection-step-1',
+      stepNumber: 1,
+      instruction: 'Black’s Rook on d8 is the only piece protecting their back rank! Sacrifice your Queen from a4 to e8 to deflect that Rook away!',
+      conceptExplanation: 'When an opponent has a single overworked piece doing all the defensive work, deflect it with a forcing sacrifice!',
+      hint: 'Launch your Queen from a4 up to e8 with check.',
+      setupFen: '3r2k1/ppp2ppp/8/8/Q7/8/5PPP/4R1K1 w - - 0 1',
+      highlightSquares: ['a4', 'e8'],
+      threatSquares: ['d8', 'g8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'a4', to: 'e8' }],
+      opponentResponse: {
+        from: 'd8',
+        to: 'e8',
+        delayMs: 500,
+        dialogue: 'A free Queen? I must take it with my Rook!',
+      },
+      explanationOnSuccess: 'Deflection complete! Black’s Rook was lured away from guarding the 8th rank!',
+    },
+    {
+      id: 'deflection-step-2',
+      stepNumber: 2,
+      instruction: 'Now deliver the final back-rank blow! Capture Black’s Rook on e8 with your Rook on e1 for Checkmate!',
+      conceptExplanation: 'Because the Black King is suffocated behind its own pawns on f7, g7, and h7, the back rank invasion is lethal!',
+      hint: 'Slide your Rook on e1 up to e8 to capture the Black Rook and win.',
+      setupFen: '4r1k1/ppp2ppp/8/8/8/8/5PPP/4R1K1 w - - 0 2',
+      highlightSquares: ['e1', 'e8'],
+      threatSquares: ['g8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e1', to: 'e8' }],
+      explanationOnSuccess: 'Checkmate! You sacrificed the Queen to engineer an unforgettable Deflection victory!',
+    },
+  ],
+};

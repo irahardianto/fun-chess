@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const clearanceInterferenceScenario: ChessScenario = {
+  id: 'clearance-interference',
+  title: 'Clearance & Interference Tactics! 🚧',
+  subtitle: 'Cut enemy defensive lines and clear the path for a lethal checkmate!',
+  category: 'intermediate_tactics',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🚧',
+  description: 'An "Interference" move places a piece directly between two defending enemy units, jamming their lines of communication and triggering a collapse!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'interference-step-1',
+      stepNumber: 1,
+      instruction: 'Black’s Queen on e7 is stubbornly defending the h7 square! Jam their defense by dropping your Rook right on d7!',
+      conceptExplanation: 'When an enemy piece is overloaded with defense, dropping a piece right in their face forces them to abandon their post!',
+      hint: 'Move your White Rook on d1 up to d7 to attack and interfere with the Black Queen.',
+      setupFen: 'r4r1k/ppp1q1pp/8/7Q/8/8/P1P2PPP/1B1R2K1 w - - 0 1',
+      highlightSquares: ['d1', 'd7'],
+      threatSquares: ['e7'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'd1', to: 'd7' }],
+      opponentResponse: {
+        from: 'e7',
+        to: 'd7',
+        delayMs: 500,
+        dialogue: 'You hung your Rook on d7! I must take it with my Queen!',
+      },
+      explanationOnSuccess: 'Interference successful! Black’s Queen was forced to capture on d7, leaving h7 completely exposed!',
+    },
+    {
+      id: 'interference-step-2',
+      stepNumber: 2,
+      instruction: 'The h7 square is unguarded! Fly your Queen from h5 to capture the h7 pawn and deliver Checkmate!',
+      conceptExplanation: 'Your Bishop on b1 backs up your Queen on h7 along the long diagonal, leaving Black’s King trapped in the corner!',
+      hint: 'Capture the pawn on h7 with your Queen on h5.',
+      setupFen: 'r4r1k/pppQ2pp/8/7Q/8/8/P1P2PPP/1B4K1 w - - 0 2',
+      highlightSquares: ['h5', 'h7'],
+      threatSquares: ['h8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'h5', to: 'h7' }],
+      explanationOnSuccess: 'Checkmate! By interfering with Black’s Queen, you paved the way to an instant victory!',
+    },
+  ],
+};

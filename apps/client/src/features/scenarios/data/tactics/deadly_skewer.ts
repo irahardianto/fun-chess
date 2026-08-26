@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const deadlySkewerScenario: ChessScenario = {
+  id: 'deadly-skewer',
+  title: 'The Deadly Skewer! 🍢',
+  subtitle: 'Laser-beam through a big piece to capture whatever hides behind it!',
+  category: 'tactical_patterns',
+  difficulty: 'intermediate',
+  targetAgeGroup: '11-15',
+  icon: '🍢',
+  description: 'A "Skewer" is like a reverse pin: you attack a high-value piece in front (like the King), forcing it to move and leaving the piece behind it exposed!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'skewer-step-1',
+      stepNumber: 1,
+      instruction: 'Move your Bishop from e2 to f3 to deliver a check on the Black King and skewer the Rook behind it on a8!',
+      conceptExplanation: 'Because the King is in check, Black must move the King, leaving the Rook on a8 completely defenseless!',
+      hint: 'Move your Bishop from e2 diagonally to f3.',
+      setupFen: 'r7/8/2k5/8/8/8/4B3/4K3 w - - 0 1',
+      highlightSquares: ['e2', 'f3'],
+      threatSquares: ['c6', 'a8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e2', to: 'f3' }],
+      opponentResponse: {
+        from: 'c6',
+        to: 'b6',
+        delayMs: 500,
+        dialogue: 'Check! My King must step aside!',
+      },
+      explanationOnSuccess: 'Laser locked! The King was forced to step away from defending the diagonal!',
+    },
+    {
+      id: 'skewer-step-2',
+      stepNumber: 2,
+      instruction: 'The King stepped away to b6! Fire along the diagonal and capture the Black Rook on a8 with your Bishop!',
+      conceptExplanation: 'The skewer worked perfectly: the King moved and the Rook fell!',
+      hint: 'Move your Bishop from f3 all the way to a8 to capture the Rook.',
+      setupFen: 'r7/8/1k6/8/8/5B2/8/4K3 w - - 1 2',
+      highlightSquares: ['f3', 'a8'],
+      threatSquares: ['a8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'f3', to: 'a8' }],
+      explanationOnSuccess: 'Kaboom! The skewer won a whole Rook and sealed victory!',
+    },
+  ],
+};

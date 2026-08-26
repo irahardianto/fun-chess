@@ -1,0 +1,40 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const pawnJourneyScenario: ChessScenario = {
+  id: 'pawn-journey',
+  title: "The Mighty Pawn's March! ♟️",
+  subtitle: 'Learn how pawns advance and capture diagonally!',
+  category: 'fundamentals',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '♟️',
+  description: 'Pawns might be small, but they march boldly forward and capture on diagonals!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'pawn-step-1',
+      stepNumber: 1,
+      instruction: 'Move your White pawn two squares forward to e4 on its very first move!',
+      conceptExplanation: 'On its starting square (rank 2 for White), a pawn has the superpower to jump forward 1 or 2 squares!',
+      hint: 'Tap the pawn on e2 and move it to e4.',
+      setupFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      highlightSquares: ['e2', 'e4'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e2', to: 'e4' }],
+      explanationOnSuccess: 'Super leap! Your pawn controlled the center of the board with a double step!',
+    },
+    {
+      id: 'pawn-step-2',
+      stepNumber: 2,
+      instruction: 'Black played d5! Capture the Black pawn diagonally on d5 with your e4 pawn!',
+      conceptExplanation: 'Pawns move straight ahead, but capture one square diagonally forward!',
+      hint: 'Move your pawn from e4 diagonally to d5 to capture the Black pawn.',
+      setupFen: 'rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+      highlightSquares: ['e4', 'd5'],
+      threatSquares: ['d5'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e4', to: 'd5' }],
+      explanationOnSuccess: 'Chomp! You captured diagonally like a real chess champion!',
+    },
+  ],
+};

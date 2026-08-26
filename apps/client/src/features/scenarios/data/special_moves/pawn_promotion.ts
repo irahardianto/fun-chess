@@ -1,0 +1,40 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const pawnPromotionScenario: ChessScenario = {
+  id: 'pawn-promotion',
+  title: 'Pawn Promotion: Rise of the Queen! 👑',
+  subtitle: 'Reach the end of the board to transform your humble pawn into a mighty Queen!',
+  category: 'special_moves',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '👑',
+  description: 'When a pawn marches all the way to the 8th rank, it earns an instant promotion to any piece you choose!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'promo-step-1',
+      stepNumber: 1,
+      instruction: 'Push your pawn from e7 to e8 to promote it to a brand new Queen!',
+      conceptExplanation: 'Almost always promote to a Queen because it possesses the greatest attacking firepower!',
+      hint: 'Move the pawn on e7 straight to e8 and choose the Queen.',
+      setupFen: '8/4P3/8/8/8/8/8/4K2k w - - 0 1',
+      highlightSquares: ['e7', 'e8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e7', to: 'e8', promotion: 'q' }],
+      explanationOnSuccess: 'Coronation complete! Your pawn earned a shining crown and became a Queen!',
+    },
+    {
+      id: 'promo-step-2',
+      stepNumber: 2,
+      instruction: 'Deliver checkmate with your new Queen by moving from e8 to e7 with King support!',
+      conceptExplanation: 'With the King supporting behind, the enemy King has nowhere left to run!',
+      hint: 'Slide your Queen on e8 down one square to e7.',
+      setupFen: '4Q3/8/8/8/8/8/5K1k/8 w - - 1 2',
+      highlightSquares: ['e8', 'e7'],
+      threatSquares: ['h2'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e8', to: 'e7' }],
+      explanationOnSuccess: 'Checkmate! The promoted Queen clinched victory for the team!',
+    },
+  ],
+};

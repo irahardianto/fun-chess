@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const royalForkScenario: ChessScenario = {
+  id: 'royal-fork',
+  title: 'The Royal Knight Fork! 🍴',
+  subtitle: 'Attack the King and Queen at the very same time!',
+  category: 'tactical_patterns',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '🍴',
+  description: 'A "Fork" occurs when a single piece attacks two or more valuable enemy pieces at once!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'fork-step-1',
+      stepNumber: 1,
+      instruction: 'Jump your White Knight to c7 to deliver a check on the King and fork the Queen and Rook!',
+      conceptExplanation: 'Knights are the fork champions of chess because their unique L-shape jumps over defenses!',
+      hint: 'Move the Knight on d5 to the c7 square.',
+      setupFen: 'r1bqk2r/pppp1ppp/2n5/3N4/4P3/8/PPP2PPP/R1BQKBNR w KQkq - 1 6',
+      highlightSquares: ['d5', 'c7'],
+      threatSquares: ['e8', 'a8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'd5', to: 'c7' }],
+      opponentResponse: {
+        from: 'e8',
+        to: 'f8',
+        delayMs: 500,
+        dialogue: 'Yikes! My King is in check!',
+      },
+      explanationOnSuccess: 'Double trouble! The Knight landed on c7 with a devastating fork!',
+    },
+    {
+      id: 'fork-step-2',
+      stepNumber: 2,
+      instruction: 'The Black King stepped to f8 to escape check! Now capture the helpless Black Rook on a8 with your Knight!',
+      conceptExplanation: 'Because the opponent had to respond to check, you get to freely take the piece they left behind!',
+      hint: 'Select the Knight on c7 and capture the Rook on a8.',
+      setupFen: 'r1bq1k1r/ppNp1ppp/2n5/8/4P3/8/PPP2PPP/R1BQKBNR w KQ - 2 7',
+      highlightSquares: ['c7', 'a8'],
+      threatSquares: ['a8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'c7', to: 'a8' }],
+      explanationOnSuccess: 'Major material won! You cleanly executed the classic Royal Fork!',
+    },
+  ],
+};

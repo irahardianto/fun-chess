@@ -1,0 +1,47 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const bodensMateScenario: ChessScenario = {
+  id: 'bodens-mate',
+  title: 'Boden’s Criss-Cross Checkmate! ⚔️',
+  subtitle: 'Criss-cross your two Bishops to slice through the enemy King’s defenses!',
+  category: 'checkmate_families',
+  difficulty: 'intermediate',
+  targetAgeGroup: '7-10',
+  icon: '⚔️',
+  description: 'In "Boden’s Mate", two attacking Bishops on intersecting criss-cross diagonals deliver checkmate against a King whose own pieces (like a Rook on d8 and Knight on d7) block all escape!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'boden-step-1',
+      stepNumber: 1,
+      instruction: 'Sacrifice your Queen on c6 with check to blast open the a6-c8 diagonal for your light-squared Bishop!',
+      conceptExplanation: 'Sacrificing the Queen strips the b-pawn away and creates the diagonal corridor needed for the criss-cross bishop mate.',
+      hint: 'Capture the pawn on c6 with your Queen on f3.',
+      setupFen: '2kr1b1r/pp1n1ppp/2p1p3/q7/2BP1B2/5Q2/PPP2PPP/R4RK1 w - - 0 1',
+      highlightSquares: ['f3', 'c6'],
+      threatSquares: ['c8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'f3', to: 'c6' }],
+      opponentResponse: {
+        from: 'b7',
+        to: 'c6',
+        delayMs: 500,
+        dialogue: 'A free Queen? Capturing with my b7 pawn!',
+      },
+      explanationOnSuccess: 'Corridor cleared! The a6-c8 diagonal is wide open!',
+    },
+    {
+      id: 'boden-step-2',
+      stepNumber: 2,
+      instruction: 'Deliver Boden’s Checkmate! Slide your Bishop from c4 all the way up to a6!',
+      conceptExplanation: 'Your Bishop on a6 checks the King, while your Bishop on f4 slices through b8 and c7, and Black’s own pieces on d7 and d8 block the remaining exits!',
+      hint: 'Move your Bishop from c4 to a6.',
+      setupFen: '2kr1b1r/p2n1ppp/2p1p3/q7/2BP1B2/8/PPP2PPP/R4RK1 w - - 0 2',
+      highlightSquares: ['c4', 'a6'],
+      threatSquares: ['c8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'c4', to: 'a6' }],
+      explanationOnSuccess: 'Checkmate! The criss-crossing Bishops delivered a legendary Boden’s Mate!',
+    },
+  ],
+};

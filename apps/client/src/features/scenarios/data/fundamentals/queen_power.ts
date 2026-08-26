@@ -1,0 +1,40 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const queenPowerScenario: ChessScenario = {
+  id: 'queen-power',
+  title: 'The Powerful Queen! ♛',
+  subtitle: 'Unleash the ultimate piece that combines Rook and Bishop superpowers!',
+  category: 'fundamentals',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '♛',
+  description: 'The Queen is the most powerful attacker on the board, moving in any straight direction for any distance!',
+  estimatedMinutes: 3,
+  steps: [
+    {
+      id: 'queen-step-1',
+      stepNumber: 1,
+      instruction: 'Slide your Queen diagonally from d1 all the way to h5 to threaten Black’s kingside!',
+      conceptExplanation: 'The Queen moves diagonally like a Bishop, reaching faraway attacking squares in one move.',
+      hint: 'Move your Queen from d1 diagonally to h5.',
+      setupFen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+      highlightSquares: ['d1', 'h5'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'd1', to: 'h5' }],
+      explanationOnSuccess: 'Zoom! Your Queen landed on h5 with menacing power!',
+    },
+    {
+      id: 'queen-step-2',
+      stepNumber: 2,
+      instruction: 'Black left their e5 pawn undefended! Slide your Queen from h5 horizontally to e5 with check!',
+      conceptExplanation: 'The Queen can switch from diagonal flight to straight-line flight in a heartbeat!',
+      hint: 'Move your Queen from h5 sideways to e5 to capture the pawn.',
+      setupFen: 'r1bqkbnr/pppp1ppp/2n5/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR w KQkq - 1 3',
+      highlightSquares: ['h5', 'e5'],
+      threatSquares: ['e5'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'h5', to: 'e5' }],
+      explanationOnSuccess: 'Check and capture! The Queen rules the board with royal majesty!',
+    },
+  ],
+};
