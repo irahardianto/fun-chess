@@ -1,0 +1,567 @@
+<script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue';
+import type {
+  PuzzleTheme,
+  PuzzleProgressStore,
+  StarRating,
+  Square,
+  Puzzle,
+} from '@fun-chess/shared';
+import BaseButton from '../../components/base/BaseButton.vue';
+import PromotionModal from '../modals/PromotionModal.vue';
+import PuzzleBoardWrapper from './components/PuzzleBoardWrapper.vue';
+import RatingClimbHud from './components/RatingClimbHud.vue';
+import StreakHud from './components/StreakHud.vue';
+import PuzzleCompletionModal from './components/PuzzleCompletionModal.vue';
+import { useThemedDrills } from './composables/useThemedDrills';
+import { useAdaptiveLadder } from './composables/useAdaptiveLadder';
+import { usePuzzleRunner } from './composables/usePuzzleRunner';
+import { getThemeDescriptor } from './data/puzzle_themes';
+
+interface Props {
+  mode?: 'themed_drills' | 'adaptive_ladder';
+  initialTheme?: PuzzleTheme;
+  customStore?: PuzzleProgressStore;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  mode: 'themed_drills',
+  initialTheme: 'fork',
+  customStore: undefined,
+});
+
+const emit = defineEmits<{
+  back: [];
+  exit: [];
+  completed: [stars: StarRating];
+}>();
+
+// --- 1. Mode Composables Wiring ---
+const themedDrills = useThemedDrills(props.initialTheme, props.customStore);
+const drillsRunner = usePuzzleRunner({
+  puzzle: themedDrills.currentPuzzle.value,
+  onSolve: (puzzle, stars) => {
+    themedDrills.handleSolve(puzzle, stars);
+  },
+});
+
+const adaptiveLadder = useAdaptiveLadder(props.customStore);
+
+// --- 2. Active Mode & Runner Resolution ---
+const isLadderMode = computed(() => props.mode === 'adaptive_ladder');
+
+const activeRunner = computed(() => {
+  return isLadderMode.value ? adaptiveLadder.runner : drillsRunner;
+});
+
+const activePuzzle = computed<Puzzle | null>(() => {
+  return isLadderMode.value
+    ? adaptiveLadder.currentPuzzle.value
+    : themedDrills.currentPuzzle.value;
+});
+
+const activeThemeDescriptor = computed(() => {
+  return getThemeDescriptor(themedDrills.activeTheme.value);
+});
+
+// --- 3. Promotion Handling ---
+const isPromotionModalOpen = ref<boolean>(false);
+const promotionPendingMove = ref<{ from: Square; to: Square } | null>(null);
+
+function handlePromotionRequired(payload: { from: Square; to: Square }) {
+  promotionPendingMove.value = payload;
+  isPromotionModalOpen.value = true;
+}
+
+function handlePromotionSelect(piece: 'q' | 'r' | 'b' | 'n') {
+  isPromotionModalOpen.value = false;
+  if (promotionPendingMove.value) {
+    activeRunner.value.applyPlayerMove({
+      from: promotionPendingMove.value.from,
+      to: promotionPendingMove.value.to,
+      promotion: piece,
+    });
+    promotionPendingMove.value = null;
+  }
+}
+
+function handlePromotionCancel() {
+  isPromotionModalOpen.value = false;
+  promotionPendingMove.value = null;
+}
+
+// --- 4. Timer & Completion State ---
+const solveStartTime = ref<number>(Date.now());
+const elapsedSeconds = ref<number>(0);
+
+onMounted(() => {
+  solveStartTime.value = Date.now();
+});
+
+// Watch for active puzzle completion
+watch(
+  () => activeRunner.value.isCompleted.value,
+  (completed) => {
+    if (completed && activeRunner.value.isSolvedSuccessfully.value) {
+      elapsedSeconds.value = Math.max(1, Math.round((Date.now() - solveStartTime.value) / 1000));
+      const stars = activeRunner.value.calculatedStars.value;
+      emit('completed', stars);
+    }
+  }
+);
+
+// Watch for initialTheme prop changes
+watch(
+  () => props.initialTheme,
+  (newTheme) => {
+    if (newTheme && props.mode === 'themed_drills') {
+      themedDrills.setTheme(newTheme);
+      if (themedDrills.currentPuzzle.value) {
+        drillsRunner.loadPuzzle(themedDrills.currentPuzzle.value);
+      }
+      solveStartTime.value = Date.now();
+      elapsedSeconds.value = 0;
+    }
+  }
+);
+
+// Watch for themed drill playlist / puzzle changes
+watch(
+  () => themedDrills.currentPuzzle.value,
+  (newPuzzle) => {
+    if (newPuzzle && props.mode === 'themed_drills') {
+      drillsRunner.loadPuzzle(newPuzzle);
+      solveStartTime.value = Date.now();
+      elapsedSeconds.value = 0;
+    }
+  }
+);
+
+// --- 5. Interactive Board Actions ---
+function handleBoardMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }) {
+  activeRunner.value.applyPlayerMove(move);
+}
+
+function handleRequestHint() {
+  activeRunner.value.revealNextHint();
+}
+
+function handleRetry() {
+  activeRunner.value.resetCurrentPuzzle();
+  solveStartTime.value = Date.now();
+  elapsedSeconds.value = 0;
+}
+
+function handleNextPuzzle() {
+  solveStartTime.value = Date.now();
+  elapsedSeconds.value = 0;
+  if (isLadderMode.value) {
+    adaptiveLadder.pickNextLadderPuzzle();
+  } else {
+    themedDrills.nextPuzzle();
+    if (themedDrills.currentPuzzle.value) {
+      drillsRunner.loadPuzzle(themedDrills.currentPuzzle.value);
+    }
+  }
+}
+
+function handleSkip() {
+  if (isLadderMode.value) {
+    if (activePuzzle.value) {
+      adaptiveLadder.handleSkipOrFail(activePuzzle.value);
+    }
+    adaptiveLadder.pickNextLadderPuzzle();
+  } else {
+    themedDrills.handleSkip();
+    if (themedDrills.currentPuzzle.value) {
+      drillsRunner.loadPuzzle(themedDrills.currentPuzzle.value);
+    }
+  }
+  solveStartTime.value = Date.now();
+  elapsedSeconds.value = 0;
+}
+
+function handleBack() {
+  emit('back');
+  emit('exit');
+}
+</script>
+
+<template>
+  <div class="puzzle-arena-layout" data-testid="puzzle-arena">
+    <!-- Top Navigation Header -->
+    <header class="arena-top-header">
+      <div class="header-left">
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          data-testid="back-btn"
+          aria-label="Back to Puzzle Hub"
+          @click="handleBack"
+        >
+          <template #icon-left>⬅️</template>
+          Puzzles
+        </BaseButton>
+
+        <div class="header-title-group">
+          <span class="arena-icon-sm" aria-hidden="true">
+            {{ isLadderMode ? '🏆' : (activeThemeDescriptor?.icon || '🎯') }}
+          </span>
+          <h1 class="arena-header-title">
+            {{ isLadderMode ? 'Adaptive Rating Ladder' : (activeThemeDescriptor?.name || 'Tactical Drill') }}
+          </h1>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Adaptive Ladder Live Rating HUD -->
+        <RatingClimbHud
+          v-if="isLadderMode"
+          :current-rating="adaptiveLadder.currentElo.value"
+          :streak="adaptiveLadder.currentStreak.value"
+          :target-rating="adaptiveLadder.targetRating.value"
+        />
+
+        <!-- Themed Drills Streak & Progress HUD -->
+        <div v-else class="drills-hud-group">
+          <StreakHud
+            :streak="themedDrills.sessionSolvedCount.value"
+            :label="`${themedDrills.sessionSolvedCount.value} Solved`"
+          />
+          <span class="drill-progress-tag" data-testid="drill-progress-tag">
+            Drill {{ themedDrills.currentPuzzleIndex.value + 1 }} / {{ themedDrills.totalInTheme.value }}
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Game Arena Content -->
+    <div class="arena-main-content">
+      <!-- Puzzle Guide / Coaching Overlay Card -->
+      <div v-if="activePuzzle" class="arena-guide-slot" data-testid="puzzle-guide-slot">
+        <div class="puzzle-info-card" :class="{ 'is-shaking': activeRunner.isShaking.value }">
+          <div class="puzzle-info-header">
+            <div class="puzzle-title-wrap">
+              <h2 class="puzzle-card-title">{{ activePuzzle.title }}</h2>
+              <span class="puzzle-difficulty-tag">{{ activePuzzle.difficulty }}</span>
+              <span class="puzzle-rating-pill">~{{ activePuzzle.rating }} Elo</span>
+            </div>
+
+            <div
+              class="turn-indicator-pill"
+              :class="activeRunner.playerColor.value === 'w' ? 'turn-white' : 'turn-black'"
+            >
+              {{ activeRunner.playerColor.value === 'w' ? '⚪ White to Move' : '⚫ Black to Move' }}
+            </div>
+          </div>
+
+          <p v-if="activePuzzle.subtitle" class="puzzle-card-description">{{ activePuzzle.subtitle }}</p>
+
+          <!-- Feedback message on mistake / bot response -->
+          <transition name="fade">
+            <div
+              v-if="activeRunner.feedbackMessage.value"
+              class="puzzle-feedback-banner"
+              data-testid="puzzle-feedback-banner"
+            >
+              <span class="feedback-icon">💬</span>
+              <span class="feedback-text">{{ activeRunner.feedbackMessage.value }}</span>
+            </div>
+          </transition>
+        </div>
+      </div>
+
+      <!-- Chessboard Container with Integrated Progressive Hint Layer -->
+      <div class="arena-board-slot">
+        <PuzzleBoardWrapper
+          :fen="activeRunner.currentFen.value"
+          :orientation="activeRunner.playerColor.value"
+          :turn="activeRunner.playerColor.value"
+          :my-color="activeRunner.playerColor.value"
+          :selected-square="activeRunner.selectedSquare.value"
+          :legal-moves="[...activeRunner.legalMoves.value]"
+          :last-move="activeRunner.lastMove.value"
+          :interactive="!activeRunner.isWaitingForBot.value && !activeRunner.isCompleted.value"
+          :hint-level="activeRunner.progressiveHint.currentHintLevel.value"
+          :hint-data="activeRunner.progressiveHint.activeHint.value"
+          @select="activeRunner.selectSquare"
+          @move="handleBoardMove"
+          @promotion-required="handlePromotionRequired"
+          @request-hint="handleRequestHint"
+        />
+      </div>
+
+      <!-- Quick Action Toolbar -->
+      <div class="arena-action-toolbar">
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          data-testid="puzzle-reset-btn"
+          :disabled="activeRunner.isWaitingForBot.value"
+          @click="handleRetry"
+        >
+          <template #icon-left>🔄</template>
+          Reset Position
+        </BaseButton>
+
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          data-testid="puzzle-skip-btn"
+          :disabled="activeRunner.isWaitingForBot.value || activeRunner.isCompleted.value"
+          @click="handleSkip"
+        >
+          <template #icon-left>⏭️</template>
+          Skip Puzzle
+        </BaseButton>
+      </div>
+    </div>
+
+    <!-- Pawn Promotion Modal -->
+    <PromotionModal
+      v-model="isPromotionModalOpen"
+      :color="activeRunner.playerColor.value"
+      @select="handlePromotionSelect"
+      @cancel="handlePromotionCancel"
+    />
+
+    <!-- Puzzle Completion Celebratory Modal -->
+    <PuzzleCompletionModal
+      :model-value="activeRunner.isCompleted.value && activeRunner.isSolvedSuccessfully.value"
+      :puzzle="activePuzzle"
+      :stars="activeRunner.calculatedStars.value"
+      :result="activeRunner.attemptResult.value"
+      :solve-time-seconds="elapsedSeconds"
+      :hints-used="activeRunner.progressiveHint.hintsUsedCount.value"
+      :mistakes-count="activeRunner.mistakesCount.value"
+      :rating-delta="isLadderMode ? adaptiveLadder.lastRatingDelta.value : null"
+      :has-next-puzzle="true"
+      @retry="handleRetry"
+      @next="handleNextPuzzle"
+      @next-puzzle="handleNextPuzzle"
+      @back-to-hub="handleBack"
+    />
+  </div>
+</template>
+
+<style scoped>
+.puzzle-arena-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  box-sizing: border-box;
+}
+
+/* TOP HEADER */
+.arena-top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-bottom: var(--space-3, 12px);
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+}
+
+.header-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.arena-icon-sm {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.arena-header-title {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  font-size: var(--text-xl, 20px);
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.drills-hud-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.drill-progress-tag {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 12px);
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--bg-surface-raised, #f8fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  color: var(--text-muted, #64748b);
+}
+
+/* MAIN CONTENT */
+.arena-main-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  width: 100%;
+}
+
+.arena-guide-slot {
+  width: 100%;
+  max-width: 580px;
+}
+
+.puzzle-info-card {
+  background: var(--bg-surface, #ffffff);
+  border: 2px solid var(--border-subtle, #e2e8f0);
+  border-radius: var(--radius-card, 16px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  box-sizing: border-box;
+}
+
+.puzzle-info-card.is-shaking {
+  animation: shake 0.4s ease-in-out;
+}
+
+.puzzle-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.puzzle-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.puzzle-card-title {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  font-size: var(--text-base, 16px);
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+  margin: 0;
+}
+
+.puzzle-difficulty-tag {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  font-size: var(--text-xs, 12px);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-primary-subtle, rgba(108, 92, 231, 0.12));
+  color: var(--color-primary, #6c5ce7);
+  text-transform: capitalize;
+}
+
+.puzzle-rating-pill {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 12px);
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text-muted, #64748b);
+}
+
+.turn-indicator-pill {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  font-size: var(--text-xs, 12px);
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill, 9999px);
+  border: 1.5px solid var(--border-medium, #cbd5e1);
+}
+
+.turn-white {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.turn-black {
+  background: #1e293b;
+  color: #ffffff;
+  border-color: #334155;
+}
+
+.puzzle-card-description {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: var(--text-sm, 14px);
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+.puzzle-feedback-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md, 10px);
+  color: var(--color-danger, #ef4444);
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+}
+
+.arena-board-slot {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.arena-action-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3, 12px);
+  width: 100%;
+  max-width: 580px;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

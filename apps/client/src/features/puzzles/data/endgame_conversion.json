@@ -1,0 +1,737 @@
+[
+  {
+    "id": "puz_endgame_001",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 700,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "novice",
+    "title": "Promote to Queen #1 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_002",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 726,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "novice",
+    "title": "Flank Pawn Promotion #2 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_003",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 752,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "novice",
+    "title": "g-Pawn Touchdown #3 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_004",
+    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "c7c8q",
+      "e3d3",
+      "c8c3"
+    ],
+    "rating": 778,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "novice",
+    "title": "Queenside Coronation #4 👑",
+    "subtitle": "Promote c8=Q and win!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_005",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 804,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "novice",
+    "title": "Promote to Queen #5 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_006",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 830,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "novice",
+    "title": "Flank Pawn Promotion #6 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_007",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 856,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "novice",
+    "title": "g-Pawn Touchdown #7 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_008",
+    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "c7c8q",
+      "e3d3",
+      "c8c3"
+    ],
+    "rating": 882,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "novice",
+    "title": "Queenside Coronation #8 👑",
+    "subtitle": "Promote c8=Q and win!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_009",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 908,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Promote to Queen #9 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_010",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 934,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Flank Pawn Promotion #10 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_011",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 960,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "g-Pawn Touchdown #11 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_012",
+    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "c7c8q",
+      "e3d3",
+      "c8c3"
+    ],
+    "rating": 986,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Queenside Coronation #12 👑",
+    "subtitle": "Promote c8=Q and win!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_013",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 1012,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Promote to Queen #13 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_014",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 1038,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Flank Pawn Promotion #14 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_015",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 1064,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "g-Pawn Touchdown #15 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_016",
+    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "c7c8q",
+      "e3d3",
+      "c8c3"
+    ],
+    "rating": 1090,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Queenside Coronation #16 👑",
+    "subtitle": "Promote c8=Q and win!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_017",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 1116,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Promote to Queen #17 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_018",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 1142,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Flank Pawn Promotion #18 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_019",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 1168,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "g-Pawn Touchdown #19 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_020",
+    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "c7c8q",
+      "e3d3",
+      "c8c3"
+    ],
+    "rating": 1194,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "easy",
+    "title": "Queenside Coronation #20 👑",
+    "subtitle": "Promote c8=Q and win!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_021",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 1220,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "Promote to Queen #21 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_022",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 1246,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "Flank Pawn Promotion #22 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_023",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 1272,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "g-Pawn Touchdown #23 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_024",
+    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "c7c8q",
+      "e3d3",
+      "c8c3"
+    ],
+    "rating": 1298,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "Queenside Coronation #24 👑",
+    "subtitle": "Promote c8=Q and win!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_025",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 1324,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "Promote to Queen #25 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_026",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 1350,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "Flank Pawn Promotion #26 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_027",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 1376,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "g-Pawn Touchdown #27 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_028",
+    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "c7c8q",
+      "e3d3",
+      "c8c3"
+    ],
+    "rating": 1402,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "Queenside Coronation #28 👑",
+    "subtitle": "Promote c8=Q and win!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_029",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 1428,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "Promote to Queen #29 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_030",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 1454,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "Flank Pawn Promotion #30 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_031",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 1480,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "medium",
+    "title": "g-Pawn Touchdown #31 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_032",
+    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "c7c8q",
+      "e3d3",
+      "c8c3"
+    ],
+    "rating": 1506,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "hard",
+    "title": "Queenside Coronation #32 👑",
+    "subtitle": "Promote c8=Q and win!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_033",
+    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "e7e8q",
+      "e3d3",
+      "e8e3"
+    ],
+    "rating": 1532,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "hard",
+    "title": "Promote to Queen #33 👑",
+    "subtitle": "Advance your e-pawn to e8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_034",
+    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "b7b8q",
+      "e3d3",
+      "b8b3"
+    ],
+    "rating": 1558,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "hard",
+    "title": "Flank Pawn Promotion #34 👑",
+    "subtitle": "Push the b-pawn to the 8th rank!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_endgame_035",
+    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "moves": [
+      "g7g8q",
+      "e3d3",
+      "g8g3"
+    ],
+    "rating": 1584,
+    "ratingDeviation": 100,
+    "themes": [
+      "endgame_conversions",
+      "pawn_endgame"
+    ],
+    "primaryTheme": "pawn_endgame",
+    "difficulty": "hard",
+    "title": "g-Pawn Touchdown #35 👑",
+    "subtitle": "Crown your g-pawn on g8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  }
+]

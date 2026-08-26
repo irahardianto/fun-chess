@@ -1,0 +1,625 @@
+[
+  {
+    "id": "puz_skewer_001",
+    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "moves": [
+      "a1a4",
+      "a5b5",
+      "a4a8"
+    ],
+    "rating": 800,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "novice",
+    "title": "Rook Rank Skewer #1 ⚡",
+    "subtitle": "Check on a4 and win the Queen on a8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_002",
+    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "moves": [
+      "e1e4",
+      "e5d5",
+      "e4e8"
+    ],
+    "rating": 828,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "novice",
+    "title": "Center File Skewer #2 ⚡",
+    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_003",
+    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "moves": [
+      "h1h4",
+      "h5g6",
+      "h4h8"
+    ],
+    "rating": 856,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "queen_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "novice",
+    "title": "Queen File Skewer #3 ⚡",
+    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_004",
+    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "moves": [
+      "c1b2",
+      "d4e4",
+      "b2g7"
+    ],
+    "rating": 884,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "novice",
+    "title": "Diagonal Bishop Skewer #4 ⚡",
+    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_005",
+    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "moves": [
+      "a1a4",
+      "a5b5",
+      "a4a8"
+    ],
+    "rating": 912,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Rook Rank Skewer #5 ⚡",
+    "subtitle": "Check on a4 and win the Queen on a8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_006",
+    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "moves": [
+      "e1e4",
+      "e5d5",
+      "e4e8"
+    ],
+    "rating": 940,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Center File Skewer #6 ⚡",
+    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_007",
+    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "moves": [
+      "h1h4",
+      "h5g6",
+      "h4h8"
+    ],
+    "rating": 968,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "queen_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Queen File Skewer #7 ⚡",
+    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_008",
+    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "moves": [
+      "c1b2",
+      "d4e4",
+      "b2g7"
+    ],
+    "rating": 996,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Diagonal Bishop Skewer #8 ⚡",
+    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_009",
+    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "moves": [
+      "a1a4",
+      "a5b5",
+      "a4a8"
+    ],
+    "rating": 1024,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Rook Rank Skewer #9 ⚡",
+    "subtitle": "Check on a4 and win the Queen on a8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_010",
+    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "moves": [
+      "e1e4",
+      "e5d5",
+      "e4e8"
+    ],
+    "rating": 1052,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Center File Skewer #10 ⚡",
+    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_011",
+    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "moves": [
+      "h1h4",
+      "h5g6",
+      "h4h8"
+    ],
+    "rating": 1080,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "queen_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Queen File Skewer #11 ⚡",
+    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_012",
+    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "moves": [
+      "c1b2",
+      "d4e4",
+      "b2g7"
+    ],
+    "rating": 1108,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Diagonal Bishop Skewer #12 ⚡",
+    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_013",
+    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "moves": [
+      "a1a4",
+      "a5b5",
+      "a4a8"
+    ],
+    "rating": 1136,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Rook Rank Skewer #13 ⚡",
+    "subtitle": "Check on a4 and win the Queen on a8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_014",
+    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "moves": [
+      "e1e4",
+      "e5d5",
+      "e4e8"
+    ],
+    "rating": 1164,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Center File Skewer #14 ⚡",
+    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_015",
+    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "moves": [
+      "h1h4",
+      "h5g6",
+      "h4h8"
+    ],
+    "rating": 1192,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "queen_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "easy",
+    "title": "Queen File Skewer #15 ⚡",
+    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_016",
+    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "moves": [
+      "c1b2",
+      "d4e4",
+      "b2g7"
+    ],
+    "rating": 1220,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Diagonal Bishop Skewer #16 ⚡",
+    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_017",
+    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "moves": [
+      "a1a4",
+      "a5b5",
+      "a4a8"
+    ],
+    "rating": 1248,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Rook Rank Skewer #17 ⚡",
+    "subtitle": "Check on a4 and win the Queen on a8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_018",
+    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "moves": [
+      "e1e4",
+      "e5d5",
+      "e4e8"
+    ],
+    "rating": 1276,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Center File Skewer #18 ⚡",
+    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_019",
+    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "moves": [
+      "h1h4",
+      "h5g6",
+      "h4h8"
+    ],
+    "rating": 1304,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "queen_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Queen File Skewer #19 ⚡",
+    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_020",
+    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "moves": [
+      "c1b2",
+      "d4e4",
+      "b2g7"
+    ],
+    "rating": 1332,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Diagonal Bishop Skewer #20 ⚡",
+    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_021",
+    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "moves": [
+      "a1a4",
+      "a5b5",
+      "a4a8"
+    ],
+    "rating": 1360,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Rook Rank Skewer #21 ⚡",
+    "subtitle": "Check on a4 and win the Queen on a8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_022",
+    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "moves": [
+      "e1e4",
+      "e5d5",
+      "e4e8"
+    ],
+    "rating": 1388,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Center File Skewer #22 ⚡",
+    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_023",
+    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "moves": [
+      "h1h4",
+      "h5g6",
+      "h4h8"
+    ],
+    "rating": 1416,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "queen_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Queen File Skewer #23 ⚡",
+    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_024",
+    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "moves": [
+      "c1b2",
+      "d4e4",
+      "b2g7"
+    ],
+    "rating": 1444,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Diagonal Bishop Skewer #24 ⚡",
+    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_025",
+    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "moves": [
+      "a1a4",
+      "a5b5",
+      "a4a8"
+    ],
+    "rating": 1472,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "medium",
+    "title": "Rook Rank Skewer #25 ⚡",
+    "subtitle": "Check on a4 and win the Queen on a8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_026",
+    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "moves": [
+      "e1e4",
+      "e5d5",
+      "e4e8"
+    ],
+    "rating": 1500,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "hard",
+    "title": "Center File Skewer #26 ⚡",
+    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_027",
+    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "moves": [
+      "h1h4",
+      "h5g6",
+      "h4h8"
+    ],
+    "rating": 1528,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "queen_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "hard",
+    "title": "Queen File Skewer #27 ⚡",
+    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_028",
+    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "moves": [
+      "c1b2",
+      "d4e4",
+      "b2g7"
+    ],
+    "rating": 1556,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "hard",
+    "title": "Diagonal Bishop Skewer #28 ⚡",
+    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_029",
+    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "moves": [
+      "a1a4",
+      "a5b5",
+      "a4a8"
+    ],
+    "rating": 1584,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "hard",
+    "title": "Rook Rank Skewer #29 ⚡",
+    "subtitle": "Check on a4 and win the Queen on a8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_skewer_030",
+    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "moves": [
+      "e1e4",
+      "e5d5",
+      "e4e8"
+    ],
+    "rating": 1612,
+    "ratingDeviation": 100,
+    "themes": [
+      "skewer",
+      "rook_endgame"
+    ],
+    "primaryTheme": "skewer",
+    "difficulty": "hard",
+    "title": "Center File Skewer #30 ⚡",
+    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  }
+]

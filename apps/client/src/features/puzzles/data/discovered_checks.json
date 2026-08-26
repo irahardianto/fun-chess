@@ -1,0 +1,617 @@
+[
+  {
+    "id": "puz_discovered_001",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4P3/4n3/8/PPP2PPP/RNBQKBNR w KQkq - 1 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "e5d6"
+    ],
+    "rating": 850,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "novice",
+    "title": "En Passant Discovery #1 💥",
+    "subtitle": "Take en passant to uncover the pin!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_002",
+    "fen": "rn1qk2r/ppp2ppp/3b4/8/4n3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 6",
+    "moves": [
+      "f1b5",
+      "c7c6",
+      "e1g1"
+    ],
+    "rating": 878,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "novice",
+    "title": "Bishop Discovery Check #2 💥",
+    "subtitle": "Check the king with Bb5+!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_003",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/8/3Nn3/8/PPP1QPPP/RNB1KB1R w KQkq - 0 6",
+    "moves": [
+      "d4c6",
+      "b7c6",
+      "e2e4"
+    ],
+    "rating": 906,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "Knight Discovery Leap #3 💥",
+    "subtitle": "Jump the knight to attack e4!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_004",
+    "fen": "r1b1k2r/ppp2ppp/2n2n2/3qp3/3P4/2B2N2/PPP2PPP/R2QKB1R w KQkq - 0 8",
+    "moves": [
+      "d4e5",
+      "d5e4",
+      "f1e2"
+    ],
+    "rating": 934,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "Central Line Discovery #4 💥",
+    "subtitle": "Open lines for your pieces!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_005",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4P3/4n3/8/PPP2PPP/RNBQKBNR w KQkq - 1 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "e5d6"
+    ],
+    "rating": 962,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "En Passant Discovery #5 💥",
+    "subtitle": "Take en passant to uncover the pin!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_006",
+    "fen": "rn1qk2r/ppp2ppp/3b4/8/4n3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 6",
+    "moves": [
+      "f1b5",
+      "c7c6",
+      "e1g1"
+    ],
+    "rating": 990,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "Bishop Discovery Check #6 💥",
+    "subtitle": "Check the king with Bb5+!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_007",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/8/3Nn3/8/PPP1QPPP/RNB1KB1R w KQkq - 0 6",
+    "moves": [
+      "d4c6",
+      "b7c6",
+      "e2e4"
+    ],
+    "rating": 1018,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "Knight Discovery Leap #7 💥",
+    "subtitle": "Jump the knight to attack e4!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_008",
+    "fen": "r1b1k2r/ppp2ppp/2n2n2/3qp3/3P4/2B2N2/PPP2PPP/R2QKB1R w KQkq - 0 8",
+    "moves": [
+      "d4e5",
+      "d5e4",
+      "f1e2"
+    ],
+    "rating": 1046,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "Central Line Discovery #8 💥",
+    "subtitle": "Open lines for your pieces!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_009",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4P3/4n3/8/PPP2PPP/RNBQKBNR w KQkq - 1 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "e5d6"
+    ],
+    "rating": 1074,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "En Passant Discovery #9 💥",
+    "subtitle": "Take en passant to uncover the pin!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_010",
+    "fen": "rn1qk2r/ppp2ppp/3b4/8/4n3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 6",
+    "moves": [
+      "f1b5",
+      "c7c6",
+      "e1g1"
+    ],
+    "rating": 1102,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "Bishop Discovery Check #10 💥",
+    "subtitle": "Check the king with Bb5+!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_011",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/8/3Nn3/8/PPP1QPPP/RNB1KB1R w KQkq - 0 6",
+    "moves": [
+      "d4c6",
+      "b7c6",
+      "e2e4"
+    ],
+    "rating": 1130,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "Knight Discovery Leap #11 💥",
+    "subtitle": "Jump the knight to attack e4!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_012",
+    "fen": "r1b1k2r/ppp2ppp/2n2n2/3qp3/3P4/2B2N2/PPP2PPP/R2QKB1R w KQkq - 0 8",
+    "moves": [
+      "d4e5",
+      "d5e4",
+      "f1e2"
+    ],
+    "rating": 1158,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "Central Line Discovery #12 💥",
+    "subtitle": "Open lines for your pieces!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_013",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4P3/4n3/8/PPP2PPP/RNBQKBNR w KQkq - 1 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "e5d6"
+    ],
+    "rating": 1186,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "easy",
+    "title": "En Passant Discovery #13 💥",
+    "subtitle": "Take en passant to uncover the pin!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_014",
+    "fen": "rn1qk2r/ppp2ppp/3b4/8/4n3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 6",
+    "moves": [
+      "f1b5",
+      "c7c6",
+      "e1g1"
+    ],
+    "rating": 1214,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Bishop Discovery Check #14 💥",
+    "subtitle": "Check the king with Bb5+!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_015",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/8/3Nn3/8/PPP1QPPP/RNB1KB1R w KQkq - 0 6",
+    "moves": [
+      "d4c6",
+      "b7c6",
+      "e2e4"
+    ],
+    "rating": 1242,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Knight Discovery Leap #15 💥",
+    "subtitle": "Jump the knight to attack e4!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_016",
+    "fen": "r1b1k2r/ppp2ppp/2n2n2/3qp3/3P4/2B2N2/PPP2PPP/R2QKB1R w KQkq - 0 8",
+    "moves": [
+      "d4e5",
+      "d5e4",
+      "f1e2"
+    ],
+    "rating": 1270,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Central Line Discovery #16 💥",
+    "subtitle": "Open lines for your pieces!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_017",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4P3/4n3/8/PPP2PPP/RNBQKBNR w KQkq - 1 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "e5d6"
+    ],
+    "rating": 1298,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "En Passant Discovery #17 💥",
+    "subtitle": "Take en passant to uncover the pin!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_018",
+    "fen": "rn1qk2r/ppp2ppp/3b4/8/4n3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 6",
+    "moves": [
+      "f1b5",
+      "c7c6",
+      "e1g1"
+    ],
+    "rating": 1326,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Bishop Discovery Check #18 💥",
+    "subtitle": "Check the king with Bb5+!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_019",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/8/3Nn3/8/PPP1QPPP/RNB1KB1R w KQkq - 0 6",
+    "moves": [
+      "d4c6",
+      "b7c6",
+      "e2e4"
+    ],
+    "rating": 1354,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Knight Discovery Leap #19 💥",
+    "subtitle": "Jump the knight to attack e4!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_020",
+    "fen": "r1b1k2r/ppp2ppp/2n2n2/3qp3/3P4/2B2N2/PPP2PPP/R2QKB1R w KQkq - 0 8",
+    "moves": [
+      "d4e5",
+      "d5e4",
+      "f1e2"
+    ],
+    "rating": 1382,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Central Line Discovery #20 💥",
+    "subtitle": "Open lines for your pieces!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_021",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4P3/4n3/8/PPP2PPP/RNBQKBNR w KQkq - 1 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "e5d6"
+    ],
+    "rating": 1410,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "En Passant Discovery #21 💥",
+    "subtitle": "Take en passant to uncover the pin!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_022",
+    "fen": "rn1qk2r/ppp2ppp/3b4/8/4n3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 6",
+    "moves": [
+      "f1b5",
+      "c7c6",
+      "e1g1"
+    ],
+    "rating": 1438,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Bishop Discovery Check #22 💥",
+    "subtitle": "Check the king with Bb5+!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_023",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/8/3Nn3/8/PPP1QPPP/RNB1KB1R w KQkq - 0 6",
+    "moves": [
+      "d4c6",
+      "b7c6",
+      "e2e4"
+    ],
+    "rating": 1466,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Knight Discovery Leap #23 💥",
+    "subtitle": "Jump the knight to attack e4!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_024",
+    "fen": "r1b1k2r/ppp2ppp/2n2n2/3qp3/3P4/2B2N2/PPP2PPP/R2QKB1R w KQkq - 0 8",
+    "moves": [
+      "d4e5",
+      "d5e4",
+      "f1e2"
+    ],
+    "rating": 1494,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "medium",
+    "title": "Central Line Discovery #24 💥",
+    "subtitle": "Open lines for your pieces!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_025",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4P3/4n3/8/PPP2PPP/RNBQKBNR w KQkq - 1 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "e5d6"
+    ],
+    "rating": 1522,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "hard",
+    "title": "En Passant Discovery #25 💥",
+    "subtitle": "Take en passant to uncover the pin!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_026",
+    "fen": "rn1qk2r/ppp2ppp/3b4/8/4n3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 6",
+    "moves": [
+      "f1b5",
+      "c7c6",
+      "e1g1"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "hard",
+    "title": "Bishop Discovery Check #26 💥",
+    "subtitle": "Check the king with Bb5+!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_027",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/8/3Nn3/8/PPP1QPPP/RNB1KB1R w KQkq - 0 6",
+    "moves": [
+      "d4c6",
+      "b7c6",
+      "e2e4"
+    ],
+    "rating": 1578,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "hard",
+    "title": "Knight Discovery Leap #27 💥",
+    "subtitle": "Jump the knight to attack e4!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_028",
+    "fen": "r1b1k2r/ppp2ppp/2n2n2/3qp3/3P4/2B2N2/PPP2PPP/R2QKB1R w KQkq - 0 8",
+    "moves": [
+      "d4e5",
+      "d5e4",
+      "f1e2"
+    ],
+    "rating": 1606,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "hard",
+    "title": "Central Line Discovery #28 💥",
+    "subtitle": "Open lines for your pieces!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_029",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4P3/4n3/8/PPP2PPP/RNBQKBNR w KQkq - 1 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "e5d6"
+    ],
+    "rating": 1634,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check",
+      "discovered_attack"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "hard",
+    "title": "En Passant Discovery #29 💥",
+    "subtitle": "Take en passant to uncover the pin!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_discovered_030",
+    "fen": "rn1qk2r/ppp2ppp/3b4/8/4n3/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 6",
+    "moves": [
+      "f1b5",
+      "c7c6",
+      "e1g1"
+    ],
+    "rating": 1662,
+    "ratingDeviation": 100,
+    "themes": [
+      "discovered_check"
+    ],
+    "primaryTheme": "discovered_check",
+    "difficulty": "hard",
+    "title": "Bishop Discovery Check #30 💥",
+    "subtitle": "Check the king with Bb5+!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  }
+]

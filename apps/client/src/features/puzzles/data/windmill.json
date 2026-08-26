@@ -1,0 +1,647 @@
+[
+  {
+    "id": "puz_windmill_001",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1200,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "Bishop-Rook Laser Mate #1 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_002",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1224,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "7th Rank Sweeper #2 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_003",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1248,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "Bishop-Rook Laser Mate #3 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_004",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1272,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "7th Rank Sweeper #4 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_005",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1296,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "Bishop-Rook Laser Mate #5 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_006",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1320,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "7th Rank Sweeper #6 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_007",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1344,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "Bishop-Rook Laser Mate #7 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_008",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1368,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "7th Rank Sweeper #8 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_009",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1392,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "Bishop-Rook Laser Mate #9 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_010",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1416,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "7th Rank Sweeper #10 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_011",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1440,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "Bishop-Rook Laser Mate #11 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_012",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1464,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "7th Rank Sweeper #12 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_013",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1488,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "medium",
+    "title": "Bishop-Rook Laser Mate #13 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_014",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1512,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #14 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_015",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1536,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Bishop-Rook Laser Mate #15 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_016",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1560,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #16 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_017",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1584,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Bishop-Rook Laser Mate #17 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_018",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1608,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #18 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_019",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1632,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Bishop-Rook Laser Mate #19 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_020",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1656,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #20 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_021",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1680,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Bishop-Rook Laser Mate #21 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_022",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1704,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #22 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_023",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1728,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Bishop-Rook Laser Mate #23 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_024",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1752,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #24 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_025",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1776,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Bishop-Rook Laser Mate #25 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_026",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1800,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #26 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_027",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1824,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Bishop-Rook Laser Mate #27 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_028",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1848,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #28 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  },
+  {
+    "id": "puz_windmill_029",
+    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "moves": [
+      "b2b8"
+    ],
+    "rating": 1872,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Bishop-Rook Laser Mate #29 🌪️",
+    "subtitle": "Back-rank mate supported by bishop!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_windmill_030",
+    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "b2b7",
+      "f8e8",
+      "e1e8",
+      "a8e8",
+      "b7a7"
+    ],
+    "rating": 1896,
+    "ratingDeviation": 100,
+    "themes": [
+      "windmill",
+      "rook_endgame"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "7th Rank Sweeper #30 🌪️",
+    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "playerColor": "w",
+    "solutionPlies": 5
+  }
+]

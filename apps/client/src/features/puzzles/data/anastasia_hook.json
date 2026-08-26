@@ -1,0 +1,592 @@
+[
+  {
+    "id": "puz_anastasia_001",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 800,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "novice",
+    "title": "Hook Mate Net #1 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_002",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 828,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "novice",
+    "title": "Anastasia's Trap #2 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_003",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 856,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "novice",
+    "title": "Knight Takes Defender #3 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_004",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 884,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "novice",
+    "title": "Hook Mate Net #4 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_005",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 912,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "easy",
+    "title": "Anastasia's Trap #5 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_006",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 940,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "Knight Takes Defender #6 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_007",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 968,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "Hook Mate Net #7 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_008",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 996,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "easy",
+    "title": "Anastasia's Trap #8 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_009",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 1024,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "Knight Takes Defender #9 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_010",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1052,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "Hook Mate Net #10 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_011",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1080,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "easy",
+    "title": "Anastasia's Trap #11 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_012",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 1108,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "Knight Takes Defender #12 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_013",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1136,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "Hook Mate Net #13 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_014",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1164,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "easy",
+    "title": "Anastasia's Trap #14 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_015",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 1192,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "Knight Takes Defender #15 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_016",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1220,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Hook Mate Net #16 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_017",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1248,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "medium",
+    "title": "Anastasia's Trap #17 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_018",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 1276,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Knight Takes Defender #18 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_019",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1304,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Hook Mate Net #19 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_020",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1332,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "medium",
+    "title": "Anastasia's Trap #20 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_021",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 1360,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Knight Takes Defender #21 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_022",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1388,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Hook Mate Net #22 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_023",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1416,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "medium",
+    "title": "Anastasia's Trap #23 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_024",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 1444,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Knight Takes Defender #24 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_025",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1472,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Hook Mate Net #25 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_026",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1500,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "hard",
+    "title": "Anastasia's Trap #26 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_027",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 1528,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "hard",
+    "title": "Knight Takes Defender #27 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_anastasia_028",
+    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1556,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "hard",
+    "title": "Hook Mate Net #28 🪝",
+    "subtitle": "Rook delivers checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_029",
+    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8"
+    ],
+    "rating": 1584,
+    "ratingDeviation": 100,
+    "themes": [
+      "anastasia_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "hard",
+    "title": "Anastasia's Trap #29 🪝",
+    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_anastasia_030",
+    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e6f8",
+      "g8f8",
+      "e1e4"
+    ],
+    "rating": 1612,
+    "ratingDeviation": 100,
+    "themes": [
+      "hook_mate",
+      "hanging_piece"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "hard",
+    "title": "Knight Takes Defender #30 🪝",
+    "subtitle": "Eliminate the defender on f8!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  }
+]

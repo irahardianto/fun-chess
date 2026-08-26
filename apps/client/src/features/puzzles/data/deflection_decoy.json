@@ -1,0 +1,622 @@
+[
+  {
+    "id": "puz_deflection_001",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 950,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Deflect Knight Defender #1 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_002",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 978,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Back-Rank Deflection #2 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_003",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1006,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Break Pin with Bd2 #3 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_004",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1034,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Deflect Knight Defender #4 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_005",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1062,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Back-Rank Deflection #5 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_006",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1090,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Break Pin with Bd2 #6 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_007",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1118,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Deflect Knight Defender #7 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_008",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1146,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Back-Rank Deflection #8 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_009",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1174,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "easy",
+    "title": "Break Pin with Bd2 #9 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_010",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1202,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Deflect Knight Defender #10 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_011",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1230,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Back-Rank Deflection #11 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_012",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1258,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Break Pin with Bd2 #12 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_013",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1286,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Deflect Knight Defender #13 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_014",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1314,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Back-Rank Deflection #14 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_015",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1342,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Break Pin with Bd2 #15 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_016",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1370,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Deflect Knight Defender #16 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_017",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1398,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Back-Rank Deflection #17 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_018",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1426,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Break Pin with Bd2 #18 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_019",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1454,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Deflect Knight Defender #19 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_020",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1482,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "medium",
+    "title": "Back-Rank Deflection #20 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_021",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1510,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Break Pin with Bd2 #21 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_022",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1538,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Deflect Knight Defender #22 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_023",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1566,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Back-Rank Deflection #23 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_024",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1594,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Break Pin with Bd2 #24 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_025",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1622,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Deflect Knight Defender #25 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_026",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Back-Rank Deflection #26 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_027",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1678,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Break Pin with Bd2 #27 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_028",
+    "fen": "r1b2rk1/ppp2ppp/8/3q4/3n4/5N2/PP1Q1PPP/R3KB1R w KQ - 0 11",
+    "moves": [
+      "f3d4",
+      "f8e8",
+      "f1e2"
+    ],
+    "rating": 1706,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Deflect Knight Defender #28 🔄",
+    "subtitle": "Take the defender and block with Be2!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_deflection_029",
+    "fen": "3r2k1/p4ppp/1p6/8/8/1P6/P4PPP/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8"
+    ],
+    "rating": 1734,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "back_rank_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Back-Rank Deflection #29 🔄",
+    "subtitle": "Take the rook on d8 for mate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_deflection_030",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/2N2N2/PPP3PP/R1BQKB1R w KQkq - 1 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 1762,
+    "ratingDeviation": 100,
+    "themes": [
+      "deflection",
+      "pin"
+    ],
+    "primaryTheme": "deflection",
+    "difficulty": "hard",
+    "title": "Break Pin with Bd2 #30 🔄",
+    "subtitle": "Develop the bishop and recapture on c3.",
+    "playerColor": "w",
+    "solutionPlies": 3
+  }
+]

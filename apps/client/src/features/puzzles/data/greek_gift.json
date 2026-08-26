@@ -1,0 +1,622 @@
+[
+  {
+    "id": "puz_greekgift_001",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1200,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Bishop Aiming at h7 #1 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_002",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1224,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Prep #2 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_003",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1248,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Kingside Pressure #3 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_004",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1272,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Bishop Aiming at h7 #4 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_005",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1296,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Prep #5 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_006",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1320,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Kingside Pressure #6 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_007",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1344,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Bishop Aiming at h7 #7 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_008",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1368,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Prep #8 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_009",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1392,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Kingside Pressure #9 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_010",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1416,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Bishop Aiming at h7 #10 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_011",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1440,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Prep #11 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_012",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1464,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Kingside Pressure #12 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_013",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1488,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Bishop Aiming at h7 #13 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_014",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1512,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Prep #14 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_015",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1536,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Kingside Pressure #15 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_016",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1560,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Bishop Aiming at h7 #16 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_017",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1584,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Prep #17 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_018",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1608,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Kingside Pressure #18 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_019",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1632,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Bishop Aiming at h7 #19 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_020",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1656,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Prep #20 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_021",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1680,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Kingside Pressure #21 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_022",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1704,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Bishop Aiming at h7 #22 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_023",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1728,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Prep #23 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_024",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1752,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Kingside Pressure #24 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_025",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1776,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Bishop Aiming at h7 #25 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_026",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1800,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Prep #26 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_027",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1824,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Kingside Pressure #27 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_028",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "moves": [
+      "f1d3",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 1848,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "clearance"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Bishop Aiming at h7 #28 🎁",
+    "subtitle": "Develop Bd3 towards the kingside!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_029",
+    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "e1g1"
+    ],
+    "rating": 1872,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift",
+      "battery"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Prep #29 🎁",
+    "subtitle": "Set up the bishop battery and castle!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_greekgift_030",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "moves": [
+      "f1d3",
+      "h7h6",
+      "g5f3"
+    ],
+    "rating": 1896,
+    "ratingDeviation": 100,
+    "themes": [
+      "greek_gift"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Kingside Pressure #30 🎁",
+    "subtitle": "Provoke h6 before the sacrifice!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  }
+]

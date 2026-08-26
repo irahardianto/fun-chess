@@ -1,0 +1,602 @@
+[
+  {
+    "id": "puz_smothered_001",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 750,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "novice",
+    "title": "Smothered Knight Checkmate #1 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_002",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 778,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "novice",
+    "title": "Double Check Corner Lure #2 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_003",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 806,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "novice",
+    "title": "Smothered Knight Checkmate #3 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_004",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 834,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "novice",
+    "title": "Double Check Corner Lure #4 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_005",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 862,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "novice",
+    "title": "Smothered Knight Checkmate #5 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_006",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 890,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "novice",
+    "title": "Double Check Corner Lure #6 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_007",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 918,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Smothered Knight Checkmate #7 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_008",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 946,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Double Check Corner Lure #8 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_009",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 974,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Smothered Knight Checkmate #9 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_010",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1002,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Double Check Corner Lure #10 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_011",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1030,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Smothered Knight Checkmate #11 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_012",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1058,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Double Check Corner Lure #12 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_013",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1086,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Smothered Knight Checkmate #13 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_014",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1114,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Double Check Corner Lure #14 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_015",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1142,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Smothered Knight Checkmate #15 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_016",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1170,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Double Check Corner Lure #16 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_017",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1198,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "easy",
+    "title": "Smothered Knight Checkmate #17 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_018",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1226,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Double Check Corner Lure #18 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_019",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1254,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Smothered Knight Checkmate #19 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_020",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1282,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Double Check Corner Lure #20 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_021",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1310,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Smothered Knight Checkmate #21 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_022",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1338,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Double Check Corner Lure #22 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_023",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1366,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Smothered Knight Checkmate #23 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_024",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1394,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Double Check Corner Lure #24 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_025",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1422,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Smothered Knight Checkmate #25 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_026",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1450,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Double Check Corner Lure #26 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_027",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1478,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Smothered Knight Checkmate #27 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_028",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1506,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Double Check Corner Lure #28 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  },
+  {
+    "id": "puz_smothered_029",
+    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "moves": [
+      "e4d6"
+    ],
+    "rating": 1534,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "mate_in_1"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Smothered Knight Checkmate #29 💨",
+    "subtitle": "Nd6# delivers smothered checkmate!",
+    "playerColor": "w",
+    "solutionPlies": 1
+  },
+  {
+    "id": "puz_smothered_030",
+    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "e1f2"
+    ],
+    "rating": 1562,
+    "ratingDeviation": 100,
+    "themes": [
+      "smothered_mate",
+      "discovered_check"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Double Check Corner Lure #30 💨",
+    "subtitle": "Nh6+ forces king to h8 corner!",
+    "playerColor": "w",
+    "solutionPlies": 3
+  }
+]
