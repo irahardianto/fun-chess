@@ -1,0 +1,896 @@
+/* ==========================================================================
+   FUN CHESS DESIGN SYSTEM TOKENS
+   Author: UX Craftsman / Frontend Engineer
+   Design Spec: DESIGN-UX-001 (.agentwork/design-ux.md)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. COLOR PRIMITIVES (LIGHT & DARK THEMES)
+   -------------------------------------------------------------------------- */
+:root {
+  color-scheme: light dark;
+
+  /* Brand / Primary — Energetic Electric Violet */
+  --color-primary-h: 255;
+  --color-primary-s: 85%;
+  --color-primary-l: 60%; /* #6c5ce7 */
+
+  /* Secondary / Accent — Sunshine Gold (Badges, Stars, Turn Indicators) */
+  --color-accent-h: 42;
+  --color-accent-s: 100%;
+  --color-accent-l: 52%; /* #ffb300 */
+
+  /* Success / Move Valid — Emerald Mint (Legal Moves, Wins) */
+  --color-success-h: 145;
+  --color-success-s: 68%;
+  --color-success-l: 48%; /* #22c55e */
+
+  /* Danger / Alert — Coral Crimson (Check Warning, Captures, Errors) */
+  --color-danger-h: 354;
+  --color-danger-s: 88%;
+  --color-danger-l: 58%; /* #ef4444 */
+
+  /* Info / Active — Sky Cyan (Spectator, LAN Status) */
+  --color-info-h: 198;
+  --color-info-s: 93%;
+  --color-info-l: 54%; /* #0ea5e9 */
+
+  /* Neutral Background & Surface Channels (Light Theme Default) */
+  --color-bg-h: 220;
+  --color-bg-s: 28%;
+  --color-bg-l: 96%; /* #f1f4f9 */
+
+  --color-surface-h: 0;
+  --color-surface-s: 0%;
+  --color-surface-l: 100%; /* #ffffff */
+
+  --color-text-h: 222;
+  --color-text-s: 47%;
+  --color-text-l: 11%; /* #0f172a */
+}
+
+/* Dark Theme Overrides for Primitives */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-bg-h: 226;
+  --color-bg-s: 30%;
+  --color-bg-l: 10%; /* #111524 */
+
+  --color-surface-h: 225;
+  --color-surface-s: 24%;
+  --color-surface-l: 16%; /* #1e2438 */
+
+  --color-text-h: 220;
+  --color-text-s: 20%;
+  --color-text-l: 96%; /* #f1f3f9 */
+}
+
+/* --------------------------------------------------------------------------
+   2. SEMANTIC APPLICATION TOKENS
+   -------------------------------------------------------------------------- */
+:root {
+  /* Surfaces & Backgrounds */
+  --bg-app:             hsl(var(--color-bg-h) var(--color-bg-s) var(--color-bg-l));
+  --bg-surface:         hsl(var(--color-surface-h) var(--color-surface-s) var(--color-surface-l));
+  --bg-surface-raised:  hsl(var(--color-surface-h) var(--color-surface-s) calc(var(--color-surface-l) - 3%));
+  --bg-surface-glass:   rgba(255, 255, 255, 0.88);
+  --bg-overlay:         rgba(15, 23, 42, 0.65); /* Modal backdrop */
+
+  /* Typography Colors */
+  --text-main:          hsl(var(--color-text-h) var(--color-text-s) var(--color-text-l));
+  --text-muted:         hsl(var(--color-text-h) 16% 42%);
+  --text-faint:         hsl(var(--color-text-h) 12% 64%);
+  --text-inverse:       #ffffff;
+  --text-on-primary:    #ffffff;
+  --text-on-accent:     #1e1b4b;
+  --text-on-danger:     #ffffff;
+  --text-on-success:    #ffffff;
+
+  /* Interactive Buttons & Accents */
+  --color-primary:        hsl(var(--color-primary-h) var(--color-primary-s) var(--color-primary-l));
+  --color-primary-hover:  hsl(var(--color-primary-h) var(--color-primary-s) calc(var(--color-primary-l) - 6%));
+  --color-primary-active: hsl(var(--color-primary-h) var(--color-primary-s) calc(var(--color-primary-l) - 12%));
+  --color-primary-bevel:  hsl(var(--color-primary-h) var(--color-primary-s) 42%);
+  --color-primary-subtle: hsl(var(--color-primary-h) var(--color-primary-s) var(--color-primary-l) / 0.14);
+
+  --color-accent:         hsl(var(--color-accent-h) var(--color-accent-s) var(--color-accent-l));
+  --color-accent-hover:   hsl(var(--color-accent-h) var(--color-accent-s) calc(var(--color-accent-l) - 6%));
+  --color-accent-active:  hsl(var(--color-accent-h) var(--color-accent-s) calc(var(--color-accent-l) - 12%));
+  --color-accent-bevel:   hsl(var(--color-accent-h) 95% 36%);
+  --color-accent-subtle:  hsl(var(--color-accent-h) var(--color-accent-s) var(--color-accent-l) / 0.16);
+
+  --color-success:        hsl(var(--color-success-h) var(--color-success-s) var(--color-success-l));
+  --color-success-hover:  hsl(var(--color-success-h) var(--color-success-s) calc(var(--color-success-l) - 6%));
+  --color-success-active: hsl(var(--color-success-h) var(--color-success-s) calc(var(--color-success-l) - 12%));
+  --color-success-bevel:  hsl(var(--color-success-h) var(--color-success-s) 34%);
+  --color-success-subtle: hsl(var(--color-success-h) var(--color-success-s) var(--color-success-l) / 0.16);
+
+  --color-danger:         hsl(var(--color-danger-h) var(--color-danger-s) var(--color-danger-l));
+  --color-danger-hover:   hsl(var(--color-danger-h) var(--color-danger-s) calc(var(--color-danger-l) - 6%));
+  --color-danger-active:  hsl(var(--color-danger-h) var(--color-danger-s) calc(var(--color-danger-l) - 12%));
+  --color-danger-bevel:   hsl(var(--color-danger-h) var(--color-danger-s) 40%);
+  --color-danger-subtle:  hsl(var(--color-danger-h) var(--color-danger-s) var(--color-danger-l) / 0.16);
+
+  --color-info:           hsl(var(--color-info-h) var(--color-info-s) var(--color-info-l));
+
+  /* Borders & Dividers */
+  --border-subtle:        hsl(var(--color-bg-h) 18% 88%);
+  --border-medium:        hsl(var(--color-bg-h) 22% 80%);
+  --border-strong:        hsl(var(--color-bg-h) 25% 68%);
+  --border-focus:         var(--color-primary);
+
+  /* --------------------------------------------------------------------------
+     CHESS BOARD & GAME SPECIFIC TOKENS
+     -------------------------------------------------------------------------- */
+  /* Warm Sand & Rich Caramel Wood (Kid-Friendly Warm Classic) */
+  --board-light-sq:          #f0d9b5; /* Warm creamy sand */
+  --board-dark-sq:           #b58863; /* Warm caramel timber */
+  --board-coord-light:       #b58863; /* Coordinate labels on light sq */
+  --board-coord-dark:        #f0d9b5; /* Coordinate labels on dark sq */
+  --board-rim:               #7d5538; /* Sturdy outer wooden border */
+  --board-rim-dark:          #533722;
+
+  /* Alternate Theme: Fresh Forest Emerald */
+  --board-light-sq-emerald:  #eeeed2;
+  --board-dark-sq-emerald:   #769656;
+  --board-rim-emerald:       #4d6934;
+
+  /* Move Highlights & Indicators */
+  --highlight-selected:      rgba(255, 215, 0, 0.65);        /* Warm Gold outline/fill */
+  --highlight-last-move:     rgba(255, 230, 110, 0.48);       /* Soft Lemon Glow */
+  --highlight-valid-dot:     rgba(34, 197, 94, 0.85);         /* Emerald target dot */
+  --highlight-valid-hover:   rgba(34, 197, 94, 0.35);         /* Soft target square fill */
+  --highlight-capture-ring:  rgba(239, 68, 68, 0.85);         /* Coral Red capture ring */
+  --check-danger-glow:       rgba(239, 68, 68, 0.90);         /* King check halo */
+  --check-danger-bg:         rgba(239, 68, 68, 0.35);         /* King check square wash */
+
+  /* Turn Indicators */
+  --turn-active-bg:          #22c55e;
+  --turn-active-text:        #ffffff;
+  --turn-waiting-bg:         #94a3b8;
+  --turn-waiting-text:       #ffffff;
+
+  /* --------------------------------------------------------------------------
+     ACADEMY & STAR RATING TOKENS
+     -------------------------------------------------------------------------- */
+  --academy-gold:          hsl(45, 100%, 51%); /* #ffc107 */
+  --academy-gold-hover:    hsl(45, 100%, 45%);
+  --academy-gold-bevel:    hsl(45, 95%, 35%);
+  --academy-gold-subtle:   hsl(45, 100%, 51% / 0.16);
+  --academy-gold-glow:     0 0 20px 4px rgba(255, 193, 7, 0.45);
+
+  --star-filled:           hsl(48, 100%, 50%); /* #ffcc00 */
+  --star-filled-stroke:    hsl(42, 100%, 36%);
+  --star-empty:            hsl(220, 16%, 82%);
+  --star-empty-stroke:     hsl(220, 16%, 68%);
+  --star-glow:             0 0 16px 4px rgba(255, 204, 0, 0.65);
+
+  --academy-step-bg:       hsl(255, 85%, 97%);
+  --academy-step-border:   hsl(255, 70%, 82%);
+  --academy-step-text:     hsl(255, 60%, 25%);
+  --academy-pill-bg:       hsl(255, 85%, 60%);
+  --academy-pill-text:     #ffffff;
+
+  --cat-fundamentals:      hsl(150, 72%, 40%);
+  --cat-fundamentals-bg:   hsl(150, 72%, 94%);
+  --cat-special:           hsl(192, 88%, 42%);
+  --cat-special-bg:        hsl(192, 88%, 94%);
+  --cat-tactics:           hsl(265, 85%, 58%);
+  --cat-tactics-bg:        hsl(265, 85%, 95%);
+  --cat-checkmates:        hsl(350, 85%, 56%);
+  --cat-checkmates-bg:     hsl(350, 85%, 95%);
+  --cat-endgame:           hsl(32, 90%, 48%);
+  --cat-endgame-bg:        hsl(32, 90%, 94%);
+
+  /* --------------------------------------------------------------------------
+     MASCOT IDENTITY PALETTE
+     -------------------------------------------------------------------------- */
+  --mascot-peanut-primary:  hsl(28, 92%, 54%);
+  --mascot-peanut-bevel:    hsl(28, 90%, 36%);
+  --mascot-peanut-bg:       hsl(32, 95%, 94%);
+  --mascot-peanut-bubble:   hsl(35, 100%, 97%);
+  --mascot-peanut-border:   hsl(28, 85%, 75%);
+  --mascot-peanut-text:     hsl(28, 80%, 20%);
+  --mascot-peanut-shadow:   0 5px 0 var(--mascot-peanut-bevel), 0 8px 18px rgba(245, 130, 32, 0.35);
+
+  --mascot-sparky-primary:  hsl(18, 92%, 50%);
+  --mascot-sparky-bevel:    hsl(18, 90%, 32%);
+  --mascot-sparky-bg:       hsl(20, 95%, 94%);
+  --mascot-sparky-bubble:   hsl(22, 100%, 97%);
+  --mascot-sparky-border:   hsl(18, 85%, 75%);
+  --mascot-sparky-text:     hsl(18, 80%, 20%);
+  --mascot-sparky-shadow:   0 5px 0 var(--mascot-sparky-bevel), 0 8px 18px rgba(240, 90, 34, 0.35);
+
+  --mascot-fox-primary:     hsl(9, 88%, 56%);
+  --mascot-fox-bevel:       hsl(9, 85%, 36%);
+  --mascot-fox-bg:          hsl(12, 95%, 94%);
+  --mascot-fox-bubble:      hsl(14, 100%, 97%);
+  --mascot-fox-border:      hsl(9, 85%, 75%);
+  --mascot-fox-text:        hsl(9, 80%, 20%);
+  --mascot-fox-shadow:      0 5px 0 var(--mascot-fox-bevel), 0 8px 18px rgba(242, 78, 46, 0.35);
+
+  --mascot-owl-primary:     hsl(245, 78%, 58%);
+  --mascot-owl-bevel:       hsl(245, 75%, 38%);
+  --mascot-owl-bg:          hsl(245, 80%, 95%);
+  --mascot-owl-bubble:      hsl(245, 90%, 98%);
+  --mascot-owl-border:      hsl(245, 70%, 75%);
+  --mascot-owl-text:        hsl(245, 70%, 20%);
+  --mascot-owl-shadow:      0 5px 0 var(--mascot-owl-bevel), 0 8px 18px rgba(91, 75, 226, 0.35);
+
+  /* --------------------------------------------------------------------------
+     HINT & GUIDANCE TOKENS
+     -------------------------------------------------------------------------- */
+  --hint-glow-from:         rgba(255, 193, 7, 0.90);
+  --hint-glow-from-bg:      rgba(255, 193, 7, 0.32);
+  --hint-glow-to:           rgba(34, 197, 94, 0.90);
+  --hint-glow-to-bg:        rgba(34, 197, 94, 0.35);
+  --hint-arrow-stroke:      #ffb300;
+  --hint-arrow-shadow:      0 0 10px rgba(255, 179, 0, 0.85);
+
+  --hint-pulse-shadow:      0 0 22px 6px rgba(255, 193, 7, 0.75);
+  --hint-banner-bg:         hsl(48, 100%, 96%);
+  --hint-banner-border:     hsl(45, 95%, 55%);
+  --hint-banner-text:       hsl(42, 90%, 22%);
+
+  --soft-error-bg:          hsl(350, 90%, 96%);
+  --soft-error-border:      hsl(350, 80%, 75%);
+  --soft-error-text:        hsl(350, 75%, 35%);
+  --soft-error-icon:        hsl(350, 85%, 55%);
+
+  /* --------------------------------------------------------------------------
+     PUZZLE HUB & MODE IDENTITY TOKENS
+     -------------------------------------------------------------------------- */
+  /* Mode 1: Themed Skill Drills */
+  --mode-drills-primary:   hsl(244, 75%, 59%); /* #4f46e5 */
+  --mode-drills-hover:     hsl(244, 75%, 52%);
+  --mode-drills-bevel:     hsl(244, 70%, 41%);
+  --mode-drills-bg:        hsl(244, 85%, 97%);
+  --mode-drills-border:    hsl(244, 70%, 82%);
+  --mode-drills-shadow:    0 5px 0 var(--mode-drills-bevel), 0 8px 20px rgba(79, 70, 229, 0.35);
+
+  /* Mode 2: Adaptive Rating Ladder */
+  --mode-ladder-primary:   hsl(271, 81%, 56%); /* #9333ea */
+  --mode-ladder-hover:     hsl(271, 81%, 50%);
+  --mode-ladder-bevel:     hsl(271, 75%, 39%);
+  --mode-ladder-bg:        hsl(271, 85%, 97%);
+  --mode-ladder-border:    hsl(271, 70%, 82%);
+  --mode-ladder-shadow:    0 5px 0 var(--mode-ladder-bevel), 0 8px 20px rgba(147, 51, 234, 0.35);
+
+  /* Mode 3: Puzzle Rush / Streak Survivor */
+  --mode-rush-primary:     hsl(21, 90%, 48%); /* #ea580c */
+  --mode-rush-hover:       hsl(21, 90%, 42%);
+  --mode-rush-bevel:       hsl(21, 85%, 34%);
+  --mode-rush-bg:          hsl(24, 100%, 97%);
+  --mode-rush-border:      hsl(21, 85%, 80%);
+  --mode-rush-shadow:      0 5px 0 var(--mode-rush-bevel), 0 8px 22px rgba(234, 88, 12, 0.38);
+
+  /* Streak Multiplier & Flame Tokens */
+  --flame-spark-start:     hsl(42, 100%, 52%);  /* #ffb300 */
+  --flame-spark-end:       hsl(28, 95%, 54%);   /* #f58220 */
+  --flame-spark-glow:      0 0 12px rgba(255, 179, 0, 0.55);
+
+  --flame-blaze-start:     hsl(25, 95%, 52%);   /* #f97316 */
+  --flame-blaze-end:       hsl(12, 90%, 52%);   /* #ef4422 */
+  --flame-blaze-glow:      0 0 20px 4px rgba(249, 115, 22, 0.70);
+
+  --flame-inferno-start:   hsl(350, 88%, 56%);  /* #f43f5e */
+  --flame-inferno-mid:     hsl(16, 92%, 52%);   /* #ea580c */
+  --flame-inferno-end:     hsl(45, 100%, 51%);  /* #ffc107 */
+  --flame-inferno-glow:    0 0 28px 8px rgba(244, 63, 94, 0.80), 0 0 10px rgba(255, 193, 7, 0.90);
+  --flame-badge-text:      #ffffff;
+
+  /* Timer Bar Tokens */
+  --timer-safe:            hsl(145, 68%, 48%); /* >60s */
+  --timer-warning:         hsl(42, 100%, 52%); /* 30s-60s */
+  --timer-danger:          hsl(354, 88%, 58%); /* <15s */
+  --timer-bonus-time:      hsl(145, 80%, 42%); /* "+5s" badge popup */
+
+  /* Strike / Life Tokens */
+  --strike-active:         hsl(145, 68%, 48%);
+  --strike-cracked:        hsl(354, 88%, 58%);
+  --strike-empty:          hsl(220, 16%, 80%);
+
+  /* 3-Tier Progressive Hint Tokens */
+  --hint-tier1-piece-glow: 0 0 18px 4px rgba(255, 193, 7, 0.85);
+  --hint-tier1-bg:         rgba(255, 193, 7, 0.28);
+  --hint-tier1-border:     hsl(45, 100%, 51%);
+
+  --hint-tier2-from-glow:  0 0 22px 6px rgba(255, 193, 7, 0.80);
+  --hint-tier2-from-bg:    rgba(255, 193, 7, 0.35);
+  --hint-tier2-to-glow:    0 0 22px 6px rgba(34, 197, 94, 0.85);
+  --hint-tier2-to-bg:      rgba(34, 197, 94, 0.38);
+  --hint-tier2-ring:       #22c55e;
+
+  --hint-tier3-arrow-start: #ffc107;
+  --hint-tier3-arrow-end:   #22c55e;
+  --hint-tier3-arrow-glow:  0 0 14px rgba(255, 193, 7, 0.90), 0 0 8px rgba(34, 197, 94, 0.90);
+  --hint-tier3-ghost-opacity: 0.55;
+  --hint-tier3-ghost-glow:  drop-shadow(0 0 12px rgba(34, 197, 94, 0.85));
+
+  --hint-meter-filled:      hsl(45, 100%, 51%);
+  --hint-meter-empty:       hsl(220, 16%, 84%);
+
+  /* Magnetic Snap Highlight */
+  --snap-target-ring:        rgba(34, 197, 94, 0.95);
+  --snap-target-bg:          rgba(34, 197, 94, 0.45);
+  --snap-target-glow:        0 0 20px 4px rgba(34, 197, 94, 0.80);
+
+  /* Button Shadows for Rush & Drills */
+  --shadow-btn-rush:           0 5px 0 var(--mode-rush-bevel), 0 8px 18px rgba(234, 88, 12, 0.40);
+  --shadow-btn-rush-hover:     0 7px 0 var(--mode-rush-bevel), 0 12px 24px rgba(234, 88, 12, 0.48);
+  --shadow-btn-rush-active:    0 1px 0 var(--mode-rush-bevel), 0 2px 5px rgba(234, 88, 12, 0.30);
+}
+
+/* Dark Theme Semantic Overrides */
+[data-theme='dark'] {
+  --bg-app:             hsl(226, 30%, 10%);
+  --bg-surface:         hsl(225, 24%, 16%);
+  --bg-surface-raised:  hsl(225, 22%, 22%);
+  --bg-surface-glass:   rgba(30, 36, 56, 0.88);
+  --bg-overlay:         rgba(5, 8, 16, 0.80);
+
+  --text-main:          hsl(220, 20%, 96%);
+  --text-muted:         hsl(220, 14%, 68%);
+  --text-faint:         hsl(220, 10%, 46%);
+
+  --border-subtle:        hsl(225, 20%, 24%);
+  --border-medium:        hsl(225, 20%, 32%);
+  --border-strong:        hsl(225, 20%, 45%);
+
+  --board-rim:            #2c1f15;
+  --board-rim-dark:       #1a120c;
+
+  /* Academy Dark Overrides */
+  --academy-step-bg:       hsl(255, 30%, 18%);
+  --academy-step-border:   hsl(255, 40%, 32%);
+  --academy-step-text:     hsl(255, 85%, 92%);
+  --star-empty:            hsl(225, 15%, 28%);
+  --star-empty-stroke:     hsl(225, 15%, 40%);
+
+  /* Category Dark Overrides */
+  --cat-fundamentals-bg:   hsl(150, 40%, 16%);
+  --cat-special-bg:        hsl(192, 45%, 16%);
+  --cat-tactics-bg:        hsl(265, 40%, 18%);
+  --cat-checkmates-bg:     hsl(350, 45%, 18%);
+  --cat-endgame-bg:        hsl(32, 45%, 16%);
+
+  /* Mascot Dark Overrides */
+  --mascot-peanut-bg:      hsl(28, 40%, 18%);
+  --mascot-peanut-bubble:  hsl(28, 30%, 22%);
+  --mascot-peanut-border:  hsl(28, 50%, 35%);
+  --mascot-peanut-text:    hsl(28, 85%, 90%);
+
+  --mascot-sparky-bg:      hsl(18, 40%, 18%);
+  --mascot-sparky-bubble:  hsl(18, 30%, 22%);
+  --mascot-sparky-border:  hsl(18, 50%, 35%);
+  --mascot-sparky-text:    hsl(18, 85%, 90%);
+
+  --mascot-fox-bg:         hsl(9, 40%, 18%);
+  --mascot-fox-bubble:     hsl(9, 30%, 22%);
+  --mascot-fox-border:     hsl(9, 50%, 35%);
+  --mascot-fox-text:       hsl(9, 85%, 90%);
+
+  --mascot-owl-bg:         hsl(245, 40%, 18%);
+  --mascot-owl-bubble:     hsl(245, 30%, 22%);
+  --mascot-owl-border:     hsl(245, 45%, 38%);
+  --mascot-owl-text:       hsl(245, 85%, 90%);
+
+  /* Hint Dark Overrides */
+  --hint-banner-bg:        hsl(45, 30%, 18%);
+  --hint-banner-border:    hsl(45, 60%, 38%);
+  --hint-banner-text:      hsl(45, 85%, 90%);
+
+  --soft-error-bg:         hsl(350, 40%, 18%);
+  --soft-error-border:     hsl(350, 50%, 35%);
+  --soft-error-text:       hsl(350, 85%, 90%);
+
+  /* Puzzle Hub Dark Overrides */
+  --mode-drills-bg:     hsl(244, 40%, 18%);
+  --mode-drills-border: hsl(244, 45%, 36%);
+  --mode-ladder-bg:     hsl(271, 40%, 18%);
+  --mode-ladder-border: hsl(271, 45%, 36%);
+  --mode-rush-bg:       hsl(21, 40%, 18%);
+  --mode-rush-border:   hsl(21, 50%, 36%);
+  --hint-meter-empty:   hsl(225, 15%, 28%);
+  --strike-empty:       hsl(225, 15%, 28%);
+}
+
+/* --------------------------------------------------------------------------
+   3. TYPOGRAPHY SCALE & FONT DECLARATIONS
+   -------------------------------------------------------------------------- */
+:root {
+  /* Font Families */
+  --font-display: 'Fredoka', cursive, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body:    'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  /* Fluid Typography Scale (320px -> 1280px viewport clamp) */
+  --text-hero:    clamp(2.40rem, 1.80rem + 2.8vw, 3.40rem);  /* 38px -> 54px */
+  --text-4xl:     clamp(1.90rem, 1.50rem + 1.9vw, 2.60rem);  /* 30px -> 42px (H1) */
+  --text-3xl:     clamp(1.50rem, 1.25rem + 1.4vw, 2.10rem);  /* 24px -> 34px (H2) */
+  --text-2xl:     clamp(1.30rem, 1.10rem + 0.9vw, 1.65rem);  /* 21px -> 26px (H3) */
+  --text-xl:      clamp(1.15rem, 1.00rem + 0.6vw, 1.35rem);  /* 18px -> 22px (H4, Modals) */
+  --text-lg:      clamp(1.05rem, 0.95rem + 0.4vw, 1.20rem);  /* 17px -> 19px (Subheadings) */
+  --text-base:    clamp(0.95rem, 0.90rem + 0.2vw, 1.05rem);  /* 15px -> 17px (Standard Body) */
+  --text-sm:      clamp(0.82rem, 0.78rem + 0.2vw, 0.92rem);  /* 13px -> 15px (Badges, Captions) */
+  --text-xs:      clamp(0.70rem, 0.67rem + 0.1vw, 0.78rem);  /* 11px -> 12.5px (Coordinates) */
+
+  /* Specialized Game Display Tokens */
+  --text-room-code:   clamp(2.2rem, 1.8rem + 2.0vw, 3.0rem);  /* 35px -> 48px */
+  --text-piece-score: clamp(0.85rem, 0.80rem + 0.2vw, 1.0rem);
+
+  /* Line Heights */
+  --leading-none:    1.0;
+  --leading-tight:   1.15;
+  --leading-snug:    1.30;
+  --leading-normal:  1.50;
+  --leading-relaxed: 1.65;
+
+  /* Font Weights */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+  --weight-heavy:    800;
+
+  /* Letter Spacing */
+  --tracking-tight:  -0.03em;
+  --tracking-normal: 0em;
+  --tracking-wide:   0.04em;
+  --tracking-code:   0.22em; /* Generous spacing for 4-letter room code */
+}
+
+/* --------------------------------------------------------------------------
+   4. SPACING, RADIUS, DEPTH, & MOTION TOKENS
+   -------------------------------------------------------------------------- */
+:root {
+  /* Spacing Scale (4px Base Grid) */
+  --space-0-5: 2px;
+  --space-1:   4px;
+  --space-1-5: 6px;
+  --space-2:   8px;
+  --space-2-5: 10px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+
+  /* Touch Target Standards */
+  --touch-target-min:    44px; /* WCAG minimum tap target */
+  --touch-target-button: 52px; /* Primary gaming tactile button height */
+  --touch-target-square: 48px; /* Minimum phone chess square size */
+
+  /* Border Radius System */
+  --radius-xs:   4px;   /* Fine badges, coordinate markers */
+  --radius-sm:   8px;   /* Small piece trays, move list pills */
+  --radius-md:   12px;  /* Input fields, square highlight rings */
+  --radius-lg:   16px;  /* Chess board outer rim, standard buttons */
+  --radius-xl:   22px;  /* Lobby cards, modal dialogs */
+  --radius-2xl:  30px;  /* Large hero containers, bottom sheets */
+  --radius-pill: 9999px;/* Turn badges, material score pills */
+
+  /* Component specific aliases */
+  --radius-btn:   var(--radius-lg);
+  --radius-card:  var(--radius-xl);
+  --radius-modal: var(--radius-2xl);
+  --radius-board: var(--radius-lg);
+
+  /* Ambient Soft Shadows */
+  --shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.09), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.14), 0 4px 10px rgba(15, 23, 42, 0.08);
+  --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.20), 0 8px 16px rgba(15, 23, 42, 0.10);
+
+  /* Tactile 3D Button Shadows (Pressable Effect) */
+  --shadow-btn-primary:        0 5px 0 var(--color-primary-bevel), 0 8px 15px rgba(108, 92, 231, 0.35);
+  --shadow-btn-primary-hover:  0 7px 0 var(--color-primary-bevel), 0 10px 20px rgba(108, 92, 231, 0.40);
+  --shadow-btn-primary-active: 0 1px 0 var(--color-primary-bevel), 0 2px 5px rgba(108, 92, 231, 0.25);
+
+  --shadow-btn-accent:         0 5px 0 var(--color-accent-bevel), 0 8px 15px rgba(255, 179, 0, 0.35);
+  --shadow-btn-accent-hover:   0 7px 0 var(--color-accent-bevel), 0 10px 20px rgba(255, 179, 0, 0.40);
+  --shadow-btn-accent-active:  0 1px 0 var(--color-accent-bevel), 0 2px 5px rgba(255, 179, 0, 0.25);
+
+  --shadow-btn-danger:         0 5px 0 var(--color-danger-bevel), 0 8px 15px rgba(239, 68, 68, 0.35);
+  --shadow-btn-danger-hover:   0 7px 0 var(--color-danger-bevel), 0 10px 20px rgba(239, 68, 68, 0.40);
+  --shadow-btn-danger-active:  0 1px 0 var(--color-danger-bevel), 0 2px 5px rgba(239, 68, 68, 0.25);
+
+  --shadow-btn-success:        0 5px 0 var(--color-success-bevel), 0 8px 15px rgba(34, 197, 94, 0.35);
+  --shadow-btn-success-hover:  0 7px 0 var(--color-success-bevel), 0 10px 20px rgba(34, 197, 94, 0.40);
+  --shadow-btn-success-active: 0 1px 0 var(--color-success-bevel), 0 2px 5px rgba(34, 197, 94, 0.25);
+
+  --shadow-btn-gold:           0 5px 0 var(--academy-gold-bevel), 0 8px 15px rgba(255, 193, 7, 0.35);
+  --shadow-btn-gold-hover:     0 7px 0 var(--academy-gold-bevel), 0 10px 20px rgba(255, 193, 7, 0.40);
+  --shadow-btn-gold-active:    0 1px 0 var(--academy-gold-bevel), 0 2px 5px rgba(255, 193, 7, 0.25);
+
+  --shadow-btn-ghost:          0 3px 0 var(--border-medium), var(--shadow-xs);
+  --shadow-btn-ghost-hover:    0 5px 0 var(--border-strong), var(--shadow-sm);
+  --shadow-btn-ghost-active:   0 1px 0 var(--border-medium);
+
+  /* Game Glow Halos */
+  --glow-check-king:  0 0 22px 6px var(--check-danger-glow);
+  --glow-valid-move:  0 0 14px 2px rgba(34, 197, 94, 0.65);
+  --glow-turn-active: 0 0 16px 3px rgba(34, 197, 94, 0.45);
+  --glow-piece-lift:  0 10px 22px rgba(0, 0, 0, 0.30);
+
+  /* Playful Easing Curves */
+  --ease-spring:      cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-out-back:    cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard:    cubic-bezier(0.2, 0, 0, 1);
+
+  /* Durations */
+  --duration-instant: 70ms;
+  --duration-fast:    140ms;
+  --duration-normal:  240ms;
+  --duration-spring:  360ms;
+  --duration-pulse:   1400ms;
+}
+
+/* --------------------------------------------------------------------------
+   5. KEYFRAME ANIMATIONS
+   -------------------------------------------------------------------------- */
+@keyframes pulse-valid-dot {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.70;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1.0;
+  }
+  100% {
+    transform: scale(0.85);
+    opacity: 0.70;
+  }
+}
+
+@keyframes pulse-capture-ring {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 3px var(--highlight-capture-ring);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 5px var(--highlight-capture-ring), 0 0 12px var(--highlight-capture-ring);
+  }
+  100% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 3px var(--highlight-capture-ring);
+  }
+}
+
+@keyframes check-strobe {
+  0%, 100% {
+    background-color: var(--check-danger-bg);
+    box-shadow: inset 0 0 15px 4px var(--color-danger), var(--glow-check-king);
+  }
+  50% {
+    background-color: rgba(239, 68, 68, 0.65);
+    box-shadow: inset 0 0 25px 8px var(--color-danger), 0 0 30px 10px var(--color-danger);
+  }
+}
+
+@keyframes check-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-5deg) scale(1.08); }
+  75% { transform: rotate(5deg) scale(1.08); }
+}
+
+@keyframes piece-capture-pop {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1.4) rotate(12deg);
+    opacity: 0.9;
+    filter: brightness(1.8) drop-shadow(0 0 12px var(--color-accent));
+  }
+  100% {
+    transform: scale(0.1) rotate(-25deg);
+    opacity: 0;
+  }
+}
+
+@keyframes turn-bounce-glow {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: var(--glow-turn-active);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.04);
+    box-shadow: 0 0 24px 6px rgba(34, 197, 94, 0.75);
+  }
+}
+
+@keyframes float-bounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.05);
+  }
+}
+
+@keyframes modal-pop-in {
+  0% {
+    transform: scale(0.88) translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes modal-fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes bubble-pop {
+  0% {
+    transform: scale(0.85) translateY(8px);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.04) translateY(-2px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes star-pop {
+  0% {
+    transform: scale(0) rotate(-30deg);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.35) rotate(10deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 12px var(--star-filled));
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 4px var(--star-filled));
+  }
+}
+
+@keyframes hint-pulse-aura {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.75), inset 0 0 10px rgba(255, 193, 7, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 24px 6px rgba(255, 193, 7, 0.90), inset 0 0 18px rgba(255, 193, 7, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.75), inset 0 0 10px rgba(255, 193, 7, 0.4);
+  }
+}
+
+@keyframes thinking-dot-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.6) translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.2) translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes shake-soft {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+@keyframes mode-switch-slide {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes flame-flicker {
+  0%, 100% {
+    transform: scale(1) rotate(-2deg);
+    filter: drop-shadow(0 0 12px var(--flame-blaze-start));
+  }
+  50% {
+    transform: scale(1.12) rotate(3deg);
+    filter: drop-shadow(0 0 24px var(--flame-blaze-end));
+  }
+}
+
+@keyframes flame-pop-in {
+  0% {
+    transform: scale(0.3) rotate(-15deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.35) rotate(5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes piece-nudge-wiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(-8deg) scale(1.08); }
+  40% { transform: rotate(8deg) scale(1.08); }
+  60% { transform: rotate(-5deg) scale(1.04); }
+  80% { transform: rotate(4deg) scale(1.02); }
+}
+
+@keyframes beacon-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.85), inset 0 0 10px rgba(34, 197, 94, 0.5);
+  }
+  60% {
+    box-shadow: 0 0 0 14px rgba(34, 197, 94, 0), inset 0 0 20px rgba(34, 197, 94, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0), inset 0 0 10px rgba(34, 197, 94, 0.5);
+  }
+}
+
+@keyframes ghost-piece-shimmer {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.50;
+  }
+  50% {
+    transform: translateY(-5px) scale(1.05);
+    opacity: 0.75;
+  }
+}
+
+@keyframes elo-bump-up {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.22); color: var(--color-success); }
+  100% { transform: scale(1); }
+}
+
+@keyframes float-delta {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  40% {
+    transform: translateY(-12px) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-26px) scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes timer-heartbeat {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px var(--color-danger);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 20px 4px var(--color-danger);
+  }
+}
+
+@keyframes arrow-draw-grow {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 0.4;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. GLOBAL RESET & BASE STYLES
+   -------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-main);
+  background-color: var(--bg-app);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  color: var(--text-main);
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+/* --------------------------------------------------------------------------
+   7. CHESS PIECE & BOARD COLOR IMMUNITY (FORCE DARK MODE ISOLATION)
+   -------------------------------------------------------------------------- */
+/* Prevent mobile browser engines (Samsung Internet, Chrome Auto-Dark) and
+   OS accessibility engines from auto-inverting chess piece SVGs and board colors */
+.chess-board-container,
+.chess-board-grid,
+.chess-square,
+.chess-piece-wrapper,
+.chess-piece-svg,
+.captured-tray,
+.captured-piece-item,
+.promotion-card,
+.piece-icon-wrapper {
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
+}
+
+.chess-piece-svg *,
+.chess-piece-svg path,
+.chess-piece-svg g {
+  forced-color-adjust: none !important;
+  color-scheme: only light !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. ACCESSIBILITY: REDUCED MOTION (MANDATORY)
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .valid-move-dot {
+    opacity: 0.9 !important;
+    transform: none !important;
+  }
+
+  .square-in-check {
+    background-color: var(--check-danger-bg) !important;
+    box-shadow: inset 0 0 10px var(--color-danger) !important;
+  }
+}
