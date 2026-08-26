@@ -110,4 +110,38 @@ describe('QrCodeModal.vue', () => {
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false]);
     expect(wrapper.emitted('close')).toHaveLength(1);
   });
+
+  it('displays inline accessible error when invalid IP is submitted and clears on valid IP', async () => {
+    wrapper = mount(QrCodeModal, {
+      props: {
+        modelValue: true,
+        roomCode: 'STAR',
+      },
+    });
+
+    const customInput = document.body.querySelector('.ip-text-input') as HTMLInputElement;
+    const applyBtn = document.body.querySelector('[data-testid="apply-custom-ip-btn"]') as HTMLButtonElement;
+
+    // Enter invalid IP
+    customInput.value = '999.999.999';
+    customInput.dispatchEvent(new Event('input'));
+    await wrapper.vm.$nextTick();
+
+    applyBtn.click();
+    await wrapper.vm.$nextTick();
+
+    const errorEl = document.body.querySelector('[data-testid="qr-ip-error"]');
+    expect(errorEl).not.toBeNull();
+    expect(errorEl?.textContent).toContain('Please enter a valid IPv4 address');
+    expect(customInput.getAttribute('aria-invalid')).toBe('true');
+
+    // Enter valid IP
+    customInput.value = '192.168.1.55';
+    customInput.dispatchEvent(new Event('input'));
+    await wrapper.vm.$nextTick();
+
+    const clearedErrorEl = document.body.querySelector('[data-testid="qr-ip-error"]');
+    expect(clearedErrorEl).toBeNull();
+    expect(customInput.getAttribute('aria-invalid')).toBe('false');
+  });
 });

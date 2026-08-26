@@ -232,9 +232,9 @@ function handleThemeSelected(theme: PuzzleTheme) {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 900px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: var(--space-3, 12px) var(--space-4, 16px);
+  padding: 0;
   gap: var(--space-4, 16px);
   box-sizing: border-box;
 }

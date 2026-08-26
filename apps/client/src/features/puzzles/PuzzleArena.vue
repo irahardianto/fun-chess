@@ -256,23 +256,23 @@ function handleBack() {
           </div>
 
           <p v-if="activePuzzle.subtitle" class="puzzle-card-description">{{ activePuzzle.subtitle }}</p>
-
-          <!-- Feedback message on mistake / bot response -->
-          <transition name="fade">
-            <div
-              v-if="activeRunner.feedbackMessage.value"
-              class="puzzle-feedback-banner"
-              data-testid="puzzle-feedback-banner"
-            >
-              <span class="feedback-icon">💬</span>
-              <span class="feedback-text">{{ activeRunner.feedbackMessage.value }}</span>
-            </div>
-          </transition>
         </div>
       </div>
 
       <!-- Chessboard Container with Integrated Progressive Hint Layer -->
       <div class="arena-board-slot">
+        <!-- Floating feedback toast on mistake / feedback -->
+        <transition name="fade">
+          <div
+            v-if="activeRunner.feedbackMessage.value"
+            class="puzzle-feedback-banner"
+            data-testid="puzzle-feedback-banner"
+          >
+            <span class="feedback-icon">💬</span>
+            <span class="feedback-text">{{ activeRunner.feedbackMessage.value }}</span>
+          </div>
+        </transition>
+
         <PuzzleBoardWrapper
           :fen="activeRunner.currentFen.value"
           :orientation="activeRunner.playerColor.value"
@@ -522,19 +522,41 @@ function handleBack() {
 }
 
 .puzzle-feedback-banner {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-toast, 10);
   display: flex;
   align-items: center;
   gap: var(--space-2, 8px);
-  padding: var(--space-2, 8px) var(--space-3, 12px);
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: var(--radius-md, 10px);
+  padding: 4px 16px;
+  background-color: var(--bg-surface-glass, rgba(255, 255, 255, 0.92));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px solid var(--color-danger, #ef4444);
+  border-radius: var(--radius-pill, 9999px);
   color: var(--color-danger, #ef4444);
-  font-size: var(--text-xs, 12px);
-  font-weight: 600;
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  font-size: var(--text-sm, 14px);
+  font-weight: 700;
+  box-shadow: var(--shadow-md, 0 6px 16px rgba(15, 23, 42, 0.1));
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.puzzle-feedback-banner .feedback-icon {
+  font-size: 1rem;
+}
+
+.puzzle-feedback-banner .feedback-text {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  font-size: var(--text-sm, 14px);
+  font-weight: 700;
 }
 
 .arena-board-slot {
+  position: relative;
   width: 100%;
   display: flex;
   justify-content: center;
@@ -557,11 +579,18 @@ function handleBack() {
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
 }
 
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+  transform: translate(-50%, -6px) scale(0.94);
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
 }
 </style>

@@ -44,4 +44,21 @@ describe('LobbyModeSelector.vue', () => {
     expect(wrapper.emitted('select')).toHaveLength(1);
     expect(wrapper.emitted('select')?.[0]).toEqual(['academy']);
   });
+
+  it('has valid tablist container and tab controls for accessibility', () => {
+    const wrapper = mount(LobbyModeSelector, {
+      props: {
+        modelValue: 'puzzle_hub',
+      },
+    });
+
+    const nav = wrapper.find('.mode-switcher-container');
+    expect(nav.attributes('role')).toBe('tablist');
+    expect(nav.attributes('aria-label')).toBe('Game Mode Selection');
+
+    const activeTab = wrapper.find('[data-testid="mode-tab-puzzle_hub"]');
+    expect(activeTab.classes()).toContain('is-active');
+    expect(activeTab.attributes('role')).toBe('tab');
+    expect(activeTab.attributes('aria-controls')).toBe('mode-panel-puzzle_hub');
+  });
 });

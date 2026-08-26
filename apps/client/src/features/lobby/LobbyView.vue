@@ -204,6 +204,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
               class="avatar-option-btn"
               :class="{ 'is-selected': selectedAvatar === emoji }"
               :aria-checked="selectedAvatar === emoji"
+              :aria-label="`Select ${emoji} avatar`"
               role="radio"
               @click="selectedAvatar = emoji"
             >
@@ -293,9 +294,9 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 840px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: var(--space-3) var(--space-4);
+  padding: 0;
   gap: var(--space-5);
   box-sizing: border-box;
 }
@@ -342,13 +343,15 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
 }
 
 .lan-mode-panel {
-  max-width: 680px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .solo-ai-panel,
 .academy-panel,
 .puzzle-hub-panel {
   width: 100%;
+  max-width: 100%;
 }
 
 .avatar-card {
@@ -358,7 +361,10 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
 .avatar-picker-group {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: var(--space-2);
+  width: 100%;
 }
 
 .section-label {
@@ -366,13 +372,14 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   color: var(--text-muted);
+  text-align: center;
 }
 
 .avatar-options {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+  justify-content: center;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 

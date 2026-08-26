@@ -111,7 +111,7 @@ function handleReturnToLobby() {
           <span class="stat-value">{{ reasonFormatted }}</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">Total Plies</span>
+          <span class="stat-label">Total Moves</span>
           <span class="stat-value">{{ props.payload.totalMoves }}</span>
         </div>
         <div class="stat-item">

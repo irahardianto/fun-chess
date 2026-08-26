@@ -9,6 +9,7 @@
    -------------------------------------------------------------------------- */
 :root {
   color-scheme: light dark;
+  scrollbar-gutter: stable;
 
   /* Brand / Primary — Energetic Electric Violet */
   --color-primary-h: 255;
@@ -86,6 +87,8 @@
   --text-on-accent:     #1e1b4b;
   --text-on-danger:     #ffffff;
   --text-on-success:    #ffffff;
+  --color-primary-text: hsl(var(--color-primary-h) 65% 38%);
+  --color-accent-text:  #92400e;
 
   /* Interactive Buttons & Accents */
   --color-primary:        hsl(var(--color-primary-h) var(--color-primary-s) var(--color-primary-l));
@@ -119,6 +122,7 @@
   --border-medium:        hsl(var(--color-bg-h) 22% 80%);
   --border-strong:        hsl(var(--color-bg-h) 25% 68%);
   --border-focus:         var(--color-primary);
+  --focus-ring:           0 0 0 3px hsl(var(--color-primary-h, 255) 85% 60% / 0.45);
 
   /* --------------------------------------------------------------------------
      CHESS BOARD & GAME SPECIFIC TOKENS
@@ -126,7 +130,7 @@
   /* Warm Sand & Rich Caramel Wood (Kid-Friendly Warm Classic) */
   --board-light-sq:          #f0d9b5; /* Warm creamy sand */
   --board-dark-sq:           #b58863; /* Warm caramel timber */
-  --board-coord-light:       #b58863; /* Coordinate labels on light sq */
+  --board-coord-light:       #7d5538; /* Coordinate labels on light sq (contrast >= 4.5:1) */
   --board-coord-dark:        #f0d9b5; /* Coordinate labels on dark sq */
   --board-rim:               #7d5538; /* Sturdy outer wooden border */
   --board-rim-dark:          #533722;
@@ -148,7 +152,7 @@
   /* Turn Indicators */
   --turn-active-bg:          #22c55e;
   --turn-active-text:        #ffffff;
-  --turn-waiting-bg:         #94a3b8;
+  --turn-waiting-bg:         #64748b; /* Accessible contrast >= 4.5:1 */
   --turn-waiting-text:       #ffffff;
 
   /* --------------------------------------------------------------------------
@@ -333,6 +337,8 @@
   --text-main:          hsl(220, 20%, 96%);
   --text-muted:         hsl(220, 14%, 68%);
   --text-faint:         hsl(220, 10%, 46%);
+  --color-primary-text: hsl(255 95% 78%);
+  --color-accent-text:  hsl(42 100% 75%);
 
   --border-subtle:        hsl(225, 20%, 24%);
   --border-medium:        hsl(225, 20%, 32%);
@@ -376,14 +382,19 @@
   --mascot-owl-border:     hsl(245, 45%, 38%);
   --mascot-owl-text:       hsl(245, 85%, 90%);
 
-  /* Hint Dark Overrides */
+  /* Hint & Alert Dark Overrides */
   --hint-banner-bg:        hsl(45, 30%, 18%);
   --hint-banner-border:    hsl(45, 60%, 38%);
   --hint-banner-text:      hsl(45, 85%, 90%);
+  --hint-banner-glass:     rgba(45, 36, 18, 0.94);
 
   --soft-error-bg:         hsl(350, 40%, 18%);
   --soft-error-border:     hsl(350, 50%, 35%);
   --soft-error-text:       hsl(350, 85%, 90%);
+  --soft-error-glass:      rgba(45, 20, 25, 0.94);
+
+  --soft-info-glass:       rgba(20, 38, 50, 0.94);
+  --soft-success-glass:    rgba(20, 45, 30, 0.94);
 
   /* Puzzle Hub Dark Overrides */
   --mode-drills-bg:     hsl(244, 40%, 18%);
@@ -432,7 +443,7 @@
   --weight-medium:   500;
   --weight-semibold: 600;
   --weight-bold:     700;
-  --weight-heavy:    800;
+  --weight-heavy:    700;
 
   /* Letter Spacing */
   --tracking-tight:  -0.03em;
@@ -532,6 +543,25 @@
   --duration-normal:  240ms;
   --duration-spring:  360ms;
   --duration-pulse:   1400ms;
+
+  /* Layer Z-Index Hierarchy (Zero-CLS Architecture) */
+  --z-board-base:          1;
+  --z-board-piece:         5;
+  --z-board-indicator:     8;
+  --z-overlay-toast:       10;
+  --z-overlay-guide:       15;
+  --z-overlay-dialogue:    20;
+  --z-overlay-alert:       30;
+  --z-modal-backdrop:      50;
+  --z-modal-card:          60;
+  --z-global-notification: 100;
+
+  /* Floating Glass Overlay Tokens */
+  --hint-banner-glass:   rgba(254, 249, 195, 0.94);
+  --soft-error-glass:    rgba(255, 241, 242, 0.94);
+  --soft-info-glass:     rgba(240, 249, 255, 0.94);
+  --soft-success-glass:  rgba(240, 253, 244, 0.94);
+  --glow-hint-banner:    0 0 20px 4px rgba(255, 193, 7, 0.38);
 }
 
 /* --------------------------------------------------------------------------
@@ -822,6 +852,11 @@ html {
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-gutter: stable;
+}
+
+.app-shell {
+  scrollbar-gutter: stable;
 }
 
 body {

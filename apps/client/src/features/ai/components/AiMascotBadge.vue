@@ -106,9 +106,9 @@ const statusText = computed(() => {
 
 <style scoped>
 .ai-mascot-badge-container {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
   width: 100%;
   box-sizing: border-box;
 }
@@ -161,7 +161,7 @@ const statusText = computed(() => {
   border-radius: var(--radius-pill);
   background-color: var(--color-accent);
   border: 2px solid var(--bg-surface);
-  animation: pulse-reconnect 1s infinite alternate;
+  animation: thinking-dot-bounce 900ms infinite ease-in-out;
 }
 
 .mascot-info {
@@ -285,11 +285,17 @@ const statusText = computed(() => {
 
 /* Speech Bubble */
 .mascot-speech-bubble {
-  position: relative;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-overlay-dialogue, 20);
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background-color: var(--bg-surface);
+  background-color: var(--bg-surface-glass, rgba(255, 255, 255, 0.92));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 2px solid var(--border-medium);
   border-radius: var(--radius-xl);
   padding: var(--space-2) var(--space-4);
@@ -297,8 +303,9 @@ const statusText = computed(() => {
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   color: var(--text-main);
-  box-shadow: var(--shadow-sm);
-  margin-top: var(--space-1);
+  box-shadow: var(--shadow-md);
+  margin-top: 0;
+  pointer-events: auto;
 }
 
 /* Bubble Pointer Tail pointing to avatar */
@@ -306,7 +313,7 @@ const statusText = computed(() => {
   content: '';
   position: absolute;
   top: -7px;
-  left: 20px;
+  left: 24px;
   width: 12px;
   height: 12px;
   background-color: var(--bg-surface);
@@ -339,7 +346,7 @@ const statusText = computed(() => {
 
 .bubble-pop-leave-to {
   opacity: 0;
-  transform: scale(0.9) translateY(4px);
+  transform: scale(0.92) translateY(4px);
 }
 
 @keyframes bubble-pop {

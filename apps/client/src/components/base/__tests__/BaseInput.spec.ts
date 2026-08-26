@@ -70,4 +70,18 @@ describe('BaseInput.vue', () => {
     expect(wrapper.emitted('update:modelValue')).toContainEqual(['']);
     expect(wrapper.emitted('clear')).toHaveLength(1);
   });
+
+  it('renders input control with proper structure and accessible attributes', () => {
+    const wrapper = mount(BaseInput, {
+      props: {
+        label: 'Username',
+        placeholder: 'Enter username',
+      },
+    });
+
+    const control = wrapper.find('.base-input-control');
+    expect(control.exists()).toBe(true);
+    expect(control.attributes('type')).toBe('text');
+    expect(control.attributes('id')).toBeDefined();
+  });
 });

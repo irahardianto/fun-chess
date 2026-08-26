@@ -92,4 +92,17 @@ describe('BaseButton.vue', () => {
     expect(wrapper.find('.test-right-icon').exists()).toBe(true);
     expect(wrapper.text()).toContain('Battle');
   });
+
+  it('renders with button type and accessible attributes', () => {
+    const wrapper = mount(BaseButton, {
+      props: {
+        type: 'submit',
+        ariaLabel: 'Submit form',
+      },
+    });
+
+    expect(wrapper.attributes('type')).toBe('submit');
+    expect(wrapper.attributes('aria-label')).toBe('Submit form');
+    expect(wrapper.classes()).toContain('btn-tactile');
+  });
 });

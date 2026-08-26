@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import SoloAiArena from '../SoloAiArena.vue';
 
 // Mock confetti
@@ -56,5 +56,29 @@ describe('SoloAiArena.vue', () => {
     await changeBtn.trigger('click');
 
     expect(wrapper.emitted('changeOpponent')).toBeTruthy();
+  });
+
+  it('displays active hint banner when hint is requested and clears it on dismiss', async () => {
+    const wrapper = mount(SoloAiArena, {
+      props: {
+        initialMascotId: 'peanut',
+      },
+    });
+
+    expect(wrapper.find('[data-testid="active-hint-banner"]').exists()).toBe(false);
+
+    const hud = wrapper.findComponent({ name: 'AiGameHud' });
+    hud.vm.$emit('hint');
+    await flushPromises();
+
+    const hintBanner = wrapper.find('[data-testid="active-hint-banner"]');
+    expect(hintBanner.exists()).toBe(true);
+    expect(hintBanner.find('.hint-banner-text').text().length).toBeGreaterThan(0);
+
+    const closeBtn = hintBanner.find('.hint-close-btn');
+    await closeBtn.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="active-hint-banner"]').exists()).toBe(false);
   });
 });

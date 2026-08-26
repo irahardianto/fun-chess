@@ -35,6 +35,7 @@ const showIpGuide = ref(false);
 const { serverLanInfo, activeLanIp, setLanIp } = useLanDiscovery();
 
 const customIpInput = ref<string>('');
+const ipError = ref<string>('');
 
 onMounted(() => {
   if (activeLanIp.value && activeLanIp.value !== '127.0.0.1') {
@@ -150,6 +151,7 @@ function onIpInput(e: Event) {
   const target = e.target as HTMLInputElement;
   const val = target.value.trim();
   customIpInput.value = val;
+  ipError.value = '';
   if (isValidIPv4(val)) {
     setLanIp(val);
     generateQr();
@@ -159,21 +161,26 @@ function onIpInput(e: Event) {
 function applyCustomIp() {
   const val = customIpInput.value.trim();
   if (isValidIPv4(val)) {
+    ipError.value = '';
     setLanIp(val);
     generateQr();
   } else if (val.length > 0) {
-    alert('Please enter a valid IPv4 address (e.g., 192.168.1.15)');
+    ipError.value = 'Please enter a valid IPv4 address (e.g., 192.168.1.15)';
+  } else {
+    ipError.value = 'Please enter an IP address';
   }
 }
 
 function selectInterface(ip: string) {
   customIpInput.value = ip;
+  ipError.value = '';
   setLanIp(ip);
   generateQr();
 }
 
 function prefillPrefix(prefix: string) {
   customIpInput.value = prefix;
+  ipError.value = '';
 }
 
 async function copyLink() {
@@ -271,18 +278,35 @@ function handleClose() {
               type="text"
               placeholder="e.g. 192.168.1.15"
               class="ip-text-input"
+              :class="{ 'has-error': !!ipError }"
+              :aria-invalid="!!ipError"
+              :aria-describedby="ipError ? 'ip-inline-error' : undefined"
               aria-label="Enter host Wi-Fi IP address"
+              data-testid="qr-custom-ip-input"
               @input="onIpInput"
               @keyup.enter="applyCustomIp"
             />
             <BaseButton
               variant="accent"
               size="sm"
+              data-testid="apply-custom-ip-btn"
               @click="applyCustomIp"
             >
               Apply IP
             </BaseButton>
           </div>
+
+          <!-- Inline Error Message -->
+          <p
+            v-if="ipError"
+            id="ip-inline-error"
+            class="ip-inline-error"
+            role="alert"
+            aria-live="polite"
+            data-testid="qr-ip-error"
+          >
+            ⚠️ {{ ipError }}
+          </p>
 
           <!-- Quick Prefill Subnet Buttons (when empty and on localhost) -->
           <div v-if="isLocalhost && !customIpInput" class="prefill-helpers">
@@ -383,7 +407,7 @@ function handleClose() {
 .qr-canvas-card {
   padding: var(--space-3);
   background-color: #ffffff;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
@@ -396,7 +420,7 @@ function handleClose() {
   display: block;
   width: 220px;
   height: 220px;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-xl, 22px) - var(--space-3, 12px));
 }
 
 .qr-loading-placeholder {
@@ -526,7 +550,7 @@ function handleClose() {
 .ip-text-input {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: 16px;
   padding: 8px 12px;
   border-radius: var(--radius-md);
   border: 1.5px solid var(--border-medium);
@@ -539,6 +563,24 @@ function handleClose() {
 .ip-text-input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+.ip-text-input.has-error {
+  border-color: var(--color-danger, #ef4444);
+}
+
+.ip-text-input.has-error:focus {
+  border-color: var(--color-danger, #ef4444);
+  box-shadow: 0 0 0 2px hsla(var(--color-danger-h, 354), 88%, 58%, 0.25);
+}
+
+.ip-inline-error {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold, 700);
+  color: var(--color-danger, #ef4444);
+  margin: 0;
+  text-align: left;
 }
 
 .prefill-helpers {
@@ -590,7 +632,7 @@ function handleClose() {
   margin-top: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--bg-surface);
-  border-radius: var(--radius-md);
+  border-radius: calc(var(--radius-lg, 16px) - var(--space-3, 12px));
   border: 1px solid var(--border-subtle);
   font-family: var(--font-body);
   font-size: var(--text-xs);

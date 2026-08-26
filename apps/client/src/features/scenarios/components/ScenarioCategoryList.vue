@@ -206,11 +206,10 @@ function getSectionStats(section: CurriculumSection) {
 .academy-browser-container {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
   width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: var(--space-4);
+  max-width: 100%;
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -223,6 +222,8 @@ function getSectionStats(section: CurriculumSection) {
   box-shadow: var(--shadow-lg);
   position: relative;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .academy-hero-content {
@@ -328,6 +329,8 @@ function getSectionStats(section: CurriculumSection) {
   overflow-x: auto;
   padding-bottom: var(--space-2);
   scrollbar-width: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .academy-category-tabs::-webkit-scrollbar {
@@ -369,12 +372,16 @@ function getSectionStats(section: CurriculumSection) {
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .curriculum-section-block {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .section-header-row {
@@ -446,6 +453,8 @@ function getSectionStats(section: CurriculumSection) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   gap: var(--space-4);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 640px) {

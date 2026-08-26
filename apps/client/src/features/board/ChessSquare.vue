@@ -176,6 +176,12 @@ function handleDragOver(event: DragEvent) {
   overflow: visible;
 }
 
+.chess-square:focus-visible {
+  outline: 3px solid var(--border-focus, #6c5ce7);
+  outline-offset: -3px;
+  z-index: 5;
+}
+
 .chess-square--light,
 .is-light {
   background-color: var(--board-light-sq);
@@ -252,10 +258,10 @@ function handleDragOver(event: DragEvent) {
 }
 
 .coord-on-light {
-  color: var(--board-coord-light);
+  color: var(--board-coord-light, #5c381e);
 }
 
 .coord-on-dark {
-  color: var(--board-coord-dark);
+  color: var(--board-coord-dark, #ffffff);
 }
 </style>

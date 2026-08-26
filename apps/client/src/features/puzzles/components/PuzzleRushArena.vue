@@ -135,7 +135,12 @@ defineExpose({
 <template>
   <div class="puzzle-rush-arena" data-testid="puzzle-rush-arena">
     <!-- Top Rush HUD Bar -->
-    <header class="rush-hud-bar" data-testid="rush-hud-bar">
+    <header
+      class="rush-hud-bar"
+      data-testid="rush-hud-bar"
+      :aria-hidden="isGameOverActive"
+      :inert="isGameOverActive"
+    >
       <!-- Mode Badge -->
       <div class="rush-mode-badge" :data-mode="effectiveMode">
         {{ effectiveMode === 'puzzle_rush' ? '⚡ 3-Min Rush' : '🛡️ Streak Survivor' }}
@@ -216,6 +221,8 @@ defineExpose({
       class="rush-board-container"
       :class="{ 'is-shaking': rush.runner.isShaking.value }"
       data-testid="rush-board-container"
+      :aria-hidden="isGameOverActive"
+      :inert="isGameOverActive"
     >
       <!-- Feedback message toast if any (e.g. error / nudge) -->
       <transition name="fade">
@@ -249,9 +256,16 @@ defineExpose({
 
     <!-- Game Over Overlay Dialog -->
     <transition name="pop-fade">
-      <div v-if="isGameOverActive" class="rush-game-over-overlay" data-testid="rush-game-over">
+      <div
+        v-if="isGameOverActive"
+        class="rush-game-over-overlay"
+        data-testid="rush-game-over"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="game-over-title"
+      >
         <div class="rush-game-over-card" data-testid="game-over-card">
-          <h2 class="game-over-title">
+          <h2 id="game-over-title" class="game-over-title">
             {{ gameOverTitle }}
           </h2>
 
@@ -363,10 +377,15 @@ defineExpose({
   font-family: var(--font-mono, monospace);
   font-size: var(--text-lg, 18px);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   padding: 4px 12px;
   border-radius: var(--radius-pill, 9999px);
   background: rgba(15, 23, 42, 0.06);
   color: var(--text-main, #0f172a);
+}
+
+.timer-digits {
+  font-variant-numeric: tabular-nums;
 }
 
 .rush-timer-badge.is-urgent {
@@ -384,6 +403,7 @@ defineExpose({
   font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
   font-size: var(--text-xs, 12px);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   padding: 2px 8px;
   border-radius: var(--radius-pill, 9999px);
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.5);
@@ -406,6 +426,7 @@ defineExpose({
 .score-value {
   font-size: var(--text-xl, 20px);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--color-primary, #6c5ce7);
 }
 
@@ -419,6 +440,7 @@ defineExpose({
   color: var(--flame-blaze-start, #ffb300);
   font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   transition: all var(--duration-normal, 240ms) var(--ease-spring);
 }
 
@@ -553,6 +575,7 @@ defineExpose({
   font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
   font-size: var(--text-base, 16px);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--text-main, #0f172a);
 }
 

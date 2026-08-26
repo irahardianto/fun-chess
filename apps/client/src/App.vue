@@ -23,12 +23,64 @@ const isDarkMode = ref(false);
 function toggleTheme() {
   isDarkMode.value = !isDarkMode.value;
   if (typeof document !== 'undefined') {
+    // Suppress CSS transitions temporarily during theme switch to prevent visual smearing
+    const style = document.createElement('style');
+    style.id = 'theme-transition-suppress';
+    style.appendChild(
+      document.createTextNode('*, *::before, *::after { transition: none !important; }')
+    );
+    document.head.appendChild(style);
+
+    // Force layout reflow
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    document.body.offsetHeight;
+
     if (isDarkMode.value) {
       document.documentElement.setAttribute('data-theme', 'dark');
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
+
+    requestAnimationFrame(() => {
+      const el = document.getElementById('theme-transition-suppress');
+      if (el && el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+    });
   }
+}
+
+// --- Inline Notifications / Error State ---
+interface AppNotification {
+  id: number;
+  type: 'error' | 'info' | 'success';
+  message: string;
+}
+
+const activeNotification = ref<AppNotification | null>(null);
+let notificationTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showNotification(message: string, type: 'error' | 'info' | 'success' = 'info', durationMs = 5000) {
+  if (notificationTimer) {
+    clearTimeout(notificationTimer);
+  }
+  activeNotification.value = {
+    id: Date.now(),
+    type,
+    message,
+  };
+  if (durationMs > 0) {
+    notificationTimer = setTimeout(() => {
+      activeNotification.value = null;
+    }, durationMs);
+  }
+}
+
+function dismissNotification() {
+  if (notificationTimer) {
+    clearTimeout(notificationTimer);
+  }
+  activeNotification.value = null;
 }
 
 // --- Audio & FX ---
@@ -339,7 +391,7 @@ async function handleHostGame(payload: { playerName: string; preferredColor: 'w'
       showQrModal.value = true;
     } else {
       playError();
-      alert(res.error?.message || 'Failed to create room');
+      showNotification(res.error?.message || 'Failed to create room', 'error');
     }
   } finally {
     isActionLoading.value = false;
@@ -352,7 +404,7 @@ async function handleJoinGame(payload: { roomCode: string; playerName: string })
     const res = await joinRoom(payload.roomCode, payload.playerName);
     if (!res.success) {
       playError();
-      alert(res.error?.message || 'Failed to join room');
+      showNotification(res.error?.message || 'Failed to join room', 'error');
     }
   } finally {
     isActionLoading.value = false;
@@ -404,7 +456,7 @@ function handleResign() {
 function handleOfferDraw() {
   if (!currentRoom.value) return;
   offerDraw(currentRoom.value.roomCode);
-  alert('Draw offer sent to opponent! 🤝');
+  showNotification('Draw offer sent to opponent! 🤝', 'info');
 }
 
 function handleAcceptDraw() {
@@ -447,10 +499,16 @@ function handleLeaveRoom() {
   <div class="app-shell" data-testid="app-shell">
     <!-- Top Global App Bar -->
     <header class="app-navbar">
-      <div class="navbar-brand" title="Fun Chess Home" @click="handleNavbarBrandClick">
+      <button
+        type="button"
+        class="navbar-brand"
+        title="Fun Chess Home"
+        aria-label="Fun Chess Home"
+        @click="handleNavbarBrandClick"
+      >
         <span class="brand-logo-icon" aria-hidden="true">♟️</span>
         <span class="brand-title">Fun Chess! ✨</span>
-      </div>
+      </button>
 
       <!-- In-Game Header Details -->
       <div v-if="currentRoom" class="room-chip-group">
@@ -504,7 +562,7 @@ function handleLeaveRoom() {
           size="sm"
           class="nav-icon-btn nav-exit-btn"
           data-testid="leave-room-btn"
-          aria-label="Exit Game to Lobby"
+          aria-label="Return to Lobby"
           @click="handleLeaveRoom"
         >
           <template #icon>
@@ -519,7 +577,7 @@ function handleLeaveRoom() {
           size="sm"
           class="nav-icon-btn nav-exit-btn"
           data-testid="exit-solo-ai-btn"
-          aria-label="Exit Solo Match"
+          aria-label="Return to Lobby"
           @click="handleSoloAiExit"
         >
           <template #icon>
@@ -534,7 +592,7 @@ function handleLeaveRoom() {
           size="sm"
           class="nav-icon-btn nav-exit-btn"
           data-testid="exit-academy-btn"
-          aria-label="Exit Academy Lesson"
+          aria-label="Return to Academy"
           @click="handleAcademyBack"
         >
           <template #icon>
@@ -549,7 +607,7 @@ function handleLeaveRoom() {
           size="sm"
           class="nav-icon-btn nav-exit-btn"
           data-testid="exit-puzzle-btn"
-          aria-label="Exit Puzzle Arena"
+          aria-label="Return to Puzzle Hub"
           @click="handlePuzzleHubExit"
         >
           <template #icon>
@@ -562,6 +620,30 @@ function handleLeaveRoom() {
 
     <!-- Main Dynamic Viewport -->
     <main class="app-viewport">
+      <!-- Accessible Inline Notification Banner -->
+      <Transition name="notification-slide">
+        <div
+          v-if="activeNotification"
+          class="app-notification-banner"
+          :class="`is-${activeNotification.type}`"
+          :role="activeNotification.type === 'error' ? 'alert' : 'status'"
+          aria-live="polite"
+          data-testid="app-notification-banner"
+        >
+          <span class="notification-icon" aria-hidden="true">
+            {{ activeNotification.type === 'error' ? '⚠️' : activeNotification.type === 'success' ? '✅' : 'ℹ️' }}
+          </span>
+          <span class="notification-message">{{ activeNotification.message }}</span>
+          <button
+            type="button"
+            class="notification-dismiss-btn"
+            aria-label="Dismiss notification"
+            @click="dismissNotification"
+          >
+            ✕
+          </button>
+        </div>
+      </Transition>
       <!-- 1. Solo AI Mascot Arena View -->
       <SoloAiArena
         v-if="currentAppMode === 'solo_ai' && soloAiConfig"
@@ -619,7 +701,7 @@ function handleLeaveRoom() {
         >
           <span>🤝 <strong>{{ drawOfferedBy.fromPlayerName }}</strong> offered a peaceful draw!</span>
           <div class="banner-buttons">
-            <BaseButton variant="success" size="sm" @click="handleAcceptDraw">Accept</BaseButton>
+            <BaseButton variant="success" size="sm" @click="handleAcceptDraw">Accept Draw</BaseButton>
             <BaseButton variant="ghost" size="sm" @click="handleDeclineDraw">Decline</BaseButton>
           </div>
         </div>
@@ -720,7 +802,7 @@ function handleLeaveRoom() {
             @click="handleOfferDraw"
           >
             <template #icon-left>🤝</template>
-            Draw
+            Offer Draw
           </BaseButton>
 
           <BaseButton
@@ -741,7 +823,7 @@ function handleLeaveRoom() {
             @click="showHistory = !showHistory"
           >
             <template #icon-left>📜</template>
-            Moves ({{ chessEngine.moveHistory.value.length }})
+            {{ showHistory ? 'Hide Moves' : 'View Moves' }} ({{ chessEngine.moveHistory.value.length }})
           </BaseButton>
         </div>
 
@@ -814,6 +896,10 @@ function handleLeaveRoom() {
   display: flex;
   flex-direction: column;
   background-color: var(--bg-app);
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 .app-navbar {
@@ -830,6 +916,7 @@ function handleLeaveRoom() {
   z-index: 50;
   box-sizing: border-box;
   width: 100%;
+  max-width: 100vw;
 }
 
 .navbar-brand {
@@ -839,6 +926,27 @@ function handleLeaveRoom() {
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  transition: transform var(--duration-fast, 150ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+}
+
+.navbar-brand:hover {
+  transform: scale(1.02);
+}
+
+.navbar-brand:active {
+  transform: scale(0.98);
+}
+
+.navbar-brand:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsl(var(--color-primary-h, 255) 85% 60% / 0.45));
+  border-radius: var(--radius-sm, 8px);
 }
 
 .brand-logo-icon {
@@ -879,6 +987,11 @@ function handleLeaveRoom() {
 
 .room-code-chip:hover {
   transform: scale(1.05);
+}
+
+.room-code-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsl(var(--color-primary-h, 255) 85% 60% / 0.45));
 }
 
 .room-chip-label {
@@ -956,21 +1069,149 @@ function handleLeaveRoom() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: var(--space-3);
-  max-width: 800px;
+  justify-content: flex-start;
+  padding: var(--space-4) var(--space-4) var(--space-8);
+  max-width: 880px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Accessible Floating Global Notification Toast */
+.app-notification-banner {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-global-notification, 100);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: calc(100% - 32px);
+  max-width: 580px;
+  padding: var(--space-2-5) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-sizing: border-box;
+  margin-bottom: 0;
+}
+
+.app-notification-banner.is-error {
+  background-color: var(--soft-error-glass, rgba(255, 241, 242, 0.94));
+  border: 1.5px solid var(--soft-error-border, hsl(350, 80%, 75%));
+  color: var(--soft-error-text, hsl(350, 75%, 28%));
+}
+
+.app-notification-banner.is-info {
+  background-color: var(--soft-info-glass, rgba(240, 249, 255, 0.94));
+  border: 1.5px solid var(--soft-info-border, hsl(198, 80%, 75%));
+  color: var(--soft-info-text, hsl(198, 90%, 25%));
+}
+
+.app-notification-banner.is-success {
+  background-color: var(--soft-success-glass, rgba(240, 253, 244, 0.94));
+  border: 1.5px solid var(--soft-success-border, hsl(145, 60%, 75%));
+  color: var(--soft-success-text, hsl(145, 80%, 22%));
+}
+
+[data-theme='dark'] .app-notification-banner.is-error {
+  background-color: var(--soft-error-glass, rgba(45, 20, 25, 0.94));
+  border-color: var(--soft-error-border, hsl(350, 50%, 35%));
+  color: var(--soft-error-text, hsl(350, 85%, 90%));
+}
+
+[data-theme='dark'] .app-notification-banner.is-info {
+  background-color: var(--soft-info-glass, rgba(20, 38, 50, 0.94));
+  border-color: var(--soft-info-border, hsl(198, 50%, 35%));
+  color: var(--soft-info-text, hsl(198, 85%, 90%));
+}
+
+[data-theme='dark'] .app-notification-banner.is-success {
+  background-color: var(--soft-success-glass, rgba(20, 45, 30, 0.94));
+  border-color: var(--soft-success-border, hsl(145, 50%, 35%));
+  color: var(--soft-success-text, hsl(145, 85%, 90%));
+}
+
+.notification-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.notification-message {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.notification-dismiss-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 0.9rem;
+  color: inherit;
+  opacity: 0.75;
+  border-radius: var(--radius-xs, 4px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--duration-fast, 150ms);
+}
+
+.notification-dismiss-btn:hover {
+  opacity: 1;
+}
+
+.notification-dismiss-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsl(var(--color-primary-h, 255) 85% 60% / 0.45));
+}
+
+.notification-slide-enter-active,
+.notification-slide-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s var(--ease-spring);
+}
+
+.notification-slide-enter-from,
+.notification-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -14px) scale(0.96);
+}
+
+.notification-slide-enter-to,
+.notification-slide-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+@keyframes banner-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
 }
 
 .game-arena-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
   max-width: 580px;
   gap: var(--space-2);
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 /* Arena Turn Indicator Banner */
@@ -988,7 +1229,7 @@ function handleLeaveRoom() {
   font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
-  color: var(--text-muted);
+  color: var(--text-main);
   box-sizing: border-box;
   transition: all var(--duration-fast);
 }
@@ -1019,28 +1260,47 @@ function handleLeaveRoom() {
 }
 
 .disconnect-warning-banner {
-  width: 100%;
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-alert, 30);
+  width: calc(100% - 16px);
+  max-width: 560px;
   background-color: var(--color-danger);
-  color: var(--text-on-danger);
+  color: var(--text-on-danger, #ffffff);
   font-family: var(--font-body);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
   text-align: center;
+  box-shadow: var(--shadow-lg);
+  box-sizing: border-box;
   animation: pulse-valid-dot 1.5s infinite ease-in-out;
 }
 
 .draw-offer-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-alert, 30);
+  width: calc(100% - 16px);
+  max-width: 560px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  background-color: var(--color-accent-subtle);
+  background-color: var(--bg-surface-glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 2px solid var(--color-accent);
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
+  color: var(--text-main);
+  box-shadow: var(--shadow-lg);
   box-sizing: border-box;
+  animation: banner-pop 0.24s var(--ease-spring);
 }
 
 .banner-buttons {
@@ -1053,12 +1313,19 @@ function handleLeaveRoom() {
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  gap: var(--space-2);
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chessboard-wrapper {
   width: 100%;
   display: flex;
   justify-content: center;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .in-game-toolbar {
@@ -1113,11 +1380,25 @@ function handleLeaveRoom() {
   }
 
   .app-viewport {
-    padding: var(--space-1);
+    padding: var(--space-3) var(--space-2) var(--space-6);
+  }
+
+  .app-notification-banner {
+    top: 64px;
+    width: calc(100% - 24px);
+    max-width: 440px;
+    padding: var(--space-2) var(--space-3);
   }
 
   .game-arena-container {
     gap: var(--space-2);
+  }
+
+  .disconnect-warning-banner,
+  .draw-offer-banner {
+    top: 8px;
+    width: calc(100% - 16px);
+    max-width: 440px;
   }
 
   .arena-turn-indicator {
@@ -1135,6 +1416,39 @@ function handleLeaveRoom() {
     padding: 6px 2px;
     font-size: var(--text-xs);
     min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-notification-banner {
+    top: 64px;
+    width: calc(100% - 24px);
+    max-width: 440px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .disconnect-warning-banner,
+  .draw-offer-banner {
+    top: 8px;
+    width: calc(100% - 16px);
+    max-width: 440px;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-notification-banner {
+    top: 58px;
+    width: calc(100% - 16px);
+    padding: 6px 10px;
+    font-size: var(--text-xs);
+  }
+
+  .disconnect-warning-banner,
+  .draw-offer-banner {
+    top: 4px;
+    width: calc(100% - 12px);
+    padding: 6px 10px;
+    font-size: var(--text-xs);
   }
 }
 </style>

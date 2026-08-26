@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted, useId } from 'vue';
+import { computed, watch, onMounted, onUnmounted, useId, ref, nextTick } from 'vue';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'full';
 
@@ -30,12 +30,75 @@ const emit = defineEmits<{
 
 const autoId = useId();
 const titleId = computed(() => `modal-title-${autoId}`);
+const modalContainerRef = ref<HTMLElement | null>(null);
+let previousActiveElement: HTMLElement | null = null;
 
 const isVisible = computed(() => {
   if (props.modelValue !== undefined) return props.modelValue;
   if (props.isOpen !== undefined) return props.isOpen;
   return false;
 });
+
+const FOCUSABLE_SELECTOR = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+function setAppInert(inert: boolean) {
+  if (typeof document === 'undefined') return;
+  const appEl = document.getElementById('app');
+  if (appEl) {
+    if (inert) {
+      appEl.setAttribute('inert', '');
+    } else {
+      appEl.removeAttribute('inert');
+    }
+  }
+}
+
+function getFocusableElements(): HTMLElement[] {
+  if (!modalContainerRef.value) return [];
+  const elements = modalContainerRef.value.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+  return Array.from(elements).filter((el) => {
+    if (el.getAttribute('aria-hidden') === 'true' || el.hasAttribute('disabled')) {
+      return false;
+    }
+    if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+function autoFocusFirstElement() {
+  nextTick(() => {
+    if (!isVisible.value) return;
+    const focusable = getFocusableElements();
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    } else if (modalContainerRef.value) {
+      modalContainerRef.value.focus();
+    }
+  });
+}
+
+function restoreFocus() {
+  if (
+    previousActiveElement &&
+    typeof previousActiveElement.focus === 'function' &&
+    previousActiveElement.isConnected
+  ) {
+    previousActiveElement.focus();
+  }
+  previousActiveElement = null;
+}
 
 function handleClose() {
   emit('update:modelValue', false);
@@ -49,8 +112,38 @@ function handleBackdropClick(event: MouseEvent) {
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-  if (props.closeOnEsc && event.key === 'Escape' && isVisible.value) {
+  if (!isVisible.value) return;
+
+  if (props.closeOnEsc && event.key === 'Escape') {
+    event.preventDefault();
     handleClose();
+    return;
+  }
+
+  if (event.key === 'Tab') {
+    const focusable = getFocusableElements();
+    if (focusable.length === 0) {
+      event.preventDefault();
+      if (modalContainerRef.value) {
+        modalContainerRef.value.focus();
+      }
+      return;
+    }
+
+    const firstElement = focusable[0];
+    const lastElement = focusable[focusable.length - 1];
+
+    if (event.shiftKey) {
+      if (document.activeElement === firstElement || !modalContainerRef.value?.contains(document.activeElement)) {
+        event.preventDefault();
+        lastElement.focus();
+      }
+    } else {
+      if (document.activeElement === lastElement || !modalContainerRef.value?.contains(document.activeElement)) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
   }
 }
 
@@ -59,9 +152,16 @@ watch(
   (visible) => {
     if (typeof document !== 'undefined') {
       if (visible) {
+        if (typeof document.activeElement !== 'undefined') {
+          previousActiveElement = document.activeElement as HTMLElement | null;
+        }
         document.body.style.overflow = 'hidden';
+        setAppInert(true);
+        autoFocusFirstElement();
       } else {
         document.body.style.overflow = '';
+        setAppInert(false);
+        restoreFocus();
       }
     }
   },
@@ -80,6 +180,8 @@ onUnmounted(() => {
   }
   if (typeof document !== 'undefined') {
     document.body.style.overflow = '';
+    setAppInert(false);
+    restoreFocus();
   }
 });
 </script>
@@ -94,6 +196,8 @@ onUnmounted(() => {
         @click="handleBackdropClick"
       >
         <div
+          ref="modalContainerRef"
+          tabindex="-1"
           class="base-modal-container"
           :class="`base-modal--${props.size}`"
           role="dialog"
@@ -165,6 +269,7 @@ onUnmounted(() => {
   box-shadow: var(--shadow-xl);
   overflow: hidden;
   box-sizing: border-box;
+  outline: none;
 }
 
 /* SIZES */
@@ -225,6 +330,12 @@ onUnmounted(() => {
   transform: scale(1.08);
 }
 
+.base-modal-close-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
 .close-icon {
   width: 18px;
   height: 18px;
@@ -250,12 +361,14 @@ onUnmounted(() => {
 }
 
 /* MODAL TRANSITION ANIMATIONS */
-.modal-fade-enter-active {
+.modal-fade-enter-active,
+.modal-fade-leave-active {
   transition: opacity var(--duration-fast) ease;
 }
 
-.modal-fade-leave-active {
-  transition: opacity var(--duration-fast) ease;
+.modal-fade-enter-active .base-modal-container,
+.modal-fade-leave-active .base-modal-container {
+  transition: transform var(--duration-spring) var(--ease-spring), opacity var(--duration-fast) ease;
 }
 
 .modal-fade-enter-from,
@@ -263,11 +376,13 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-.modal-fade-enter-active .base-modal-container {
-  animation: modal-pop-in var(--duration-spring) var(--ease-out-back);
+.modal-fade-enter-from .base-modal-container {
+  opacity: 0;
+  transform: scale(0.90) translateY(20px);
 }
 
-.modal-fade-leave-active .base-modal-container {
-  animation: modal-pop-in var(--duration-fast) ease reverse;
+.modal-fade-leave-to .base-modal-container {
+  opacity: 0;
+  transform: scale(0.92) translateY(12px);
 }
 </style>

@@ -84,10 +84,16 @@ const displayText = computed(() => {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 0.75rem;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   padding: 2px 6px;
   border-radius: var(--radius-pill, 9999px);
   background: rgba(255, 255, 255, 0.35);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.score-value,
+.stat-value {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Stage: Spark (2x) */

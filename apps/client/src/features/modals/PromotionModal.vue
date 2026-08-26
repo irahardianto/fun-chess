@@ -144,7 +144,7 @@ function handleClose() {
 }
 
 .promotion-card:active {
-  transform: translateY(1px);
+  transform: translateY(4px) scale(0.96);
 }
 
 .piece-icon-wrapper {
@@ -154,7 +154,7 @@ function handleClose() {
   width: 54px;
   height: 54px;
   background-color: var(--bg-surface);
-  border-radius: var(--radius-md);
+  border-radius: calc(var(--radius-lg) - var(--space-3));
   border: 1px solid var(--border-subtle);
   flex-shrink: 0;
   color-scheme: only light !important;

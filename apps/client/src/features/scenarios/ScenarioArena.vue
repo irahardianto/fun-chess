@@ -115,11 +115,11 @@ function handleNextLesson() {
         <BaseButton
           variant="ghost"
           size="sm"
-          aria-label="Back to Academy Menu"
+          aria-label="Return to Academy"
           @click="emit('back')"
         >
           <template #icon-left>⬅️</template>
-          Academy
+          Return to Academy
         </BaseButton>
 
         <div class="scenario-header-title-group">
@@ -283,6 +283,7 @@ function handleNextLesson() {
 }
 
 .arena-board-slot {
+  position: relative;
   width: 100%;
   display: flex;
   justify-content: center;

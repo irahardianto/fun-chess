@@ -112,7 +112,7 @@ function onJoinSubmit() {
 .card-badge {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  color: var(--color-accent);
+  color: var(--color-accent-text, #92400e);
   background-color: var(--color-accent-subtle);
   padding: 2px 8px;
   border-radius: var(--radius-pill);

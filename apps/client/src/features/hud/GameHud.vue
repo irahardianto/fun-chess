@@ -66,36 +66,44 @@ const emit = defineEmits<{
           variant="ghost"
           size="sm"
           data-testid="toggle-sound-btn"
+          :aria-label="isMuted ? 'Unmute audio' : 'Mute audio'"
           @click="emit('toggle-sound')"
         >
           <template #icon>{{ isMuted ? '🔇' : '🔊' }}</template>
+          <span>{{ isMuted ? 'Unmute' : 'Mute' }}</span>
         </BaseButton>
 
         <BaseButton
           variant="ghost"
           size="sm"
           data-testid="flip-board-btn"
+          aria-label="Flip board"
           @click="emit('flip-board')"
         >
-          <template #icon>🔄 Flip</template>
+          <template #icon>🔄</template>
+          <span>Flip</span>
         </BaseButton>
 
         <BaseButton
           variant="ghost"
           size="sm"
           data-testid="offer-draw-btn"
+          aria-label="Offer draw"
           @click="emit('offer-draw')"
         >
-          <template #icon>🤝 Draw</template>
+          <template #icon>🤝</template>
+          <span>Offer Draw</span>
         </BaseButton>
 
         <BaseButton
           variant="danger"
           size="sm"
           data-testid="resign-btn"
+          aria-label="Resign"
           @click="emit('resign')"
         >
-          <template #icon>🏳️ Resign</template>
+          <template #icon>🏳️</template>
+          <span>Resign</span>
         </BaseButton>
       </div>
     </div>

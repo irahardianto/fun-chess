@@ -48,15 +48,18 @@ function onHostSubmit() {
 
       <div class="color-picker-section">
         <label class="section-label">Choose Your Piece Color:</label>
-        <div class="color-options-grid">
+        <div class="color-options-grid" role="radiogroup" aria-label="Choose your piece color">
           <button
             type="button"
             class="color-option-btn"
             :class="{ 'is-selected': preferredColor === 'w' }"
+            role="radio"
+            :aria-checked="preferredColor === 'w'"
+            aria-label="Play as White (Play First)"
             data-testid="color-white-btn"
             @click="preferredColor = 'w'"
           >
-            <span class="color-btn-icon">⚪</span>
+            <span class="color-btn-icon" aria-hidden="true">⚪</span>
             <span class="color-btn-title">White</span>
             <span class="color-btn-desc">Play First</span>
           </button>
@@ -65,10 +68,13 @@ function onHostSubmit() {
             type="button"
             class="color-option-btn"
             :class="{ 'is-selected': preferredColor === 'random' }"
+            role="radio"
+            :aria-checked="preferredColor === 'random'"
+            aria-label="Play as Random Color (Surprise Me)"
             data-testid="color-random-btn"
             @click="preferredColor = 'random'"
           >
-            <span class="color-btn-icon">🎲</span>
+            <span class="color-btn-icon" aria-hidden="true">🎲</span>
             <span class="color-btn-title">Random</span>
             <span class="color-btn-desc">Surprise Me</span>
           </button>
@@ -77,10 +83,13 @@ function onHostSubmit() {
             type="button"
             class="color-option-btn"
             :class="{ 'is-selected': preferredColor === 'b' }"
+            role="radio"
+            :aria-checked="preferredColor === 'b'"
+            aria-label="Play as Black (Defend)"
             data-testid="color-black-btn"
             @click="preferredColor = 'b'"
           >
-            <span class="color-btn-icon">⚫</span>
+            <span class="color-btn-icon" aria-hidden="true">⚫</span>
             <span class="color-btn-title">Black</span>
             <span class="color-btn-desc">Defend</span>
           </button>
@@ -163,7 +172,7 @@ function onHostSubmit() {
   border-radius: var(--radius-md);
   background-color: var(--bg-surface);
   cursor: pointer;
-  transition: all var(--duration-fast) ease;
+  transition: all var(--duration-fast) var(--ease-spring);
 }
 
 .color-option-btn:hover {
@@ -171,10 +180,24 @@ function onHostSubmit() {
   background-color: var(--color-primary-subtle);
 }
 
+.color-option-btn:focus-visible {
+  outline: 2px solid var(--border-focus, var(--color-primary));
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
+}
+
+.color-option-btn:active {
+  transform: translateY(4px) scale(0.96);
+}
+
 .color-option-btn.is-selected {
   border-color: var(--color-primary);
   background-color: var(--color-primary-subtle);
   box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.color-option-btn.is-selected:active {
+  transform: translateY(4px) scale(0.96);
 }
 
 .color-btn-icon {

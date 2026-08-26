@@ -139,7 +139,7 @@ function handleLobby() {
           </span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">Total Plies</span>
+          <span class="stat-label">Total Moves</span>
           <span class="stat-value">{{ props.payload?.totalMoves || 0 }}</span>
         </div>
         <div class="stat-item">

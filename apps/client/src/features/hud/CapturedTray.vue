@@ -102,6 +102,13 @@ const sortedPieces = computed(() => {
   align-items: center;
   flex-wrap: nowrap;
   min-width: 24px;
+  max-width: 140px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pieces-row::-webkit-scrollbar {
+  display: none;
 }
 
 .captured-piece-item {
@@ -134,6 +141,7 @@ const sortedPieces = computed(() => {
   font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
   padding: 1px var(--space-2);
   border-radius: var(--radius-pill);
   line-height: 1.2;

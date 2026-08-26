@@ -254,5 +254,36 @@ describe('PuzzleRushArena.vue', () => {
 
     expect(wrapper.vm.rush.runner).toBeDefined();
   });
+
+  it('sets dialog attributes and inert on background when game over is active', async () => {
+    const store = new InMemoryPuzzleProgressStore();
+    const wrapper = mount(PuzzleRushArena, {
+      props: {
+        subMode: 'puzzle_rush',
+        customStore: store,
+      },
+    });
+
+    const hudBar = wrapper.find('[data-testid="rush-hud-bar"]');
+    const boardContainer = wrapper.find('[data-testid="rush-board-container"]');
+
+    expect(hudBar.attributes('aria-hidden')).toBe('false');
+    expect(boardContainer.attributes('aria-hidden')).toBe('false');
+
+    // End run -> game over
+    wrapper.vm.rush.stopRun();
+    await wrapper.vm.$nextTick();
+
+    const gameOverOverlay = wrapper.find('[data-testid="rush-game-over"]');
+    expect(gameOverOverlay.exists()).toBe(true);
+    expect(gameOverOverlay.attributes('role')).toBe('dialog');
+    expect(gameOverOverlay.attributes('aria-modal')).toBe('true');
+    expect(gameOverOverlay.attributes('aria-labelledby')).toBe('game-over-title');
+
+    expect(hudBar.attributes('aria-hidden')).toBe('true');
+    expect(boardContainer.attributes('aria-hidden')).toBe('true');
+  });
 });
+
+
 

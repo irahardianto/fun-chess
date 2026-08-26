@@ -129,6 +129,7 @@ function handleResetStep() {
 
 <style scoped>
 .scenario-guide-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -240,14 +241,31 @@ function handleResetStep() {
 
 /* HINT BUBBLE */
 .guide-hint-bubble {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 540px;
+  z-index: var(--z-overlay-dialogue, 20);
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  background: var(--hint-banner-bg);
-  border: 2px solid var(--hint-banner-border);
+  background: var(--hint-banner-glass, rgba(254, 249, 195, 0.94));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px solid var(--hint-banner-border, hsl(45, 95%, 55%));
   border-radius: var(--radius-lg);
   padding: var(--space-3) var(--space-4);
-  color: var(--hint-banner-text);
+  color: var(--hint-banner-text, hsl(42, 90%, 22%));
+  box-shadow: var(--glow-hint-banner, 0 0 20px 4px rgba(255, 193, 7, 0.38), var(--shadow-lg));
+  box-sizing: border-box;
+}
+
+[data-theme='dark'] .guide-hint-bubble {
+  background: var(--hint-banner-glass, rgba(40, 32, 20, 0.94));
+  border-color: var(--hint-banner-border, hsl(45, 60%, 38%));
+  color: var(--hint-banner-text, hsl(45, 85%, 90%));
 }
 
 .mascot-avatar-small {
@@ -276,26 +294,48 @@ function handleResetStep() {
 
 /* FEEDBACK BANNER */
 .guide-feedback-banner {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-guide, 15);
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
+  padding: 6px 18px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-body);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
 }
 
 .guide-feedback-banner.is-positive {
-  background-color: hsl(145, 68%, 92%);
-  color: hsl(145, 80%, 25%);
-  border: 1px solid hsl(145, 68%, 70%);
+  background-color: var(--soft-success-glass, rgba(240, 253, 244, 0.94));
+  color: var(--soft-success-text, hsl(145, 80%, 22%));
+  border: 1.5px solid var(--soft-success-border, hsl(145, 68%, 60%));
 }
 
 .guide-feedback-banner.is-warning {
-  background-color: var(--soft-error-bg);
-  color: var(--soft-error-text);
-  border: 1px solid var(--soft-error-border);
+  background-color: var(--soft-error-glass, rgba(255, 241, 242, 0.94));
+  color: var(--soft-error-text, hsl(350, 75%, 32%));
+  border: 1.5px solid var(--soft-error-border, hsl(350, 80%, 75%));
+}
+
+[data-theme='dark'] .guide-feedback-banner.is-positive {
+  background-color: var(--soft-success-glass, rgba(20, 45, 30, 0.94));
+  color: var(--soft-success-text, hsl(145, 85%, 90%));
+  border-color: var(--soft-success-border, hsl(145, 50%, 35%));
+}
+
+[data-theme='dark'] .guide-feedback-banner.is-warning {
+  background-color: var(--soft-error-glass, rgba(45, 20, 25, 0.94));
+  color: var(--soft-error-text, hsl(350, 85%, 90%));
+  border-color: var(--soft-error-border, hsl(350, 50%, 35%));
 }
 
 /* ANIMATIONS */
@@ -310,25 +350,51 @@ function handleResetStep() {
 }
 
 .bubble-pop-leave-active {
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .bubble-pop-leave-to {
   opacity: 0;
+  transform: translateX(-50%) scale(0.92) translateY(4px);
 }
 
 @keyframes bubble-pop {
   0% {
-    transform: scale(0.85) translateY(8px);
+    transform: translateX(-50%) scale(0.85) translateY(8px);
     opacity: 0;
   }
   70% {
-    transform: scale(1.04) translateY(-2px);
+    transform: translateX(-50%) scale(1.04) translateY(-2px);
     opacity: 1;
   }
   100% {
-    transform: scale(1) translateY(0);
+    transform: translateX(-50%) scale(1) translateY(0);
     opacity: 1;
+  }
+}
+
+/* RESPONSIVE */
+@media (max-width: 480px) {
+  .guide-feedback-banner {
+    padding: 4px 14px;
+    font-size: var(--text-xs);
+  }
+
+  .guide-hint-bubble {
+    width: calc(100% - 16px);
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+@media (max-width: 320px) {
+  .guide-feedback-banner {
+    padding: 3px 10px;
+    font-size: 11px;
+  }
+
+  .guide-hint-bubble {
+    width: calc(100% - 12px);
+    padding: var(--space-2) var(--space-2-5);
   }
 }
 </style>

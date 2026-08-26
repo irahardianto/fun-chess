@@ -95,7 +95,7 @@ function selectMode(modeId: AppGameMode) {
   border: 2px solid var(--border-medium);
   box-shadow: var(--shadow-sm);
   width: 100%;
-  max-width: 780px;
+  max-width: 880px;
   box-sizing: border-box;
 }
 
@@ -125,8 +125,13 @@ function selectMode(modeId: AppGameMode) {
 }
 
 .mode-tab-button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: 2px solid var(--border-focus, var(--color-primary));
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
+}
+
+.mode-tab-button:active {
+  transform: translateY(4px) scale(0.96);
 }
 
 .mode-icon {
@@ -165,11 +170,19 @@ function selectMode(modeId: AppGameMode) {
   transform: translateY(-1px);
 }
 
+.mode-tab-button.is-active.theme--multiplayer_lan:active {
+  transform: translateY(4px) scale(0.96);
+}
+
 .mode-tab-button.is-active.theme--solo_ai {
   background-color: var(--mascot-peanut-primary, hsl(28, 92%, 54%));
   color: #ffffff;
   box-shadow: var(--mascot-peanut-shadow, 0 5px 0 hsl(28, 90%, 36%), 0 8px 18px rgba(245, 130, 32, 0.35));
   transform: translateY(-1px);
+}
+
+.mode-tab-button.is-active.theme--solo_ai:active {
+  transform: translateY(4px) scale(0.96);
 }
 
 .mode-tab-button.is-active.theme--academy {
@@ -179,11 +192,19 @@ function selectMode(modeId: AppGameMode) {
   transform: translateY(-1px);
 }
 
+.mode-tab-button.is-active.theme--academy:active {
+  transform: translateY(4px) scale(0.96);
+}
+
 .mode-tab-button.is-active.theme--puzzle_hub {
   background-color: var(--color-primary, #6c5ce7);
   color: #ffffff;
   box-shadow: var(--shadow-btn-primary, 0 5px 0 var(--color-primary-bevel), 0 8px 15px rgba(108, 92, 231, 0.35));
   transform: translateY(-1px);
+}
+
+.mode-tab-button.is-active.theme--puzzle_hub:active {
+  transform: translateY(4px) scale(0.96);
 }
 
 @media (max-width: 580px) {
@@ -205,6 +226,26 @@ function selectMode(modeId: AppGameMode) {
 
   .mode-badge {
     display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .mode-switcher-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-radius: var(--radius-xl);
+    padding: var(--space-1-5);
+    gap: var(--space-1-5);
+  }
+
+  .mode-tab-button {
+    min-height: 48px;
+    padding: var(--space-2);
+    border-radius: var(--radius-lg);
+  }
+
+  .mode-badge {
+    display: block;
   }
 }
 </style>

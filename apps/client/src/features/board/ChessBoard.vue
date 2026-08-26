@@ -299,7 +299,7 @@ function handleDragEnd(
   grid-template-rows: repeat(8, 1fr);
   width: 100%;
   height: 100%;
-  border-radius: calc(var(--radius-board) - 4px);
+  border-radius: calc(var(--radius-board) - 8px);
   overflow: hidden;
   box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.25);
 }

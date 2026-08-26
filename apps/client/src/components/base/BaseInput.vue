@@ -217,7 +217,7 @@ function handleKeyDown(event: KeyboardEvent) {
   padding: var(--space-2-5) var(--space-4);
   font-family: var(--font-body);
   font-weight: var(--weight-semibold);
-  font-size: var(--text-base);
+  font-size: 16px; /* Prevents iOS Safari auto-zoom on input focus */
   color: var(--text-main);
   background: transparent;
   border: none;

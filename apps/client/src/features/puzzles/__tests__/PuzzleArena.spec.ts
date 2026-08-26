@@ -165,6 +165,9 @@ describe('PuzzleArena.vue', () => {
 
       expect(wrapper.find('[data-testid="puzzle-feedback-banner"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="puzzle-feedback-banner"]').text()).toContain('Not quite');
+      // Verify Zero-CLS floating toast structure: mounted in arena-board-slot, NOT expanding puzzle-info-card
+      expect(wrapper.find('.arena-board-slot').find('[data-testid="puzzle-feedback-banner"]').exists()).toBe(true);
+      expect(wrapper.find('.puzzle-info-card').find('[data-testid="puzzle-feedback-banner"]').exists()).toBe(false);
 
       // Shake animation expires after timer
       vi.advanceTimersByTime(500);

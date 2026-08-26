@@ -101,4 +101,87 @@ describe('BaseModal.vue', () => {
     expect(wrapper.emitted('close')).toHaveLength(1);
     wrapper.unmount();
   });
+
+  it('sets inert attribute on #app when open and removes when closed', async () => {
+    const appEl = document.createElement('div');
+    appEl.id = 'app';
+    document.body.appendChild(appEl);
+
+    const wrapper = mount(BaseModal, {
+      props: {
+        modelValue: true,
+        title: 'Inert Modal',
+      },
+    });
+
+    expect(appEl.hasAttribute('inert')).toBe(true);
+
+    await wrapper.setProps({ modelValue: false });
+    expect(appEl.hasAttribute('inert')).toBe(false);
+
+    wrapper.unmount();
+    appEl.remove();
+  });
+
+  it('traps Tab and Shift+Tab focus within modal', async () => {
+    const wrapper = mount(BaseModal, {
+      props: {
+        modelValue: true,
+        title: 'Focus Trap Modal',
+        showCloseButton: true,
+      },
+      slots: {
+        default: '<button id="btn1">Button 1</button><button id="btn2">Button 2</button>',
+      },
+      attachTo: document.body,
+    });
+
+    const closeBtn = document.body.querySelector('.base-modal-close-btn') as HTMLButtonElement;
+    const btn2 = document.body.querySelector('#btn2') as HTMLButtonElement;
+
+    // Set focus on last element (btn2)
+    btn2.focus();
+    expect(document.activeElement).toBe(btn2);
+
+    // Tab on last element should cycle to first element (closeBtn)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Shift+Tab on first element should cycle to last element (btn2)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
+    expect(document.activeElement).toBe(btn2);
+
+    wrapper.unmount();
+  });
+
+  it('auto-focuses first element and restores focus to previous element on close', async () => {
+    const triggerBtn = document.createElement('button');
+    triggerBtn.id = 'trigger-btn';
+    document.body.appendChild(triggerBtn);
+    triggerBtn.focus();
+    expect(document.activeElement).toBe(triggerBtn);
+
+    const wrapper = mount(BaseModal, {
+      props: {
+        modelValue: true,
+        title: 'Auto Focus Modal',
+        showCloseButton: true,
+      },
+      slots: {
+        default: '<input id="test-input" />',
+      },
+      attachTo: document.body,
+    });
+
+    await wrapper.vm.$nextTick();
+    const closeBtn = document.body.querySelector('.base-modal-close-btn') as HTMLButtonElement;
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Close modal
+    await wrapper.setProps({ modelValue: false });
+    expect(document.activeElement).toBe(triggerBtn);
+
+    wrapper.unmount();
+    triggerBtn.remove();
+  });
 });

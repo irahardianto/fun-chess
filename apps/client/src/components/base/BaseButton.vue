@@ -117,6 +117,12 @@ function handleClick(event: MouseEvent) {
   box-sizing: border-box;
 }
 
+.btn-tactile:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
 /* SIZES */
 .btn-tactile--sm {
   font-size: var(--text-sm);
@@ -157,7 +163,7 @@ function handleClick(event: MouseEvent) {
 }
 
 .btn-tactile--primary:active:not(:disabled) {
-  transform: translateY(4px);
+  transform: translateY(4px) scale(0.96);
   box-shadow: var(--shadow-btn-primary-active);
 }
 
@@ -175,7 +181,7 @@ function handleClick(event: MouseEvent) {
 }
 
 .btn-tactile--accent:active:not(:disabled) {
-  transform: translateY(4px);
+  transform: translateY(4px) scale(0.96);
   box-shadow: var(--shadow-btn-accent-active);
 }
 
@@ -193,7 +199,7 @@ function handleClick(event: MouseEvent) {
 }
 
 .btn-tactile--success:active:not(:disabled) {
-  transform: translateY(4px);
+  transform: translateY(4px) scale(0.96);
   box-shadow: var(--shadow-btn-success-active);
 }
 
@@ -211,7 +217,7 @@ function handleClick(event: MouseEvent) {
 }
 
 .btn-tactile--danger:active:not(:disabled) {
-  transform: translateY(4px);
+  transform: translateY(4px) scale(0.96);
   box-shadow: var(--shadow-btn-danger-active);
 }
 
@@ -232,7 +238,7 @@ function handleClick(event: MouseEvent) {
 }
 
 .btn-tactile--ghost:active:not(:disabled) {
-  transform: translateY(2px);
+  transform: translateY(2px) scale(0.96);
   box-shadow: none;
 }
 

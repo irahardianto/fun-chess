@@ -142,7 +142,7 @@ function handlePlay() {
   width: 48px;
   height: 48px;
   min-width: 48px;
-  border-radius: var(--radius-lg);
+  border-radius: calc(var(--radius-card, 22px) - var(--space-3, 12px));
   background: var(--bg-surface-raised);
   border: 1px solid var(--border-subtle);
   font-size: 1.6rem;

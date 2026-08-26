@@ -152,7 +152,7 @@ function handleBackToAcademy() {
       <div class="modal-footer-actions">
         <BaseButton variant="ghost" size="md" @click="handleBackToAcademy">
           <template #icon-left>🎓</template>
-          Academy
+          Return to Academy
         </BaseButton>
 
         <BaseButton variant="ghost" size="md" @click="handleRetry">
@@ -273,6 +273,7 @@ function handleBackToAcademy() {
   font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
   color: var(--text-main);
 }
 

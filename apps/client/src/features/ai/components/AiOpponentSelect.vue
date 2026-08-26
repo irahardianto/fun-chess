@@ -131,8 +131,9 @@ function getMascotColorClass(id: MascotId): string {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 820px;
+  max-width: 100%;
   margin: 0 auto;
+  padding: 0;
   gap: var(--space-6);
   box-sizing: border-box;
 }

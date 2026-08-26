@@ -364,6 +364,7 @@ function handleExit() {
 
 /* Arena Playfield */
 .arena-playfield {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -405,15 +406,23 @@ function handleExit() {
 
 /* Active Hint Banner */
 .active-hint-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 540px;
+  z-index: var(--z-overlay-dialogue, 20);
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 100%;
-  background-color: var(--hint-banner-bg, hsl(48, 100%, 96%));
+  background-color: var(--hint-banner-glass, var(--hint-banner-bg, hsl(48, 100%, 96%)));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 2px solid var(--hint-banner-border, hsl(45, 95%, 55%));
   border-radius: var(--radius-lg);
   padding: var(--space-2-5) var(--space-4);
-  box-shadow: 0 0 16px 2px rgba(255, 193, 7, 0.4);
+  box-shadow: var(--glow-hint-banner, 0 0 20px 4px rgba(255, 193, 7, 0.38), var(--shadow-lg));
   box-sizing: border-box;
 }
 
@@ -453,17 +462,25 @@ function handleExit() {
   font-weight: var(--weight-bold);
   color: var(--hint-banner-text, hsl(42, 90%, 22%));
   line-height: var(--leading-snug);
+  margin: 0;
 }
 
+/* Transition */
 .hint-slide-enter-active,
 .hint-slide-leave-active {
-  transition: all var(--duration-fast) var(--ease-spring);
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) var(--ease-spring);
 }
 
 .hint-slide-enter-from,
 .hint-slide-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translate(-50%, -10px) scale(0.95);
+}
+
+.hint-slide-enter-to,
+.hint-slide-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
 }
 
 /* Chessboard Frame */
