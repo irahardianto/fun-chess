@@ -1,185 +1,175 @@
-# Fun Chess — Kid-Centric UI/UX Design Specification
-## Chess Academy Expansion & Dedicated Puzzle Hub
+# Zero-CLS Layout Stability & Visual Design Specification
+## Frozen Design Contract for All Game Screens in Fun Chess Client
 
-**Specification Identifier:** `DESIGN-UX-PUZZLE-001`  
+**Specification Identifier:** `DESIGN-UX-ZERO-CLS-001`  
 **Document Target:** `.agentwork/design-ux.md`  
 **Author:** `@ux-craftsman` (UI/UX Excellence Authority)  
-**Target Audience:** Kids & Teens aged 7 to 15 (Absolute Beginners to Scholastic Club Champions) & Families  
-**Aesthetic Vision:** *Playful Tactile Arcade* — Warm, vibrant, tactile, encouraging, delightful, and non-punitive. Rich physical affordances with 3D pressable buttons, pill badges, bouncy spring physics, expressive mascot banter, dopamine-rich flame combo streaks, glowing magical hints, and rewarding star celebrations.
+**Target Workspace:** `apps/client/`  
+**Status:** **FROZEN DESIGN CONTRACT** (Mandatory implementation reference for builders)  
+
+---
+
+## Executive Summary & Core Mandate
+
+In interactive games like chess, **Cumulative Layout Shift (CLS) is a critical UX defect**. Any sudden vertical shift of the $8 \times 8$ board, piece coordinate grid, or action buttons when dialogues, hints, feedback messages, or connection warnings trigger causes:
+1. **Misclicks & Accidental Move Dispatches:** Players clicking/tapping a square as an element renders can select the wrong square or blunder a piece.
+2. **Visual Jarring & Cognitive Disruption:** Abrupt layout jumping disrupts focus during tactical calculation and time-scramble puzzle rush.
+3. **Degraded Performance & Reflow Penalty:** Browser engine reflows across complex SVG piece trees during document-flow DOM mutations.
+
+### The Zero-CLS Architectural Rule:
+> **All transient visual feedback (speech bubbles, tactical hints, guide instructions, correctness toasts, disconnect alerts, and draw offers) MUST be rendered as non-displacing absolute floating overlays or fixed toasts.**  
+> The underlying gameplay stage—including player HUD badges, captured piece trays, chessboard frames, and in-game toolbars—MUST maintain **$0\text{px}$ vertical displacement** throughout all dynamic state transitions.
 
 ---
 
 ## Table of Contents
-1. [Design Direction & Core Tenets](#1-design-direction--core-tenets)
-2. [Complete Design Tokens & Color Palette](#2-complete-design-tokens--color-palette)
+
+1. [Z-Index Layering System & Elevation Architecture](#1-z-index-layering-system--elevation-architecture)
+2. [Complete Design System Tokens & Color Palette](#2-complete-design-system-tokens--color-palette)
    - [2.1 Primitives (Light & Dark HSL Channels)](#21-primitives-light--dark-hsl-channels)
-   - [2.2 Semantic Application Tokens](#22-semantic-application-tokens)
-   - [2.3 Puzzle Hub & Mode Identity Tokens](#23-puzzle-hub--mode-identity-tokens)
-   - [2.4 Streak Multiplier & Flame FX Tokens](#24-streak-multiplier--flame-fx-tokens)
-   - [2.5 3-Tier Progressive Hint Tokens](#25-3-tier-progressive-hint-tokens)
-   - [2.6 Chessboard & Highlight Tokens](#26-chessboard--highlight-tokens)
-   - [2.7 Dark Theme Overrides & Board Color Immunity](#27-dark-theme-overrides--board-color-immunity)
+   - [2.2 Semantic Surface & Text Tokens](#22-semantic-surface--text-tokens)
+   - [2.3 Elevation Shadows, Borders & Focus Rings](#23-elevation-shadows-borders--focus-rings)
+   - [2.4 Dark Theme Overrides](#24-dark-theme-overrides)
 3. [Typography Scale & Spacing System](#3-typography-scale--spacing-system)
    - [3.1 Google Fonts Configuration](#31-google-fonts-configuration)
    - [3.2 Fluid Typography Hierarchy](#32-fluid-typography-hierarchy)
    - [3.3 4px Base Spacing Grid](#33-4px-base-spacing-grid)
-   - [3.4 Border Radii & Depth Tokens](#34-border-radii--depth-tokens)
-   - [3.5 Tactile 3D Button Shadows](#35-tactile-3d-button-shadows)
-4. [Animation & Micro-Interaction Specifications](#4-animation--micro-interaction-specifications)
-5. [Puzzle Hub Main Screen & Mode Cards Visual Specs](#5-puzzle-hub-main-screen--mode-cards-visual-specs)
-   - [5.1 Lobby Navigation & Mode Switcher Integration](#51-lobby-navigation--mode-switcher-integration)
-   - [5.2 Puzzle Hub Header & Overall Player Stats](#52-puzzle-hub-header--overall-player-stats)
-   - [5.3 Mode Card 1: Themed Skill Drills](#53-mode-card-1-themed-skill-drills)
-   - [5.4 Mode Card 2: Adaptive Rating Ladder](#54-mode-card-2-adaptive-rating-ladder)
-   - [5.5 Mode Card 3: Puzzle Rush / Streak Survivor](#55-mode-card-3-puzzle-rush--streak-survivor)
-   - [5.6 Locked vs Unlocked Card States](#56-locked-vs-unlocked-card-states)
-6. [Puzzle Arena HUD & Gameplay Components](#6-puzzle-arena-hud--gameplay-components)
-   - [6.1 Dynamic Rating Badge & Elo Live Counter](#61-dynamic-rating-badge--elo-live-counter)
-   - [6.2 Streak Combo Multiplier & Flame Effects (🔥)](#62-streak-combo-multiplier--flame-effects-)
-   - [6.3 Timer Bar for Puzzle Rush](#63-timer-bar-for-puzzle-rush)
-   - [6.4 Star Progress Bar & Strike Life Counter](#64-star-progress-bar--strike-life-counter)
-7. [3-Tier Progressive Hint System Visual Specs](#7-3-tier-progressive-hint-system-visual-specs)
-   - [7.1 Tier 1: Piece Nudge Glow (Subtle Attention Cue)](#71-tier-1-piece-nudge-glow-subtle-attention-cue)
-   - [7.2 Tier 2: Target Square Glow (Directional Beacon)](#72-tier-2-target-square-glow-directional-beacon)
-   - [7.3 Tier 3: Show Me Solution (Vector Arrow & Ghost Piece)](#73-tier-3-show-me-solution-vector-arrow--ghost-piece)
-   - [7.4 Progressive Hint Button UI & Auto-Scaling Trigger](#74-progressive-hint-button-ui--auto-scaling-trigger)
-8. [Non-Punitive Bot Reaction Dialogue & Celebratory Fanfare](#8-non-punitive-bot-reaction-dialogue--celebratory-fanfare)
-   - [8.1 Mascot Reaction Persona Matrix](#81-mascot-reaction-persona-matrix)
-   - [8.2 Non-Punitive Mistake Recovery & Soft Reset](#82-non-punitive-mistake-recovery--soft-reset)
-   - [8.3 Celebratory Fanfare & Confetti Triggers](#83-celebratory-fanfare--confetti-triggers)
-   - [8.4 Puzzle Solve & Mode Completion Modals](#84-puzzle-solve--mode-completion-modals)
-9. [Mobile Touch, Ergonomics & Magnetic Snap Guidelines](#9-mobile-touch-ergonomics--magnetic-snap-guidelines)
-   - [9.1 Minimum Touch Targets & Thumb-Zone Layout](#91-minimum-touch-targets--thumb-zone-layout)
-   - [9.2 Magnetic Snap Radius & Drag Indicators](#92-magnetic-snap-radius--drag-indicators)
-   - [9.3 Dual Input Parity: Tap-to-Move & Drag-and-Drop](#93-dual-input-parity-tap-to-move--drag-and-drop)
-10. [Accessibility & WCAG 2.1 AA Compliance](#10-accessibility--wcag-21-aa-compliance)
-11. [Frozen Design Contract & Builder Rules](#11-frozen-design-contract--builder-rules)
+   - [3.4 Border Radius Hierarchy](#34-border-radius-hierarchy)
+4. [Solo AI Arena Overlay Specifications](#4-solo-ai-arena-overlay-specifications)
+   - [4.1 Mascot Speech Bubble (`.mascot-speech-bubble`)](#41-mascot-speech-bubble-mascot-speech-bubble)
+   - [4.2 Active Hint Banner (`.active-hint-banner`)](#42-active-hint-banner-active-hint-banner)
+5. [Academy / Scenario Arena Overlay Specifications](#5-academy--scenario-arena-overlay-specifications)
+   - [5.1 Guide Feedback Banner (`.guide-feedback-banner`)](#51-guide-feedback-banner-guide-feedback-banner)
+   - [5.2 Active Hint Bubble (`.guide-hint-bubble`)](#52-active-hint-bubble-guide-hint-bubble)
+6. [Tactical Drills & Puzzle Arena Overlay Specifications](#6-tactical-drills--puzzle-arena-overlay-specifications)
+   - [6.1 Puzzle Feedback Banner (`.puzzle-feedback-banner`)](#61-puzzle-feedback-banner-puzzle-feedback-banner)
+   - [6.2 Benchmark Reference: `.rush-feedback-toast` Alignment](#62-benchmark-reference-rush-feedback-toast-alignment)
+7. [LAN Multiplayer & App Shell Overlay Specifications](#7-lan-multiplayer--app-shell-overlay-specifications)
+   - [7.1 Global Notification Banner (`.app-notification-banner`)](#71-global-notification-banner-app-notification-banner)
+   - [7.2 Disconnect Warning Banner (`.disconnect-warning-banner`)](#72-disconnect-warning-banner-disconnect-warning-banner)
+   - [7.3 Draw Offer Banner (`.draw-offer-banner`)](#73-draw-offer-banner-draw-offer-banner)
+8. [Animation & Micro-Interaction Specifications](#8-animation--micro-interaction-specifications)
+9. [Responsive Rules & Breakpoint Matrix (320px, 480px, 768px, 1280px)](#9-responsive-rules--breakpoint-matrix-320px-480px-768px-1280px)
+10. [Base Component Visual Specs](#10-base-component-visual-specs)
+11. [Frozen Design Contract Compliance Checklist for Builders](#11-frozen-design-contract-compliance-checklist-for-builders)
 
 ---
 
-## 1. Design Direction & Core Tenets
+## 1. Z-Index Layering System & Elevation Architecture
 
-### 1.1 Aesthetic Direction: Playful Gamified Tactile Arcade
-Fun Chess expansion transforms tactical chess training from dry, intimidating notation exercises into a vibrant, high-energy arcade playground for kids and teens (ages 7–15). Every action delivers instant, tactile, and rewarding physical feedback.
+To ensure overlays never collide, clip, or obscure critical interactive controls inappropriately, Fun Chess adopts a strict **8-tier z-index scale**.
 
 ```
 +-------------------------------------------------------------------------------+
-|                         PLAYFUL TACTILE CHESS ARCADE                          |
+|                        Z-INDEX ELEVATION HIERARCHY                            |
 |                                                                               |
-|   +--------------------------+    +---------------------------------------+   |
-|   |    TACTILE 3D BUTTONS    |    |      DOPAMINE STREAK LOOPS            |   |
-|   |  - 5px Bevel Shadows     |    |  - Animated Flame Multipliers (🔥)    |   |
-|   |  - Spring Easing (Bounce)|    |  - Dynamic Kid Elo Badges (800-1600+) |   |
-|   |  - Instant Push Feedback |    |  - Dual Confetti Cannon Celebrations  |   |
-|   +--------------------------+    +---------------------------------------+   |
-|                                                                               |
-|   +--------------------------+    +---------------------------------------+   |
-|   |  3-TIER PROGRESSIVE HINT |    |     NON-PUNITIVE COMPANIONS           |   |
-|   |  - Tier 1: Nudge Glow    |    |  - Peanut 🐶, Sparky 🐿️, Fox 🦊, Owl 🦉|   |
-|   |  - Tier 2: Target Beacon |    |  - Soft error wobbles (no harsh red)  |   |
-|   |  - Tier 3: Ghost & Arrow |    |  - Unlimited friendly retries         |   |
-|   +--------------------------+    +---------------------------------------+   |
+|  [Tier 7: z-index: 100]  Global System Notifications (.app-notification-banner)|
+|  ---------------------------------------------------------------------------  |
+|  [Tier 6: z-index: 90]   Fixed App Navigation Header (.app-navbar)            |
+|  ---------------------------------------------------------------------------  |
+|  [Tier 5: z-index: 51]   Modal Dialog Content (PromotionModal, GameOverModal) |
+|  [Tier 4: z-index: 50]   Modal Backdrops (.rush-game-over-overlay, BaseModal) |
+|  ---------------------------------------------------------------------------  |
+|  [Tier 3: z-index: 30]   In-Game Critical Alerts (Disconnect / Draw Offer)    |
+|  ---------------------------------------------------------------------------  |
+|  [Tier 2: z-index: 20]   Mascot Speech Bubbles & Floating Tactical Cards      |
+|  ---------------------------------------------------------------------------  |
+|  [Tier 1: z-index: 10]   In-Arena Floating Feedback Pills & Toasts            |
+|  ---------------------------------------------------------------------------  |
+|  [Tier 0: z-index: 1-5]  Base Board, Pieces, Highlights, HUD Trays, In-flow   |
 +-------------------------------------------------------------------------------+
 ```
 
-### 1.2 The Five Core Kid-Centric Tenets
-1. **Physical Affordance & Tactile Joy:** Interactive elements feel juicy and physical. Buttons depress by `3px`–`4px` with bevel shadow reduction. Cards pop upward with soft drop shadows when hovered or touched.
-2. **Zero Frustration & Non-Punitive Feedback:** Mistakes are never penalized with harsh red screens, buzzer sounds, or lost progress. Incorrect moves gently spring the piece back to its square accompanied by friendly mascot hints ("Almost! That bishop is defending. Look for a fork! 💡").
-3. **Progressive Hint Autonomy:** Rather than giving away answers immediately or letting kids get stuck, the 3-tier progressive hint system scales automatically from subtle piece nudges to full ghost piece solutions.
-4. **Dopamine Progression Loops:** Celebrate every breakthrough with flame streak multipliers, star collection progress, level promotions, and confetti fanfare.
-5. **Foolproof Touch & Magnetic Ergonomics:** Sized generously for smaller fingers (`≥ 48px` tap targets, `28px` magnetic snap radius on piece drop), high contrast WCAG AA compliant colors, and dual tap/drag interaction.
+### 1.1 CSS Z-Index Custom Properties
+
+Add these tokens to `:root` in `apps/client/src/assets/design-tokens.css`:
+
+```css
+:root {
+  /* Z-Index Elevation Hierarchy */
+  --z-base:                1;    /* Base chessboard grid, captured trays, in-flow cards */
+  --z-board-indicators:    5;    /* Move arrows, valid move dots, check glows */
+  --z-overlay-toast:       10;   /* Floating puzzle feedback pills (.rush-feedback-toast, .puzzle-feedback-banner) */
+  --z-overlay-guide:       15;   /* Scenario feedback toast (.guide-feedback-banner) */
+  --z-overlay-dialogue:    20;   /* Mascot speech bubble (.mascot-speech-bubble) & active hint (.active-hint-banner) */
+  --z-overlay-alert:       30;   /* Disconnect warning (.disconnect-warning-banner), Draw offer (.draw-offer-banner) */
+  --z-modal-backdrop:      50;   /* Modal backdrop masks */
+  --z-modal-content:       51;   /* Modal dialogue cards & promotion pickers */
+  --z-navbar:              90;   /* Top global navigation bar */
+  --z-global-notification: 100;  /* System-wide toasts (.app-notification-banner) */
+}
+```
 
 ---
 
-## 2. Complete Design Tokens & Color Palette
+## 2. Complete Design System Tokens & Color Palette
 
-All colors are mathematically specified using HSL channels to allow precise opacity adjustments, bevel variations, and seamless light/dark theme switching.
+All color tokens use HSL primitive channels with semantic mapping for full theme fidelity.
 
 ### 2.1 Primitives (Light & Dark HSL Channels)
 
 ```css
-/* ==========================================================================
-   COLOR PRIMITIVES (LIGHT & DARK BASES)
-   ========================================================================== */
 :root {
   color-scheme: light dark;
 
   /* Brand / Primary — Energetic Electric Violet */
   --color-primary-h: 255;
   --color-primary-s: 85%;
-  --color-primary-l: 60%; /* Hex: #6c5ce7 */
+  --color-primary-l: 60%; /* #6c5ce7 */
 
   /* Secondary / Accent — Sunshine Gold */
   --color-accent-h: 42;
   --color-accent-s: 100%;
-  --color-accent-l: 52%; /* Hex: #ffb300 */
+  --color-accent-l: 52%; /* #ffb300 */
 
-  /* Success / Move Valid — Emerald Mint */
+  /* Success — Emerald Mint */
   --color-success-h: 145;
   --color-success-s: 68%;
-  --color-success-l: 48%; /* Hex: #22c55e */
+  --color-success-l: 48%; /* #22c55e */
 
-  /* Warning / Streak Blaze — Vivid Tangerine */
+  /* Warning / Orange Flame */
   --color-warning-h: 25;
   --color-warning-s: 95%;
-  --color-warning-l: 52%; /* Hex: #f97316 */
+  --color-warning-l: 52%; /* #f97316 */
 
   /* Danger / Alert — Coral Crimson */
   --color-danger-h: 354;
   --color-danger-s: 88%;
-  --color-danger-l: 58%; /* Hex: #ef4444 */
+  --color-danger-l: 58%; /* #ef4444 */
 
   /* Info / Active — Sky Cyan */
   --color-info-h: 198;
   --color-info-s: 93%;
-  --color-info-l: 54%; /* Hex: #0ea5e9 */
+  --color-info-l: 54%; /* #0ea5e9 */
 
-  /* Light Theme Surface Bases */
+  /* Light Theme Surface Primitives */
   --color-bg-h: 220;
   --color-bg-s: 28%;
-  --color-bg-l: 96%; /* Hex: #f1f4f9 */
+  --color-bg-l: 96%; /* #f1f4f9 */
 
   --color-surface-h: 0;
   --color-surface-s: 0%;
-  --color-surface-l: 100%; /* Hex: #ffffff */
+  --color-surface-l: 100%; /* #ffffff */
 
   --color-text-h: 222;
   --color-text-s: 47%;
-  --color-text-l: 11%; /* Hex: #0f172a */
-}
-
-/* Dark Theme Primitives */
-[data-theme='dark'] {
-  color-scheme: dark;
-
-  --color-bg-h: 226;
-  --color-bg-s: 30%;
-  --color-bg-l: 10%; /* Hex: #111524 */
-
-  --color-surface-h: 225;
-  --color-surface-s: 24%;
-  --color-surface-l: 16%; /* Hex: #1e2438 */
-
-  --color-text-h: 220;
-  --color-text-s: 20%;
-  --color-text-l: 96%; /* Hex: #f1f3f9 */
+  --color-text-l: 11%; /* #0f172a */
 }
 ```
 
----
-
-### 2.2 Semantic Application Tokens
+### 2.2 Semantic Surface & Text Tokens
 
 ```css
 :root {
-  /* Surfaces & Backgrounds */
+  /* Surfaces & Glass Overlays */
   --bg-app:             hsl(var(--color-bg-h) var(--color-bg-s) var(--color-bg-l));
   --bg-surface:         hsl(var(--color-surface-h) var(--color-surface-s) var(--color-surface-l));
   --bg-surface-raised:  hsl(var(--color-surface-h) var(--color-surface-s) calc(var(--color-surface-l) - 3%));
-  --bg-surface-glass:   rgba(255, 255, 255, 0.90);
+  --bg-surface-glass:   rgba(255, 255, 255, 0.92);
+  --bg-surface-glass-subtle: rgba(255, 255, 255, 0.78);
   --bg-overlay:         rgba(15, 23, 42, 0.68);
 
-  /* Typography Colors */
+  /* Typography */
   --text-main:          hsl(var(--color-text-h) var(--color-text-s) var(--color-text-l));
   --text-muted:         hsl(var(--color-text-h) 16% 42%);
   --text-faint:         hsl(var(--color-text-h) 12% 64%);
@@ -189,218 +179,77 @@ All colors are mathematically specified using HSL channels to allow precise opac
   --text-on-danger:     #ffffff;
   --text-on-success:    #ffffff;
 
-  /* Button Colors & Bevels */
-  --color-primary:        hsl(var(--color-primary-h) var(--color-primary-s) var(--color-primary-l));
-  --color-primary-hover:  hsl(var(--color-primary-h) var(--color-primary-s) calc(var(--color-primary-l) - 6%));
-  --color-primary-active: hsl(var(--color-primary-h) var(--color-primary-s) calc(var(--color-primary-l) - 12%));
-  --color-primary-bevel:  hsl(var(--color-primary-h) var(--color-primary-s) 42%);
-  --color-primary-subtle: hsl(var(--color-primary-h) var(--color-primary-s) var(--color-primary-l) / 0.14);
+  /* Tactical Hint & Error Banners */
+  --hint-banner-bg:         hsl(48, 100%, 96%);
+  --hint-banner-border:     hsl(45, 95%, 55%);
+  --hint-banner-text:       hsl(42, 90%, 22%);
+  --hint-banner-glass:      rgba(254, 249, 195, 0.94);
 
-  --color-accent:         hsl(var(--color-accent-h) var(--color-accent-s) var(--color-accent-l));
-  --color-accent-hover:   hsl(var(--color-accent-h) var(--color-accent-s) calc(var(--color-accent-l) - 6%));
-  --color-accent-active:  hsl(var(--color-accent-h) var(--color-accent-s) calc(var(--color-accent-l) - 12%));
-  --color-accent-bevel:   hsl(var(--color-accent-h) 95% 36%);
-  --color-accent-subtle:  hsl(var(--color-accent-h) var(--color-accent-s) var(--color-accent-l) / 0.16);
+  --soft-error-bg:          hsl(350, 90%, 96%);
+  --soft-error-border:      hsl(350, 80%, 75%);
+  --soft-error-text:        hsl(350, 75%, 32%);
+  --soft-error-glass:       rgba(255, 241, 242, 0.94);
 
-  --color-success:        hsl(var(--color-success-h) var(--color-success-s) var(--color-success-l));
-  --color-success-hover:  hsl(var(--color-success-h) var(--color-success-s) calc(var(--color-success-l) - 6%));
-  --color-success-active: hsl(var(--color-success-h) var(--color-success-s) calc(var(--color-success-l) - 12%));
-  --color-success-bevel:  hsl(var(--color-success-h) var(--color-success-s) 34%);
-  --color-success-subtle: hsl(var(--color-success-h) var(--color-success-s) var(--color-success-l) / 0.16);
+  --soft-success-bg:        hsl(145, 68%, 94%);
+  --soft-success-border:    hsl(145, 68%, 60%);
+  --soft-success-text:      hsl(145, 80%, 22%);
+  --soft-success-glass:     rgba(240, 253, 244, 0.94);
 
-  --color-danger:         hsl(var(--color-danger-h) var(--color-danger-s) var(--color-danger-l));
-  --color-danger-hover:   hsl(var(--color-danger-h) var(--color-danger-s) calc(var(--color-danger-l) - 6%));
-  --color-danger-active:  hsl(var(--color-danger-h) var(--color-danger-s) calc(var(--color-danger-l) - 12%));
-  --color-danger-bevel:   hsl(var(--color-danger-h) var(--color-danger-s) 40%);
-  --color-danger-subtle:  hsl(var(--color-danger-h) var(--color-danger-s) var(--color-danger-l) / 0.16);
+  --soft-info-bg:           hsl(198, 90%, 95%);
+  --soft-info-border:       hsl(198, 80%, 75%);
+  --soft-info-text:         hsl(198, 90%, 25%);
+  --soft-info-glass:        rgba(240, 249, 255, 0.94);
+}
+```
 
-  --color-warning:        hsl(var(--color-warning-h) var(--color-warning-s) var(--color-warning-l));
-  --color-warning-bevel:  hsl(var(--color-warning-h) var(--color-warning-s) 38%);
-  --color-warning-subtle: hsl(var(--color-warning-h) var(--color-warning-s) var(--color-warning-l) / 0.16);
+### 2.3 Elevation Shadows, Borders & Focus Rings
 
-  --color-info:           hsl(var(--color-info-h) var(--color-info-s) var(--color-info-l));
-
-  /* Borders & Focus Rings */
+```css
+:root {
+  /* Borders */
   --border-subtle:        hsl(var(--color-bg-h) 18% 88%);
   --border-medium:        hsl(var(--color-bg-h) 22% 80%);
   --border-strong:        hsl(var(--color-bg-h) 25% 68%);
   --border-focus:         var(--color-primary);
   --focus-ring:           0 0 0 3px hsl(var(--color-primary-h) 85% 60% / 0.45);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.09), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.14), 0 4px 10px rgba(15, 23, 42, 0.08);
+  --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.20), 0 8px 16px rgba(15, 23, 42, 0.10);
+
+  /* Glow Halos */
+  --glow-hint-banner:  0 0 20px 4px rgba(255, 193, 7, 0.38), var(--shadow-lg);
+  --glow-danger-toast: 0 0 18px 3px rgba(239, 68, 68, 0.35), var(--shadow-md);
+  --glow-toast-toast:  0 6px 20px rgba(108, 92, 231, 0.25), var(--shadow-md);
 }
 ```
 
----
-
-### 2.3 Puzzle Hub & Mode Identity Tokens
-
-The Puzzle Hub features 3 dedicated, visually distinct game modes with individual brand identities:
-
-| Mode ID | Mode Name | Theme Personality | Primary Brand Hex / HSL | Accent Bevel |
-| :--- | :--- | :--- | :--- | :--- |
-| `drills` | **Themed Skill Drills** | Scholarly, Focused, Tactical | `#4f46e5` (`hsl(244, 75%, 59%)`) | `#3730a3` (`hsl(244, 70%, 41%)`) |
-| `ladder` | **Adaptive Rating Ladder** | Triumphant, Tiered, Gamified | `#9333ea` (`hsl(271, 81%, 56%)`) | `#6b21a8` (`hsl(271, 75%, 39%)`) |
-| `rush` | **Puzzle Rush / Streak Survivor** | High-Octane, Adrenaline, Flame | `#ea580c` (`hsl(21, 90%, 48%)`) | `#9a3412` (`hsl(21, 85%, 34%)`) |
-
-```css
-:root {
-  /* Mode 1: Themed Skill Drills */
-  --mode-drills-primary:   hsl(244, 75%, 59%); /* #4f46e5 */
-  --mode-drills-hover:     hsl(244, 75%, 52%);
-  --mode-drills-bevel:     hsl(244, 70%, 41%);
-  --mode-drills-bg:        hsl(244, 85%, 97%);
-  --mode-drills-border:    hsl(244, 70%, 82%);
-  --mode-drills-shadow:    0 5px 0 var(--mode-drills-bevel), 0 8px 20px rgba(79, 70, 229, 0.35);
-
-  /* Mode 2: Adaptive Rating Ladder */
-  --mode-ladder-primary:   hsl(271, 81%, 56%); /* #9333ea */
-  --mode-ladder-hover:     hsl(271, 81%, 50%);
-  --mode-ladder-bevel:     hsl(271, 75%, 39%);
-  --mode-ladder-bg:        hsl(271, 85%, 97%);
-  --mode-ladder-border:    hsl(271, 70%, 82%);
-  --mode-ladder-shadow:    0 5px 0 var(--mode-ladder-bevel), 0 8px 20px rgba(147, 51, 234, 0.35);
-
-  /* Mode 3: Puzzle Rush / Streak Survivor */
-  --mode-rush-primary:     hsl(21, 90%, 48%); /* #ea580c */
-  --mode-rush-hover:       hsl(21, 90%, 42%);
-  --mode-rush-bevel:       hsl(21, 85%, 34%);
-  --mode-rush-bg:          hsl(24, 100%, 97%);
-  --mode-rush-border:      hsl(21, 85%, 80%);
-  --mode-rush-shadow:      0 5px 0 var(--mode-rush-bevel), 0 8px 22px rgba(234, 88, 12, 0.38);
-
-  /* Star & Academy Mastery Tokens */
-  --academy-gold:          hsl(45, 100%, 51%); /* #ffc107 */
-  --academy-gold-hover:    hsl(45, 100%, 45%);
-  --academy-gold-bevel:    hsl(45, 95%, 35%);
-  --academy-gold-subtle:   hsl(45, 100%, 51% / 0.16);
-  --academy-gold-glow:     0 0 20px 4px rgba(255, 193, 7, 0.45);
-
-  --star-filled:           hsl(48, 100%, 50%); /* #ffcc00 */
-  --star-filled-stroke:    hsl(42, 100%, 36%);
-  --star-empty:            hsl(220, 16%, 82%);
-  --star-empty-stroke:     hsl(220, 16%, 68%);
-  --star-glow:             0 0 16px 4px rgba(255, 204, 0, 0.65);
-}
-```
-
----
-
-### 2.4 Streak Multiplier & Flame FX Tokens
-
-The combo multiplier creates a multi-stage dopamine escalation loop based on consecutive puzzle solves:
-
-```css
-:root {
-  /* Combo 1-2x: Spark Amber */
-  --flame-spark-start:     hsl(42, 100%, 52%);  /* #ffb300 */
-  --flame-spark-end:       hsl(28, 95%, 54%);   /* #f58220 */
-  --flame-spark-glow:      0 0 12px rgba(255, 179, 0, 0.55);
-
-  /* Combo 3-4x: Blaze Tangerine */
-  --flame-blaze-start:     hsl(25, 95%, 52%);   /* #f97316 */
-  --flame-blaze-end:       hsl(12, 90%, 52%);   /* #ef4422 */
-  --flame-blaze-glow:      0 0 20px 4px rgba(249, 115, 22, 0.70);
-
-  /* Combo 5x+ (MAX): Inferno Crimson & Gold */
-  --flame-inferno-start:   hsl(350, 88%, 56%);  /* #f43f5e */
-  --flame-inferno-mid:     hsl(16, 92%, 52%);   /* #ea580c */
-  --flame-inferno-end:     hsl(45, 100%, 51%);  /* #ffc107 */
-  --flame-inferno-glow:    0 0 28px 8px rgba(244, 63, 94, 0.80), 0 0 10px rgba(255, 193, 7, 0.90);
-  --flame-badge-text:      #ffffff;
-
-  /* Timer Bar Tokens */
-  --timer-safe:            hsl(145, 68%, 48%); /* >60s */
-  --timer-warning:         hsl(42, 100%, 52%); /* 30s-60s */
-  --timer-danger:          hsl(354, 88%, 58%); /* <15s */
-  --timer-bonus-time:      hsl(145, 80%, 42%); /* "+5s" badge popup */
-
-  /* Strike / Life Tokens (Survivor Mode) */
-  --strike-active:         hsl(145, 68%, 48%); /* Active shield/heart 💚 */
-  --strike-cracked:        hsl(354, 88%, 58%); /* Lost strike 💔 */
-  --strike-empty:          hsl(220, 16%, 80%); /* Inactive strike slot */
-}
-```
-
----
-
-### 2.5 3-Tier Progressive Hint Tokens
-
-```css
-:root {
-  /* Tier 1: Piece Nudge Glow */
-  --hint-tier1-piece-glow: 0 0 18px 4px rgba(255, 193, 7, 0.85);
-  --hint-tier1-bg:         rgba(255, 193, 7, 0.28);
-  --hint-tier1-border:     hsl(45, 100%, 51%);
-
-  /* Tier 2: Target Square Glow */
-  --hint-tier2-from-glow:  0 0 22px 6px rgba(255, 193, 7, 0.80);
-  --hint-tier2-from-bg:    rgba(255, 193, 7, 0.35);
-  --hint-tier2-to-glow:    0 0 22px 6px rgba(34, 197, 94, 0.85);
-  --hint-tier2-to-bg:      rgba(34, 197, 94, 0.38);
-  --hint-tier2-ring:       #22c55e;
-
-  /* Tier 3: Show Me Solution (Vector Arrow & Ghost Piece) */
-  --hint-tier3-arrow-start: #ffc107;
-  --hint-tier3-arrow-end:   #22c55e;
-  --hint-tier3-arrow-glow:  0 0 14px rgba(255, 193, 7, 0.90), 0 0 8px rgba(34, 197, 94, 0.90);
-  --hint-tier3-ghost-opacity: 0.55;
-  --hint-tier3-ghost-glow:  drop-shadow(0 0 12px rgba(34, 197, 94, 0.85));
-
-  /* Hint Banner & Guidance Box */
-  --hint-banner-bg:         hsl(48, 100%, 96%);
-  --hint-banner-border:     hsl(45, 95%, 55%);
-  --hint-banner-text:       hsl(42, 90%, 22%);
-  --hint-meter-filled:      hsl(45, 100%, 51%);
-  --hint-meter-empty:       hsl(220, 16%, 84%);
-
-  /* Non-Punitive Soft Mistake */
-  --soft-error-bg:          hsl(350, 90%, 96%);
-  --soft-error-border:      hsl(350, 80%, 75%);
-  --soft-error-text:        hsl(350, 75%, 35%);
-  --soft-error-icon:        hsl(350, 85%, 55%);
-}
-```
-
----
-
-### 2.6 Chessboard & Highlight Tokens
-
-```css
-:root {
-  /* Warm Classic Sand & Caramel Timber */
-  --board-light-sq:          #f0d9b5; /* Warm creamy sand */
-  --board-dark-sq:           #b58863; /* Warm caramel timber */
-  --board-coord-light:       #b58863; /* Coordinate labels on light sq */
-  --board-coord-dark:        #f0d9b5; /* Coordinate labels on dark sq */
-  --board-rim:               #7d5538; /* Sturdy outer wooden border */
-  --board-rim-dark:          #533722;
-
-  /* Move Highlights & Indicators */
-  --highlight-selected:      rgba(255, 215, 0, 0.65);        /* Warm Gold outline/fill */
-  --highlight-last-move:     rgba(255, 230, 110, 0.48);       /* Soft Lemon Glow */
-  --highlight-valid-dot:     rgba(34, 197, 94, 0.85);         /* Emerald target dot */
-  --highlight-valid-hover:   rgba(34, 197, 94, 0.35);         /* Soft target square fill */
-  --highlight-capture-ring:  rgba(239, 68, 68, 0.85);         /* Coral Red capture ring */
-  --check-danger-glow:       rgba(239, 68, 68, 0.90);         /* King check halo */
-  --check-danger-bg:         rgba(239, 68, 68, 0.35);         /* King check square wash */
-
-  /* Magnetic Snap Highlight on Mobile Drag */
-  --snap-target-ring:        rgba(34, 197, 94, 0.95);
-  --snap-target-bg:          rgba(34, 197, 94, 0.45);
-  --snap-target-glow:        0 0 20px 4px rgba(34, 197, 94, 0.80);
-}
-```
-
----
-
-### 2.7 Dark Theme Overrides & Board Color Immunity
+### 2.4 Dark Theme Overrides
 
 ```css
 [data-theme='dark'] {
-  /* Surfaces */
+  color-scheme: dark;
+
+  --color-bg-h: 226;
+  --color-bg-s: 30%;
+  --color-bg-l: 10%; /* #111524 */
+
+  --color-surface-h: 225;
+  --color-surface-s: 24%;
+  --color-surface-l: 16%; /* #1e2438 */
+
+  --color-text-h: 220;
+  --color-text-s: 20%;
+  --color-text-l: 96%; /* #f1f3f9 */
+
   --bg-app:             hsl(226, 30%, 10%);
   --bg-surface:         hsl(225, 24%, 16%);
   --bg-surface-raised:  hsl(225, 22%, 22%);
   --bg-surface-glass:   rgba(30, 36, 56, 0.92);
+  --bg-surface-glass-subtle: rgba(30, 36, 56, 0.80);
   --bg-overlay:         rgba(5, 8, 16, 0.82);
 
   --text-main:          hsl(220, 20%, 96%);
@@ -411,55 +260,25 @@ The combo multiplier creates a multi-stage dopamine escalation loop based on con
   --border-medium:      hsl(225, 20%, 32%);
   --border-strong:      hsl(225, 20%, 45%);
 
-  --board-rim:          #2c1f15;
-  --board-rim-dark:     #1a120c;
-
-  /* Mode Overrides */
-  --mode-drills-bg:     hsl(244, 40%, 18%);
-  --mode-drills-border: hsl(244, 45%, 36%);
-  --mode-ladder-bg:     hsl(271, 40%, 18%);
-  --mode-ladder-border: hsl(271, 45%, 36%);
-  --mode-rush-bg:       hsl(21, 40%, 18%);
-  --mode-rush-border:   hsl(21, 50%, 36%);
-
-  /* Hint Overrides */
   --hint-banner-bg:     hsl(45, 30%, 18%);
   --hint-banner-border: hsl(45, 60%, 38%);
   --hint-banner-text:   hsl(45, 85%, 90%);
-  --hint-meter-empty:   hsl(225, 15%, 28%);
+  --hint-banner-glass:  rgba(40, 32, 20, 0.94);
 
   --soft-error-bg:      hsl(350, 40%, 18%);
   --soft-error-border:  hsl(350, 50%, 35%);
   --soft-error-text:    hsl(350, 85%, 90%);
+  --soft-error-glass:   rgba(45, 20, 25, 0.94);
 
-  --star-empty:         hsl(225, 15%, 28%);
-  --star-empty-stroke:  hsl(225, 15%, 40%);
-}
+  --soft-success-bg:    hsl(145, 40%, 18%);
+  --soft-success-border:hsl(145, 50%, 35%);
+  --soft-success-text:  hsl(145, 85%, 90%);
+  --soft-success-glass: rgba(20, 45, 30, 0.94);
 
-/* ==========================================================================
-   CRITICAL: CHESS BOARD & PIECE COLOR IMMUNITY
-   Prevents mobile browsers & OS dark modes from auto-inverting chess pieces
-   ========================================================================== */
-.chess-board-container,
-.chess-board-grid,
-.chess-square,
-.chess-piece-wrapper,
-.chess-piece-svg,
-.captured-tray,
-.captured-piece-item,
-.promotion-card,
-.piece-icon-wrapper,
-.ghost-piece-svg {
-  color-scheme: only light !important;
-  forced-color-adjust: none !important;
-}
-
-.chess-piece-svg *,
-.chess-piece-svg path,
-.chess-piece-svg g,
-.ghost-piece-svg * {
-  forced-color-adjust: none !important;
-  color-scheme: only light !important;
+  --soft-info-bg:       hsl(198, 40%, 18%);
+  --soft-info-border:   hsl(198, 50%, 35%);
+  --soft-info-text:     hsl(198, 85%, 90%);
+  --soft-info-glass:    rgba(20, 38, 50, 0.94);
 }
 ```
 
@@ -468,37 +287,23 @@ The combo multiplier creates a multi-stage dopamine escalation loop based on con
 ## 3. Typography Scale & Spacing System
 
 ### 3.1 Google Fonts Configuration
-Fun Chess uses a 3-tier font strategy balancing playfulness with tabular numerical precision:
-- **Display & Headings:** `'Fredoka', cursive, sans-serif` — Warm, rounded, joyful, bouncy. Used for Titles, Mode Cards, Flame Combo Callouts, Mascot Banter, and Victory Modals.
-- **Body & Explanations:** `'Nunito', sans-serif` — Highly readable rounded sans-serif. Used for Step Instructions, Tactical Clues, Button Labels, and Modal Subtitles.
-- **Tabular & Monospace:** `'JetBrains Mono', monospace` — Fixed-width figures for Elo Rating Counters, Rush Timers, Streak Multipliers, and Chess Board Coordinates.
 
-```html
-<!-- Include in index.html <head> with preconnect -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700;800&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
-```
-
----
+- **Display & Headings:** `'Fredoka', cursive, sans-serif` (`500, 600, 700, 800`)
+- **Body & Explanations:** `'Nunito', sans-serif` (`500, 600, 700, 800`)
+- **Mono / Tabular Numbers:** `'JetBrains Mono', monospace` (`600, 700, 800`)
 
 ### 3.2 Fluid Typography Hierarchy
 
-| CSS Token | Clamp Expression | Mobile (375px) | Desktop (1280px) | Line Height | Usage |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `--text-hero` | `clamp(2.40rem, 1.80rem + 2.8vw, 3.40rem)` | 38px | 54px | 1.05 | Victory Title, Mode Winner Banner |
-| `--text-4xl` | `clamp(1.90rem, 1.50rem + 1.9vw, 2.60rem)` | 30px | 42px | 1.15 | Page Titles (H1), Solved Announcement |
-| `--text-3xl` | `clamp(1.50rem, 1.25rem + 1.4vw, 2.10rem)` | 24px | 34px | 1.20 | Mode Card Headings (H2), Elo Tier Name |
-| `--text-2xl` | `clamp(1.30rem, 1.10rem + 0.9vw, 1.65rem)` | 21px | 26px | 1.30 | Section Subheadings (H3), Drill Theme |
-| `--text-xl` | `clamp(1.15rem, 1.00rem + 0.6vw, 1.35rem)` | 18px | 22px | 1.35 | Drill Card Title, Modal Dialog Body |
-| `--text-lg` | `clamp(1.05rem, 0.95rem + 0.4vw, 1.20rem)` | 17px | 19px | 1.40 | Mascot Banter, Tactical Hints |
-| `--text-base` | `clamp(0.95rem, 0.90rem + 0.2vw, 1.05rem)` | 15px | 17px | 1.50 | Standard Body, Action Button Text |
-| `--text-sm` | `clamp(0.82rem, 0.78rem + 0.2vw, 0.92rem)` | 13px | 15px | 1.40 | Pills, Badges, Category Meta |
-| `--text-xs` | `clamp(0.70rem, 0.67rem + 0.1vw, 0.78rem)` | 11px | 12.5px| 1.20 | Board Coordinates, Small Tags |
-| `--text-timer` | `clamp(1.80rem, 1.40rem + 1.6vw, 2.40rem)` | 28px | 38px | 1.00 | Puzzle Rush Countdown Timer (Mono) |
-| `--text-combo` | `clamp(1.40rem, 1.10rem + 1.2vw, 1.90rem)` | 22px | 30px | 1.00 | Combo Multiplier (`x3 🔥`) (Fredoka) |
-
----
+| Token | Clamp Value | Approx 375px | Approx 1280px | Line Height | Usage |
+|---|---|---|---|---|---|
+| `--text-hero` | `clamp(2.40rem, 1.80rem + 2.8vw, 3.40rem)` | 38px | 54px | `1.05` | Victory announcements |
+| `--text-3xl` | `clamp(1.50rem, 1.25rem + 1.4vw, 2.10rem)` | 24px | 34px | `1.20` | Section H2, Modal Titles |
+| `--text-2xl` | `clamp(1.30rem, 1.10rem + 0.9vw, 1.65rem)` | 21px | 26px | `1.30` | Arena sub-headers |
+| `--text-xl` | `clamp(1.15rem, 1.00rem + 0.6vw, 1.35rem)` | 18px | 22px | `1.35` | Card titles, Dialog bodies |
+| `--text-lg` | `clamp(1.05rem, 0.95rem + 0.4vw, 1.20rem)` | 17px | 19px | `1.40` | Active tactical hint text |
+| `--text-base` | `clamp(0.95rem, 0.90rem + 0.2vw, 1.05rem)` | 15px | 17px | `1.50` | Default body, Mascot chat |
+| `--text-sm` | `clamp(0.82rem, 0.78rem + 0.2vw, 0.92rem)` | 13px | 15px | `1.40` | Feedback toast pills, Subtitles |
+| `--text-xs` | `clamp(0.70rem, 0.67rem + 0.1vw, 0.78rem)` | 11px | 12.5px| `1.20` | Badges, coordinates, tags |
 
 ### 3.3 4px Base Spacing Grid
 
@@ -517,806 +322,797 @@ Fun Chess uses a 3-tier font strategy balancing playfulness with tabular numeric
   --space-10:  40px;
   --space-12:  48px;
   --space-16:  64px;
-  --space-20:  80px;
-  --space-24:  96px;
 }
 ```
 
----
-
-### 3.4 Border Radii & Depth Tokens
+### 3.4 Border Radius Hierarchy
 
 ```css
 :root {
-  /* Radii Scale */
-  --radius-xs:   4px;   /* Small status pills */
-  --radius-sm:   8px;   /* Tactical tag badges, coordinates */
-  --radius-md:   12px;  /* Inputs, small HUD controls */
-  --radius-lg:   16px;  /* Chess board outer rim, standard buttons */
-  --radius-xl:   22px;  /* Mode cards, HUD containers, speech bubbles */
-  --radius-2xl:  30px;  /* Modals, celebration sheets */
-  --radius-pill: 9999px;/* Combo pills, rating pills, turn pills */
-
-  /* Component Radii Aliases */
-  --radius-btn:    var(--radius-lg);
-  --radius-card:   var(--radius-xl);
-  --radius-bubble: var(--radius-xl);
-  --radius-modal:  var(--radius-2xl);
-  --radius-board:  var(--radius-lg);
-
-  /* Ambient Soft Shadows */
-  --shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.08);
-  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.09), 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.14), 0 4px 10px rgba(15, 23, 42, 0.08);
-  --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.20), 0 8px 16px rgba(15, 23, 42, 0.10);
-  --shadow-piece-drag: 0 16px 32px rgba(0, 0, 0, 0.35);
+  --radius-xs:   4px;   /* Tag indicators */
+  --radius-sm:   8px;   /* Small pills */
+  --radius-md:   12px;  /* Input fields, alert banners */
+  --radius-lg:   16px;  /* Buttons, hint cards, board outer rim */
+  --radius-xl:   22px;  /* Speech bubbles, modal cards */
+  --radius-2xl:  30px;  /* Hero dialogs */
+  --radius-pill: 9999px;/* Feedback toasts, turn pills */
 }
 ```
 
 ---
 
-### 3.5 Tactile 3D Button Shadows
+## 4. Solo AI Arena Overlay Specifications
 
-Interactive buttons use 3-layer tactile shadows to create a physical pushable toy-box effect:
+### 4.1 Mascot Speech Bubble (`.mascot-speech-bubble`)
+
+- **Component:** `apps/client/src/features/ai/components/AiMascotBadge.vue`
+- **Layout Shift Problem:** Rendering in normal flex flow expanded `.ai-mascot-badge-container` by $+54\text{px}$, causing the chessboard below to jump downward during speech banter.
+- **Zero-CLS Solution:** Position `.mascot-speech-bubble` as an absolute overlay anchored to `.ai-mascot-badge-container`, with pointer tail pointing to the mascot avatar medallion.
+
+```
++-------------------------------------------------------------------------------+
+| [.ai-mascot-badge-container (position: relative; width: 100%;)]               |
+|                                                                               |
+|   +-----------------------------------------------------------------------+   |
+|   | [ 🐶 ]  Peanut ~800  [AI]                   ⚪ White      [ Ready ]   |   |
+|   +-----------------------------------------------------------------------+   |
+|         ▲                                                                     |
+|       /   \ (Pointer Tail: top: -7px; left: 24px;)                            |
+|   +-----------------------------------------------------------------------+   |
+|   | 💬 "Woof! You found a sneaky fork! Great job!" (position: absolute;)  |   |
+|   +-----------------------------------------------------------------------+   |
++-------------------------------------------------------------------------------+
+```
+
+#### Exact CSS Specification:
 
 ```css
-:root {
-  /* Primary Violet */
-  --shadow-btn-primary:        0 5px 0 var(--color-primary-bevel), 0 8px 15px rgba(108, 92, 231, 0.35);
-  --shadow-btn-primary-hover:  0 7px 0 var(--color-primary-bevel), 0 10px 20px rgba(108, 92, 231, 0.40);
-  --shadow-btn-primary-active: 0 1px 0 var(--color-primary-bevel), 0 2px 5px rgba(108, 92, 231, 0.25);
-
-  /* Accent Gold / Hint */
-  --shadow-btn-gold:           0 5px 0 var(--academy-gold-bevel), 0 8px 15px rgba(255, 193, 7, 0.35);
-  --shadow-btn-gold-hover:     0 7px 0 var(--academy-gold-bevel), 0 10px 20px rgba(255, 193, 7, 0.40);
-  --shadow-btn-gold-active:    0 1px 0 var(--academy-gold-bevel), 0 2px 5px rgba(255, 193, 7, 0.25);
-
-  /* Success Green */
-  --shadow-btn-success:        0 5px 0 var(--color-success-bevel), 0 8px 15px rgba(34, 197, 94, 0.35);
-  --shadow-btn-success-hover:  0 7px 0 var(--color-success-bevel), 0 10px 20px rgba(34, 197, 94, 0.40);
-  --shadow-btn-success-active: 0 1px 0 var(--color-success-bevel), 0 2px 5px rgba(34, 197, 94, 0.25);
-
-  /* Rush Blaze Orange */
-  --shadow-btn-rush:           0 5px 0 var(--mode-rush-bevel), 0 8px 18px rgba(234, 88, 12, 0.40);
-  --shadow-btn-rush-hover:     0 7px 0 var(--mode-rush-bevel), 0 12px 24px rgba(234, 88, 12, 0.48);
-  --shadow-btn-rush-active:    0 1px 0 var(--mode-rush-bevel), 0 2px 5px rgba(234, 88, 12, 0.30);
-
-  /* Ghost / Neutral */
-  --shadow-btn-ghost:          0 3px 0 var(--border-medium), var(--shadow-xs);
-  --shadow-btn-ghost-hover:    0 5px 0 var(--border-strong), var(--shadow-sm);
-  --shadow-btn-ghost-active:   0 1px 0 var(--border-medium);
-}
-```
-
----
-
-## 4. Animation & Micro-Interaction Specifications
-
-| Animation Name | Trigger Moment | Keyframes Summary | Duration / Easing |
-| :--- | :--- | :--- | :--- |
-| `flame-flicker` | Streak combo $\ge 3$ active | Scale oscillates between 1.0 and 1.14 with $\pm 4^\circ$ tilt and bright flame halo. | 650ms infinite ease-in-out |
-| `flame-pop-in` | Combo multiplier increment | Scales rapidly from 0.4 to 1.35 with spring recoil and golden ring burst. | 320ms `var(--ease-spring)` |
-| `piece-nudge-wiggle`| Tier 1 hint activated | Piece rotates $-6^\circ \to +6^\circ \to -4^\circ \to 0^\circ$ twice, glowing golden. | 600ms ease-in-out |
-| `beacon-pulse` | Tier 2 target square | Expanding concentric radial rings around destination square. | 1100ms infinite cubic-bezier(0, 0, 0.2, 1) |
-| `ghost-piece-shimmer`| Tier 3 solution active | Semi-transparent piece floats gently ($0 \to -4\text{px}$) with luminous emerald shimmer. | 1400ms infinite ease-in-out |
-| `arrow-draw-grow` | Tier 3 solution arrow | SVG stroke-dashoffset animates from $100\% \to 0\%$, arrow head snaps in. | 350ms `var(--ease-out-expo)` |
-| `elo-bump-up` | Puzzle solve rating gain | Elo badge scales $1.25\text{x}$, glows emerald, delta pill `+12` floats upward. | 450ms `var(--ease-spring)` |
-| `timer-heartbeat` | Rush timer $< 15\text{s}$ | Timer bar and badge thump rhythmically with urgent coral pulsing glow. | 500ms infinite ease-in-out |
-| `shake-soft` | Incorrect move played | Board / piece wiggles horizontally ($\pm 4\text{px}$) without penalty; pieces snap back. | 280ms ease-in-out |
-| `confetti-burst` | Puzzle solve / clear | Dual-corner burst of 40–80 confetti particles. | 1800ms physics decay |
-
-```css
-/* ==========================================================================
-   KEYFRAME DEFINITIONS
-   ========================================================================== */
-@keyframes flame-flicker {
-  0%, 100% {
-    transform: scale(1) rotate(-2deg);
-    filter: drop-shadow(0 0 12px var(--flame-blaze-start));
-  }
-  50% {
-    transform: scale(1.12) rotate(3deg);
-    filter: drop-shadow(0 0 24px var(--flame-blaze-end));
-  }
-}
-
-@keyframes flame-pop-in {
-  0% {
-    transform: scale(0.3) rotate(-15deg);
-    opacity: 0;
-  }
-  70% {
-    transform: scale(1.35) rotate(5deg);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-@keyframes piece-nudge-wiggle {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  20% { transform: rotate(-8deg) scale(1.08); }
-  40% { transform: rotate(8deg) scale(1.08); }
-  60% { transform: rotate(-5deg) scale(1.04); }
-  80% { transform: rotate(4deg) scale(1.02); }
-}
-
-@keyframes beacon-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.85), inset 0 0 10px rgba(34, 197, 94, 0.5);
-  }
-  60% {
-    box-shadow: 0 0 0 14px rgba(34, 197, 94, 0), inset 0 0 20px rgba(34, 197, 94, 0.7);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0), inset 0 0 10px rgba(34, 197, 94, 0.5);
-  }
-}
-
-@keyframes ghost-piece-shimmer {
-  0%, 100% {
-    transform: translateY(0) scale(1);
-    opacity: 0.50;
-  }
-  50% {
-    transform: translateY(-5px) scale(1.05);
-    opacity: 0.75;
-  }
-}
-
-@keyframes elo-bump-up {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.22); color: var(--color-success); }
-  100% { transform: scale(1); }
-}
-
-@keyframes float-delta {
-  0% {
-    transform: translateY(0) scale(0.8);
-    opacity: 0;
-  }
-  40% {
-    transform: translateY(-12px) scale(1.1);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-26px) scale(0.9);
-    opacity: 0;
-  }
-}
-
-@keyframes timer-heartbeat {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 8px var(--color-danger);
-  }
-  50% {
-    transform: scale(1.06);
-    box-shadow: 0 0 20px 4px var(--color-danger);
-  }
-}
-
-@keyframes shake-soft {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-4px); }
-  40%, 80% { transform: translateX(4px); }
-}
-```
-
----
-
-## 5. Puzzle Hub Main Screen & Mode Cards Visual Specs
-
-### 5.1 Lobby Navigation & Mode Switcher Integration
-The Lobby features an intuitive 4-way Mode Switcher pill container:
-
-```
-+-----------------------------------------------------------------------------------------------+
-|                                      ♟️✨ FUN CHESS!                                          |
-|                       Play, Learn, Solve, and Level Up with Chess Buddies!                    |
-|                                                                                               |
-|   +---------------------------------------------------------------------------------------+   |
-|   | [ 👥 Play LAN ] | [ 🤖 Play vs AI ] | [ 🎓 Chess Academy ] | [ 🧩 Puzzle Hub (NEW) ]  |   |
-|   +---------------------------------------------------------------------------------------+   |
-+-----------------------------------------------------------------------------------------------+
-```
-
-When active, the `[ 🧩 Puzzle Hub ]` tab lights up in `--color-primary` (`#6c5ce7`) with a golden `NEW! ⭐` pill badge.
-
----
-
-### 5.2 Puzzle Hub Header & Overall Player Stats
-
-```
-+-----------------------------------------------------------------------------------------------+
-|  🧩 PUZZLE HUB                                                                                |
-|  Master chess tactics with fun drills, rating challenges, and speed rush!                     |
-|                                                                                               |
-|   +---------------------------------------------------------------------------------------+   |
-|   |  ⭐ 42 / 90 Stars  |  📈 1,180 Kid Elo (Knight Scout)  |  🔥 7 Max Streak  |  🎯 88% Acc.  |   |
-|   +---------------------------------------------------------------------------------------+   |
-+-----------------------------------------------------------------------------------------------+
-```
-
-#### Visual Specs for Global Stats Pill Bar:
-- **Container:** `background: var(--bg-surface); border: 2px solid var(--border-subtle); border-radius: var(--radius-pill); padding: var(--space-2) var(--space-5); display: flex; justify-content: space-around; box-shadow: var(--shadow-sm);`
-- **Stat Items:** Icon (`20px`) + Value (`font-family: var(--font-display); font-weight: 700; font-size: var(--text-base);`) + Label (`font-size: var(--text-xs); color: var(--text-muted);`).
-
----
-
-### 5.3 Mode Card 1: Themed Skill Drills (`DrillsModeCard.vue`)
-
-Drills focus on pattern recognition by category (Forks, Pins, Skewers, Discovered Attacks, Greek Gift sacrifice, Windmills, Smothered Mates, Back-Rank Mates).
-
-```
-+-----------------------------------------------------------------------------------------------+
-|   +---------------------------------------------------------------------------------------+   |
-|   |  [ 🎯 THEMED SKILL DRILLS ]                                         ⭐ 28 / 40 Stars  |   |
-|   |  Master essential superpowers: Forks, Pins, Windmills, Greek Gifts, and Checkmates!    |   |
-|   |                                                                                       |   |
-|   |  [ 🍴 Royal Forks (8/8) ⭐⭐⭐ ]    [ 📌 Sneaky Pins (6/8) ⭐⭐☆ ]   [ 🌪️ Windmills (4/8) ] |   |
-|   |  [ 🎁 Greek Gifts (3/8) ]           [ 💨 Smothered Mate (5/8) ]     [ 🛡️ Back-Rank (6/8) ] |   |
-|   |                                                                                       |   |
-|   |                                                      [ 🚀 ENTER SKILL DRILLS ➡️ ]      |   |
-|   +---------------------------------------------------------------------------------------+   |
-+-----------------------------------------------------------------------------------------------+
-```
-
-#### Visual Specs:
-- **Card Background:** `background: linear-gradient(135deg, var(--bg-surface) 0%, var(--mode-drills-bg) 100%);`
-- **Accent Border:** `border: 2px solid var(--mode-drills-border); border-radius: var(--radius-card);`
-- **Theme Tag Pills:** `background: var(--bg-surface); border: 1.5px solid var(--mode-drills-border); padding: 6px 12px; border-radius: var(--radius-pill); font-family: var(--font-display); font-size: var(--text-sm); font-weight: 600;`
-- **CTA Button:** Tactile button using `background: var(--mode-drills-primary); box-shadow: var(--mode-drills-shadow); color: #fff;`
-
----
-
-### 5.4 Mode Card 2: Adaptive Rating Ladder (`RatingLadderCard.vue`)
-
-Dynamic ladder matching puzzles to the child's live rating with encouraging rank badges.
-
-```
-+-----------------------------------------------------------------------------------------------+
-|   +---------------------------------------------------------------------------------------+   |
-|   |  [ 📈 ADAPTIVE RATING LADDER ]                                 Current: 1,180 Kid Elo |   |
-|   |  Solve puzzles that match your skills! Climb from Pawn Novice to Queen Champion!      |   |
-|   |                                                                                       |   |
-|   |  Rank Tier: ♞ KNIGHT SCOUT (1,000 – 1,200)                                            |   |
-|   |  [========== Progress to Bishop Tactician (1,200) : 1,180/1,200 (90%) ==========]    |   |
-|   |                                                                                       |   |
-|   |  Target Next Puzzle: ~1,190 Elo • +12 Points for Win                                  |   |
-|   |                                                      [ ⚔️ PLAY NEXT PUZZLE ➡️ ]        |   |
-|   +---------------------------------------------------------------------------------------+   |
-+-----------------------------------------------------------------------------------------------+
-```
-
-#### Kid Rating Progression Tiers:
-| Elo Bracket | Tier Name | Tier Icon | Badge Gradient |
-| :--- | :--- | :--- | :--- |
-| **800 – 999** | **Pawn Novice** | ♙ | Green Mint (`#22c55e` to `#16a34a`) |
-| **1,000 – 1,199** | **Knight Scout** | ♘ | Cyan Sky (`#0ea5e9` to `#0284c7`) |
-| **1,200 – 1,399** | **Bishop Tactician** | ♗ | Violet Purple (`#8b5cf6` to `#6d28d9`) |
-| **1,400 – 1,599** | **Rook Guardian** | ♖ | Coral Tangerine (`#f97316` to `#ea580c`) |
-| **1,600+** | **Queen Champion** | ♕ | Sunshine Gold & Ruby (`#ffb300` to `#e11d48`) |
-
----
-
-### 5.5 Mode Card 3: Puzzle Rush / Streak Survivor (`RushModeCard.vue`)
-
-High-octane dopamine arcade mode with dual sub-mode options:
-
-```
-+-----------------------------------------------------------------------------------------------+
-|   +---------------------------------------------------------------------------------------+   |
-|   |  [ 🔥 PUZZLE RUSH & STREAK SURVIVOR ]                               Best Score: 18 🔥 |   |
-|   |  Fast-paced arcade puzzles! Build combo streaks and beat the clock!                   |   |
-|   |                                                                                       |   |
-|   |  +-------------------------------------+   +-------------------------------------+    |   |
-|   |  |  ⏱️ 3-MINUTE BLITZ                  |   |  ❤️ 3-STRIKE SURVIVOR               |    |   |
-|   |  |  Race against a 3:00 timer.         |   |  No time limit! Keep solving until  |    |   |
-|   |  |  +5s bonus on every solve!          |   |  you make 3 mistakes.               |    |   |
-|   |  |  Best: 16 Solved                    |   |  Best: 24 Solved                    |    |   |
-|   |  |  [ START BLITZ ⏱️ ]                 |   |  [ START SURVIVOR ❤️ ]              |    |   |
-|   |  +-------------------------------------+   +-------------------------------------+    |   |
-|   +---------------------------------------------------------------------------------------+   |
-+-----------------------------------------------------------------------------------------------+
-```
-
-#### Visual Specs:
-- **Card Background:** `linear-gradient(135deg, var(--bg-surface) 0%, var(--mode-rush-bg) 100%);`
-- **Sub-Mode Tiles:** `background: var(--bg-surface); border: 2px solid var(--mode-rush-border); border-radius: var(--radius-lg); padding: var(--space-4); text-align: center;`
-- **Action Buttons:** Tactile rush button with `background: var(--mode-rush-primary); box-shadow: var(--shadow-btn-rush);`
-
----
-
-### 5.6 Locked vs Unlocked Card States
-
-If a mode, drill, or rush tier requires prerequisite stars or level (e.g. "Unlock at 15 Stars ⭐"):
-
-```css
-/* Locked State Spec */
-.puzzle-card.is-locked {
+/* Container Anchor */
+.ai-mascot-badge-container {
   position: relative;
-  filter: grayscale(0.65) opacity(0.82);
-  pointer-events: none;
-  border-style: dashed;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.puzzle-card.is-locked .lock-overlay {
+/* Absolute Floating Speech Bubble */
+.mascot-speech-bubble {
   position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(3px);
-  border-radius: inherit;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-overlay-dialogue, 20);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--bg-surface-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-main);
+  box-shadow: var(--shadow-md);
+  margin-top: 0;
+  pointer-events: auto;
+}
+
+/* Speech Bubble Tail */
+.mascot-speech-bubble::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 24px;
+  width: 12px;
+  height: 12px;
+  background-color: var(--bg-surface);
+  border-left: 2px solid var(--border-medium);
+  border-top: 2px solid var(--border-medium);
+  transform: rotate(45deg);
+}
+
+/* Transition Invariants */
+.bubble-pop-enter-active {
+  animation: bubble-pop 280ms var(--ease-spring);
+}
+
+.bubble-pop-leave-active {
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.bubble-pop-leave-to {
+  opacity: 0;
+  transform: scale(0.92) translateY(4px);
+}
+```
+
+---
+
+### 4.2 Active Hint Banner (`.active-hint-banner`)
+
+- **Component:** `apps/client/src/features/ai/SoloAiArena.vue`
+- **Layout Shift Problem:** Mounting between top opponent HUD and chessboard shifted the board downward by $+75\text{px}$ to $+95\text{px}$.
+- **Zero-CLS Solution:** Position `.active-hint-banner` as an absolute floating card overlay anchored above the top edge of the board area, with glowing border and dismiss button.
+
+```
++-------------------------------------------------------------------------------+
+| [.arena-playfield (position: relative; width: 100%;)]                         |
+|                                                                               |
+|   [ Top Opponent HUD ]                                                        |
+|                                                                               |
+|   +-----------------------------------------------------------------------+   |
+|   | 💡 TACTICAL HINT                                                  [✕] |   |
+|   | Look for your Knight on f3 jumping to e5 to attack the Queen!         |   |
+|   | (position: absolute; top: 8px; z-index: 20; max-width: 540px;)       |   |
+|   +-----------------------------------------------------------------------+   |
+|                                                                               |
+|   +-----------------------------------------------------------------------+   |
+|   |                                                                       |   |
+|   |                           CHESS BOARD (8x8)                           |   |
+|   |                       (0px Shift Guaranteed)                          |   |
+|   |                                                                       |   |
+|   +-----------------------------------------------------------------------+   |
++-------------------------------------------------------------------------------+
+```
+
+#### Exact CSS Specification:
+
+```css
+/* Arena Playfield Anchor */
+.arena-playfield {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  width: 100%;
   gap: var(--space-2);
-  z-index: 10;
 }
 
-.lock-badge {
-  background: var(--bg-surface);
-  color: var(--text-main);
-  border: 2px solid var(--academy-gold);
+/* Absolute Floating Hint Card */
+.active-hint-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 540px;
+  z-index: var(--z-overlay-dialogue, 20);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background-color: var(--hint-banner-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px solid var(--hint-banner-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2-5) var(--space-4);
+  box-shadow: var(--glow-hint-banner);
+  box-sizing: border-box;
+}
+
+.hint-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hint-badge {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  color: var(--text-on-accent);
+  background-color: var(--color-accent);
+  padding: 2px 8px;
   border-radius: var(--radius-pill);
-  padding: 6px 16px;
+}
+
+.hint-close-btn {
+  background: transparent;
+  border: none;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.hint-close-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.hint-banner-text {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--hint-banner-text);
+  line-height: var(--leading-snug);
+  margin: 0;
+}
+
+/* Transition */
+.hint-slide-enter-active,
+.hint-slide-leave-active {
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) var(--ease-spring);
+}
+
+.hint-slide-enter-from,
+.hint-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -10px) scale(0.95);
+}
+
+.hint-slide-enter-to,
+.hint-slide-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+```
+
+---
+
+## 5. Academy / Scenario Arena Overlay Specifications
+
+### 5.1 Guide Feedback Banner (`.guide-feedback-banner`)
+
+- **Component:** `apps/client/src/features/scenarios/components/ScenarioGuideOverlay.vue`
+- **Layout Shift Problem:** Mounting within `.scenario-guide-container` expanded guide card height by $+40\text{px}$, displacing `.arena-board-slot` downward while the user was executing interactive exercises.
+- **Zero-CLS Solution:** Position `.guide-feedback-banner` as an absolute floating pill toast hovering at the bottom margin of the guide slot / top edge of the board frame.
+
+#### Exact CSS Specification:
+
+```css
+/* Scenario Guide Container Anchor */
+.scenario-guide-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background-color: var(--academy-step-bg);
+  border: 2px solid var(--academy-step-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
+}
+
+/* Absolute Floating Feedback Toast */
+.guide-feedback-banner {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-guide, 15);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 18px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.guide-feedback-banner.is-positive {
+  background-color: var(--soft-success-glass);
+  color: var(--soft-success-text);
+  border: 1.5px solid var(--soft-success-border);
+}
+
+.guide-feedback-banner.is-warning {
+  background-color: var(--soft-error-glass);
+  color: var(--soft-error-text);
+  border: 1.5px solid var(--soft-error-border);
+}
+```
+
+---
+
+### 5.2 Active Hint Bubble (`.guide-hint-bubble`)
+
+- **Component:** `apps/client/src/features/scenarios/components/ScenarioGuideOverlay.vue`
+- **Layout Shift Problem:** When requested, the hint bubble pushed guide height by $+70\text{px}$.
+- **Zero-CLS Solution:** Float `.guide-hint-bubble` as an absolute floating card anchored below the guide container, or within a non-shifting overlay layer over `.scenario-board-relative-frame`.
+
+#### Exact CSS Specification:
+
+```css
+.guide-hint-bubble {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 540px;
+  z-index: var(--z-overlay-dialogue, 20);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  background: var(--hint-banner-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px solid var(--hint-banner-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  color: var(--hint-banner-text);
+  box-shadow: var(--glow-hint-banner);
+  box-sizing: border-box;
+}
+
+.mascot-avatar-small {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.bubble-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bubble-speaker {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  color: var(--color-accent-bevel);
+}
+
+.bubble-text {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+```
+
+---
+
+## 6. Tactical Drills & Puzzle Arena Overlay Specifications
+
+### 6.1 Puzzle Feedback Banner (`.puzzle-feedback-banner`)
+
+- **Component:** `apps/client/src/features/puzzles/PuzzleArena.vue`
+- **Layout Shift Problem:** Rendering inside `.puzzle-info-card` expanded the card by $+40\text{px}$ on incorrect moves, displacing `.arena-board-slot` downward.
+- **Zero-CLS Solution:** Adopt the `PuzzleRushArena.vue` established pattern (`.rush-feedback-toast`) by making `.puzzle-feedback-banner` an absolute floating toast positioned at `top: -12px` over the board wrapper.
+
+```
++-------------------------------------------------------------------------------+
+| [.arena-board-slot (position: relative; width: 100%;)]                        |
+|                                                                               |
+|   +-----------------------------------------------------------------------+   |
+|   | 💬 Incorrect move. Try again! (position: absolute; top: -12px; z: 10) |   |
+|   +-----------------------------------------------------------------------+   |
+|                                                                               |
+|   +-----------------------------------------------------------------------+   |
+|   |                         PUZZLE CHESS BOARD                            |   |
+|   |                       (0px Shift Guaranteed)                          |   |
+|   +-----------------------------------------------------------------------+   |
++-------------------------------------------------------------------------------+
+```
+
+#### Exact CSS Specification:
+
+```css
+/* Board Slot Anchor */
+.arena-board-slot {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* Absolute Floating Feedback Pill */
+.puzzle-feedback-banner {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-toast, 10);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 16px;
+  background-color: var(--bg-surface-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px solid var(--color-danger);
+  border-radius: var(--radius-pill);
+  color: var(--color-danger);
   font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: 700;
   box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.puzzle-feedback-banner .feedback-icon {
+  font-size: 1rem;
+}
+
+.puzzle-feedback-banner .feedback-text {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+/* Transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s var(--ease-spring);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -6px) scale(0.94);
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+```
+
+---
+
+### 6.2 Benchmark Reference: `.rush-feedback-toast` Alignment
+
+In `apps/client/src/features/puzzles/components/PuzzleRushArena.vue`, `.rush-feedback-toast` is already structured with zero layout shift:
+- `position: absolute; top: -12px; z-index: 10;`
+- `background: var(--bg-surface); border: 2px solid var(--color-primary); border-radius: var(--radius-pill);`
+- `padding: 4px 16px; font-family: var(--font-display); font-size: 14px; font-weight: 700;`
+
+The specification for `PuzzleArena.vue` (`.puzzle-feedback-banner`) aligns with this exact benchmark standard.
+
+---
+
+## 7. LAN Multiplayer & App Shell Overlay Specifications
+
+### 7.1 Global Notification Banner (`.app-notification-banner`)
+
+- **Component:** `apps/client/src/App.vue`
+- **Layout Shift Problem:** Rendered in normal document flow at the top of `.app-viewport`, shifting every page view (Lobby, Solo AI, Academy, Puzzles, Multiplayer) down by $+48\text{px}$ on display, and jumping back up on auto-dismiss.
+- **Zero-CLS Solution:** Position `.app-notification-banner` as a **fixed floating toast** pinned `top: 68px` (just below the $56\text{px}$ fixed navbar + $12\text{px}$ spacing) with `z-index: 100`.
+
+```
++-------------------------------------------------------------------------------+
+| [ Fixed Global App Navbar: height: 56px; z-index: 90 ]                        |
++-------------------------------------------------------------------------------+
+                                 ▼ 12px gap
+        +---------------------------------------------------------------+
+        | [⚠️] Draw offer sent to opponent! 🤝                      [✕] |
+        | (position: fixed; top: 68px; left: 50%; z-index: 100;)        |
+        +---------------------------------------------------------------+
+                                 ▼
++-------------------------------------------------------------------------------+
+| [.app-viewport (Main page content starts here — 0px Shift Guaranteed)]        |
+|                                                                               |
+|   [ Game Arena / Lobby / Academy Screen ]                                     |
++-------------------------------------------------------------------------------+
+```
+
+#### Exact CSS Specification:
+
+```css
+.app-notification-banner {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-global-notification, 100);
   display: flex;
   align-items: center;
-  gap: var(--space-1-5);
-}
-```
-
----
-
-## 6. Puzzle Arena HUD & Gameplay Components
-
-The Puzzle Arena features a high-visibility, responsive HUD placed either above/below the board (mobile portrait) or alongside the board (tablet/desktop).
-
-```
-+-----------------------------------------------------------------------------------------------+
-|  [ ⬅️ Hub ]   [ 🎯 Fork Mastery #4 ]   [ 📈 1,180 (+12) ]   [ 🔥 x3 COMBO! ]   [ 💡 Hint (1/3)]|
-+-----------------------------------------------------------------------------------------------+
-|                                                                                               |
-|                                    [ CHESS BOARD ]                                            |
-|                               (Interactive Puzzle State)                                      |
-|                                                                                               |
-+-----------------------------------------------------------------------------------------------+
-|  ⏱️ RUSH TIMER: [==================== 01:45 ====================]  (+5s on solve!)           |
-|  💬 Sparky 🐿️: "Look at Black's King and Queen! Can your Knight jump in between? 🌰"          |
-+-----------------------------------------------------------------------------------------------+
-```
-
----
-
-### 6.1 Dynamic Rating Badge & Elo Live Counter (`PuzzleEloBadge.vue`)
-
-- **Component Anatomy:**
-  - Tier Icon (`♘`)
-  - Live Elo Number (`1,180` in `JetBrains Mono`, `font-weight: 800`)
-  - Animated Delta Pill (`+12` in spring green for solve, `-4` in soft muted lilac on skip)
-- **Delta Animation:**
-  When a puzzle is solved, the Elo number smoothly counts up over `600ms` while the `+12` pill floats upward and fades out using `@keyframes float-delta`.
-
----
-
-### 6.2 Streak Combo Multiplier & Flame Effects (🔥) (`StreakComboBadge.vue`)
-
-The Combo Badge visually escalates as the player strings together correct solutions:
-
-```
-[ 1x Solved ]  -->  [ 🔥 x2 COMBO ]  -->  [ 🔥🔥 x3 ON FIRE! ]  -->  [ 🔥⚡ x5 UNSTOPPABLE! ⚡🔥 ]
-  (Amber Tag)          (Orange Flame)       (Pulsing Red Flame)          (Inferno Rainbow Glow)
-```
-
-#### Flame Stages Specification:
-
-| Combo Count | Badge Text | Background Gradient | Glow & Effects |
-| :--- | :--- | :--- | :--- |
-| **Combo 1** | `1 Solved ⭐` | Neutral Surface | Subtle `--shadow-xs` |
-| **Combo 2** | `🔥 x2 STREAK` | `linear-gradient(45deg, #ffb300, #f58220)` | `var(--flame-spark-glow)`, `@keyframes flame-pop-in` |
-| **Combo 3–4** | `🔥🔥 x3 ON FIRE!` | `linear-gradient(45deg, #f97316, #ef4422)` | `var(--flame-blaze-glow)`, `@keyframes flame-flicker` |
-| **Combo 5+** | `⚡🔥 x5 INFERNO! 🔥⚡`| `linear-gradient(45deg, #f43f5e, #ea580c, #ffc107)` | `var(--flame-inferno-glow)`, border particle aura, fanfare chime |
-
-```css
-.streak-badge.is-inferno {
-  background: linear-gradient(135deg, var(--flame-inferno-start), var(--flame-inferno-mid), var(--flame-inferno-end));
-  color: var(--flame-badge-text);
+  gap: var(--space-3);
+  width: calc(100% - 32px);
+  max-width: 580px;
+  padding: var(--space-2-5) var(--space-4);
+  border-radius: var(--radius-lg);
   font-family: var(--font-display);
-  font-size: var(--text-combo);
-  font-weight: 800;
-  padding: 6px 18px;
-  border-radius: var(--radius-pill);
-  box-shadow: var(--flame-inferno-glow);
-  animation: flame-flicker 650ms infinite ease-in-out;
-  border: 2px solid #ffffff;
-}
-```
-
----
-
-### 6.3 Timer Bar for Puzzle Rush (`RushTimerBar.vue`)
-
-For the 3-Minute Blitz mode, a prominent full-width timer bar provides clear time feedback without panic:
-
-```css
-.rush-timer-container {
-  width: 100%;
-  height: 18px;
-  background: var(--bg-surface-raised);
-  border: 2px solid var(--border-medium);
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  position: relative;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-sizing: border-box;
+  margin-bottom: 0;
 }
 
-.rush-timer-fill {
-  height: 100%;
-  border-radius: inherit;
-  transition: width 100ms linear, background-color 300ms ease;
+.app-notification-banner.is-error {
+  background-color: var(--soft-error-glass);
+  border: 1.5px solid var(--soft-error-border);
+  color: var(--soft-error-text);
 }
 
-/* Dynamic State Classes */
-.rush-timer-fill.is-safe {
-  background: var(--timer-safe); /* Emerald (>60s) */
-}
-.rush-timer-fill.is-warning {
-  background: var(--timer-warning); /* Amber (30s-60s) */
-}
-.rush-timer-fill.is-danger {
-  background: var(--timer-danger); /* Coral (<15s) */
-  animation: timer-heartbeat 500ms infinite ease-in-out;
-}
-```
-
-- **Bonus Time Popup:**
-  When a puzzle is solved, `+5s ⏱️` springs out of the timer in emerald green text (`font-family: var(--font-mono); font-weight: 800`).
-
----
-
-### 6.4 Star Progress Bar & Strike Life Counter (`StrikeCounter.vue`)
-
-- **3-Minute Blitz / Drills:**
-  Segmented progress bar with 10–20 dot pills showing solved (filled gold `⭐`), skipped, and remaining steps.
-- **3-Strike Survivor Mode:**
-  3 Large Shield/Heart icons (`width: 36px; height: 36px;`):
-  - **Active Strike:** Glowing green shield/heart (`💚` / `🛡️`) with soft pulse.
-  - **Lost Strike:** Soft cracked animation (`💔` / `🩶`) accompanied by encouraging mascot prompt ("2 shields left! Take your time to calculate! 🐾").
-
----
-
-## 7. 3-Tier Progressive Hint System Visual Specs
-
-The single unified hint UI intelligently scales guidance in 3 progressive tiers so kids learn independently without frustration:
-
-```
-[ Click 💡 Hint ]
-      │
-      ├── Tier 1 (1st Click): Piece Nudge Glow (Which piece should move?)
-      ├── Tier 2 (2nd Click): Target Square Beacon (Where does it go?)
-      └── Tier 3 (3rd Click): Show Me Solution (Vector Arrow & Ghost Piece)
-```
-
----
-
-### 7.1 Tier 1: Piece Nudge Glow (Subtle Attention Cue)
-
-- **Board Effect:**
-  The piece that needs to move performs a friendly wiggle animation (`@keyframes piece-nudge-wiggle`) and emits an ambient golden aura.
-- **Destination Square:** Kept secret to let the child find the move themselves.
-- **Mascot Clue:** *"Look at your Knight on c4! It sees an opening! 👀"*
-
-```css
-/* Tier 1 CSS Classes */
-.chess-square.is-hint-tier1 .chess-piece-wrapper {
-  animation: piece-nudge-wiggle 600ms ease-in-out;
+.app-notification-banner.is-info {
+  background-color: var(--soft-info-glass);
+  border: 1.5px solid var(--soft-info-border);
+  color: var(--soft-info-text);
 }
 
-.chess-square.is-hint-tier1 {
-  box-shadow: inset 0 0 0 3px var(--hint-tier1-border), var(--hint-tier1-piece-glow) !important;
-  background-color: var(--hint-tier1-bg) !important;
-  border-radius: var(--radius-sm);
-}
-```
-
----
-
-### 7.2 Tier 2: Target Square Glow (Directional Beacon)
-
-- **Board Effect:**
-  - **Origin Square:** Pulsing golden halo (`--hint-tier2-from-glow`).
-  - **Target Square:** Concentric emerald rings expanding outward using `@keyframes beacon-pulse`.
-- **Mascot Clue:** *"Move your Knight to d6 to execute the royal fork! 🎯"*
-
-```css
-/* Tier 2 CSS Classes */
-.chess-square.is-hint-tier2-from {
-  box-shadow: inset 0 0 0 3px var(--academy-gold), var(--hint-tier2-from-glow) !important;
-  background-color: var(--hint-tier2-from-bg) !important;
+.app-notification-banner.is-success {
+  background-color: var(--soft-success-glass);
+  border: 1.5px solid var(--soft-success-border);
+  color: var(--soft-success-text);
 }
 
-.chess-square.is-hint-tier2-to {
-  animation: beacon-pulse 1.1s infinite ease-in-out !important;
-  background-color: var(--hint-tier2-to-bg) !important;
-  border-radius: var(--radius-sm);
+.notification-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
-```
 
----
+.notification-message {
+  flex: 1 1 auto;
+  text-align: left;
+}
 
-### 7.3 Tier 3: Show Me Solution (Vector Arrow & Ghost Piece)
-
-- **Board Effect:**
-  1. **SVG Vector Arrow:** A smooth glowing gradient arrow drawn from origin square center `(x1, y1)` to target square center `(x2, y2)`.
-  2. **Ghost Piece:** A 55% transparent rendering of the moving piece floating over the destination square with `@keyframes ghost-piece-shimmer`.
-- **Mascot Clue:** *"Here is the complete move: Knight jumps to d6 with check! Let's play it! 🚀"*
-
-```svg
-<!-- SVG Vector Arrow Blueprint (Overlay above chessboard grid) -->
-<svg class="hint-arrow-overlay" viewBox="0 0 800 800">
-  <defs>
-    <linearGradient id="hintGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffc107" />
-      <stop offset="100%" stop-color="#22c55e" />
-    </linearGradient>
-    <marker id="hintArrowHead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-      <path d="M 0 0 L 8 4 L 0 8 Z" fill="#22c55e" />
-    </marker>
-    <filter id="hintGlowFilter">
-      <feGaussianBlur stdDeviation="3" result="blur" />
-      <feMerge>
-        <feMergeNode in="blur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
-  </defs>
-  <path
-    d="M 250 550 Q 280 400 350 350"
-    stroke="url(#hintGradient)"
-    stroke-width="10"
-    stroke-linecap="round"
-    fill="none"
-    marker-end="url(#hintArrowHead)"
-    filter="url(#hintGlowFilter)"
-    class="hint-drawn-arrow"
-  />
-</svg>
-```
-
-```css
-/* Ghost Piece Styling */
-.ghost-piece-wrapper {
-  position: absolute;
-  inset: 0;
-  display: flex;
+.notification-dismiss-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 0.9rem;
+  color: inherit;
+  opacity: 0.75;
+  border-radius: var(--radius-xs);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  opacity: var(--hint-tier3-ghost-opacity);
-  filter: var(--hint-tier3-ghost-glow);
-  pointer-events: none;
-  animation: ghost-piece-shimmer 1.4s infinite ease-in-out;
+  transition: opacity var(--duration-fast);
+}
+
+.notification-dismiss-btn:hover {
+  opacity: 1;
+}
+
+.notification-dismiss-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Transition */
+.notification-slide-enter-active,
+.notification-slide-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s var(--ease-spring);
+}
+
+.notification-slide-enter-from,
+.notification-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -14px) scale(0.96);
+}
+
+.notification-slide-enter-to,
+.notification-slide-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
 }
 ```
 
 ---
 
-### 7.4 Progressive Hint Button UI & Auto-Scaling Trigger
+### 7.2 Disconnect Warning Banner (`.disconnect-warning-banner`)
 
-The Hint Button displays a 3-segment pill intensity meter:
+- **Component:** `apps/client/src/App.vue`
+- **Layout Shift Problem:** Rendered in flex flow inside `.game-arena-container`, shifting the entire match layout down by $+42\text{px}$.
+- **Zero-CLS Solution:** Position as an absolute overlay banner at `top: 8px` with `z-index: 30`.
 
-```
-[ 💡 Hint (1/3) ]  ──(click 1)──>  [ 🎯 Target (2/3) ]  ──(click 2)──>  [ 🚀 Show Move (3/3) ]
-```
+#### Exact CSS Specification:
 
 ```css
-.btn-hint-progressive {
+.game-arena-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 580px;
+  gap: var(--space-2);
+  box-sizing: border-box;
+}
+
+.disconnect-warning-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-alert, 30);
+  width: calc(100% - 16px);
+  max-width: 560px;
+  background-color: var(--color-danger);
+  color: var(--text-on-danger);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  text-align: center;
+  box-shadow: var(--glow-danger-toast);
+  box-sizing: border-box;
+  animation: pulse-valid-dot 1.5s infinite ease-in-out;
+}
+```
+
+---
+
+### 7.3 Draw Offer Banner (`.draw-offer-banner`)
+
+- **Component:** `apps/client/src/App.vue`
+- **Layout Shift Problem:** Rendered in flex flow with interactive buttons, shifting board and HUD down by $+56\text{px}$ during live play.
+- **Zero-CLS Solution:** Position as an absolute floating card overlay at `top: 8px` with `z-index: 30`.
+
+#### Exact CSS Specification:
+
+```css
+.draw-offer-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-alert, 30);
+  width: calc(100% - 16px);
+  max-width: 560px;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  background: var(--bg-surface);
-  border: 2px solid var(--academy-gold);
-  border-radius: var(--radius-pill);
-  padding: var(--space-2) var(--space-4);
-  box-shadow: var(--shadow-btn-gold);
-  cursor: pointer;
-}
-
-.hint-meter-dots {
-  display: flex;
-  gap: 4px;
-}
-
-.hint-meter-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--hint-meter-empty);
-  transition: background-color 200ms ease;
-}
-
-.hint-meter-dot.is-filled {
-  background: var(--hint-meter-filled);
-  box-shadow: 0 0 6px var(--hint-meter-filled);
-}
-```
-
----
-
-## 8. Non-Punitive Bot Reaction Dialogue & Celebratory Fanfare
-
-### 8.1 Mascot Reaction Persona Matrix
-
-| Mascot Persona | Signature Role | Tone & Personality | Reaction to Solve | Reaction to Mistake |
-| :--- | :--- | :--- | :--- | :--- |
-| **Peanut the Pup 🐶** | Novice Cheerleader | Enthusiastic, Bubbly, Silly | "WOOF! You got it! Look at that piece fly! 🎉" | "Ruff! That square is guarded. Let's try again! 🐾" |
-| **Sparky Squirrel 🐿️** | Speed & Tactics Scout | Zippy, Energetic, Nutty | "ZAP! That fork was sharper than an acorn! 🌰⚡"| "Whoops! Scurry back! Can we attack two pieces? 🐿️"|
-| **Clever Fox 🦊** | Strategic Guide | Sneaky, Encouraging, Sharp | "Aha! Beautiful tactical vision! Checkmate trap! 🦊👏"| "Clever thought, but check if the King can escape! 💡"|
-| **GM Owl 🦉** | Chess Academy Master | Wise, Scholarly, Gentle | "Masterful execution, young tactician! Hoo-hoo! 🎓✨"| "A noble try. Look for the piece with no defenders. 🦉"|
-
----
-
-### 8.2 Non-Punitive Mistake Recovery & Soft Reset
-
-When a child plays an incorrect move:
-1. **No Red Screen / No Penalty Sound:** No buzzer or red X icons.
-2. **Soft Physical Snapback:** The piece springs smoothly back to its starting square with `@keyframes shake-soft` (280ms duration).
-3. **Mascot Speech Bubble Pop:** Friendly speech bubble updates with an encouraging hint (`animation: bubble-pop 280ms var(--ease-spring)`).
-4. **Auto Hint Progression:** After 2 failed attempts on the same puzzle, Tier 1 Hint automatically pulses to guide the child without forcing them to ask.
-
----
-
-### 8.3 Celebratory Fanfare & Confetti Triggers
-
-1. **Micro-Solve (Each puzzle in Drills/Rush):**
-   - Sound: Bright marimba / arcade chime.
-   - Visual: 15-particle localized confetti burst originating from the destination square.
-   - HUD: Combo multiplier bump (`+1 Streak 🔥`).
-2. **Major Completion (Drill Category / Rush Run Finish):**
-   - Sound: Orchestral fanfare chime + mascot victory cheer.
-   - Visual: Full-screen dual confetti cannons firing from bottom-left `(0.1, 0.9)` and bottom-right `(0.9, 0.9)` using `canvas-confetti`.
-   - Stars: 3 Stars pop in sequentially with `180ms` staggered delay using `@keyframes star-pop`.
-
----
-
-### 8.4 Puzzle Solve & Mode Completion Modals (`PuzzleCompletionModal.vue`)
-
-```
-+-----------------------------------------------------------------------------------------------+
-|                                  🎉 PUZZLE CRUSHED! 🎉                                        |
-|                                                                                               |
-|                                     ⭐   ⭐   ⭐                                              |
-|                                (3 / 3 Stars Earned!)                                          |
-|                                                                                               |
-|                         "Outstanding! You found the Royal Fork                                |
-|                              and trapped the enemy Queen!"                                    |
-|                                                                                               |
-|   +---------------------------------------------------------------------------------------+   |
-|   |  📈 Rating: 1,192 (+12)   |  🔥 Max Streak: 5x   |  ⏱️ Solve Time: 14s   |  💡 Hints: 0   |   |
-|   +---------------------------------------------------------------------------------------+   |
-|                                                                                               |
-|   [ 🔄 Retry for Speed ]                                     [ 🚀 Next Puzzle ➡️ ]             |
-+-----------------------------------------------------------------------------------------------+
-```
-
----
-
-## 9. Mobile Touch, Ergonomics & Magnetic Snap Guidelines
-
-### 9.1 Minimum Touch Targets & Thumb-Zone Layout
-- **Minimum Tap Target:** `48px x 48px` on all mobile viewports (`375px` to `430px`).
-- **Tactile Action Buttons:** Minimum height `52px` (hero CTA buttons `60px`).
-- **Thumb-Zone Optimization:** In mobile portrait mode, all primary gameplay controls (`[💡 Hint]`, `[🔄 Reset]`, `[➡️ Next]`) are placed in the bottom 35% of the screen for natural one-handed thumb reach.
-- **Safe Area Insets:** All bottom bars use `padding-bottom: max(var(--space-4), env(safe-area-inset-bottom))`.
-
-```css
-.puzzle-mobile-controls {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
-  background: var(--bg-surface-glass);
+  justify-content: space-between;
+  background-color: var(--bg-surface-glass);
   backdrop-filter: blur(10px);
-  border-top: 2px solid var(--border-subtle);
+  -webkit-backdrop-filter: blur(10px);
+  border: 2px solid var(--color-accent);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  box-shadow: var(--shadow-lg);
+  box-sizing: border-box;
+}
+
+.banner-buttons {
   display: flex;
-  gap: var(--space-3);
-  z-index: 50;
+  gap: var(--space-2);
 }
 ```
 
 ---
 
-### 9.2 Magnetic Snap Radius & Drag Indicators
+## 8. Animation & Micro-Interaction Specifications
 
-To prevent frustration when young children drag pieces with smaller fingers:
-- **Magnetic Snap Radius:** When dragging a piece within `28px` of any legal destination square, that square automatically activates:
-  - Expands with a glowing target ring (`.is-magnetic-snap`).
-  - Drop target square lights up in `--snap-target-bg` (`rgba(34, 197, 94, 0.45)`).
-- **Touch Drag Elevation:** On `touchstart` / drag start, the lifted piece scales up by `1.18x` with elevation shadow `--shadow-piece-drag` (`0 16px 32px rgba(0,0,0,0.35)`), centered `12px` above the fingertip so the child's thumb does not obscure the piece.
+All floating overlays utilize hardware-accelerated transforms and spring physics to create a delightful, non-jarring feel.
+
+| Animation Name | Trigger Event | Keyframe Transformation | Duration & Easing |
+|---|---|---|---|
+| `bubble-pop` | Mascot banter dialogue reveals | `scale(0.85) translateY(6px)` $\to$ `scale(1.04) translateY(-2px)` $\to$ `scale(1) translateY(0)` | 280ms `var(--ease-spring)` |
+| `hint-slide` | Tactical hint requested | `translate(-50%, -10px) scale(0.95)` $\to$ `translate(-50%, 0) scale(1)` | 240ms `var(--ease-spring)` |
+| `notification-slide` | Global alert dispatched | `translate(-50%, -14px) scale(0.96)` $\to$ `translate(-50%, 0) scale(1)` | 250ms `var(--ease-spring)` |
+| `banner-pop` | Disconnect / Draw offer alert | `translate(-50%, -8px) scale(0.95)` $\to$ `translate(-50%, 0) scale(1)` | 240ms `var(--ease-spring)` |
+| `fade-pop` | Feedback pill display | `translate(-50%, -6px) scale(0.94)` $\to$ `translate(-50%, 0) scale(1)` | 200ms `var(--ease-spring)` |
+
+### CSS Keyframes:
 
 ```css
-.chess-square.is-magnetic-snap {
-  box-shadow: inset 0 0 0 3px var(--snap-target-ring), var(--snap-target-glow) !important;
-  background-color: var(--snap-target-bg) !important;
-  transform: scale(1.04);
-  transition: transform 120ms var(--ease-spring);
+@keyframes bubble-pop {
+  0% {
+    transform: scale(0.85) translateY(6px);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.04) translateY(-2px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes banner-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
 }
 ```
 
 ---
 
-### 9.3 Dual Input Parity: Tap-to-Move & Drag-and-Drop
-Every puzzle supports 100% feature parity across both interaction styles:
-1. **Tap-to-Move:** Tap piece $\to$ legal destination squares glow $\to$ tap destination to complete move.
-2. **Drag-and-Drop:** Touch and drag piece $\to$ magnetic snap activates on hover $\to$ release to complete move.
+## 9. Responsive Rules & Breakpoint Matrix (320px, 480px, 768px, 1280px)
+
+Every overlay must adapt gracefully across device form factors while preserving complete layout stillness.
+
+```
++---------------------------------------------------------------------------------------+
+|                               RESPONSIVE OVERLAY MATRIX                               |
+|                                                                                       |
+|  Viewport:       320px (SE)     |  480px (Mobile)  |  768px (Tablet)  | 1280px (Desktop) |
+|  -----------------------------------------------------------------------------------  |
+|  Notification:   width: calc(100% - 16px); max-w: 304px | max-w: 440px | max-w: 580px |
+|  Speech Bubble:  width: 100%; top: calc(100% + 4px); tail: left: 18px (left: 24px)   |
+|  Hint Banner:    width: calc(100% - 16px); top: 6px     | width: calc(100% - 24px)    |
+|  Feedback Toast: padding: 3px 12px; font-size: 12px     | padding: 4px 16px; 14px     |
++---------------------------------------------------------------------------------------+
+```
+
+### 9.1 Exact Responsive Breakpoint Rules
+
+#### A. 320px Viewport (Ultra-Compact Phone / iPhone SE):
+- `.app-notification-banner`: `width: calc(100% - 16px); top: 58px; padding: 6px 10px; font-size: var(--text-xs);`
+- `.mascot-speech-bubble`: `width: 100%; padding: 6px 10px; font-size: var(--text-xs);` Tail offset: `left: 16px;`
+- `.active-hint-banner`: `width: calc(100% - 12px); top: 4px; padding: 6px 10px; font-size: var(--text-xs);`
+- `.guide-feedback-banner`, `.puzzle-feedback-banner`: `padding: 3px 10px; font-size: 11px;`
+- `.disconnect-warning-banner`, `.draw-offer-banner`: `width: calc(100% - 12px); top: 4px; padding: 6px 10px; font-size: var(--text-xs);`
+
+#### B. 480px Viewport (Standard & Large Smartphone):
+- `.app-notification-banner`: `width: calc(100% - 24px); max-width: 440px; top: 64px; padding: 8px 14px; font-size: var(--text-sm);`
+- `.mascot-speech-bubble`: `padding: 8px 14px; font-size: var(--text-sm);` Tail offset: `left: 22px;`
+- `.active-hint-banner`: `width: calc(100% - 20px); max-width: 440px; top: 8px; padding: 8px 14px;`
+- `.guide-feedback-banner`, `.puzzle-feedback-banner`: `padding: 4px 14px; font-size: var(--text-xs);`
+- `.disconnect-warning-banner`, `.draw-offer-banner`: `width: calc(100% - 16px); max-width: 440px; top: 8px;`
+
+#### C. 768px Viewport (Tablet / iPad Portrait):
+- `.app-notification-banner`: `width: calc(100% - 32px); max-width: 540px; top: 68px; padding: 10px 16px; font-size: var(--text-sm);`
+- `.active-hint-banner`: `max-width: 520px; top: 8px; padding: 10px 16px;`
+- `.guide-feedback-banner`, `.puzzle-feedback-banner`: `padding: 5px 16px; font-size: var(--text-sm);`
+
+#### D. 1280px Viewport (Desktop / Full Width Screen):
+- All arenas capped at `max-width: 580px` (Solo AI, LAN Multiplayer) or `max-width: 960px` (Academy, Puzzles layout slot).
+- Overlays maintain centered alignment (`left: 50%; transform: translateX(-50%);`) with max-width limits preventing oversized expansion.
 
 ---
 
-## 10. Accessibility & WCAG 2.1 AA Compliance
+## 10. Base Component Visual Specs
 
-### 10.1 Color Contrast Matrix
+### 10.1 Tactile 3D Buttons (`BaseButton.vue`)
 
-| Interface Element | Color Values | Contrast Ratio | WCAG AA Requirement | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **Electric Violet on White** | `#6c5ce7` on `#ffffff` | **5.2:1** | 4.5:1 | ✅ PASS |
-| **Skill Drills Navy on White** | `#4f46e5` on `#ffffff` | **7.4:1** | 4.5:1 | ✅ PASS (AAA) |
-| **Sunshine Gold on Dark Plum** | `#ffb300` on `#1e1b4b` | **11.4:1** | 4.5:1 | ✅ PASS (AAA) |
-| **Dark Theme Body Text** | `#f1f3f9` on `#1e2438` | **14.1:1** | 4.5:1 | ✅ PASS (AAA) |
-| **Rush Inferno Text on Dark** | `#ffc107` on `#111524` | **12.8:1** | 4.5:1 | ✅ PASS (AAA) |
-| **Board Coordinate Labels** | `#b58863` on `#f0d9b5` | **4.6:1** | 4.5:1 | ✅ PASS |
+- **Primary Button:** `background: var(--color-primary); box-shadow: var(--shadow-btn-primary); border-radius: var(--radius-btn);`
+  - Active press: `transform: translateY(3px); box-shadow: var(--shadow-btn-primary-active);`
+- **Accent Button:** `background: var(--color-accent); box-shadow: var(--shadow-btn-accent); color: var(--text-on-accent);`
+- **Ghost Button:** `background: transparent; border: 1.5px solid var(--border-medium); box-shadow: var(--shadow-btn-ghost);`
+- **Minimum Tap Target:** `height: 44px; min-width: 44px;` (WCAG 2.1 AA requirement).
 
-### 10.2 Non-Color Cues & Redundancy
-- **No information is conveyed through color alone:**
-  - Hint tiers use distinct shapes (Wiggle icon, Concentric Target Rings, Vector Arrow).
-  - Strikes use Hearts (`💚` vs `💔`) and text counters (`2 Strikes Remaining`).
-  - Elo tiers use distinctive chess piece glyphs (`♙`, `♘`, `♗`, `♖`, `♕`).
-  - Timer stages combine color shifts with icon state changes and rhythmic pulsation.
+### 10.2 Cards & Containers (`BaseCard.vue`)
 
-### 10.3 Keyboard & Screen Reader Accessibility
-- **Board Grid Navigation:** Full arrow key (`ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`) square navigation with `Space` / `Enter` selection.
-- **Live ARIA Announcements:** Mascot hint updates, solve announcements, and streak counters use `aria-live="polite"` regions.
-- **Reduced Motion:** Full compliance with `@media (prefers-reduced-motion: reduce)` disabling particle physics and continuous flame oscillations.
+- `background: var(--bg-surface); border: 2px solid var(--border-subtle); border-radius: var(--radius-card); box-shadow: var(--shadow-sm);`
+- Dark mode: `background: var(--bg-surface); border-color: var(--border-subtle);`
+
+### 10.3 Modal Dialogs (`BaseModal.vue`)
+
+- **Backdrop:** `position: fixed; inset: 0; background: var(--bg-overlay); backdrop-filter: blur(6px); z-index: var(--z-modal-backdrop);`
+- **Card Content:** `position: relative; z-index: var(--z-modal-content); background: var(--bg-surface); border-radius: var(--radius-modal); box-shadow: var(--shadow-xl);`
 
 ---
 
-## 11. Frozen Design Contract & Builder Rules
+## 11. Frozen Design Contract Compliance Checklist for Builders
 
-This specification is a **frozen design contract** for frontend builders implementing the Chess Academy & Puzzle Hub expansion.
+Frontend builders implementing tickets **SC-1**, **SC-2**, **SC-3**, and **SC-4** MUST strictly adhere to the following invariants:
 
-### Mandatory Builder Rules:
-1. **Zero Hardcoded CSS Values:** Every color, gradient, shadow, radius, font, and spacing unit MUST reference the design tokens defined in this document or `design-tokens.css`.
-2. **Component File Structure (Vertical Slice Architecture):**
-   ```
-   apps/client/src/features/puzzles/
-     ├── PuzzleHubView.vue              # Main Hub Screen with 3 Mode Cards
-     ├── PuzzleArena.vue                # Puzzle Gameplay Arena
-     ├── components/
-     │    ├── DrillsModeCard.vue         # Themed Skill Drills Card
-     │    ├── RatingLadderCard.vue       # Adaptive Rating Ladder Card
-     │    ├── RushModeCard.vue           # Puzzle Rush / Streak Survivor Card
-     │    ├── PuzzleEloBadge.vue         # Live Dynamic Rating Pill
-     │    ├── StreakComboBadge.vue       # Animated Flame Multiplier Badge
-     │    ├── RushTimerBar.vue           # Rush Countdown Bar with bonus time popup
-     │    ├── StrikeCounter.vue          # 3-Strike Life Shield Counter
-     │    ├── ProgressiveHintButton.vue  # 3-Tier Progressive Hint Controller
-     │    ├── HintArrowOverlay.vue       # SVG Glowing Vector Arrow
-     │    └── PuzzleCompletionModal.vue  # Celebratory Star & Fanfare Modal
-     ├── composables/
-     │    ├── usePuzzleHub.ts            # Hub state & mode switcher
-     │    ├── usePuzzleEngine.ts         # Move validation & puzzle loader
-     │    ├── useProgressiveHints.ts     # 3-Tier Hint state controller
-     │    └── useStreakManager.ts        # Flame multipliers & dopamine feedback
-     └── data/                           # Curated Puzzles (Forks, Pins, Windmills, etc.)
-   ```
-3. **Tactile Button Architecture:** All interactive buttons must utilize the 3D tactile bevel structure with downward active `translateY(3px)` press states.
-4. **Non-Punitive Tone Guarantee:** Error messages, retry prompts, and mascot dialogues must remain 100% positive, educational, and free of failure penalties.
+| Screen / Feature | Component File | Required Selector | Required Positioning | Z-Index Token | Data-TestID to Retain |
+|---|---|---|---|---|---|
+| **Solo AI** | `AiMascotBadge.vue` | `.mascot-speech-bubble` | `position: absolute; top: calc(100% + 4px);` | `--z-overlay-dialogue` (20) | `mascot-dialogue-bubble` |
+| **Solo AI** | `SoloAiArena.vue` | `.active-hint-banner` | `position: absolute; top: 8px; left: 50%; transform: translateX(-50%);` | `--z-overlay-dialogue` (20) | `active-hint-banner` |
+| **Academy** | `ScenarioGuideOverlay.vue` | `.guide-feedback-banner` | `position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);` | `--z-overlay-guide` (15) | (Any existing testids) |
+| **Academy** | `ScenarioGuideOverlay.vue` | `.guide-hint-bubble` | `position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);` | `--z-overlay-dialogue` (20) | (Any existing testids) |
+| **Puzzles** | `PuzzleArena.vue` | `.puzzle-feedback-banner` | `position: absolute; top: -12px; left: 50%; transform: translateX(-50%);` | `--z-overlay-toast` (10) | `puzzle-feedback-banner` |
+| **Shell** | `App.vue` | `.app-notification-banner` | `position: fixed; top: 68px; left: 50%; transform: translateX(-50%);` | `--z-global-notification` (100) | `app-notification-banner` |
+| **Multiplayer**| `App.vue` | `.disconnect-warning-banner` | `position: absolute; top: 8px; left: 50%; transform: translateX(-50%);` | `--z-overlay-alert` (30) | (Any existing testids) |
+| **Multiplayer**| `App.vue` | `.draw-offer-banner` | `position: absolute; top: 8px; left: 50%; transform: translateX(-50%);` | `--z-overlay-alert` (30) | (Any existing testids) |
+
+### Non-Negotiable Contract Invariants:
+1. **$0\text{px}$ Displacement:** Chessboard, player HUDs, captured piece trays, and action bars must have $0\text{px}$ movement when any transient overlay mounts or unmounts.
+2. **DOM TestID Preservation:** All existing `data-testid` attributes (`mascot-dialogue-bubble`, `active-hint-banner`, `puzzle-feedback-banner`, `app-notification-banner`) must remain on their respective elements.
+3. **No Hardcoded Hex in Components:** All styles must reference the design tokens defined in this specification (`var(--z-*)`, `var(--color-*)`, `var(--shadow-*)`, `var(--radius-*)`).
 
 ---
-*Design Specification verified and approved by `@ux-craftsman`.*
+
+*This document is authored and frozen by `@ux-craftsman`. Changes require design review approval.*
