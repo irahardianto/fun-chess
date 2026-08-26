@@ -1,0 +1,23 @@
+{
+  "name": "fun-chess",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "apps/server",
+    "apps/client"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace=@fun-chess/server",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:integration",
+    "test:integration": "vitest run --config vitest.config.ts",
+    "test:contracts": "vitest run tests/contracts",
+    "dev": "npm run build --workspace=@fun-chess/shared && (npm run dev --workspace=@fun-chess/server & npm run dev --workspace=@fun-chess/client)",
+    "dev:client": "npm run dev --workspace=@fun-chess/client",
+    "dev:server": "npm run dev --workspace=@fun-chess/server"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}
