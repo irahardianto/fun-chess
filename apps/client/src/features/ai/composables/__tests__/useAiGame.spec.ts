@@ -417,4 +417,63 @@ describe('useAiGame', () => {
       expect(hint).toBeNull();
     });
   });
+
+  describe('AI Calculation Failure & Emergency Fallback', () => {
+    it('handles minimax engine error, logs error, plays error audio, and executes emergency fallback move', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(minimaxEngine, 'findBestMove').mockRejectedValue(new Error('Search worker crashed'));
+
+      const game = useAiGame({ autoStart: false });
+
+      // Player makes opening move e2 -> e4
+      const moved = game.applyPlayerMove('e2', 'e4');
+      expect(moved).toBe(true);
+      expect(game.moveHistory.value.length).toBe(1);
+
+      // Wait for AI calculation to fail and fallback move to be executed
+      await vi.waitFor(() => {
+        expect(game.moveHistory.value.length).toBe(2);
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(game.isAiThinking.value).toBe(false);
+      expect(game.turn.value).toBe('w');
+      expect(game.isPlayerTurn.value).toBe(true);
+      expect(game.lastMove.value).not.toBeNull();
+    });
+
+    it('handles invalid AI move returned by engine and falls back to a legal move', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(minimaxEngine, 'findBestMove').mockResolvedValue({
+        move: { from: 'a1', to: 'a8' }, // Illegal move for Black from initial position
+        score: 0,
+        depth: 1,
+        nodesEvaluated: 1,
+        isBlunder: false,
+        searchDurationMs: 5,
+      });
+
+      const game = useAiGame({ autoStart: false });
+
+      game.applyPlayerMove('e2', 'e4');
+
+      await vi.waitFor(() => {
+        expect(game.moveHistory.value.length).toBe(2);
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(game.isAiThinking.value).toBe(false);
+      expect(game.turn.value).toBe('w');
+    });
+
+    it('safely handles corrupted initial FEN via createSafeChess without throwing', () => {
+      const game = useAiGame({
+        initialFen: 'corrupted-invalid-fen-string',
+        autoStart: false,
+      });
+
+      expect(game.fen.value).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+      expect(game.turn.value).toBe('w');
+    });
+  });
 });

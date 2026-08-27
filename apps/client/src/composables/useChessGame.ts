@@ -3,7 +3,6 @@
  * Uses chess.js for optimistic moves, legal move calculation, and local validation.
  */
 import { ref, computed } from 'vue';
-import { Chess } from 'chess.js';
 import type {
   PieceColor,
   PieceType,
@@ -11,6 +10,7 @@ import type {
   GameState,
   MoveResult,
 } from '@fun-chess/shared';
+import { createSafeChess, safeLoadFen } from '@fun-chess/shared';
 
 const PIECE_VALUES: Record<PieceType, number> = {
   p: 1,
@@ -22,7 +22,7 @@ const PIECE_VALUES: Record<PieceType, number> = {
 };
 
 export function useChessGame(initialFen?: string) {
-  const chess = new Chess(initialFen);
+  const chess = createSafeChess(initialFen);
 
   const fen = ref(chess.fen());
   const turn = ref<PieceColor>(chess.turn() as PieceColor);
@@ -291,7 +291,7 @@ export function useChessGame(initialFen?: string) {
 
   function syncGameState(state: GameState): void {
     try {
-      chess.load(state.fen);
+      safeLoadFen(chess, state.fen);
       fen.value = state.fen;
       turn.value = state.turn;
       isCheck.value = state.isCheck;
@@ -322,7 +322,7 @@ export function useChessGame(initialFen?: string) {
 
   function resetGame(customFen?: string): void {
     if (customFen) {
-      chess.load(customFen);
+      safeLoadFen(chess, customFen);
     } else {
       chess.reset();
     }

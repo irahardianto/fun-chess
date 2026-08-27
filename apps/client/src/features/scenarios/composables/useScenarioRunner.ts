@@ -1,5 +1,4 @@
 import { ref, computed, readonly, onUnmounted, getCurrentInstance } from 'vue';
-import { Chess } from 'chess.js';
 import type {
   Square,
   PieceColor,
@@ -8,6 +7,7 @@ import type {
   ChessScenario,
   StarRating,
 } from '@fun-chess/shared';
+import { createSafeChess, safeLoadFen } from '@fun-chess/shared';
 import { validateStepMove } from '../engine/scenario_validator';
 import { calculateStars, calculateAccuracy } from '../engine/star_calculator';
 import { useAudio } from '../../../composables/useAudio';
@@ -55,7 +55,7 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
   const pendingPromotion = ref<{ from: Square; to: Square } | null>(null);
 
   // Internal chess.js engine instance
-  const chess = new Chess(currentFen.value);
+  const chess = createSafeChess(currentFen.value);
 
   // Active timers
   let botTimer: ReturnType<typeof setTimeout> | null = null;
@@ -104,7 +104,7 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
 
   function syncEngineFen(fenStr: string): void {
     try {
-      chess.load(fenStr);
+      safeLoadFen(chess, fenStr);
       currentFen.value = chess.fen();
     } catch {
       currentFen.value = fenStr;

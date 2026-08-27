@@ -77,12 +77,32 @@ const availableInterfaces = computed(() => {
   return Array.from(list);
 });
 
+const isCloudMode = computed(() => {
+  const info = props.lanInfo || serverLanInfo.value;
+  return (
+    !!info?.isCloudRelay ||
+    info?.relayMode === 'cloud' ||
+    Boolean(info?.publicUrl) ||
+    (typeof window !== 'undefined' && window.location.protocol === 'https:')
+  );
+});
+
 const effectiveHost = computed(() => {
-  // 1. Manual user override or stored activeLanIp
-  if (activeLanIp.value && activeLanIp.value !== '127.0.0.1' && activeLanIp.value !== 'localhost') {
+  // 1. Manual user override or stored activeLanIp (only in LAN mode)
+  if (!isCloudMode.value && activeLanIp.value && activeLanIp.value !== '127.0.0.1' && activeLanIp.value !== 'localhost') {
     return activeLanIp.value;
   }
-  // 2. Window location if accessed via IP directly
+  // 2. Cloud Relay publicUrl hostname
+  const info = props.lanInfo || serverLanInfo.value;
+  if (isCloudMode.value && info?.publicUrl) {
+    try {
+      const urlObj = new URL(info.publicUrl.startsWith('http') ? info.publicUrl : `https://${info.publicUrl}`);
+      return urlObj.hostname;
+    } catch {
+      // fallback
+    }
+  }
+  // 3. Window location if accessed via hostname/domain directly
   if (
     typeof window !== 'undefined' &&
     window.location.hostname &&
@@ -91,8 +111,7 @@ const effectiveHost = computed(() => {
   ) {
     return window.location.hostname;
   }
-  // 3. Server-detected LAN IP
-  const info = props.lanInfo || serverLanInfo.value;
+  // 4. Server-detected LAN IP
   if (info?.lanIp && info.lanIp !== '127.0.0.1' && info.lanIp !== 'localhost') {
     return info.lanIp;
   }
@@ -100,15 +119,39 @@ const effectiveHost = computed(() => {
 });
 
 const effectivePort = computed(() => {
-  if (typeof window !== 'undefined' && window.location.port) {
-    return window.location.port;
+  // Never append container internal port in Cloud Relay mode or on standard HTTPS/HTTP ports
+  if (isCloudMode.value) {
+    return '';
+  }
+  if (typeof window !== 'undefined') {
+    if (window.location.protocol === 'https:') return '';
+    if (window.location.port) {
+      return (window.location.port === '80' || window.location.port === '443') ? '' : window.location.port;
+    }
   }
   const info = props.lanInfo || serverLanInfo.value;
-  return info?.port ? String(info.port) : '3000';
+  if (info?.isCloudRelay || info?.relayMode === 'cloud' || info?.publicUrl) {
+    return '';
+  }
+  if (info?.port) {
+    return (info.port === 80 || info.port === 443) ? '' : String(info.port);
+  }
+  return '3000';
 });
 
 const effectiveJoinUrl = computed(() => {
   if (props.joinUrl) return props.joinUrl;
+  const info = props.lanInfo || serverLanInfo.value;
+  if (isCloudMode.value) {
+    if (info?.publicUrl) {
+      const base = info.publicUrl.replace(/\/+$/, '');
+      return `${base}/?join=${props.roomCode}`;
+    }
+    if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
+      const base = window.location.origin.replace(/\/+$/, '');
+      return `${base}/?join=${props.roomCode}`;
+    }
+  }
   const protocol = typeof window !== 'undefined' && window.location.protocol ? window.location.protocol : 'http:';
   const port = effectivePort.value;
   const portPart = port ? `:${port}` : '';
@@ -117,17 +160,9 @@ const effectiveJoinUrl = computed(() => {
 });
 
 const isLocalhost = computed(() => {
+  if (isCloudMode.value) return false;
   const host = effectiveHost.value;
   return host === 'localhost' || host === '127.0.0.1';
-});
-
-const isCloudMode = computed(() => {
-  const info = props.lanInfo || serverLanInfo.value;
-  return (
-    !!info?.isCloudRelay ||
-    info?.relayMode === 'cloud' ||
-    (typeof window !== 'undefined' && window.location.protocol === 'https:')
-  );
 });
 
 async function generateQr() {
@@ -193,15 +228,49 @@ function prefillPrefix(prefix: string) {
 }
 
 async function copyLink() {
-  try {
-    await navigator.clipboard.writeText(effectiveJoinUrl.value);
+  const text = effectiveJoinUrl.value;
+  let succeeded = false;
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+      succeeded = true;
+    } catch {
+      // Fallback for non-secure HTTP LAN contexts
+    }
+  }
+
+  if (!succeeded && typeof document !== 'undefined') {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.top = '0';
+      textarea.style.left = '0';
+      textarea.style.width = '1px';
+      textarea.style.height = '1px';
+      textarea.style.padding = '0';
+      textarea.style.border = 'none';
+      textarea.style.outline = 'none';
+      textarea.style.boxShadow = 'none';
+      textarea.style.background = 'transparent';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      succeeded = document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } catch {
+      succeeded = false;
+    }
+  }
+
+  if (succeeded) {
     copied.value = true;
     if (copyTimeout) clearTimeout(copyTimeout);
     copyTimeout = setTimeout(() => {
       copied.value = false;
     }, 2000);
-  } catch {
-    // Fallback
   }
 }
 

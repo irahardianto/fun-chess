@@ -427,4 +427,66 @@ describe("Game Socket Handlers", () => {
       );
     });
   });
+
+  describe("Payload sanitization and malformed requests", () => {
+    it("handles null or undefined payload in game:move without crashing", async () => {
+      let ackResponse: any;
+      await whiteSocket.trigger("game:move", null, (res) => {
+        ackResponse = res;
+      });
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBeDefined();
+    });
+
+    it("handles missing roomCode in game:resign gracefully", async () => {
+      let ackResponse: any;
+      await whiteSocket.trigger("game:resign", {}, (res) => {
+        ackResponse = res;
+      });
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+    });
+
+    it("handles missing roomCode in game:offer_draw gracefully", async () => {
+      let ackResponse: any;
+      await whiteSocket.trigger("game:offer_draw", {}, (res) => {
+        ackResponse = res;
+      });
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+    });
+
+    it("handles missing roomCode in game:respond_draw gracefully", async () => {
+      let ackResponse: any;
+      await blackSocket.trigger("game:respond_draw", {}, (res) => {
+        ackResponse = res;
+      });
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+    });
+
+    it("handles missing roomCode in game:request_rematch gracefully", async () => {
+      let ackResponse: any;
+      await whiteSocket.trigger("game:request_rematch", {}, (res) => {
+        ackResponse = res;
+      });
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+    });
+
+    it("handles missing roomCode in game:respond_rematch gracefully", async () => {
+      let ackResponse: any;
+      await blackSocket.trigger("game:respond_rematch", {}, (res) => {
+        ackResponse = res;
+      });
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+    });
+  });
 });

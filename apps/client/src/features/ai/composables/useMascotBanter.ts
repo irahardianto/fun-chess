@@ -1,4 +1,4 @@
-import { ref, computed, toValue, onUnmounted, type MaybeRef } from 'vue';
+import { ref, computed, toValue, onUnmounted, getCurrentInstance, type MaybeRef } from 'vue';
 import type { MascotPersona, MascotDialogueTrigger } from '@fun-chess/shared';
 
 export interface UseMascotBanterOptions {
@@ -99,9 +99,11 @@ export function useMascotBanter(options?: UseMascotBanterOptions | MaybeRef<Masc
     isSpeaking.value = false;
   }
 
-  onUnmounted(() => {
-    clearTimers();
-  });
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      clearTimers();
+    });
+  }
 
   return {
     currentPersona: computed(() => currentPersona.value),

@@ -19,3 +19,4 @@ export * from "./utils/dictionary_mapper.js";
 export * from "./utils/schema_validator.js";
 export * from "./utils/progress_merger.js";
 export * from "./utils/progress_codec.js";
+export * from "./utils/chess_factory.js";

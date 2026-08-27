@@ -8,6 +8,7 @@ import type {
   HintCalculator,
   AiSearchConfig,
 } from '@fun-chess/shared';
+import { createSafeChess } from '@fun-chess/shared';
 import { MinimaxEngine } from './minimax_engine.js';
 
 const PIECE_NAMES: Record<PieceType, string> = {
@@ -219,7 +220,7 @@ export class HintEngine implements HintCalculator {
     fen: string,
     playerColor: PieceColor,
   ): Promise<HintRecommendation | null> {
-    const chess = new Chess(fen);
+    const chess = createSafeChess(fen);
 
     if (chess.isGameOver()) {
       return null;
@@ -249,7 +250,7 @@ export class HintEngine implements HintCalculator {
       return null;
     }
 
-    const chessBefore = new Chess(fen);
+    const chessBefore = createSafeChess(fen);
     const { theme, explanation } = identifyTacticalTheme(chessBefore, chess, moveResult);
 
     return {

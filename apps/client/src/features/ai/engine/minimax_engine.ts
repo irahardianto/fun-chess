@@ -5,6 +5,7 @@ import type {
   AiMoveEvaluation,
   ChessAiEngine,
 } from '@fun-chess/shared';
+import { createSafeChess } from '@fun-chess/shared';
 import { PIECE_VALUES } from './piece_square_tables.js';
 import {
   evaluateBoard,
@@ -251,7 +252,7 @@ export class MinimaxEngine implements ChessAiEngine {
    */
   async findBestMove(fen: string, config: AiSearchConfig): Promise<AiMoveEvaluation> {
     const startTime = performance.now();
-    const chess = new Chess(fen);
+    const chess = createSafeChess(fen);
     const state: SearchState = { nodesEvaluated: 0 };
     const turn = chess.turn(); // 'w' or 'b'
     const isMaximizing = turn === 'w';

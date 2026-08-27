@@ -51,6 +51,58 @@ describe('QrCodeModal.vue', () => {
     );
   });
 
+  it('falls back to document.execCommand when navigator.clipboard is unavailable or writeText fails', async () => {
+    // Simulate non-secure LAN HTTP environment
+    const execCommandFn = vi.fn().mockReturnValue(true);
+    document.execCommand = execCommandFn;
+    Object.assign(navigator, {
+      clipboard: undefined,
+    });
+
+    wrapper = mount(QrCodeModal, {
+      props: {
+        modelValue: true,
+        roomCode: 'FALL',
+        joinUrl: 'http://192.168.1.77:3000/?join=FALL',
+      },
+    });
+
+    const copyBtn = document.body.querySelector('[data-testid="copy-link-btn"]') as HTMLButtonElement;
+    expect(copyBtn).not.toBeNull();
+    copyBtn.click();
+    await wrapper.vm.$nextTick();
+
+    expect(execCommandFn).toHaveBeenCalledWith('copy');
+    expect(copyBtn.textContent).toContain('Copied!');
+  });
+
+  it('falls back to document.execCommand when navigator.clipboard.writeText rejects', async () => {
+    const execCommandFn = vi.fn().mockReturnValue(true);
+    document.execCommand = execCommandFn;
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn().mockRejectedValue(new Error('Permission denied on insecure HTTP origin')),
+      },
+    });
+
+    wrapper = mount(QrCodeModal, {
+      props: {
+        modelValue: true,
+        roomCode: 'REJC',
+        joinUrl: 'http://192.168.1.88:3000/?join=REJC',
+      },
+    });
+
+    const copyBtn = document.body.querySelector('[data-testid="copy-link-btn"]') as HTMLButtonElement;
+    expect(copyBtn).not.toBeNull();
+    copyBtn.click();
+
+    await vi.waitFor(() => {
+      expect(execCommandFn).toHaveBeenCalledWith('copy');
+      expect(copyBtn.textContent).toContain('Copied!');
+    });
+  });
+
   it('uses LAN IP from lanInfo when available on localhost', async () => {
     wrapper = mount(QrCodeModal, {
       props: {
@@ -170,5 +222,35 @@ describe('QrCodeModal.vue', () => {
 
     const subtitle = document.body.querySelector('.qr-subtitle');
     expect(subtitle?.textContent).toContain('Share via Cloud Link / QR Code');
+  });
+
+  it('generates cloud join URL without port :3000 when publicUrl is provided', async () => {
+    wrapper = mount(QrCodeModal, {
+      props: {
+        modelValue: true,
+        roomCode: '457M',
+        lanInfo: {
+          lanIp: 'fun-chess-753683872274.asia-southeast1.run.app',
+          port: 3000,
+          localUrl: 'http://localhost:3000',
+          joinUrl: 'https://fun-chess-753683872274.asia-southeast1.run.app',
+          interfaces: ['169.254.8.1'],
+          isCloudRelay: true,
+          relayMode: 'cloud',
+          publicUrl: 'https://fun-chess-753683872274.asia-southeast1.run.app',
+        },
+      },
+    });
+
+    await wrapper.vm.$nextTick();
+
+    const preview = document.body.querySelector('.url-preview');
+    expect(preview?.textContent).toBe('https://fun-chess-753683872274.asia-southeast1.run.app/?join=457M');
+    expect(preview?.textContent).not.toContain(':3000');
+
+    expect(QRCode.toDataURL).toHaveBeenCalledWith(
+      'https://fun-chess-753683872274.asia-southeast1.run.app/?join=457M',
+      expect.any(Object)
+    );
   });
 });

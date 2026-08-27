@@ -113,6 +113,7 @@ const isCloudMode = computed(() => {
   return (
     !!info?.isCloudRelay ||
     info?.relayMode === 'cloud' ||
+    Boolean(info?.publicUrl) ||
     (typeof window !== 'undefined' && window.location.protocol === 'https:')
   );
 });
@@ -123,6 +124,15 @@ const activeProgressMap = computed(() => {
 
 const effectiveJoinUrl = computed(() => {
   const info = props.lanInfo || serverLanInfo.value;
+  if (isCloudMode.value) {
+    if (info?.publicUrl) {
+      return info.publicUrl.replace(/\/+$/, '');
+    }
+    if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
+      return window.location.origin.replace(/\/+$/, '');
+    }
+  }
+
   const host =
     activeLanIp.value && activeLanIp.value !== '127.0.0.1' && activeLanIp.value !== 'localhost'
       ? activeLanIp.value
@@ -133,11 +143,15 @@ const effectiveJoinUrl = computed(() => {
           : 'localhost';
 
   const port =
-    typeof window !== 'undefined' && window.location.port
-      ? window.location.port
-      : info?.port
-        ? String(info.port)
-        : '3000';
+    isCloudMode.value
+      ? ''
+      : typeof window !== 'undefined' && window.location.port
+        ? (window.location.port === '80' || window.location.port === '443' ? '' : window.location.port)
+        : typeof window !== 'undefined' && window.location.protocol === 'https:'
+          ? ''
+          : info?.port
+            ? (info.port === 80 || info.port === 443 ? '' : String(info.port))
+            : '3000';
 
   const protocol = typeof window !== 'undefined' && window.location.protocol ? window.location.protocol : 'http:';
   const portPart = port ? `:${port}` : '';

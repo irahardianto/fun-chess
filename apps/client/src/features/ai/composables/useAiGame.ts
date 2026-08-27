@@ -1,5 +1,4 @@
-import { ref, computed, onUnmounted } from 'vue';
-import { Chess } from 'chess.js';
+import { ref, computed, onUnmounted, getCurrentInstance } from 'vue';
 import type {
   Square,
   PieceColor,
@@ -11,6 +10,7 @@ import type {
   GameOverPayload,
   MoveResult,
 } from '@fun-chess/shared';
+import { createSafeChess, safeLoadFen } from '@fun-chess/shared';
 import {
   getMascotPersona,
   getAiConfigForMascot,
@@ -62,7 +62,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
   const banter = useMascotBanter({ persona: mascot });
 
   // Chess Rules Engine Instance
-  const chess = new Chess(initialFen);
+  const chess = createSafeChess(initialFen);
 
   // Player & Game Configuration
   const rawPlayerColor = ref<PieceColor | 'random'>(initialPlayerColor);
@@ -264,6 +264,49 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     return true;
   }
 
+  function applyAiMoveResult(result: import('chess.js').Move, isBlunder = false): void {
+    lastMove.value = { from: result.from, to: result.to };
+
+    const moveRes: MoveResult = {
+      from: result.from,
+      to: result.to,
+      san: result.san,
+      piece: result.piece as PieceType,
+      color: result.color as PieceColor,
+      captured: result.captured as PieceType | undefined,
+      promotion: result.promotion as PieceType | undefined,
+      flags: result.flags,
+      fen: chess.fen(),
+      moveNumber: chess.history().length,
+      timestamp: Date.now(),
+    };
+
+    moveHistory.value.push(moveRes);
+    updateLocalState();
+
+    // Trigger SFX
+    if (result.captured) {
+      playCapture();
+    } else {
+      playMove();
+    }
+
+    // Check for Game Over after AI move
+    if (checkAndHandleGameOver()) {
+      return;
+    }
+
+    // Contextual Dialogue Triggers for AI move
+    if (chess.inCheck()) {
+      playCheck();
+      banter.triggerBanter('ai_check');
+    } else if (isBlunder) {
+      banter.triggerBanter('ai_blunder');
+    } else {
+      banter.triggerBanter('ai_move');
+    }
+  }
+
   /**
    * Dispatches the AI turn calculation using Minimax search and blunder generation.
    */
@@ -292,51 +335,30 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       });
 
       if (!result) {
+        throw new Error(`AI engine generated invalid move: ${JSON.stringify(chosenMove)}`);
+      }
+
+      applyAiMoveResult(result, evaluation.isBlunder);
+    } catch (err) {
+      if (currentOpId !== activeAiOperationId) {
         return;
       }
+      console.error('[useAiGame] AI calculation failed, executing emergency fallback move:', err);
+      playError();
 
-      lastMove.value = { from: result.from, to: result.to };
-
-      const moveRes: MoveResult = {
-        from: result.from,
-        to: result.to,
-        san: result.san,
-        piece: result.piece as PieceType,
-        color: result.color as PieceColor,
-        captured: result.captured as PieceType | undefined,
-        promotion: result.promotion as PieceType | undefined,
-        flags: result.flags,
-        fen: chess.fen(),
-        moveNumber: chess.history().length,
-        timestamp: Date.now(),
-      };
-
-      moveHistory.value.push(moveRes);
-      updateLocalState();
-
-      // Trigger SFX
-      if (result.captured) {
-        playCapture();
-      } else {
-        playMove();
+      // Emergency fallback legal move (random or first valid move) so game never freezes
+      const legalMovesList = chess.moves({ verbose: true });
+      if (legalMovesList.length > 0 && !chess.isGameOver()) {
+        const fallback = legalMovesList[Math.floor(Math.random() * legalMovesList.length)];
+        const fallbackResult = chess.move({
+          from: fallback.from,
+          to: fallback.to,
+          promotion: fallback.promotion as 'q' | 'r' | 'b' | 'n' | undefined,
+        });
+        if (fallbackResult) {
+          applyAiMoveResult(fallbackResult, false);
+        }
       }
-
-      // Check for Game Over after AI move
-      if (checkAndHandleGameOver()) {
-        return;
-      }
-
-      // Contextual Dialogue Triggers for AI move
-      if (chess.inCheck()) {
-        playCheck();
-        banter.triggerBanter('ai_check');
-      } else if (evaluation.isBlunder) {
-        banter.triggerBanter('ai_blunder');
-      } else {
-        banter.triggerBanter('ai_move');
-      }
-    } catch {
-      // Graceful error recovery
     } finally {
       if (currentOpId === activeAiOperationId) {
         isAiThinking.value = false;
@@ -512,7 +534,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     if (!snapshot) return false;
 
     try {
-      chess.load(snapshot.fen);
+      safeLoadFen(chess, snapshot.fen);
       moveHistory.value = moveHistory.value.slice(0, snapshot.moveCount);
       lastMove.value = moveHistory.value.length > 0
         ? { from: moveHistory.value[moveHistory.value.length - 1]!.from, to: moveHistory.value[moveHistory.value.length - 1]!.to }
@@ -610,7 +632,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     orientation.value = playerColor.value;
 
     if (initialFen) {
-      chess.load(initialFen);
+      safeLoadFen(chess, initialFen);
     } else {
       chess.reset();
     }
@@ -650,10 +672,12 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     }
   }
 
-  onUnmounted(() => {
-    activeAiOperationId++;
-    isAiThinking.value = false;
-  });
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      activeAiOperationId++;
+      isAiThinking.value = false;
+    });
+  }
 
   return {
     // Mascot & Dialogue

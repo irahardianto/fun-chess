@@ -92,4 +92,15 @@ describe('useChessGame composable', () => {
     expect(game.capturedWhite.value).toEqual(['p']);
     expect(game.capturedBlack.value).toEqual(['p']);
   });
+
+  it('safely handles corrupted initial FEN without crashing', () => {
+    const safeGame = useChessGame('invalid-corrupt-fen');
+    expect(safeGame.fen.value).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+    expect(safeGame.turn.value).toBe('w');
+  });
+
+  it('safely handles reset with corrupted FEN without crashing', () => {
+    game.resetGame('invalid-corrupt-fen');
+    expect(game.fen.value).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+  });
 });

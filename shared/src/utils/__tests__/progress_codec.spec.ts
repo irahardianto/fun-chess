@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { DefaultProgressCodec, progressCodec } from "../progress_codec.js";
+import {
+  DefaultProgressCodec,
+  progressCodec,
+  decodeProgressFromQr,
+  decodeProgressFromEnvelope,
+  encodeProgressToQr,
+  encodeProgressToEnvelope,
+  bytesToBase64Url,
+  base64UrlToBytes,
+} from "../progress_codec.js";
 import type { UnifiedProgressPayload } from "../../types/progress_sync.js";
 import { FUN_CHESS_PAYLOAD_MAGIC_PREFIX } from "../../types/progress_sync.js";
 
@@ -291,6 +300,50 @@ describe("Progress Codec (Deflate + CRC-32 + Base64URL QR & JSON Envelope)", () 
       // Act & Assert
       expect(() => codec.decodeFromEnvelopeJson("not a json")).toThrow();
       expect(() => codec.decodeFromEnvelopeJson("")).toThrow();
+    });
+  });
+
+  describe("Standalone Helper Functions (decodeProgressFromQr, decodeProgressFromEnvelope, encodeProgressToQr, encodeProgressToEnvelope)", () => {
+    it("encodes and decodes QR string via standalone helper functions", async () => {
+      const payload = createRealisticPayload(10, 10);
+      const qr = await encodeProgressToQr(payload);
+      expect(qr.startsWith(FUN_CHESS_PAYLOAD_MAGIC_PREFIX)).toBe(true);
+
+      const decoded = await decodeProgressFromQr(qr);
+      expect(decoded.version).toBe(payload.version);
+      expect(decoded.puzzles.ratingProfile.rating).toBe(
+        payload.puzzles.ratingProfile.rating,
+      );
+      expect(Object.keys(decoded.scenarios)).toHaveLength(10);
+    });
+
+    it("encodes and decodes JSON envelope via standalone helper functions", () => {
+      const payload = createRealisticPayload(8, 8);
+      const envelopeJson = encodeProgressToEnvelope(payload);
+      expect(envelopeJson).toContain("FC_PROGRESS_V1");
+
+      const decoded = decodeProgressFromEnvelope(envelopeJson);
+      expect(decoded.version).toBe(payload.version);
+      expect(decoded.puzzles.ratingProfile.rating).toBe(
+        payload.puzzles.ratingProfile.rating,
+      );
+      expect(Object.keys(decoded.scenarios)).toHaveLength(8);
+    });
+
+    it("round-trips bytesToBase64Url and base64UrlToBytes", () => {
+      const testBytes = new Uint8Array([1, 2, 3, 4, 255, 128, 0, 42, 99]);
+      const b64 = bytesToBase64Url(testBytes);
+      expect(typeof b64).toBe("string");
+      const decodedBytes = base64UrlToBytes(b64);
+      expect(decodedBytes).toEqual(testBytes);
+    });
+
+    it("base64UrlToBytes handles empty and whitespace strings gracefully", () => {
+      expect(base64UrlToBytes("")).toEqual(new Uint8Array(0));
+      expect(base64UrlToBytes("   ")).toEqual(new Uint8Array(0));
+      expect(base64UrlToBytes(null as unknown as string)).toEqual(
+        new Uint8Array(0),
+      );
     });
   });
 });

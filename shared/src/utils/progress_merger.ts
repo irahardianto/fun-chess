@@ -368,9 +368,10 @@ export function calculateProgressDiff(
     localPeakRating !== incomingPeakRating ||
     localRushHighScore !== incomingRushHighScore ||
     localSurvivorHighScore !== incomingSurvivorHighScore ||
-    JSON.stringify(local.scenarios) !== JSON.stringify(incoming.scenarios) ||
-    JSON.stringify(local.puzzles.solvedPuzzles) !==
-      JSON.stringify(incoming.puzzles.solvedPuzzles);
+    JSON.stringify(local.scenarios ?? {}) !==
+      JSON.stringify(incoming.scenarios ?? {}) ||
+    JSON.stringify(local.puzzles?.solvedPuzzles ?? {}) !==
+      JSON.stringify(incoming.puzzles?.solvedPuzzles ?? {});
 
   return {
     academy: {

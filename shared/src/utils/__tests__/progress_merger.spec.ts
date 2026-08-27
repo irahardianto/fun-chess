@@ -350,6 +350,142 @@ describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => 
     });
   });
 
+  describe("Partial Progress Payloads & Missing Puzzles", () => {
+    it("safely handles smart_merge when local or incoming is missing puzzles", () => {
+      // Arrange
+      const localWithoutPuzzles = {
+        version: 1,
+        exportedAt: 1700000000000,
+        clientVersion: "1.0.0",
+        scenarios: {
+          "lesson-1": {
+            scenarioId: "lesson-1",
+            starsEarned: 2 as const,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 1699990000000,
+            lastCompletedAt: 1699990000000,
+          },
+        },
+      } as unknown as UnifiedProgressPayload;
+
+      const incomingWithPuzzles = createIncomingPayload();
+
+      // Act
+      const merged = merger.merge(
+        localWithoutPuzzles,
+        incomingWithPuzzles,
+        "smart_merge",
+      );
+
+      // Assert
+      expect(merged.scenarios["lesson-1"]?.starsEarned).toBe(3);
+      expect(merged.puzzles.ratingProfile.rating).toBe(1300);
+      expect(merged.puzzles.ratingProfile.peakRating).toBe(1350);
+      expect(merged.puzzles.solvedPuzzles.puz_001?.stars).toBe(3);
+    });
+
+    it("safely handles smart_merge when incoming is missing puzzles", () => {
+      // Arrange
+      const localWithPuzzles = createLocalPayload();
+      const incomingWithoutPuzzles = {
+        version: 1,
+        exportedAt: 1700001000000,
+        clientVersion: "1.1.0",
+        scenarios: {},
+      } as unknown as UnifiedProgressPayload;
+
+      // Act
+      const merged = merger.merge(
+        localWithPuzzles,
+        incomingWithoutPuzzles,
+        "smart_merge",
+      );
+
+      // Assert
+      expect(merged.puzzles.ratingProfile.rating).toBe(1100);
+      expect(merged.puzzles.ratingProfile.peakRating).toBe(1150);
+      expect(merged.puzzles.solvedPuzzles.puz_001?.stars).toBe(2);
+    });
+
+    it("safely handles smart_merge when both local and incoming are missing puzzles", () => {
+      // Arrange
+      const localWithoutPuzzles = {
+        version: 1,
+        exportedAt: 1700000000000,
+        scenarios: {},
+      } as unknown as UnifiedProgressPayload;
+
+      const incomingWithoutPuzzles = {
+        version: 1,
+        exportedAt: 1700001000000,
+        scenarios: {},
+      } as unknown as UnifiedProgressPayload;
+
+      // Act
+      const merged = merger.merge(
+        localWithoutPuzzles,
+        incomingWithoutPuzzles,
+        "smart_merge",
+      );
+
+      // Assert
+      expect(merged.puzzles).toBeDefined();
+      expect(merged.puzzles.ratingProfile.rating).toBe(800);
+      expect(merged.puzzles.ratingProfile.ratingDeviation).toBe(350);
+      expect(merged.puzzles.solvedPuzzles).toEqual({});
+      expect(merged.puzzles.themeMastery).toEqual({});
+    });
+
+    it("safely calculates diff when local or incoming is missing puzzles without throwing", () => {
+      // Arrange
+      const localWithoutPuzzles = {
+        version: 1,
+        exportedAt: 1700000000000,
+        scenarios: {},
+      } as unknown as UnifiedProgressPayload;
+
+      const incomingWithPuzzles = createIncomingPayload();
+
+      // Act
+      const diff = merger.calculateDiff(
+        localWithoutPuzzles,
+        incomingWithPuzzles,
+      );
+
+      // Assert
+      expect(diff.hasDifferences).toBe(true);
+      expect(diff.hasUpgrades).toBe(true);
+      expect(diff.puzzles.localRating).toBe(800);
+      expect(diff.puzzles.incomingRating).toBe(1300);
+      expect(diff.puzzles.localSolvedCount).toBe(0);
+      expect(diff.puzzles.incomingSolvedCount).toBe(2);
+    });
+
+    it("safely calculates diff when incoming is missing puzzles without throwing", () => {
+      // Arrange
+      const localWithPuzzles = createLocalPayload();
+      const incomingWithoutPuzzles = {
+        version: 1,
+        exportedAt: 1700001000000,
+        scenarios: {},
+      } as unknown as UnifiedProgressPayload;
+
+      // Act
+      const diff = merger.calculateDiff(
+        localWithPuzzles,
+        incomingWithoutPuzzles,
+      );
+
+      // Assert
+      expect(diff.hasDifferences).toBe(true);
+      expect(diff.puzzles.localRating).toBe(1100);
+      expect(diff.puzzles.incomingRating).toBe(800);
+      expect(diff.puzzles.localSolvedCount).toBe(1);
+      expect(diff.puzzles.incomingSolvedCount).toBe(0);
+    });
+  });
+
   describe("Functional Export Helpers", () => {
     it("provides functional helpers mergeUnifiedProgress and calculateProgressDiff", () => {
       // Arrange

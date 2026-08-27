@@ -248,4 +248,64 @@ describe('useScenarioRunner', () => {
       expect(runner.hintsUsedCurrentAttempt.value).toBe(0);
     });
   });
+
+  describe('Pawn Promotion Workflow', () => {
+    const promotionScenario: ChessScenario = {
+      id: 'promo-lesson',
+      title: 'Pawn Promotion',
+      subtitle: 'Promote your pawn',
+      description: 'Promote your pawn to a Queen',
+      icon: '♟️',
+      category: 'special_moves',
+      difficulty: 'beginner',
+      targetAgeGroup: 'all',
+      estimatedMinutes: 2,
+      steps: [
+        {
+          id: 'step-1',
+          stepNumber: 1,
+          setupFen: '8/4P3/8/8/8/8/8/4k2K w - - 0 1',
+          instruction: 'Push your pawn to the 8th rank to promote!',
+          hint: 'Move e7 to e8',
+          allowedMoves: [{ from: 'e7', to: 'e8' }],
+          threatSquares: ['e8'],
+          explanationOnSuccess: 'Great promotion!',
+        },
+      ],
+    };
+
+    it('triggers pendingPromotion when selecting pawn to 8th rank and completes with completePromotion', () => {
+      const runner = useScenarioRunner(promotionScenario);
+
+      runner.selectSquare('e7');
+      expect(runner.selectedSquare.value).toBe('e7');
+
+      runner.selectSquare('e8');
+      expect(runner.pendingPromotion.value).toEqual({ from: 'e7', to: 'e8' });
+
+      const completed = runner.completePromotion('q');
+      expect(completed).toBe(true);
+      expect(runner.pendingPromotion.value).toBeNull();
+      expect(runner.currentFen.value).toContain('Q');
+      expect(runner.isStepSuccess.value).toBe(true);
+    });
+
+    it('cancels pending promotion via cancelPromotion', () => {
+      const runner = useScenarioRunner(promotionScenario);
+
+      runner.selectSquare('e7');
+      runner.selectSquare('e8');
+      expect(runner.pendingPromotion.value).toEqual({ from: 'e7', to: 'e8' });
+
+      runner.cancelPromotion();
+      expect(runner.pendingPromotion.value).toBeNull();
+      expect(runner.selectedSquare.value).toBeNull();
+      expect(runner.legalMoves.value).toEqual([]);
+    });
+
+    it('returns false when completePromotion is called without pendingPromotion', () => {
+      const runner = useScenarioRunner(promotionScenario);
+      expect(runner.completePromotion('q')).toBe(false);
+    });
+  });
 });

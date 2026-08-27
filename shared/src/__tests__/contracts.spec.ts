@@ -55,6 +55,8 @@ import type {
   AppShellEventMap,
   // Audio contracts
   SoundEffectType,
+  // Avatar contracts
+  PlayerAvatar,
   // Sync contracts
   UnifiedProgressPayload,
   UnifiedProgressEnvelope,
@@ -64,6 +66,9 @@ import type {
 import {
   FUN_CHESS_PAYLOAD_MAGIC_PREFIX,
   UNIFIED_PROGRESS_SCHEMA_VERSION,
+  PLAYER_AVATARS,
+  DEFAULT_PLAYER_AVATAR,
+  DEFAULT_OPPONENT_AVATAR,
 } from "../index.js";
 
 describe("Shared Contracts & Data Model Specification", () => {
@@ -498,6 +503,27 @@ describe("Shared Contracts & Data Model Specification", () => {
       ];
       expect(strategies).toHaveLength(3);
       expect(strategies).toContain("smart_merge");
+    });
+  });
+
+  describe("Avatar Contracts", () => {
+    it("validates player avatar list and default fallback constants", () => {
+      expect(PLAYER_AVATARS).toContain("🦁");
+      expect(PLAYER_AVATARS).toContain("🐼");
+      expect(PLAYER_AVATARS).toContain("🚀");
+      expect(PLAYER_AVATARS).toContain("🦄");
+      expect(PLAYER_AVATARS).toContain("⚡");
+      expect(PLAYER_AVATARS).toContain("👑");
+      expect(PLAYER_AVATARS).toHaveLength(6);
+
+      expect(DEFAULT_PLAYER_AVATAR).toBe("🦁");
+      expect(DEFAULT_OPPONENT_AVATAR).toBe("🐼");
+      expect(PLAYER_AVATARS).toContain(DEFAULT_PLAYER_AVATAR);
+      expect(PLAYER_AVATARS).toContain(DEFAULT_OPPONENT_AVATAR);
+      expect(DEFAULT_PLAYER_AVATAR).not.toBe(DEFAULT_OPPONENT_AVATAR);
+
+      const customAvatar: PlayerAvatar = "🦄";
+      expect(PLAYER_AVATARS).toContain(customAvatar);
     });
   });
 });

@@ -1,5 +1,6 @@
 import { Chess } from 'chess.js';
 import type { PieceSquareTableSet } from '@fun-chess/shared';
+import { createSafeChess } from '@fun-chess/shared';
 import {
   PIECE_VALUES,
   DEFAULT_PST_TABLES,
@@ -125,6 +126,6 @@ export function evaluateFen(
   usePst = true,
   customPst: PieceSquareTableSet = DEFAULT_PST_TABLES,
 ): number {
-  const chess = new Chess(fen);
+  const chess = createSafeChess(fen);
   return evaluateBoard(chess, usePst, customPst);
 }

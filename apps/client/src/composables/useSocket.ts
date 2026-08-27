@@ -78,6 +78,8 @@ function clearSession(): void {
   }
 }
 
+const attachedSockets = new WeakSet<object>();
+
 /**
  * Primary Vue 3 composable for managing WebSocket connection, room lifecycle,
  * move synchronization, chat/draw/rematch offers, and session persistence.
@@ -126,6 +128,11 @@ export function useSocket(injectedSocket?: TypedSocket) {
   }
 
   function attachListeners(s: TypedSocket): void {
+    if (attachedSockets.has(s)) {
+      return;
+    }
+    attachedSockets.add(s);
+
     s.on('connect', () => {
       isConnected.value = true;
       socketId.value = s.id || '';
@@ -134,6 +141,22 @@ export function useSocket(injectedSocket?: TypedSocket) {
 
     s.on('disconnect', () => {
       isConnected.value = false;
+    });
+
+    s.on('connect_error', (err: Error) => {
+      isConnected.value = false;
+      lastError.value = {
+        code: 'ERR_SOCKET_TIMEOUT',
+        message: err?.message || 'Connection error',
+      };
+    });
+
+    (s as any).on('reconnect_failed', () => {
+      isConnected.value = false;
+      lastError.value = {
+        code: 'ERR_SOCKET_TIMEOUT',
+        message: 'Reconnection failed after maximum attempts',
+      };
     });
 
     s.on('room:created', (room: RoomState) => {
@@ -523,6 +546,7 @@ export function useSocket(injectedSocket?: TypedSocket) {
     rematchRequestedBy,
     lastGameOver,
     kingInCheck,
+    initSocket,
     connect,
     disconnect,
     createRoom,

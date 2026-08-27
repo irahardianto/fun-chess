@@ -30,7 +30,7 @@ export function registerGameSocketHandlers(
       MakeMoveRequest,
       { success: true; moveResult: MoveResult }
     >(logger, "game:move", socket.id, async (req) => {
-      const roomCode = req.roomCode.toUpperCase();
+      const roomCode = (req?.roomCode || "").toString().trim().toUpperCase();
       const result = await gameService.makeMove(req, socket.id);
 
       io.to(roomCode).emit("game:moved", {
@@ -62,8 +62,8 @@ export function registerGameSocketHandlers(
       "game:resign",
       socket.id,
       async (req) => {
-        const roomCode = req.roomCode.toUpperCase();
-        const result = await gameService.resign(req.roomCode, socket.id);
+        const roomCode = (req?.roomCode || "").toString().trim().toUpperCase();
+        const result = await gameService.resign(roomCode, socket.id);
         cancelAllDisconnectTimersForRoom(roomCode);
         io.to(roomCode).emit("game:over", result.gameOverPayload);
         return { success: true };
@@ -79,7 +79,8 @@ export function registerGameSocketHandlers(
       "game:offer_draw",
       socket.id,
       async (req) => {
-        const result = await gameService.offerDraw(req.roomCode, socket.id);
+        const roomCode = (req?.roomCode || "").toString().trim().toUpperCase();
+        const result = await gameService.offerDraw(roomCode, socket.id);
         if (result.opponentPlayer?.socketId) {
           io.to(result.opponentPlayer.socketId).emit("game:draw_offered", {
             fromPlayerId: result.fromPlayer.id,
@@ -99,11 +100,11 @@ export function registerGameSocketHandlers(
       "game:respond_draw",
       socket.id,
       async (req) => {
-        const roomCode = req.roomCode.toUpperCase();
+        const roomCode = (req?.roomCode || "").toString().trim().toUpperCase();
         const result = await gameService.respondDraw(
-          req.roomCode,
+          roomCode,
           socket.id,
-          req.accept,
+          req?.accept,
         );
 
         if (result.accept && result.gameOverPayload) {
@@ -128,9 +129,9 @@ export function registerGameSocketHandlers(
       "game:request_rematch",
       socket.id,
       async (req) => {
-        const roomCode = req.roomCode.toUpperCase();
+        const roomCode = (req?.roomCode || "").toString().trim().toUpperCase();
         const result = await gameService.requestRematch(
-          req.roomCode,
+          roomCode,
           socket.id,
         );
 
@@ -152,11 +153,11 @@ export function registerGameSocketHandlers(
       "game:respond_rematch",
       socket.id,
       async (req) => {
-        const roomCode = req.roomCode.toUpperCase();
+        const roomCode = (req?.roomCode || "").toString().trim().toUpperCase();
         const result = await gameService.respondRematch(
-          req.roomCode,
+          roomCode,
           socket.id,
-          req.accept,
+          req?.accept,
         );
 
         if (result.accept && result.nextGameState) {

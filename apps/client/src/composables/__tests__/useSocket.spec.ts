@@ -584,5 +584,37 @@ describe('useSocket composable', () => {
     eventHandlers['game:rematch_declined']();
     expect(rematchRequestedBy.value).toBeNull();
   });
+
+  it('should handle connect_error and reconnect_failed events promptly', () => {
+    const { isConnected, lastError } = useSocket(mockSocket);
+
+    expect(isConnected.value).toBe(true);
+
+    // Trigger connect_error
+    eventHandlers['connect_error'](new Error('Connection refused'));
+    expect(isConnected.value).toBe(false);
+    expect(lastError.value?.code).toBe('ERR_SOCKET_TIMEOUT');
+    expect(lastError.value?.message).toBe('Connection refused');
+
+    // Trigger reconnect_failed
+    eventHandlers['reconnect_failed']();
+    expect(isConnected.value).toBe(false);
+    expect(lastError.value?.code).toBe('ERR_SOCKET_TIMEOUT');
+    expect(lastError.value?.message).toContain('Reconnection failed');
+  });
+
+  it('should prevent duplicate listener attachments when socket is re-initialized or re-attached', () => {
+    // First initialization
+    const { initSocket } = useSocket(mockSocket);
+    const onCallCount = mockSocket.on.mock.calls.length;
+    expect(onCallCount).toBeGreaterThan(0);
+
+    // Subsequent initialization / attachment calls on the same socket instance
+    initSocket();
+    useSocket(mockSocket);
+
+    // on() should not have been called additional times
+    expect(mockSocket.on.mock.calls.length).toBe(onCallCount);
+  });
 });
 
