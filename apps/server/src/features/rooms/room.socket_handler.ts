@@ -17,9 +17,9 @@ export const DISCONNECT_GRACE_PERIOD_MS = 60_000;
 /**
  * In-memory map of pending disconnect grace timers keyed by `${roomCode}:${playerId}`.
  */
-export const disconnectTimers = new Map<string, NodeJS.Timeout>();
+const disconnectTimers = new Map<string, NodeJS.Timeout>();
 
-export function getDisconnectTimerKey(
+function getDisconnectTimerKey(
   roomCode: string,
   playerId: string,
 ): string {

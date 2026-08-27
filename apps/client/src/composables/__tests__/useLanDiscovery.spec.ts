@@ -57,4 +57,77 @@ describe('useLanDiscovery composable', () => {
 
     expect(activeLanIp.value).toBe('192.168.1.88');
   });
+
+  it('fetches server LAN discovery from /api/lan-info and populates state', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          lanIp: '192.168.1.150',
+          port: 3000,
+          isCloudRelay: false,
+        }),
+      })
+    );
+
+    const { serverLanInfo, activeLanIp, init, isLoaded } = useLanDiscovery();
+    await init();
+
+    expect(isLoaded.value).toBe(true);
+    expect(serverLanInfo.value?.lanIp).toBe('192.168.1.150');
+    expect(activeLanIp.value).toBe('192.168.1.150');
+  });
+
+  it('gracefully handles fetch failure (offline mode) without throwing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network offline')));
+
+    const { serverLanInfo, activeLanIp, init, isLoaded } = useLanDiscovery();
+    await init();
+
+    expect(isLoaded.value).toBe(true);
+    expect(serverLanInfo.value).toBeNull();
+    expect(activeLanIp.value).toBe('');
+  });
+
+  it('clears activeLanIp and removes from localStorage when empty string is provided', () => {
+    const { activeLanIp, setLanIp } = useLanDiscovery();
+    setLanIp('192.168.1.200');
+    expect(activeLanIp.value).toBe('192.168.1.200');
+
+    setLanIp('');
+    expect(activeLanIp.value).toBe('');
+    expect(localStorage.getItem('fun_chess_lan_ip')).toBeNull();
+  });
+
+  it('detects LAN IP via WebRTC ICE candidate gathering', async () => {
+    class MockRTCPeerConnection {
+      onicecandidate: ((event: any) => void) | null = null;
+      createDataChannel() {}
+      async createOffer() {
+        return {};
+      }
+      async setLocalDescription() {
+        // Trigger icecandidate with candidate string containing LAN IP
+        setTimeout(() => {
+          if (this.onicecandidate) {
+            this.onicecandidate({
+              candidate: {
+                candidate: 'candidate:1 1 UDP 2130706431 192.168.1.199 54321 typ host',
+              },
+            });
+          }
+        }, 10);
+      }
+      close() {}
+    }
+
+    vi.stubGlobal('RTCPeerConnection', MockRTCPeerConnection);
+
+    const { activeLanIp, detectedWebRtcIp, init } = useLanDiscovery();
+    await init();
+
+    expect(detectedWebRtcIp.value).toBe('192.168.1.199');
+    expect(activeLanIp.value).toBe('192.168.1.199');
+  });
 });

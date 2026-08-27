@@ -37,6 +37,46 @@ describe('useAudio composable', () => {
     expect(isMuted.value).toBe(false);
   });
 
+  it('should toggle and set sound enabled reactively', () => {
+    const { isSoundEnabled, isMuted, toggleSound, setSoundEnabled } = useAudio(mockSynth);
+
+    setSoundEnabled(true);
+    expect(isSoundEnabled.value).toBe(true);
+    expect(isMuted.value).toBe(false);
+
+    toggleSound();
+    expect(isSoundEnabled.value).toBe(false);
+    expect(isMuted.value).toBe(true);
+
+    setSoundEnabled(true);
+    expect(isSoundEnabled.value).toBe(true);
+    expect(isMuted.value).toBe(false);
+  });
+
+  it('triggers haptic vibration when navigator.vibrate is available', () => {
+    const vibrateMock = vi.fn();
+    vi.stubGlobal('navigator', {
+      vibrate: vibrateMock,
+    });
+
+    const { playMove, playCapture, playCheck, playVictory, playError } = useAudio(mockSynth);
+
+    playMove();
+    expect(vibrateMock).toHaveBeenCalledWith(12);
+
+    playCapture();
+    expect(vibrateMock).toHaveBeenCalledWith([20, 30, 20]);
+
+    playCheck();
+    expect(vibrateMock).toHaveBeenCalledWith([40, 40, 40]);
+
+    playVictory();
+    expect(vibrateMock).toHaveBeenCalledWith([50, 50, 100, 50, 150]);
+
+    playError();
+    expect(vibrateMock).toHaveBeenCalledWith(50);
+  });
+
   it('should delegate sound triggers to synthesizer methods', () => {
     const {
       playMove,

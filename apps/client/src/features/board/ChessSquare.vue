@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Square } from '@fun-chess/shared';
+import MoveIndicator from './MoveIndicator.vue';
 
 interface Props {
   square: Square;
@@ -145,26 +146,11 @@ function handleDragOver(event: DragEvent) {
     <!-- Piece Slot -->
     <slot />
 
-    <!-- Move Indicator container for testid -->
-    <div
-      v-if="props.isValidMove || capturableState"
-      data-testid="move-indicator"
-      class="move-indicator-wrapper"
-    >
-      <!-- Valid Move Indicator Dot (Empty Target) -->
-      <span
-        v-if="props.isValidMove && !props.hasPiece && !capturableState"
-        class="valid-move-dot"
-        aria-hidden="true"
-      />
-
-      <!-- Enemy Capture Ring Indicator -->
-      <span
-        v-if="capturableState"
-        class="capture-target-ring"
-        aria-hidden="true"
-      />
-    </div>
+    <!-- Move Indicator -->
+    <MoveIndicator
+      v-if="(props.isValidMove && !props.hasPiece && !capturableState) || capturableState"
+      :is-capture="capturableState"
+    />
 
     <!-- File Coordinate Label (Bottom Right) -->
     <span

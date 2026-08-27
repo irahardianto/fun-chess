@@ -38,14 +38,6 @@ export class RoomFullError extends AppError {
   }
 }
 
-export class RoomAlreadyExistsError extends AppError {
-  constructor(roomCode: string) {
-    super("ERR_ROOM_ALREADY_EXISTS", `Room '${roomCode}' already exists`, 409, {
-      roomCode,
-    });
-  }
-}
-
 export class InvalidRoomCodeError extends AppError {
   constructor(roomCode: string) {
     super(
