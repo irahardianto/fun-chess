@@ -93,6 +93,20 @@ describe('BaseInput.vue', () => {
     expect(wrapper.emitted('clear')).toHaveLength(1);
   });
 
+  it('renders accessible clear button without tabindex="-1" and with aria-label', () => {
+    const wrapper = mount(BaseInput, {
+      props: {
+        modelValue: 'Initial text',
+        clearable: true,
+      },
+    });
+
+    const clearBtn = wrapper.find('.base-input-clear-btn');
+    expect(clearBtn.exists()).toBe(true);
+    expect(clearBtn.attributes('aria-label')).toBe('Clear input text');
+    expect(clearBtn.attributes('tabindex')).toBeUndefined();
+  });
+
   it('renders prefix and suffix slots with accessible attributes', () => {
     const wrapper = mount(BaseInput, {
       slots: {

@@ -128,7 +128,6 @@ function handleKeyDown(event: KeyboardEvent) {
         type="button"
         class="base-input-clear-btn"
         aria-label="Clear input text"
-        tabindex="-1"
         @click="handleClear"
       >
         <svg viewBox="0 0 20 20" fill="currentColor" class="clear-icon" aria-hidden="true">
@@ -257,6 +256,7 @@ function handleKeyDown(event: KeyboardEvent) {
 }
 
 .base-input-clear-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -269,9 +269,27 @@ function handleKeyDown(event: KeyboardEvent) {
   transition: color var(--duration-fast) ease, transform var(--duration-instant) ease;
 }
 
+.base-input-clear-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+}
+
 .base-input-clear-btn:hover {
   color: var(--color-danger);
   transform: scale(1.1);
+}
+
+.base-input-clear-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 
 .clear-icon {
