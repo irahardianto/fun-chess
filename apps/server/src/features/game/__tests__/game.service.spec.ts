@@ -99,6 +99,38 @@ describe("GameService", () => {
       expect(result.gameOverPayload?.winnerName).toBe("White Player");
     });
 
+    it("detects threefold repetition draw and sets room status to game_over with threefold_repetition reason", async () => {
+      const room = createActiveGameRoom("3FOLD");
+      await store.save(room);
+
+      const moves: { from: string; to: string; sock: string }[] = [
+        { from: "g1", to: "f3", sock: "sock_white" },
+        { from: "g8", to: "f6", sock: "sock_black" },
+        { from: "f3", to: "g1", sock: "sock_white" },
+        { from: "f6", to: "g8", sock: "sock_black" },
+        { from: "g1", to: "f3", sock: "sock_white" },
+        { from: "g8", to: "f6", sock: "sock_black" },
+        { from: "f3", to: "g1", sock: "sock_white" },
+        { from: "f6", to: "g8", sock: "sock_black" },
+      ];
+
+      let lastResult: any;
+      for (const m of moves) {
+        lastResult = await service.makeMove(
+          { roomCode: "3FOLD", move: { from: m.from, to: m.to } },
+          m.sock,
+        );
+      }
+
+      expect(lastResult.gameState.isDraw).toBe(true);
+      expect(lastResult.gameState.isThreefoldRepetition).toBe(true);
+      expect(lastResult.room.status).toBe("game_over");
+      expect(lastResult.gameOverPayload).toBeDefined();
+      expect(lastResult.gameOverPayload?.winner).toBe("draw");
+      expect(lastResult.gameOverPayload?.reason).toBe("threefold_repetition");
+      expect(lastResult.gameOverPayload?.message).toContain("threefold repetition");
+    });
+
     it("detects check and populates checkInfo", async () => {
       // White queen on e2, black king on e8 -> White plays Qe7+ (assuming pawn not blocking)
       const checkPositionFen =

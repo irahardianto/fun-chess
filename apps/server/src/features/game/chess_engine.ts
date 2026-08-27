@@ -123,7 +123,10 @@ export class ChessEngine {
     const isCheck = chess.inCheck();
     const isCheckmate = chess.isGameOver() && isCheck;
     const isStalemate = chess.isStalemate();
-    const isThreefoldRepetition = chess.isThreefoldRepetition();
+    const isThreefoldRepetition = this.isThreefoldRepetition(
+      chess,
+      moveHistory,
+    );
     const isInsufficientMaterial = chess.isInsufficientMaterial();
 
     // FEN halfmove clock (5th token)
@@ -246,6 +249,71 @@ export class ChessEngine {
       capturedBlack,
       materialAdvantage,
     };
+  }
+
+  /**
+   * Normalizes a FEN string to its position signature:
+   * piece placement + active color + castling availability + en passant target square
+   * (the first 4 whitespace-separated tokens of the FEN string).
+   */
+  public static normalizeFen(fen: string): string {
+    return fen.trim().split(/\s+/).slice(0, 4).join(" ");
+  }
+
+  /**
+   * Determines whether threefold repetition has occurred by tracking normalized FEN
+   * occurrences across the game history plus current board position.
+   */
+  public static isThreefoldRepetition(
+    chess: Chess,
+    moveHistory: MoveResult[] = [],
+  ): boolean {
+    if (chess.isThreefoldRepetition()) {
+      return true;
+    }
+
+    if (moveHistory.length === 0) {
+      return false;
+    }
+
+    const positions: string[] = [];
+
+    // Attempt to reconstruct the initial starting position if moveHistory is from standard start
+    try {
+      const replay = new Chess();
+      let replayValid = true;
+      for (const m of moveHistory) {
+        const res = replay.move({
+          from: m.from as ChessJsSquare,
+          to: m.to as ChessJsSquare,
+          promotion: m.promotion,
+        });
+        if (!res) {
+          replayValid = false;
+          break;
+        }
+      }
+      if (replayValid) {
+        positions.push(this.normalizeFen(new Chess().fen()));
+      }
+    } catch {
+      // Replay failed or non-standard start
+    }
+
+    for (const m of moveHistory) {
+      positions.push(this.normalizeFen(m.fen));
+    }
+
+    const counts = new Map<string, number>();
+    for (const pos of positions) {
+      const count = (counts.get(pos) || 0) + 1;
+      if (count >= 3) {
+        return true;
+      }
+      counts.set(pos, count);
+    }
+
+    return false;
   }
 
   /**

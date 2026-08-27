@@ -193,4 +193,101 @@ describe("ChessEngine", () => {
       expect(materialAdvantage.white).toBe(0);
     });
   });
+
+  describe("Threefold Repetition Detection", () => {
+    it("correctly normalizes FEN strings to first 4 tokens", () => {
+      const fullFen =
+        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
+      const normalized = ChessEngine.normalizeFen(fullFen);
+      expect(normalized).toBe(
+        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3",
+      );
+    });
+
+    it("detects threefold repetition when moves cycle back to initial position 3 times", () => {
+      // Sequence: 1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8
+      const moves: { from: string; to: string; turn: "w" | "b" }[] = [
+        { from: "g1", to: "f3", turn: "w" },
+        { from: "g8", to: "f6", turn: "b" },
+        { from: "f3", to: "g1", turn: "w" },
+        { from: "f6", to: "g8", turn: "b" }, // Position occurs 2nd time
+        { from: "g1", to: "f3", turn: "w" },
+        { from: "g8", to: "f6", turn: "b" },
+        { from: "f3", to: "g1", turn: "w" },
+        { from: "f6", to: "g8", turn: "b" }, // Position occurs 3rd time -> threefold repetition
+      ];
+
+      let currentFen = new Chess().fen();
+      let history: any[] = [];
+
+      for (let i = 0; i < moves.length; i++) {
+        const m = moves[i]!;
+        const outcome = ChessEngine.validateAndApplyMove(
+          currentFen,
+          { from: m.from, to: m.to },
+          m.turn,
+          history,
+        );
+
+        expect(outcome.success).toBe(true);
+        if (!outcome.success) return;
+
+        currentFen = outcome.nextState.fen;
+        history = outcome.nextState.moveHistory;
+
+        if (i < moves.length - 1) {
+          expect(outcome.nextState.isDraw).toBe(false);
+          expect(outcome.nextState.isThreefoldRepetition).toBe(false);
+        } else {
+          // 8th ply: 3rd occurrence of starting position
+          expect(outcome.nextState.isThreefoldRepetition).toBe(true);
+          expect(outcome.nextState.isDraw).toBe(true);
+        }
+      }
+    });
+
+    it("detects threefold repetition for non-start intermediate positions", () => {
+      // 1. e4 e5 (new base position)
+      // 2. Nf3 Nf6 3. Ng1 Ng8 4. Nf3 Nf6 5. Ng1 Ng8
+      const moves: { from: string; to: string; turn: "w" | "b" }[] = [
+        { from: "e2", to: "e4", turn: "w" },
+        { from: "e7", to: "e5", turn: "b" }, // Base position reached (1st occurrence)
+        { from: "g1", to: "f3", turn: "w" },
+        { from: "g8", to: "f6", turn: "b" },
+        { from: "f3", to: "g1", turn: "w" },
+        { from: "f6", to: "g8", turn: "b" }, // Base position reached (2nd occurrence)
+        { from: "g1", to: "f3", turn: "w" },
+        { from: "g8", to: "f6", turn: "b" },
+        { from: "f3", to: "g1", turn: "w" },
+        { from: "f6", to: "g8", turn: "b" }, // Base position reached (3rd occurrence)
+      ];
+
+      let currentFen = new Chess().fen();
+      let history: any[] = [];
+
+      for (let i = 0; i < moves.length; i++) {
+        const m = moves[i]!;
+        const outcome = ChessEngine.validateAndApplyMove(
+          currentFen,
+          { from: m.from, to: m.to },
+          m.turn,
+          history,
+        );
+
+        expect(outcome.success).toBe(true);
+        if (!outcome.success) return;
+
+        currentFen = outcome.nextState.fen;
+        history = outcome.nextState.moveHistory;
+
+        if (i < moves.length - 1) {
+          expect(outcome.nextState.isDraw).toBe(false);
+          expect(outcome.nextState.isThreefoldRepetition).toBe(false);
+        } else {
+          expect(outcome.nextState.isThreefoldRepetition).toBe(true);
+          expect(outcome.nextState.isDraw).toBe(true);
+        }
+      }
+    });
+  });
 });
