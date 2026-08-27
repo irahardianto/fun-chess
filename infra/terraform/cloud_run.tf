@@ -31,8 +31,8 @@ resource "google_cloud_run_v2_service" "default" {
       }
 
       env {
-        name  = "PORT"
-        value = "3000"
+        name  = "PUBLIC_URL"
+        value = var.public_url
       }
 
       startup_probe {

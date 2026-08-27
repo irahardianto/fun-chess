@@ -19,7 +19,7 @@ variable "service_name" {
 variable "container_image" {
   type        = string
   description = "Container image URI"
-  default     = "gcr.io/fun-chess-506800/fun-chess:latest"
+  default     = "asia-southeast1-docker.pkg.dev/fun-chess-506800/fun-chess-repo/fun-chess:latest"
 }
 
 variable "min_instances" {
@@ -44,4 +44,10 @@ variable "memory_limit" {
   type        = string
   description = "Memory limit for container"
   default     = "512Mi"
+}
+
+variable "public_url" {
+  type        = string
+  description = "Public URL for Cloud Relay"
+  default     = "https://fun-chess-753683872274.asia-southeast1.run.app"
 }
