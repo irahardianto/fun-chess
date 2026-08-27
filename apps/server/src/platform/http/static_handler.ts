@@ -9,6 +9,7 @@ const MIME_TYPES: Record<string, string> = {
   ".mjs": "application/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json",
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -38,6 +39,7 @@ export async function serveStaticFile(
   options: StaticFileHandlerOptions,
   logger?: Logger,
 ): Promise<boolean> {
+  const isHead = req.method?.toUpperCase() === "HEAD";
   const urlPath = req.url?.split("?")[0] || "/";
   const sanitizedPath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const rootDir = path.resolve(options.distPath);
@@ -48,7 +50,11 @@ export async function serveStaticFile(
   // Prevent directory traversal outside rootDir
   if (!targetFilePath.startsWith(rootDir)) {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end("Forbidden");
+    if (isHead) {
+      res.end();
+    } else {
+      res.end("Forbidden");
+    }
     return true;
   }
 
@@ -79,15 +85,25 @@ export async function serveStaticFile(
       "Content-Length": Buffer.byteLength(content),
       "Cache-Control": cacheControl,
     });
-    res.end(content);
+    if (isHead) {
+      res.end();
+    } else {
+      res.end(content);
+    }
     return true;
   } catch (err) {
     if (options.fallbackHtml) {
+      const fbLength = Buffer.byteLength(options.fallbackHtml);
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
+        "Content-Length": fbLength,
         "Cache-Control": "no-cache",
       });
-      res.end(options.fallbackHtml);
+      if (isHead) {
+        res.end();
+      } else {
+        res.end(options.fallbackHtml);
+      }
       return true;
     }
 
@@ -98,3 +114,4 @@ export async function serveStaticFile(
     return false;
   }
 }
+

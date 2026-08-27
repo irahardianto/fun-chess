@@ -110,6 +110,88 @@ describe("createHttpServer", () => {
     expect(res.headers.get("access-control-allow-methods")).toContain("GET");
   });
 
+  it("respects process.env.CORS_ORIGIN in response headers", async () => {
+    const originalCors = process.env.CORS_ORIGIN;
+    try {
+      process.env.CORS_ORIGIN = "https://fun-chess.example.com";
+      const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+      expect(res.headers.get("access-control-allow-origin")).toBe(
+        "https://fun-chess.example.com",
+      );
+    } finally {
+      if (originalCors !== undefined) {
+        process.env.CORS_ORIGIN = originalCors;
+      } else {
+        delete process.env.CORS_ORIGIN;
+      }
+    }
+  });
+
+  it("attaches security headers to all responses (SEC-02)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+    expect(res.headers.get("x-frame-options")).toBe("DENY");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("referrer-policy")).toBe(
+      "strict-origin-when-cross-origin",
+    );
+  });
+
+  describe("HTTP HEAD Method Support (NET-02)", () => {
+    it("responds to HEAD /healthz with 200, headers, and empty body", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/healthz`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/plain");
+      expect(res.headers.get("content-length")).toBeDefined();
+      expect(res.headers.get("x-frame-options")).toBe("DENY");
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+
+    it("responds to HEAD /health with 200, headers, and empty body", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/health`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("application/json");
+      expect(res.headers.get("content-length")).toBeDefined();
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+
+    it("responds to HEAD /api/lan-info with 200, headers, and empty body", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("application/json");
+      expect(res.headers.get("content-length")).toBeDefined();
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+
+    it("responds to HEAD /lobby (SPA route) with 200, headers, and empty body", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/lobby`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/html");
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+
+    it("responds to HEAD /api/unknown with 404, headers, and empty body", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/unknown`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(404);
+      expect(res.headers.get("content-type")).toContain("application/json");
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+  });
+
   it("serves SPA fallback HTML for web routes", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/lobby`);
     expect(res.status).toBe(200);
@@ -132,6 +214,7 @@ describe("createHttpServer", () => {
     };
     expect(json.error.code).toBe("ERR_NOT_FOUND");
   });
+
 
   describe("Cloud Relay Mode", () => {
     let cloudServer: Server;

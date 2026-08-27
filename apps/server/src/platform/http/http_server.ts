@@ -79,13 +79,19 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     const [pathname] = url.split("?");
 
     // CORS Headers
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    const corsOrigin = process.env.CORS_ORIGIN || "*";
+    res.setHeader("Access-Control-Allow-Origin", corsOrigin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
     res.setHeader(
       "Access-Control-Allow-Headers",
       "Content-Type, Authorization, X-Correlation-ID",
     );
     res.setHeader("X-Correlation-ID", correlationId);
+
+    // Security Headers (SEC-02)
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
     // Handle preflight OPTIONS
     if (method === "OPTIONS") {
@@ -108,7 +114,11 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         "Content-Type": "application/json; charset=utf-8",
         "Content-Length": Buffer.byteLength(body),
       });
-      res.end(body);
+      if (method === "HEAD") {
+        res.end();
+      } else {
+        res.end(body);
+      }
 
       const durationMs = Math.round(performance.now() - startTime);
       logger.info(`HTTP Response: ${method} ${pathname} [${statusCode}]`, {
@@ -126,7 +136,11 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         "Content-Type": "text/plain; charset=utf-8",
         "Content-Length": Buffer.byteLength(text),
       });
-      res.end(text);
+      if (method === "HEAD") {
+        res.end();
+      } else {
+        res.end(text);
+      }
 
       const durationMs = Math.round(performance.now() - startTime);
       logger.info(`HTTP Response: ${method} ${pathname} [${statusCode}]`, {
@@ -140,15 +154,15 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     };
 
     try {
-      // 1. GET /healthz - Container Liveness & Readiness Probe
-      if (method === "GET" && pathname === "/healthz") {
+      // 1. GET / HEAD /healthz - Container Liveness & Readiness Probe
+      if ((method === "GET" || method === "HEAD") && pathname === "/healthz") {
         sendTextResponse(200, "OK");
         return;
       }
 
-      // 2. GET /health & GET /api/health - Operational Telemetry Health Check
+      // 2. GET / HEAD /health & GET / HEAD /api/health - Operational Telemetry Health Check
       if (
-        method === "GET" &&
+        (method === "GET" || method === "HEAD") &&
         (pathname === "/health" || pathname === "/api/health")
       ) {
         const mem = process.memoryUsage();
@@ -179,21 +193,22 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         return;
       }
 
-      // 3. GET /api/lan-info - Host Addressing & QR Discovery
-      if (method === "GET" && pathname === "/api/lan-info") {
+      // 3. GET / HEAD /api/lan-info - Host Addressing & QR Discovery
+      if ((method === "GET" || method === "HEAD") && pathname === "/api/lan-info") {
         const lanInfo = addressService.getAddressingInfo(port);
         sendJsonResponse(200, lanInfo);
         return;
       }
 
-      // 4. Static Assets / SPA Fallback
-      if (method === "GET") {
+      // 4. Static Assets / SPA Fallback (non-API routes)
+      if ((method === "GET" || method === "HEAD") && !pathname.startsWith("/api/")) {
         const served = await serveStaticFile(
           req,
           res,
           { distPath, fallbackHtml },
           logger,
         );
+
         if (served) {
           const durationMs = Math.round(performance.now() - startTime);
           logger.debug(`HTTP Static served: ${pathname}`, {
@@ -205,6 +220,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
           return;
         }
       }
+
 
       // 5. Unhandled 404
       sendJsonResponse(404, {

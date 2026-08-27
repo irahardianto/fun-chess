@@ -70,4 +70,40 @@ describe("HTTP API Contracts", () => {
       expect(body).toBe("OK");
     });
   });
+
+  describe("Security Headers (SEC-02)", () => {
+    it("should return standard security headers on all HTTP endpoints", async () => {
+      const res = await fetch(`${serverInstance.url}/healthz`);
+      expect(res.headers.get("x-frame-options")).toBe("DENY");
+      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(res.headers.get("referrer-policy")).toBe(
+        "strict-origin-when-cross-origin",
+      );
+    });
+  });
+
+  describe("HTTP HEAD Method Support (NET-02)", () => {
+    it("should respond to HEAD /healthz with 200 OK, headers, and empty body", async () => {
+      const res = await fetch(`${serverInstance.url}/healthz`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/plain");
+      expect(res.headers.get("content-length")).toBeDefined();
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+
+    it("should respond to HEAD /api/lan-info with 200 OK, headers, and empty body", async () => {
+      const res = await fetch(`${serverInstance.url}/api/lan-info`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("application/json");
+      expect(res.headers.get("content-length")).toBeDefined();
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+  });
 });
+

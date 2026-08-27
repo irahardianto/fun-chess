@@ -9,10 +9,17 @@ import {
 } from "@fun-chess/shared";
 import { Logger } from "../../platform/logger/logger.interface.js";
 import { wrapSocketHandler } from "../../platform/socket/socket_logging_middleware.js";
+import { SocketRateLimiter } from "../../platform/socket/socket_rate_limiter.js";
 import { RoomService } from "./room.service.js";
+import { RateLimitExceededError } from "./room.errors.js";
 import { TypedSocketServer } from "../../platform/socket/socket_server.js";
 
 export const DISCONNECT_GRACE_PERIOD_MS = 60_000;
+
+export const defaultSocketRateLimiter = new SocketRateLimiter({
+  maxRequests: 5,
+  windowMs: 10_000,
+});
 
 /**
  * In-memory map of pending disconnect grace timers keyed by `${roomCode}:${playerId}`.
@@ -65,6 +72,7 @@ export function registerRoomSocketHandlers(
   socket: Socket,
   roomService: RoomService,
   logger: Logger,
+  rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
 ): void {
   // 1. room:create
   socket.on(
@@ -73,6 +81,12 @@ export function registerRoomSocketHandlers(
       CreateRoomRequest,
       { success: true; room: RoomState; sessionToken: string }
     >(logger, "room:create", socket.id, async (req) => {
+      if (!rateLimiter.consume(socket.id)) {
+        throw new RateLimitExceededError(
+          "Rate limit exceeded for room creation. Maximum 5 requests per 10 seconds allowed.",
+          { socketId: socket.id, maxRequests: 5, windowMs: 10_000 },
+        );
+      }
       const result = await roomService.createRoom(req, socket.id);
       await socket.join(result.room.roomCode);
 
@@ -92,9 +106,16 @@ export function registerRoomSocketHandlers(
       JoinRoomRequest,
       { success: true; room: RoomState; player: Player; sessionToken: string }
     >(logger, "room:join", socket.id, async (req) => {
+      if (!rateLimiter.consume(socket.id)) {
+        throw new RateLimitExceededError(
+          "Rate limit exceeded for room joining. Maximum 5 requests per 10 seconds allowed.",
+          { socketId: socket.id, maxRequests: 5, windowMs: 10_000 },
+        );
+      }
       const result = await roomService.joinRoom(req, socket.id);
       const roomCode = result.room.roomCode;
       await socket.join(roomCode);
+
 
       socket.emit("room:joined", result.room);
       socket.to(roomCode).emit("room:player_joined", {
@@ -186,7 +207,9 @@ export async function handleSocketDisconnect(
   roomService: RoomService,
   logger: Logger,
   gracePeriodMs = DISCONNECT_GRACE_PERIOD_MS,
+  rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
 ): Promise<void> {
+  rateLimiter.reset(socketId);
   const result = await roomService.handleDisconnect(socketId);
   if (!result) return;
 

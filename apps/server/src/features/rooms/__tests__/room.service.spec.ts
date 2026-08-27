@@ -395,6 +395,44 @@ describe("RoomService", () => {
       expect(result).toBeNull();
     });
 
+    it("returns game_over with draw when BOTH players are disconnected on timeout", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "WhiteHost", preferredColor: "w" },
+        "sock_w",
+      );
+      const { player: blackPlayer } = await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "BlackJoiner" },
+        "sock_b",
+      );
+
+      // Both players drop socket
+      await service.handleDisconnect("sock_w");
+      await service.handleDisconnect("sock_b");
+
+      const disconnectedRoom = await service.getRoom(created.roomCode);
+      expect(disconnectedRoom?.status).toBe("paused_disconnect");
+      expect(disconnectedRoom?.whitePlayer?.isConnected).toBe(false);
+      expect(disconnectedRoom?.blackPlayer?.isConnected).toBe(false);
+
+      // Timeout fires for White
+      const result = await service.handleAbandonmentForfeit(
+        created.roomCode,
+        created.hostId,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.room.status).toBe("game_over");
+      expect(result?.gameOverPayload.winner).toBe("draw");
+      expect(result?.gameOverPayload.winnerName).toBeUndefined();
+      expect(result?.gameOverPayload.reason).toBe("abandonment");
+      expect(result?.gameOverPayload.message).toBe(
+        "Both players disconnected. Game ended by abandonment.",
+      );
+
+      const savedRoom = await service.getRoom(created.roomCode);
+      expect(savedRoom?.status).toBe("game_over");
+    });
+
     it("returns null for non-existent room", async () => {
       const result = await service.handleAbandonmentForfeit("NONO", "some_id");
       expect(result).toBeNull();

@@ -247,8 +247,11 @@ export async function createTestServer(
     const pathname = parsedUrl.pathname;
 
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
     if (req.method === "OPTIONS") {
       res.writeHead(204);
@@ -256,7 +259,7 @@ export async function createTestServer(
       return;
     }
 
-    if (pathname === "/api/lan-info" && req.method === "GET") {
+    if (pathname === "/api/lan-info" && (req.method === "GET" || req.method === "HEAD")) {
       const address = server.address();
       const port = typeof address === "object" && address ? address.port : 3000;
       const { lanIp, interfaces } = getLanInterfaces();
@@ -269,20 +272,35 @@ export async function createTestServer(
         interfaces,
       };
 
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(response));
+      const body = JSON.stringify(response);
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      });
+      if (req.method === "HEAD") {
+        res.end();
+      } else {
+        res.end(body);
+      }
       return;
     }
 
-    if (pathname === "/healthz" && req.method === "GET") {
-      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("OK");
+    if (pathname === "/healthz" && (req.method === "GET" || req.method === "HEAD")) {
+      res.writeHead(200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Length": Buffer.byteLength("OK"),
+      });
+      if (req.method === "HEAD") {
+        res.end();
+      } else {
+        res.end("OK");
+      }
       return;
     }
 
     if (
       (pathname === "/health" || pathname === "/api/health") &&
-      req.method === "GET"
+      (req.method === "GET" || req.method === "HEAD")
     ) {
       const activeRooms = await roomStore.count();
       const mem = process.memoryUsage();
@@ -303,13 +321,30 @@ export async function createTestServer(
         },
       };
 
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(response));
+      const body = JSON.stringify(response);
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      });
+      if (req.method === "HEAD") {
+        res.end();
+      } else {
+        res.end(body);
+      }
       return;
     }
 
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Not Found" }));
+    const notFoundBody = JSON.stringify({ error: "Not Found" });
+    res.writeHead(404, {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(notFoundBody),
+    });
+    if (req.method === "HEAD") {
+      res.end();
+    } else {
+      res.end(notFoundBody);
+    }
+
   });
 
   const io = new SocketIOServer(server, {

@@ -99,3 +99,13 @@ export class InvalidPayloadError extends AppError {
     });
   }
 }
+
+export class RateLimitExceededError extends AppError {
+  constructor(
+    message = "Rate limit exceeded. Please wait before retrying.",
+    details?: Record<string, unknown>,
+  ) {
+    super("ERR_RATE_LIMITED", message, 429, details);
+  }
+}
+

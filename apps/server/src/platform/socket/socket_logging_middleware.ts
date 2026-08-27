@@ -9,6 +9,42 @@ export interface SocketOperationContext {
 }
 
 /**
+ * Deeply redacts sensitive fields (such as sessionToken) from payloads before logging.
+ */
+export function sanitizePayload<T>(data: T, seen = new WeakSet<object>()): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (typeof data !== "object") {
+    return data;
+  }
+  if (seen.has(data as object)) {
+    return "[CIRCULAR]" as unknown as T;
+  }
+  seen.add(data as object);
+
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizePayload(item, seen)) as unknown as T;
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (
+      key === "sessionToken" ||
+      key === "session_token" ||
+      key.toLowerCase() === "sessiontoken"
+    ) {
+      result[key] = "[REDACTED]";
+    } else if (typeof value === "object" && value !== null) {
+      result[key] = sanitizePayload(value, seen);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result as T;
+}
+
+/**
  * Higher-order interceptor providing 3-point automated structured logging
  * (start, success, failure) with correlation IDs, latency tracking, and structured error responses.
  */
@@ -29,8 +65,9 @@ export function wrapSocketHandler<TReq, TRes>(
       operation: operationName,
       correlationId,
       socketId,
-      payload: req,
+      payload: sanitizePayload(req),
     });
+
 
     try {
       const result = await handler(req, { correlationId, socketId });

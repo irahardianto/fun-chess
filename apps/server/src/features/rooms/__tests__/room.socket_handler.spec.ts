@@ -5,6 +5,7 @@ import {
   cancelDisconnectTimer,
   clearAllDisconnectTimers,
 } from "../room.socket_handler.js";
+import { SocketRateLimiter } from "../../../platform/socket/socket_rate_limiter.js";
 import { RoomService } from "../room.service.js";
 import { MockRoomStore } from "../mock_room.store.js";
 import { NullLogger } from "../../../platform/logger/null_logger.js";
@@ -82,6 +83,7 @@ describe("Room Socket Handlers", () => {
   let logger: NullLogger;
   let io: TestIo;
   let socket: TestSocket;
+  let rateLimiter: SocketRateLimiter;
 
   beforeEach(() => {
     store = new MockRoomStore();
@@ -89,6 +91,7 @@ describe("Room Socket Handlers", () => {
     logger = new NullLogger();
     io = new TestIo();
     socket = new TestSocket("sock_host");
+    rateLimiter = new SocketRateLimiter({ maxRequests: 5, windowMs: 10_000 });
     clearAllDisconnectTimers();
 
     registerRoomSocketHandlers(
@@ -96,6 +99,7 @@ describe("Room Socket Handlers", () => {
       socket as unknown as Socket,
       service,
       logger,
+      rateLimiter,
     );
   });
 
@@ -128,6 +132,35 @@ describe("Room Socket Handlers", () => {
         ackResponse.room.roomCode,
       );
     });
+
+    it("rejects room creation with ERR_RATE_LIMITED when rate limit is exceeded (SEC-01)", async () => {
+      // Consume 5 allowed requests
+      for (let i = 0; i < 5; i++) {
+        let ack: any;
+        await socket.trigger(
+          "room:create",
+          { playerName: `User${i}`, preferredColor: "w" },
+          (res) => {
+            ack = res;
+          },
+        );
+        expect(ack.success).toBe(true);
+      }
+
+      // 6th attempt must be rejected
+      let rateLimitAck: any;
+      await socket.trigger(
+        "room:create",
+        { playerName: "Flooder", preferredColor: "w" },
+        (res) => {
+          rateLimitAck = res;
+        },
+      );
+
+      expect(rateLimitAck.success).toBe(false);
+      expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
+      expect(rateLimitAck.error.message).toContain("Rate limit exceeded");
+    });
   });
 
   describe("room:join", () => {
@@ -143,6 +176,7 @@ describe("Room Socket Handlers", () => {
         joinerSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       let ackResponse: any;
@@ -158,6 +192,7 @@ describe("Room Socket Handlers", () => {
       expect(ackResponse.player.name).toBe("Bob");
       expect(ackResponse.player.color).toBe("b");
       expect(joinerSocket.rooms.has(created.roomCode)).toBe(true);
+
 
       // Joined event emitted to joiner
       const joinedEvent = joinerSocket.emittedEvents.find(
@@ -178,7 +213,42 @@ describe("Room Socket Handlers", () => {
       expect(gameStartedEmit).toBeDefined();
       expect(gameStartedEmit?.room).toBe(created.roomCode);
     });
+
+    it("rejects room join with ERR_RATE_LIMITED when rate limit is exceeded (SEC-01)", async () => {
+      const joinerSocket = new TestSocket("sock_join_flooder");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        joinerSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      // 5 rapid attempts
+      for (let i = 0; i < 5; i++) {
+        await joinerSocket.trigger(
+          "room:join",
+          { roomCode: "NONEXISTENT", playerName: "Bob" },
+          () => {},
+        );
+      }
+
+      // 6th attempt
+      let rateLimitAck: any;
+      await joinerSocket.trigger(
+        "room:join",
+        { roomCode: "NONEXISTENT", playerName: "Bob" },
+        (res) => {
+          rateLimitAck = res;
+        },
+      );
+
+      expect(rateLimitAck.success).toBe(false);
+      expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
+      expect(rateLimitAck.error.message).toContain("Rate limit exceeded");
+    });
   });
+
 
   describe("room:reconnect", () => {
     it("reconnects dropped player, joins socket, cancels disconnect timer, and broadcasts room:player_reconnected", async () => {
@@ -392,6 +462,45 @@ describe("Room Socket Handlers", () => {
 
       const gameOverEmit = io.toEmits.find((e) => e.event === "game:over");
       expect(gameOverEmit).toBeUndefined();
+    });
+
+    it("emits game:over with draw when BOTH players disconnect and grace timer expires", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "Alice", preferredColor: "w" },
+        "sock_alice",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Bob" },
+        "sock_bob",
+      );
+
+      // Both Alice and Bob disconnect with 20ms grace period
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        "sock_alice",
+        service,
+        logger,
+        20,
+      );
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        "sock_bob",
+        service,
+        logger,
+        20,
+      );
+
+      // Wait for the 20ms timer to fire
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const gameOverEmit = io.toEmits.find((e) => e.event === "game:over");
+      expect(gameOverEmit).toBeDefined();
+      expect((gameOverEmit?.payload as any).reason).toBe("abandonment");
+      expect((gameOverEmit?.payload as any).winner).toBe("draw");
+      expect((gameOverEmit?.payload as any).winnerName).toBeUndefined();
+      expect((gameOverEmit?.payload as any).message).toBe(
+        "Both players disconnected. Game ended by abandonment.",
+      );
     });
   });
 });

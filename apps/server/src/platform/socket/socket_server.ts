@@ -18,11 +18,11 @@ export function createSocketServer(
     httpServer,
     {
       cors: {
-        origin: "*",
+        origin: process.env.CORS_ORIGIN || "*",
         methods: ["GET", "POST"],
       },
-      pingInterval: 10000,
-      pingTimeout: 5000,
+      pingInterval: 25000,
+      pingTimeout: 20000,
       ...customOptions,
     },
   );

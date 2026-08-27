@@ -67,4 +67,63 @@ describe("wrapSocketHandler", () => {
       "Operation failed: test:fail",
     );
   });
+
+  it("redacts sessionToken from logged request payloads (SEC-03)", async () => {
+    const logger = new NullLogger();
+    const handler = async (req: { roomCode: string; sessionToken: string }) => {
+      return { success: true, roomCode: req.roomCode };
+    };
+
+    const wrapped = wrapSocketHandler(
+      logger,
+      "room:reconnect",
+      "sock_reconn",
+      handler,
+    );
+
+    await wrapped({
+      roomCode: "ABCD",
+      sessionToken: "secret_session_token_12345",
+    });
+
+    expect(logger.infoLogs).toHaveLength(2);
+    const startLog = logger.infoLogs[0];
+    expect(startLog?.message).toContain("Operation started: room:reconnect");
+    expect(startLog?.context?.["payload"]).toEqual({
+      roomCode: "ABCD",
+      sessionToken: "[REDACTED]",
+    });
+  });
+
+  it("deeply sanitizes nested objects and arrays containing sessionToken", async () => {
+    const logger = new NullLogger();
+    const handler = async (req: any) => {
+      return { success: true };
+    };
+
+    const wrapped = wrapSocketHandler(
+      logger,
+      "complex:event",
+      "sock_nested",
+      handler,
+    );
+
+    await wrapped({
+      user: {
+        id: "u1",
+        sessionToken: "super_secret_token",
+      },
+      tokens: [{ sessionToken: "token_in_array" }, { other: "safe_value" }],
+    });
+
+    const startLog = logger.infoLogs[0];
+    expect(startLog?.context?.["payload"]).toEqual({
+      user: {
+        id: "u1",
+        sessionToken: "[REDACTED]",
+      },
+      tokens: [{ sessionToken: "[REDACTED]" }, { other: "safe_value" }],
+    });
+  });
 });
+

@@ -17,6 +17,7 @@ describe("serveStaticFile", () => {
     ".mjs": "application/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
     ".json": "application/json; charset=utf-8",
+    ".webmanifest": "application/manifest+json",
     ".svg": "image/svg+xml",
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -31,6 +32,7 @@ describe("serveStaticFile", () => {
     ".wav": "audio/wav",
     ".ogg": "audio/ogg",
   };
+
 
   beforeAll(async () => {
     // Create temporary fixture directory
@@ -90,7 +92,7 @@ describe("serveStaticFile", () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  describe("MIME Types (All 18 Supported Formats)", () => {
+  describe("MIME Types (All 19 Supported Formats)", () => {
     for (const [ext, expectedMime] of Object.entries(MIME_EXT_MAP)) {
       it(`serves ${ext} with correct Content-Type '${expectedMime}' and headers`, async () => {
         const fileName = ext === ".html" ? "index.html" : `test_file${ext}`;
@@ -114,6 +116,29 @@ describe("serveStaticFile", () => {
       const res = await fetch(`http://127.0.0.1:${port}/unknown.bin`);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("application/octet-stream");
+    });
+  });
+
+  describe("HTTP HEAD Method Support (NET-02)", () => {
+    it("handles HEAD requests for static assets with 200, headers, and empty body", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/test_file.css`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/css; charset=utf-8");
+      expect(res.headers.get("content-length")).toBeDefined();
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+
+    it("handles HEAD requests for SPA routes returning index.html headers with empty body", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/room/1234`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      const body = await res.text();
+      expect(body).toBe("");
     });
   });
 
@@ -143,6 +168,7 @@ describe("serveStaticFile", () => {
       expect(text).toContain("Root Index");
     });
   });
+
 
   describe("Directory Traversal Prevention", () => {
     it("prevents directory traversal attacks outside rootDir", async () => {

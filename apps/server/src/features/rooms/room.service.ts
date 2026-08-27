@@ -362,7 +362,6 @@ export class RoomService {
       disconnectedPlayer.color === "w" ? "b" : "w";
     const winnerPlayer =
       winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
-    const winnerName = winnerPlayer?.name || "Opponent";
 
     room.status = "game_over";
     room.lastActivityAt = Date.now();
@@ -371,15 +370,31 @@ export class RoomService {
       1,
       Math.round((Date.now() - room.createdAt) / 1000),
     );
-    const gameOverPayload: GameOverPayload = {
-      winner: winnerColor,
-      winnerName,
-      reason: "abandonment",
-      message: `${disconnectedPlayer.name} disconnected. ${winnerName} won by abandonment!`,
-      finalFen: room.game.fen,
-      totalMoves: room.game.moveCount,
-      durationSeconds,
-    };
+
+    let gameOverPayload: GameOverPayload;
+
+    if (winnerPlayer && winnerPlayer.isConnected) {
+      const winnerName = winnerPlayer.name;
+      gameOverPayload = {
+        winner: winnerColor,
+        winnerName,
+        reason: "abandonment",
+        message: `${disconnectedPlayer.name} disconnected. ${winnerName} won by abandonment!`,
+        finalFen: room.game.fen,
+        totalMoves: room.game.moveCount,
+        durationSeconds,
+      };
+    } else {
+      // Both players are disconnected when the grace timer expires
+      gameOverPayload = {
+        winner: "draw",
+        reason: "abandonment",
+        message: "Both players disconnected. Game ended by abandonment.",
+        finalFen: room.game.fen,
+        totalMoves: room.game.moveCount,
+        durationSeconds,
+      };
+    }
 
     await this.store.save(room);
     return { room, gameOverPayload };
