@@ -316,7 +316,7 @@ function handleThemeSelected(theme: PuzzleTheme) {
 }
 
 .stat-label {
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   color: var(--text-muted, #64748b);
   font-weight: 600;
 }

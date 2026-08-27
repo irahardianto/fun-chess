@@ -12,7 +12,7 @@ describe('ScenarioCategoryList.vue', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('CHESS ACADEMY');
+    expect(wrapper.text()).toContain('Chess Academy');
     expect(wrapper.text()).toContain('Master Chess Step by Step!');
     expect(wrapper.text()).toContain('All Lessons');
 

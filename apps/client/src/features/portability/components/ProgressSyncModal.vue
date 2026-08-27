@@ -298,7 +298,7 @@ function handleTabKeyDown(event: KeyboardEvent) {
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 4px;
-  transition: all 140ms ease;
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .error-dismiss-btn:hover {
@@ -332,7 +332,7 @@ function handleTabKeyDown(event: KeyboardEvent) {
   font-weight: var(--weight-bold);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 180ms ease;
+  transition: color var(--duration-fast) ease, background-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .sync-tab-btn:hover {

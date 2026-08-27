@@ -17,8 +17,8 @@ const emit = defineEmits<{
 const modeOptions: readonly LobbyModeOption[] = [
   {
     id: 'multiplayer_lan',
-    title: 'Play LAN',
-    subtitle: 'Multiplayer',
+    title: 'Play with Friends',
+    subtitle: 'Online or Wi-Fi',
     icon: '👥',
     colorTheme: 'primary',
   },
@@ -143,7 +143,7 @@ function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
   cursor: pointer;
   min-height: 48px;
   font-family: var(--font-display);
-  transition: all var(--duration-fast) var(--ease-spring);
+  transition: transform var(--duration-fast) var(--ease-spring), color var(--duration-fast) ease, background-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
   text-decoration: none;
   user-select: none;
 }
@@ -206,7 +206,7 @@ function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
 
 .mode-tab-button.is-active.theme--solo_ai {
   background-color: var(--mascot-peanut-primary, hsl(28, 92%, 54%));
-  color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
   box-shadow: var(--mascot-peanut-shadow, 0 5px 0 hsl(28, 90%, 36%), 0 8px 18px rgba(245, 130, 32, 0.35));
   transform: translateY(-1px);
 }
@@ -228,7 +228,7 @@ function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
 
 .mode-tab-button.is-active.theme--puzzle_hub {
   background-color: var(--color-primary, #6c5ce7);
-  color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
   box-shadow: var(--shadow-btn-primary, 0 5px 0 var(--color-primary-bevel), 0 8px 15px rgba(108, 92, 231, 0.35));
   transform: translateY(-1px);
 }

@@ -38,7 +38,7 @@ const emit = defineEmits<{
 const { celebrate } = useConfetti();
 
 const bannerTitle = computed(() => {
-  if (props.isPlayerWinner) return 'VICTORY! 🏆🎉';
+  if (props.isPlayerWinner) return 'Victory! 🏆🎉';
   if (props.isDraw) return "It's a Draw! ⚖️";
   return 'Good Match! 👏';
 });

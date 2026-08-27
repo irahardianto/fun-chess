@@ -19,6 +19,8 @@ describe('LobbyModeSelector.vue', () => {
     const puzzleHubTab = wrapper.find('[data-testid="mode-tab-puzzle_hub"]');
 
     expect(lanTab.exists()).toBe(true);
+    expect(lanTab.text()).toContain('Play with Friends');
+    expect(lanTab.text()).toContain('Online or Wi-Fi');
     expect(soloAiTab.exists()).toBe(true);
     expect(academyTab.exists()).toBe(true);
     expect(puzzleHubTab.exists()).toBe(true);

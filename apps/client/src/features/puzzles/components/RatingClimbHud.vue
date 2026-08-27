@@ -14,11 +14,11 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const tierInfo = computed(() => {
-  if (props.currentRating >= 1600) return { name: 'Queen Champion', icon: '👑', color: '#ffb300' };
-  if (props.currentRating >= 1400) return { name: 'Rook Master', icon: '🏰', color: '#ea580c' };
-  if (props.currentRating >= 1200) return { name: 'Bishop Tactician', icon: '♗', color: '#8b5cf6' };
-  if (props.currentRating >= 1000) return { name: 'Knight Scout', icon: '♘', color: '#0ea5e9' };
-  return { name: 'Pawn Novice', icon: '♙', color: '#22c55e' };
+  if (props.currentRating >= 1600) return { name: 'Queen Champion', icon: '👑', color: 'var(--color-accent, #ffb300)' };
+  if (props.currentRating >= 1400) return { name: 'Rook Master', icon: '🏰', color: 'var(--mode-rush-primary, #ea580c)' };
+  if (props.currentRating >= 1200) return { name: 'Bishop Tactician', icon: '♗', color: 'var(--color-primary, #8b5cf6)' };
+  if (props.currentRating >= 1000) return { name: 'Knight Scout', icon: '♘', color: 'var(--color-info, #0ea5e9)' };
+  return { name: 'Pawn Novice', icon: '♙', color: 'var(--color-success, #22c55e)' };
 });
 </script>
 
@@ -109,8 +109,8 @@ const tierInfo = computed(() => {
 }
 
 .streak-pill.is-hot {
-  background: linear-gradient(135deg, #ea580c, #f43f5e);
-  color: #fff;
+  background: linear-gradient(135deg, var(--flame-blaze-start, #ea580c), var(--flame-inferno-start, #f43f5e));
+  color: var(--text-on-primary, #ffffff);
   animation: flame-flicker 0.65s infinite ease-in-out;
 }
 </style>

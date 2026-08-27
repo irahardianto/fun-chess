@@ -9,6 +9,7 @@ import type {
   MascotId,
   PieceColor,
 } from '@fun-chess/shared';
+import { PLAYER_AVATARS, DEFAULT_PLAYER_AVATAR } from '@fun-chess/shared';
 import BaseCard from '../../components/base/BaseCard.vue';
 import HostCard from './HostCard.vue';
 import JoinCard from './JoinCard.vue';
@@ -61,8 +62,35 @@ const emit = defineEmits<{
   'open-sync': [];
 }>();
 
-const avatars = ['🦁', '🚀', '🦄', '⚡', '👑', '🐼'] as const;
-const selectedAvatar = ref<string>('🦁');
+const STORAGE_KEY = 'fun_chess_player_avatar';
+
+function getSavedAvatar(): string {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved && (PLAYER_AVATARS as readonly string[]).includes(saved)) {
+        return saved;
+      }
+    } catch {
+      // Storage access error fallback
+    }
+  }
+  return DEFAULT_PLAYER_AVATAR;
+}
+
+const selectedAvatar = ref<string>(getSavedAvatar());
+
+function selectAvatar(avatar: string) {
+  selectedAvatar.value = avatar;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, avatar);
+    } catch {
+      // Storage access error fallback
+    }
+  }
+}
+
 const activeMode = ref<AppGameMode>(
   props.initialMode === 'lobby' ? 'multiplayer_lan' : props.initialMode || 'multiplayer_lan'
 );
@@ -80,6 +108,15 @@ const { serverLanInfo, activeLanIp } = useLanDiscovery();
 const scenarioProgress = useScenarioProgress();
 const { isOffline } = useNetworkStatus();
 const { canInstall, isStandalone, promptInstall } = usePwaInstall();
+
+const isCloudMode = computed(() => {
+  const info = props.lanInfo || serverLanInfo.value;
+  return (
+    !!info?.isCloudRelay ||
+    info?.relayMode === 'cloud' ||
+    (typeof window !== 'undefined' && window.location.protocol === 'https:')
+  );
+});
 
 const activeProgressMap = computed(() => {
   return props.progressMap ?? scenarioProgress.progressMap.value;
@@ -142,12 +179,14 @@ function onJoin(payload: { roomCode: string; playerName: string }) {
   });
 }
 
-function handleStartSoloAi(payload: { mascotId: MascotId; playerColor: PieceColor | 'random' }) {
+function handleStartSoloAi(payload: { mascotId: MascotId; playerColor: PieceColor | 'random'; avatar?: string }) {
+  const avatar = payload.avatar || selectedAvatar.value;
+  selectAvatar(avatar);
   const config = {
     mascotId: payload.mascotId,
     playerColor: payload.playerColor,
     playerName: 'You',
-    playerAvatar: selectedAvatar.value,
+    playerAvatar: avatar,
   };
   emit('startSoloAi', config);
   emit('start-solo-ai', config);
@@ -229,15 +268,16 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
           <label class="section-label">Select Your Avatar Emoji:</label>
           <div class="avatar-options" role="radiogroup" aria-label="Choose your avatar emoji">
             <button
-              v-for="emoji in avatars"
+              v-for="emoji in PLAYER_AVATARS"
               :key="emoji"
               type="button"
               class="avatar-option-btn"
               :class="{ 'is-selected': selectedAvatar === emoji }"
               :aria-checked="selectedAvatar === emoji"
               :aria-label="`Select ${emoji} avatar`"
+              :data-testid="`lobby-avatar-option-${emoji}`"
               role="radio"
-              @click="selectedAvatar = emoji"
+              @click="selectAvatar(emoji)"
             >
               {{ emoji }}
             </button>
@@ -259,12 +299,12 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
         />
       </div>
 
-      <!-- LAN IP Host Banner -->
-      <div class="lan-host-banner">
-        <span class="lan-icon">📡</span>
+      <!-- Server Status Banner (Cloud or Local Wi-Fi) -->
+      <div class="lan-host-banner" :class="{ 'is-cloud-relay': isCloudMode }" data-testid="lobby-server-banner">
+        <span class="lan-icon">{{ isCloudMode ? '☁️' : '📡' }}</span>
         <div class="lan-details">
-          <span class="lan-title">Local Wi-Fi Server Active</span>
-          <span class="lan-url">Join URL: {{ effectiveJoinUrl }}</span>
+          <span class="lan-title">{{ isCloudMode ? '☁️ Cloud Server Online' : 'Local Wi-Fi Server Active' }}</span>
+          <span class="lan-url">{{ isCloudMode ? 'Share via Cloud Link / QR Code' : `Join URL: ${effectiveJoinUrl}` }}</span>
         </div>
       </div>
     </div>
@@ -279,6 +319,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
       data-testid="solo-ai-panel"
     >
       <AiOpponentSelect
+        :initial-avatar="selectedAvatar"
         @start="handleStartSoloAi"
       />
     </div>
@@ -401,7 +442,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   font-size: var(--text-xs, 12px);
   font-weight: var(--weight-bold, 700);
   cursor: pointer;
-  transition: all var(--duration-fast, 150ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+  transition: transform var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .quick-install-btn:hover {
@@ -428,7 +469,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   font-size: var(--text-xs, 12px);
   font-weight: var(--weight-bold, 700);
   cursor: pointer;
-  transition: all var(--duration-fast, 150ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+  transition: transform var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .quick-sync-btn:hover {
@@ -501,7 +542,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   border: 2px solid var(--border-medium);
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-spring);
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease, background-color var(--duration-fast) ease;
 }
 
 .avatar-option-btn:hover {

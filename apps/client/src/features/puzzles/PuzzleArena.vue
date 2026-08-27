@@ -504,14 +504,14 @@ function handleBack() {
 }
 
 .turn-white {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-main, #0f172a);
 }
 
 .turn-black {
-  background: #1e293b;
-  color: #ffffff;
-  border-color: #334155;
+  background: var(--text-main, #1e293b);
+  color: var(--text-inverse, #ffffff);
+  border-color: var(--border-medium, #334155);
 }
 
 .puzzle-card-description {
@@ -546,7 +546,7 @@ function handleBack() {
 }
 
 .puzzle-feedback-banner .feedback-icon {
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 
 .puzzle-feedback-banner .feedback-text {

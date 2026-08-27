@@ -72,7 +72,7 @@ const progressPercent = computed<number>(() => tierProgress.value.percent);
     <!-- Rank Tier Showcase & Progress Bar -->
     <div class="rank-tier-box">
       <div class="tier-name-row">
-        <span class="tier-label">CURRENT RANK:</span>
+        <span class="tier-label">Current Rank:</span>
         <span class="tier-badge-pill" data-testid="rank-tier-badge">
           {{ rankTier.icon }} {{ rankTier.name }}
         </span>
@@ -201,7 +201,7 @@ const progressPercent = computed<number>(() => tierProgress.value.percent);
 }
 
 .elo-unit {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   color: var(--text-muted, #64748b);
 }
@@ -224,7 +224,7 @@ const progressPercent = computed<number>(() => tierProgress.value.percent);
 }
 
 .tier-label {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 800;
   color: var(--text-muted, #64748b);
   letter-spacing: 0.04em;
@@ -292,7 +292,7 @@ const progressPercent = computed<number>(() => tierProgress.value.percent);
 .ladder-cta-btn {
   width: 100%;
   background: var(--mode-ladder-primary, #9333ea) !important;
-  color: #ffffff !important;
+  color: var(--text-on-primary, #ffffff) !important;
   box-shadow: 0 5px 0 var(--mode-ladder-bevel, #6b21a8), 0 8px 18px rgba(147, 51, 234, 0.35) !important;
 }
 
@@ -330,7 +330,7 @@ const progressPercent = computed<number>(() => tierProgress.value.percent);
 
 .lock-subtext {
   font-size: var(--text-xs, 12px);
-  color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
   font-weight: 600;
 }
 </style>

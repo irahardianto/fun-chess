@@ -17,7 +17,7 @@ const errorMsg = ref('');
 function onHostSubmit() {
   const name = hostNickname.value.trim();
   if (!name) {
-    errorMsg.value = 'Please enter your name to host a match!';
+    errorMsg.value = 'Enter your nickname to host a match.';
     return;
   }
   errorMsg.value = '';
@@ -173,7 +173,7 @@ function onHostSubmit() {
   border-radius: var(--radius-md);
   background-color: var(--bg-surface);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-spring);
+  transition: transform var(--duration-fast) var(--ease-spring), border-color var(--duration-fast) ease, background-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .color-option-btn:hover {

@@ -167,7 +167,7 @@ export function useQrScanner(options: UseQrScannerOptions = {}): UseQrScannerRet
       isScanning.value = false;
 
       if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
-        cameraError.value = 'Camera permission was denied. Please allow camera access in your browser settings to scan QR codes! 📷';
+        cameraError.value = 'Camera permission was denied. Allow camera access in browser settings to scan QR codes.';
       } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
         cameraError.value = 'No camera found on this device.';
       } else if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {

@@ -45,7 +45,7 @@ function onJoinSubmit() {
     return;
   }
   if (!code || code.length !== 4) {
-    localError.value = 'Room code must be 4 characters!';
+    localError.value = 'Room code must be 4 characters.';
     return;
   }
 

@@ -115,7 +115,7 @@ function handleClose() {
         <!-- Current Device Card -->
         <div class="conflict-card">
           <div class="conflict-card-header">
-            <span>CURRENT DEVICE 📱</span>
+            <span>Current Device 📱</span>
           </div>
 
           <div class="conflict-stats-list">
@@ -124,7 +124,7 @@ function handleClose() {
               :class="{ 'is-winner': localStars > incomingStars }"
             >
               <span>⭐ {{ localStars }} Stars</span>
-              <span v-if="localStars > incomingStars" class="stat-winner-badge">[BEST]</span>
+              <span v-if="localStars > incomingStars" class="stat-winner-badge">Best</span>
             </div>
 
             <div
@@ -132,7 +132,7 @@ function handleClose() {
               :class="{ 'is-winner': localRating > incomingRating }"
             >
               <span>🎯 {{ localRating }} Elo</span>
-              <span v-if="localRating > incomingRating" class="stat-winner-badge">[BEST]</span>
+              <span v-if="localRating > incomingRating" class="stat-winner-badge">Best</span>
             </div>
 
             <div
@@ -140,7 +140,7 @@ function handleClose() {
               :class="{ 'is-winner': localSolved > incomingSolved }"
             >
               <span>🧩 {{ localSolved }} Solved</span>
-              <span v-if="localSolved > incomingSolved" class="stat-winner-badge">[BEST]</span>
+              <span v-if="localSolved > incomingSolved" class="stat-winner-badge">Best</span>
             </div>
 
             <div
@@ -148,7 +148,7 @@ function handleClose() {
               :class="{ 'is-winner': localStreak > incomingStreak }"
             >
               <span>🔥 {{ localStreak }} Streak</span>
-              <span v-if="localStreak > incomingStreak" class="stat-winner-badge">[BEST]</span>
+              <span v-if="localStreak > incomingStreak" class="stat-winner-badge">Best</span>
             </div>
           </div>
         </div>
@@ -156,7 +156,7 @@ function handleClose() {
         <!-- Imported Save Card -->
         <div class="conflict-card is-imported">
           <div class="conflict-card-header">
-            <span>IMPORTED SAVE 📥</span>
+            <span>Imported Save 📥</span>
           </div>
 
           <div class="conflict-stats-list">
@@ -165,7 +165,7 @@ function handleClose() {
               :class="{ 'is-winner': incomingStars > localStars }"
             >
               <span>⭐ {{ incomingStars }} Stars</span>
-              <span v-if="incomingStars > localStars" class="stat-winner-badge">[BEST]</span>
+              <span v-if="incomingStars > localStars" class="stat-winner-badge">Best</span>
             </div>
 
             <div
@@ -173,7 +173,7 @@ function handleClose() {
               :class="{ 'is-winner': incomingRating > localRating }"
             >
               <span>🎯 {{ incomingRating }} Elo</span>
-              <span v-if="incomingRating > localRating" class="stat-winner-badge">[BEST]</span>
+              <span v-if="incomingRating > localRating" class="stat-winner-badge">Best</span>
             </div>
 
             <div
@@ -181,7 +181,7 @@ function handleClose() {
               :class="{ 'is-winner': incomingSolved > localSolved }"
             >
               <span>🧩 {{ incomingSolved }} Solved</span>
-              <span v-if="incomingSolved > localSolved" class="stat-winner-badge">[BEST]</span>
+              <span v-if="incomingSolved > localSolved" class="stat-winner-badge">Best</span>
             </div>
 
             <div
@@ -189,7 +189,7 @@ function handleClose() {
               :class="{ 'is-winner': incomingStreak > localStreak }"
             >
               <span>🔥 {{ incomingStreak }} Streak</span>
-              <span v-if="incomingStreak > localStreak" class="stat-winner-badge">[BEST]</span>
+              <span v-if="incomingStreak > localStreak" class="stat-winner-badge">Best</span>
             </div>
           </div>
         </div>
@@ -199,7 +199,7 @@ function handleClose() {
       <div class="merge-info-callout">
         <span class="callout-icon" aria-hidden="true">✨</span>
         <div class="callout-text">
-          <strong>SMART MERGE EXPLANATION:</strong>
+          <strong>Smart merge:</strong>
           Smart merge combines both saves safely without data loss. It keeps your highest Elo rating, all solved puzzles + lessons, and maximum star records.
         </div>
       </div>
@@ -250,7 +250,7 @@ function handleClose() {
 
 .conflict-modal-title {
   font-family: var(--font-display);
-  font-size: var(--text-modal-h2, 22px);
+  font-size: var(--text-xl);
   font-weight: var(--weight-bold);
   color: var(--text-main);
   line-height: 1.2;
@@ -258,7 +258,7 @@ function handleClose() {
 
 .conflict-modal-subtitle {
   font-family: var(--font-body);
-  font-size: var(--text-caption, 12px);
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
@@ -301,7 +301,7 @@ function handleClose() {
   align-items: center;
   justify-content: space-between;
   font-family: var(--font-display);
-  font-size: var(--text-card-h4, 16px);
+  font-size: var(--text-base);
   font-weight: var(--weight-bold);
   color: var(--text-main);
   padding-bottom: var(--space-1, 4px);
@@ -322,7 +322,7 @@ function handleClose() {
   border-radius: var(--radius-sm, 8px);
   background-color: var(--bg-surface);
   font-family: var(--font-body);
-  font-size: var(--text-body-base, 14px);
+  font-size: var(--text-sm);
   color: var(--text-main);
 }
 
@@ -338,10 +338,9 @@ function handleClose() {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold, 700);
   background-color: var(--stat-better-badge, #047857);
-  color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
   padding: 2px 6px;
   border-radius: var(--radius-pill, 9999px);
-  text-transform: uppercase;
 }
 
 .merge-info-callout {
@@ -349,12 +348,12 @@ function handleClose() {
   align-items: flex-start;
   gap: var(--space-2-5, 10px);
   padding: var(--space-3, 12px) var(--space-4, 16px);
-  background-color: rgba(16, 185, 129, 0.12);
-  border: 1.5px solid #10b981;
+  background-color: var(--stat-better-bg, rgba(16, 185, 129, 0.12));
+  border: 1.5px solid var(--stat-better-border, #10b981);
   border-radius: var(--radius-lg, 16px);
   color: var(--text-main);
   font-family: var(--font-body);
-  font-size: var(--text-body-base, 14px);
+  font-size: var(--text-sm);
   line-height: 1.4;
 }
 

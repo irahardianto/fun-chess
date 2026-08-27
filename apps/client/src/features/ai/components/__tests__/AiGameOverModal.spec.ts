@@ -43,7 +43,7 @@ describe('AiGameOverModal.vue', () => {
       },
     });
 
-    expect(document.body.textContent).toContain('VICTORY!');
+    expect(document.body.textContent).toContain('Victory!');
     const headline = document.body.querySelector('.banner-headline');
     expect(headline?.classList.contains('is-victory')).toBe(true);
 

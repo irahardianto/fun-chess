@@ -1,19 +1,36 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import AiOpponentSelect from '../AiOpponentSelect.vue';
 import { ALL_MASCOTS } from '../../data/index';
 
 describe('AiOpponentSelect.vue', () => {
+  let mockStorage: Record<string, string> = {};
+
+  beforeEach(() => {
+    mockStorage = {};
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn((key: string) => mockStorage[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        mockStorage[key] = value;
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete mockStorage[key];
+      }),
+      clear: vi.fn(() => {
+        mockStorage = {};
+      }),
+    });
+  });
   it('renders header, title, and all 4 mascot persona cards', () => {
     const wrapper = mount(AiOpponentSelect);
 
     expect(wrapper.text()).toContain('Choose Your Opponent');
-    expect(wrapper.text()).toContain('SINGLE-PLAYER CHESS');
+    expect(wrapper.text()).toContain('Single-Player Chess');
 
     ALL_MASCOTS.forEach((mascot) => {
       expect(wrapper.text()).toContain(mascot.name);
       expect(wrapper.text()).toContain(mascot.avatar);
-      expect(wrapper.text()).toContain(`~${mascot.eloEstimate} ELO`);
+      expect(wrapper.text()).toContain(`~${mascot.eloEstimate} Elo`);
       expect(wrapper.text()).toContain(mascot.title);
     });
 
@@ -51,7 +68,33 @@ describe('AiOpponentSelect.vue', () => {
     expect(colorButtons[1]?.classes()).not.toContain('is-selected');
   });
 
-  it('emits "select" and "start" events when a mascot challenge button is clicked', async () => {
+  it('renders all 6 avatar emoji options with 🦁 selected by default', () => {
+    const wrapper = mount(AiOpponentSelect);
+
+    const avatarButtons = wrapper.findAll('.avatar-option-btn');
+    expect(avatarButtons.length).toBe(6);
+
+    const avatars = ['🦁', '🚀', '🦄', '⚡', '👑', '🐼'];
+    avatars.forEach((emoji, idx) => {
+      expect(avatarButtons[idx]?.text()).toBe(emoji);
+    });
+
+    const lionOption = wrapper.find('[data-testid="avatar-option-🦁"]');
+    expect(lionOption.classes()).toContain('is-selected');
+    expect(lionOption.attributes('aria-checked')).toBe('true');
+  });
+
+  it('allows selecting avatar and persists to localStorage under fun_chess_player_avatar', async () => {
+    const wrapper = mount(AiOpponentSelect);
+
+    const rocketOption = wrapper.find('[data-testid="avatar-option-🚀"]');
+    await rocketOption.trigger('click');
+
+    expect(rocketOption.classes()).toContain('is-selected');
+    expect(localStorage.getItem('fun_chess_player_avatar')).toBe('🚀');
+  });
+
+  it('emits "select" and "start" events including avatar when a mascot challenge button is clicked', async () => {
     const wrapper = mount(AiOpponentSelect);
 
     const challengeFoxBtn = wrapper.find('[data-testid="challenge-btn-fox"]');
@@ -64,23 +107,27 @@ describe('AiOpponentSelect.vue', () => {
 
     expect(wrapper.emitted('start')).toBeTruthy();
     expect(wrapper.emitted('start')?.[0]).toEqual([
-      { mascotId: 'fox', playerColor: 'w' },
+      { mascotId: 'fox', playerColor: 'w', avatar: '🦁' },
     ]);
   });
 
-  it('emits selected color when custom color is picked before challenge', async () => {
+  it('emits selected color and avatar when custom preferences are picked before challenge', async () => {
     const wrapper = mount(AiOpponentSelect);
 
     // Pick Black
     const colorButtons = wrapper.findAll('.color-option-btn');
     await colorButtons[2]?.trigger('click');
 
+    // Pick Unicorn avatar
+    const unicornOption = wrapper.find('[data-testid="avatar-option-🦄"]');
+    await unicornOption.trigger('click');
+
     // Challenge Sparky
     const challengeSparkyBtn = wrapper.find('[data-testid="challenge-btn-sparky"]');
     await challengeSparkyBtn.trigger('click');
 
     expect(wrapper.emitted('start')?.[0]).toEqual([
-      { mascotId: 'sparky', playerColor: 'b' },
+      { mascotId: 'sparky', playerColor: 'b', avatar: '🦄' },
     ]);
   });
 

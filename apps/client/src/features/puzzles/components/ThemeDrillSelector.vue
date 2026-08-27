@@ -43,6 +43,11 @@ const categories: { id: PuzzleThemeCategory | 'all'; label: string; icon: string
   { id: 'opening_traps', label: 'Traps', icon: '🪤' },
 ];
 
+function formatMasteryLevel(level?: string): string {
+  if (!level) return 'Novice';
+  return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
+}
+
 function handleSelect(theme: PuzzleTheme) {
   emit('select-theme', theme);
   emit('selectTheme', theme);
@@ -133,7 +138,7 @@ function handleCategoryKeyDown(event: KeyboardEvent, currentId: PuzzleThemeCateg
 
         <div class="card-footer-stats">
           <span class="mastery-level-tag" :data-level="masteryLookup[desc.id]?.masteryLevel || 'novice'">
-            {{ (masteryLookup[desc.id]?.masteryLevel || 'novice').toUpperCase() }}
+            {{ formatMasteryLevel(masteryLookup[desc.id]?.masteryLevel) }}
           </span>
           <span class="solved-count">
             ⭐ {{ masteryLookup[desc.id]?.starsEarned || 0 }} Stars ({{ masteryLookup[desc.id]?.solved || 0 }} Solved)
@@ -173,7 +178,7 @@ function handleCategoryKeyDown(event: KeyboardEvent, currentId: PuzzleThemeCateg
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all var(--duration-fast) var(--ease-spring);
+  transition: border-color var(--duration-fast) ease, transform var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .category-tab-btn:hover {
@@ -184,7 +189,7 @@ function handleCategoryKeyDown(event: KeyboardEvent, currentId: PuzzleThemeCateg
 .category-tab-btn.is-active {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: #fff;
+  color: var(--text-on-primary, #ffffff);
   box-shadow: 0 4px 12px rgba(108, 92, 231, 0.35);
 }
 
@@ -200,7 +205,7 @@ function handleCategoryKeyDown(event: KeyboardEvent, currentId: PuzzleThemeCateg
   flex-direction: column;
   gap: var(--space-2);
   border: 2px solid transparent;
-  transition: all var(--duration-fast) var(--ease-spring);
+  transition: transform var(--duration-fast) var(--ease-spring), border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .theme-drill-card:hover {

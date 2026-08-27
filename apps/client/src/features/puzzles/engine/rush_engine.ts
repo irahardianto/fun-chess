@@ -40,11 +40,11 @@ export function getFlameLabel(streak: number): string {
   const stage = getFlameStage(streak);
   switch (stage) {
     case 'inferno':
-      return '🔥 INFERNO STREAK! (3x)';
+      return '🔥 Inferno Streak (3x)';
     case 'blaze':
-      return '⚡ ON FIRE! (2x)';
+      return '⚡ On Fire (2x)';
     case 'spark':
-      return '✨ STREAK ACTIVE!';
+      return '✨ Streak Active';
     default:
       return '';
   }

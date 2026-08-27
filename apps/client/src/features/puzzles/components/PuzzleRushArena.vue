@@ -56,11 +56,11 @@ const isTimeUrgent = computed(() => effectiveMode.value === 'puzzle_rush' && cur
 const gameOverTitle = computed(() => {
   if (effectiveMode.value === 'puzzle_rush') {
     if (currentStrikes.value >= currentMaxStrikes.value) {
-      return '💥 RUN FINISHED!';
+      return '💥 Run finished!';
     }
-    return '⏰ TIME UP!';
+    return '⏰ Time is up!';
   }
-  return '💥 RUN FINISHED!';
+  return '💥 Run finished!';
 });
 
 const rankAchieved = computed(() => {
@@ -297,7 +297,7 @@ defineExpose({
           </div>
 
           <p v-if="isNewHighScore" class="new-high-score" data-testid="new-high-score-badge">
-            🎉 NEW HIGH SCORE! 🏆
+            🎉 New high score! 🏆
           </p>
 
           <div class="game-over-actions">
@@ -443,7 +443,7 @@ defineExpose({
   font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  transition: all var(--duration-normal, 240ms) var(--ease-spring);
+  transition: background var(--duration-normal) ease, color var(--duration-normal) ease, transform var(--duration-normal) var(--ease-spring);
 }
 
 .flame-combo-badge.has-streak {

@@ -50,7 +50,7 @@ describe('HostCard.vue (Accessibility & Interactions)', () => {
 
     expect(wrapper.emitted('host')).toBeUndefined();
     const inputGroup = wrapper.find('[data-testid="host-nickname-input"]');
-    expect(inputGroup.find('.base-input-error').text()).toContain('Please enter your name to host a match!');
+    expect(inputGroup.find('.base-input-error').text()).toContain('Enter your nickname to host a match.');
     expect(inputGroup.find('input').attributes('aria-invalid')).toBe('true');
   });
 

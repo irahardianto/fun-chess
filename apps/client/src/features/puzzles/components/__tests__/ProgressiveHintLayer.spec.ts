@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import ProgressiveHintLayer from '../ProgressiveHintLayer.vue';
+import ProgressiveHintLayer, { squareToCoordinates } from '../ProgressiveHintLayer.vue';
 
 describe('ProgressiveHintLayer.vue', () => {
   it('renders nothing when hint level is 0', () => {
@@ -131,5 +131,81 @@ describe('ProgressiveHintLayer.vue', () => {
     await button.trigger('click');
 
     expect(wrapper.emitted('request-hint')).toHaveLength(1);
+  });
+
+  it('computes correct square coordinates for White and Black orientations', () => {
+    // White orientation: e2 (file e=4, rank 2 => col 4, row 6)
+    const e2White = squareToCoordinates('e2', 'w');
+    expect(e2White.x).toBe(50);
+    expect(e2White.y).toBe(75);
+    expect(e2White.centerX).toBe(56.25);
+    expect(e2White.centerY).toBe(81.25);
+
+    // White orientation: e4 (col 4, row 4)
+    const e4White = squareToCoordinates('e4', 'w');
+    expect(e4White.x).toBe(50);
+    expect(e4White.y).toBe(50);
+    expect(e4White.centerX).toBe(56.25);
+    expect(e4White.centerY).toBe(56.25);
+
+    // Black orientation: e2 (file e=4 => col 7-4=3, rank 2 => row 2-1=1)
+    const e2Black = squareToCoordinates('e2', 'b');
+    expect(e2Black.x).toBe(37.5);
+    expect(e2Black.y).toBe(12.5);
+    expect(e2Black.centerX).toBe(43.75);
+    expect(e2Black.centerY).toBe(18.75);
+  });
+
+  it('applies computed inline styles to nudge square, beacon square, and SVG arrow line', () => {
+    const wrapper = mount(ProgressiveHintLayer, {
+      props: {
+        hintLevel: 3,
+        sourceSquare: 'e2',
+        targetSquare: 'e4',
+        orientation: 'w',
+      },
+    });
+
+    const nudgeSquare = wrapper.find('[data-testid="hint-nudge-square"]');
+    expect(nudgeSquare.exists()).toBe(true);
+    expect(nudgeSquare.attributes('style')).toContain('left: 50%');
+    expect(nudgeSquare.attributes('style')).toContain('top: 75%');
+    expect(nudgeSquare.attributes('style')).toContain('width: 12.5%');
+    expect(nudgeSquare.attributes('style')).toContain('height: 12.5%');
+
+    const beaconSquare = wrapper.find('[data-testid="hint-beacon-square"]');
+    expect(beaconSquare.exists()).toBe(true);
+    expect(beaconSquare.attributes('style')).toContain('left: 50%');
+    expect(beaconSquare.attributes('style')).toContain('top: 50%');
+    expect(beaconSquare.attributes('style')).toContain('width: 12.5%');
+    expect(beaconSquare.attributes('style')).toContain('height: 12.5%');
+
+    const arrowSvg = wrapper.find('[data-testid="hint-arrow-svg"]');
+    expect(arrowSvg.exists()).toBe(true);
+    const arrowLine = arrowSvg.find('.hint-arrow-line');
+    expect(arrowLine.exists()).toBe(true);
+    expect(arrowLine.attributes('x1')).toBe('56.25');
+    expect(arrowLine.attributes('y1')).toBe('81.25');
+    expect(arrowLine.attributes('x2')).toBe('56.25');
+    expect(arrowLine.attributes('y2')).toBe('56.25');
+  });
+
+  it('updates coordinates dynamically when orientation is flipped to Black', () => {
+    const wrapper = mount(ProgressiveHintLayer, {
+      props: {
+        hintLevel: 3,
+        sourceSquare: 'e2',
+        targetSquare: 'e4',
+        orientation: 'b',
+      },
+    });
+
+    const nudgeSquare = wrapper.find('[data-testid="hint-nudge-square"]');
+    expect(nudgeSquare.attributes('style')).toContain('left: 37.5%');
+    expect(nudgeSquare.attributes('style')).toContain('top: 12.5%');
+
+    const beaconSquare = wrapper.find('[data-testid="hint-beacon-square"]');
+    expect(beaconSquare.attributes('style')).toContain('left: 37.5%');
+    expect(beaconSquare.attributes('style')).toContain('top: 37.5%');
   });
 });

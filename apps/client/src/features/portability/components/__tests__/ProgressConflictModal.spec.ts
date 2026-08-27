@@ -147,8 +147,8 @@ describe('ProgressConflictModal.vue', () => {
 
     const badges = wrapper.findAll('.stat-winner-badge');
     expect(badges.length).toBeGreaterThan(0);
-    expect(wrapper.text()).toContain('CURRENT DEVICE');
-    expect(wrapper.text()).toContain('IMPORTED SAVE');
+    expect(wrapper.text()).toContain('Current Device');
+    expect(wrapper.text()).toContain('Imported Save');
     expect(wrapper.text()).toContain('1350 Elo');
   });
 

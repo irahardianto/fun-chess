@@ -61,7 +61,7 @@ describe('PuzzleRushArena.vue', () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find('[data-testid="rush-game-over"]').exists()).toBe(true);
-    expect(wrapper.find('.game-over-title').text()).toContain('TIME UP');
+    expect(wrapper.find('.game-over-title').text()).toContain('Time is up');
   });
 
   it('executes solves, increases score, grants +5s bonus, and shows notification', async () => {
@@ -158,7 +158,7 @@ describe('PuzzleRushArena.vue', () => {
     await wrapper.vm.$nextTick();
     expect(strikeIcons().filter((s) => s.text().includes('❌')).length).toBe(3);
     expect(wrapper.find('[data-testid="rush-game-over"]').exists()).toBe(true);
-    expect(wrapper.find('.game-over-title').text()).toContain('RUN FINISHED');
+    expect(wrapper.find('.game-over-title').text()).toContain('Run finished');
   });
 
   it('runs in streak survivor mode without timer and decrements lives on mistakes', async () => {

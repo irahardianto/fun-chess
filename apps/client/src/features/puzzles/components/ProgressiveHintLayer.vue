@@ -1,6 +1,37 @@
+<script lang="ts">
+import type { Square, PieceColor } from '@fun-chess/shared';
+
+export interface SquareCoordinates {
+  x: number;
+  y: number;
+  centerX: number;
+  centerY: number;
+}
+
+export function squareToCoordinates(
+  sq: Square | string,
+  orientation: PieceColor = 'w'
+): SquareCoordinates {
+  const file = sq.charAt(0).toLowerCase();
+  const rank = sq.charAt(1);
+  const fileNum = file.charCodeAt(0) - 97; // 'a' -> 0, ..., 'h' -> 7
+  const rankNum = parseInt(rank, 10); // '1' -> 1, ..., '8' -> 8
+
+  const col = orientation === 'w' ? fileNum : 7 - fileNum;
+  const row = orientation === 'w' ? 8 - rankNum : rankNum - 1;
+
+  const x = col * 12.5;
+  const y = row * 12.5;
+  const centerX = x + 6.25;
+  const centerY = y + 6.25;
+
+  return { x, y, centerX, centerY };
+}
+</script>
+
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { HintData, HintLevel, Square, PieceColor } from '@fun-chess/shared';
+import type { HintData, HintLevel } from '@fun-chess/shared';
 import BaseButton from '../../../components/base/BaseButton.vue';
 
 interface Props {
@@ -47,10 +78,55 @@ const effectiveTarget = computed(() => {
   return props.targetSquare || props.hintData?.targetSquare;
 });
 
+const nudgeSquareStyle = computed(() => {
+  if (!effectiveSource.value) return {};
+  const coords = squareToCoordinates(effectiveSource.value, props.orientation);
+  return {
+    left: `${coords.x}%`,
+    top: `${coords.y}%`,
+    width: '12.5%',
+    height: '12.5%',
+  };
+});
+
+const beaconSquareStyle = computed(() => {
+  if (!effectiveTarget.value) return {};
+  const coords = squareToCoordinates(effectiveTarget.value, props.orientation);
+  return {
+    left: `${coords.x}%`,
+    top: `${coords.y}%`,
+    width: '12.5%',
+    height: '12.5%',
+  };
+});
+
+const arrowCoords = computed(() => {
+  if (!effectiveSource.value || !effectiveTarget.value) return null;
+  const src = squareToCoordinates(effectiveSource.value, props.orientation);
+  const tgt = squareToCoordinates(effectiveTarget.value, props.orientation);
+  return {
+    x1: src.centerX,
+    y1: src.centerY,
+    x2: tgt.centerX,
+    y2: tgt.centerY,
+  };
+});
+
+const ghostPieceStyle = computed(() => {
+  if (!effectiveTarget.value) return {};
+  const coords = squareToCoordinates(effectiveTarget.value, props.orientation);
+  return {
+    left: `${coords.x}%`,
+    top: `${coords.y}%`,
+    width: '12.5%',
+    height: '12.5%',
+  };
+});
+
 const hintLabel = computed(() => {
-  if (effectiveLevel.value === 0) return '💡 Need a Hint?';
-  if (effectiveLevel.value === 1) return '🎯 Show Target?';
-  if (effectiveLevel.value === 2) return '👑 Show Solution!';
+  if (effectiveLevel.value === 0) return '💡 Get Hint';
+  if (effectiveLevel.value === 1) return '🎯 Show Target';
+  if (effectiveLevel.value === 2) return '👑 Show Solution';
   return '👑 Solution Shown';
 });
 
@@ -71,22 +147,52 @@ const hintBadge = computed(() => {
         v-if="effectiveLevel >= 1 && effectiveSource"
         class="hint-nudge-square"
         data-testid="hint-nudge-square"
+        :style="nudgeSquareStyle"
       />
       <div
         v-if="effectiveLevel >= 2 && effectiveTarget"
         class="hint-beacon-square"
         data-testid="hint-beacon-square"
+        :style="beaconSquareStyle"
       />
       <svg
         v-if="effectiveLevel >= 3"
         class="hint-arrow-svg"
         data-testid="hint-arrow-svg"
         viewBox="0 0 100 100"
-      />
+        aria-hidden="true"
+      >
+        <defs>
+          <marker
+            id="hint-arrowhead"
+            viewBox="0 0 10 10"
+            refX="6"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--academy-gold, #ffc107)" />
+          </marker>
+        </defs>
+        <line
+          v-if="arrowCoords"
+          :x1="arrowCoords.x1"
+          :y1="arrowCoords.y1"
+          :x2="arrowCoords.x2"
+          :y2="arrowCoords.y2"
+          stroke="var(--academy-gold, #ffc107)"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          marker-end="url(#hint-arrowhead)"
+          class="hint-arrow-line"
+        />
+      </svg>
       <div
         v-if="effectiveLevel >= 3 && movingPiece"
         class="hint-ghost-piece"
         data-testid="hint-ghost-piece"
+        :style="ghostPieceStyle"
       />
     </div>
 
@@ -179,6 +285,78 @@ const hintBadge = computed(() => {
   inset: 0;
   pointer-events: none;
   z-index: var(--z-board-indicator, 8);
+}
+
+.hint-nudge-square {
+  position: absolute;
+  inset: 0;
+  border: 3.5px solid var(--academy-gold, #ffc107);
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: 0 0 14px rgba(255, 193, 7, 0.8), inset 0 0 8px rgba(255, 193, 7, 0.4);
+  background-color: rgba(255, 193, 7, 0.25);
+  animation: nudge-pulse 1.8s infinite ease-in-out;
+  box-sizing: border-box;
+}
+
+.hint-beacon-square {
+  right: auto;
+  bottom: auto;
+  border: 3.5px solid var(--color-success, #22c55e);
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.85), inset 0 0 8px rgba(34, 197, 94, 0.45);
+  background-color: rgba(34, 197, 94, 0.28);
+  animation: beacon-pulse 1.8s infinite ease-in-out;
+  box-sizing: border-box;
+}
+
+.hint-arrow-svg {
+  width: 100%;
+  height: 100%;
+  z-index: var(--z-board-indicator, 9);
+}
+
+.hint-arrow-line {
+  filter: drop-shadow(0 0 4px rgba(255, 193, 7, 0.9));
+  animation: arrow-glow 2s infinite ease-in-out;
+}
+
+.hint-ghost-piece {
+  right: auto;
+  bottom: auto;
+  opacity: 0.7;
+}
+
+@keyframes nudge-pulse {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes beacon-pulse {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes arrow-glow {
+  0%, 100% {
+    opacity: 0.85;
+    stroke-width: 2.2;
+  }
+  50% {
+    opacity: 1;
+    stroke-width: 3.2;
+  }
 }
 
 .hint-controls-wrapper {
@@ -290,7 +468,7 @@ const hintBadge = computed(() => {
   height: 10px;
   border-radius: 50%;
   background: var(--hint-meter-empty, #e2e8f0);
-  transition: all var(--duration-fast, 140ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  transition: background-color var(--duration-fast, 140ms) var(--ease-spring), box-shadow var(--duration-fast, 140ms) ease, transform var(--duration-fast, 140ms) var(--ease-spring);
 }
 
 .meter-dot.is-active {
@@ -301,7 +479,7 @@ const hintBadge = computed(() => {
 
 .pop-fade-enter-active,
 .pop-fade-leave-active {
-  transition: all 0.25s var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  transition: opacity 0.25s ease, transform 0.25s var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
 }
 
 .pop-fade-enter-from,

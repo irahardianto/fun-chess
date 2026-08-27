@@ -71,7 +71,7 @@ describe('JoinCard.vue (Accessibility & Error Binding)', () => {
 
     expect(wrapper.emitted('join')).toBeUndefined();
     const roomInputGroup = wrapper.find('[data-testid="join-room-code-input"]');
-    expect(roomInputGroup.find('.base-input-error').text()).toContain('Room code must be 4 characters!');
+    expect(roomInputGroup.find('.base-input-error').text()).toContain('Room code must be 4 characters.');
     expect(roomInputGroup.find('input').attributes('aria-invalid')).toBe('true');
   });
 

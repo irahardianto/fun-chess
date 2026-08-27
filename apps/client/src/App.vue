@@ -7,6 +7,9 @@ import type {
   SoloAiLaunchConfig,
   ChessScenario,
 } from '@fun-chess/shared';
+import {
+  DEFAULT_PLAYER_AVATAR,
+} from '@fun-chess/shared';
 import { BaseButton } from '@/components/base';
 import { ChessBoard } from '@/features/board';
 import { PlayerBadge, CapturedTray, MoveHistoryList } from '@/features/hud';
@@ -197,6 +200,11 @@ const {
 } = chessEngine;
 
 // --- Local UI States & Modals ---
+const myPlayerAvatar = ref<string>(
+  typeof localStorage !== 'undefined'
+    ? localStorage.getItem('fun_chess_player_avatar') || DEFAULT_PLAYER_AVATAR
+    : DEFAULT_PLAYER_AVATAR
+);
 const showQrModal = ref(false);
 const showGameOverModal = ref(false);
 const initialRoomCode = ref('');
@@ -349,6 +357,9 @@ function handleModeChange(mode: AppGameMode) {
 
 function handleStartSoloAi(config: SoloAiLaunchConfig) {
   soloAiConfig.value = config;
+  if (config.playerAvatar) {
+    myPlayerAvatar.value = config.playerAvatar;
+  }
   currentAppMode.value = 'solo_ai';
   playStart();
 }
@@ -423,7 +434,22 @@ function handleNavbarBrandClick() {
 }
 
 // --- User Actions ---
-async function handleHostGame(payload: { playerName: string; preferredColor: 'w' | 'b' | 'random' }) {
+function handleCreateRoom(payload: { playerName: string; avatar: string; preferredColor: 'w' | 'b' | 'random' }) {
+  if (payload.avatar) {
+    myPlayerAvatar.value = payload.avatar;
+  }
+}
+
+function handleJoinRoom(payload: { roomCode: string; playerName: string; avatar: string }) {
+  if (payload.avatar) {
+    myPlayerAvatar.value = payload.avatar;
+  }
+}
+
+async function handleHostGame(payload: { playerName: string; avatar?: string; preferredColor: 'w' | 'b' | 'random' }) {
+  if (payload.avatar) {
+    myPlayerAvatar.value = payload.avatar;
+  }
   isActionLoading.value = true;
   try {
     const res = await createRoom(payload.playerName, payload.preferredColor);
@@ -438,7 +464,10 @@ async function handleHostGame(payload: { playerName: string; preferredColor: 'w'
   }
 }
 
-async function handleJoinGame(payload: { roomCode: string; playerName: string }) {
+async function handleJoinGame(payload: { roomCode: string; playerName: string; avatar?: string }) {
+  if (payload.avatar) {
+    myPlayerAvatar.value = payload.avatar;
+  }
   isActionLoading.value = true;
   try {
     const res = await joinRoom(payload.roomCode, payload.playerName);
@@ -562,10 +591,11 @@ function handleLeaveRoom() {
           type="button"
           class="room-code-chip"
           data-testid="room-code-chip"
-          title="Click to view QR code"
+          title="View QR code"
+          :aria-label="'View QR code for room ' + (currentRoom?.roomCode || '')"
           @click="showQrModal = true"
         >
-          <span class="room-chip-label">ROOM:</span>
+          <span class="room-chip-label">Room:</span>
           <span class="room-chip-code">{{ currentRoom.roomCode }}</span>
           <span class="room-chip-icon">📱</span>
         </button>
@@ -854,7 +884,7 @@ function handleLeaveRoom() {
             :is-connected="isConnected"
             :is-host="isHost"
             :is-self="true"
-            avatar="🦁"
+            :avatar="myPlayerAvatar"
           />
         </div>
 
@@ -919,6 +949,10 @@ function handleLeaveRoom() {
         @mode-change="handleModeChange"
         @host="handleHostGame"
         @join="handleJoinGame"
+        @create-room="handleCreateRoom"
+        @createRoom="handleCreateRoom"
+        @join-room="handleJoinRoom"
+        @joinRoom="handleJoinRoom"
         @start-solo-ai="handleStartSoloAi"
         @select-scenario="handleSelectScenario"
         @launch-drills="handleLaunchDrills"
@@ -1143,7 +1177,7 @@ function handleLeaveRoom() {
 }
 
 .room-chip-icon {
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .turn-status-badge {
@@ -1186,8 +1220,9 @@ function handleLeaveRoom() {
 
 .nav-icon-btn {
   padding: 4px 8px;
-  min-width: 34px;
-  height: 34px;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1200,7 +1235,7 @@ function handleLeaveRoom() {
 }
 
 .exit-icon {
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 
 .exit-text {
@@ -1304,7 +1339,7 @@ function handleLeaveRoom() {
   border: none;
   cursor: pointer;
   padding: 4px;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: inherit;
   opacity: 0.75;
   border-radius: var(--radius-xs, 4px);
@@ -1526,8 +1561,9 @@ function handleLeaveRoom() {
   }
 
   .nav-icon-btn {
-    min-width: 32px;
-    height: 32px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
     padding: 2px 6px;
   }
 

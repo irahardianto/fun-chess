@@ -128,7 +128,7 @@ const statusText = computed(() => {
   border-radius: var(--radius-lg);
   border: 1.5px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
-  transition: all var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
   box-sizing: border-box;
   width: 100%;
 }

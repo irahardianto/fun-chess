@@ -54,8 +54,8 @@ describe('Puzzle Rush Engine', () => {
     expect(getFlameStage(4)).toBe('blaze');
     expect(getFlameStage(6)).toBe('inferno');
 
-    expect(getFlameLabel(2)).toContain('STREAK');
-    expect(getFlameLabel(4)).toContain('ON FIRE');
-    expect(getFlameLabel(6)).toContain('INFERNO');
+    expect(getFlameLabel(2)).toContain('Streak');
+    expect(getFlameLabel(4)).toContain('On Fire');
+    expect(getFlameLabel(6)).toContain('Inferno');
   });
 });

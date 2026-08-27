@@ -204,7 +204,7 @@ function handleBackToAcademy() {
   color: var(--star-empty);
   transform: scale(0.8);
   opacity: 0.4;
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease, color 0.3s ease;
 }
 
 .star-wrapper.is-earned.is-popped {

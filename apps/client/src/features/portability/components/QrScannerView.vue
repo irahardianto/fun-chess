@@ -148,7 +148,7 @@ function handleManualSubmit() {
 
       <span class="dropzone-icon" aria-hidden="true">📁</span>
       <div class="dropzone-text-group">
-        <p class="dropzone-title">DRAG & DROP SAVE FILE HERE (.json)</p>
+        <p class="dropzone-title">Drag and drop save file (.json)</p>
         <p class="dropzone-subtitle">or restore an exported backup file</p>
       </div>
 
@@ -179,7 +179,7 @@ function handleManualSubmit() {
           id="manual-backup-input"
           v-model="manualText"
           class="manual-textarea"
-          placeholder="Paste Version 12 code string (FC1:...) or JSON backup here..."
+          placeholder="Paste Version 12 code string (FC1:...) or JSON backup..."
           rows="3"
         />
         <BaseButton
@@ -375,7 +375,7 @@ function handleManualSubmit() {
   border: var(--dropzone-border, 2px dashed var(--color-primary));
   border-radius: var(--radius-lg, 16px);
   text-align: center;
-  transition: all 180ms ease;
+  transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, transform var(--duration-fast) ease;
   box-sizing: border-box;
 }
 
@@ -431,7 +431,7 @@ function handleManualSubmit() {
   cursor: pointer;
   padding: 6px 12px;
   border-radius: var(--radius-pill, 9999px);
-  transition: all 140ms ease;
+  transition: color var(--duration-fast) ease, background-color var(--duration-fast) ease;
 }
 
 .manual-drawer-toggle:hover {

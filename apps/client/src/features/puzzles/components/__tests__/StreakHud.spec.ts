@@ -18,7 +18,7 @@ describe('StreakHud.vue', () => {
     });
 
     expect(wrapper.classes()).toContain('stage--spark');
-    expect(wrapper.find('[data-testid="streak-label"]').text()).toContain('STREAK');
+    expect(wrapper.find('[data-testid="streak-label"]').text()).toContain('Streak');
     expect(wrapper.text()).toContain('x2');
   });
 
@@ -28,7 +28,7 @@ describe('StreakHud.vue', () => {
     });
 
     expect(wrapper.classes()).toContain('stage--blaze');
-    expect(wrapper.find('[data-testid="streak-label"]').text()).toContain('ON FIRE');
+    expect(wrapper.find('[data-testid="streak-label"]').text()).toContain('On Fire');
   });
 
   it('renders Inferno stage on 6+ streak', () => {
@@ -37,6 +37,6 @@ describe('StreakHud.vue', () => {
     });
 
     expect(wrapper.classes()).toContain('stage--inferno');
-    expect(wrapper.find('[data-testid="streak-label"]').text()).toContain('INFERNO');
+    expect(wrapper.find('[data-testid="streak-label"]').text()).toContain('Inferno');
   });
 });

@@ -368,6 +368,51 @@ describe('App.vue Shell & Navigation Integration', () => {
     const mainContent = wrapper.find('main#main-content');
     expect(mainContent.exists()).toBe(true);
   });
+
+  it('passes the chosen avatar to player badge during gameplay in Solo AI mode', async () => {
+    const wrapper = mount(App);
+
+    const lobbyView = wrapper.findComponent({ name: 'LobbyView' });
+    lobbyView.vm.$emit('start-solo-ai', {
+      mascotId: 'fox',
+      playerColor: 'w',
+      playerName: 'Hero',
+      playerAvatar: '🦄',
+    });
+
+    await flushPromises();
+
+    const soloArena = wrapper.findComponent({ name: 'SoloAiArena' });
+    expect(soloArena.exists()).toBe(true);
+    expect(soloArena.props('playerAvatar')).toBe('🦄');
+  });
+
+  it('passes the chosen avatar to player badge during multiplayer match', async () => {
+    mockStorage['fun_chess_player_avatar'] = '⚡';
+    mockCurrentPlayer.value = { id: 'p1', name: 'LightningPlayer', color: 'w', socketId: 'mock-socket-1' };
+    mockCurrentRoom.value = {
+      roomCode: 'BOLT',
+      status: 'playing',
+      hostId: 'p1',
+      whitePlayer: { id: 'p1', name: 'LightningPlayer', color: 'w', socketId: 'mock-socket-1', isConnected: true },
+      blackPlayer: { id: 'p2', name: 'Black Player', color: 'b', socketId: 'mock-socket-2', isConnected: true },
+      game: {
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        turn: 'w',
+        moves: [],
+        capturedWhite: [],
+        capturedBlack: [],
+      },
+    };
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const playerBadges = wrapper.findAllComponents({ name: 'PlayerBadge' });
+    const selfBadge = playerBadges.find((badge) => badge.props('isSelf') === true);
+    expect(selfBadge?.exists()).toBe(true);
+    expect(selfBadge?.props('avatar')).toBe('⚡');
+  });
 });
 
 

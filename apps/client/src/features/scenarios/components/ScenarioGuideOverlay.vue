@@ -138,7 +138,7 @@ function handleResetStep() {
   border-radius: var(--radius-xl);
   padding: var(--space-4) var(--space-5);
   box-shadow: var(--shadow-sm);
-  transition: all var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) ease, background-color var(--duration-fast) ease;
   box-sizing: border-box;
 }
 
@@ -389,7 +389,7 @@ function handleResetStep() {
 @media (max-width: 320px) {
   .guide-feedback-banner {
     padding: 3px 10px;
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .guide-hint-bubble {

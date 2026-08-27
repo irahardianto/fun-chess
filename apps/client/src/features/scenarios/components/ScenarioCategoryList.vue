@@ -127,7 +127,7 @@ function getSectionStats(section: CurriculumSection) {
     <header class="academy-hero-banner">
       <div class="academy-hero-content">
         <div class="academy-badge-row">
-          <span class="academy-brand-pill">🎓 CHESS ACADEMY</span>
+          <span class="academy-brand-pill">🎓 Chess Academy</span>
           <div class="academy-star-counter" role="status" aria-label="Total stars earned">
             <span class="star-gold-glyph" aria-hidden="true">⭐</span>
             <span class="star-counter-text">{{ totalEarnedStars }} / {{ maxPossibleStars }} Stars</span>
@@ -390,7 +390,7 @@ function getSectionStats(section: CurriculumSection) {
   color: var(--text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: all var(--duration-fast) ease;
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease;
 }
 
 .category-tab-btn:hover {

@@ -113,5 +113,52 @@ describe('LobbyView.vue', () => {
 
     await installBtn.trigger('click');
   });
+
+  it('renders Cloud Server Online banner when isCloudRelay is true', () => {
+    const wrapper = mount(LobbyView, {
+      props: {
+        lanInfo: {
+          lanIp: '127.0.0.1',
+          port: 3000,
+          localUrl: 'https://cloud.funchess.app',
+          joinUrl: 'https://cloud.funchess.app',
+          interfaces: [],
+          isCloudRelay: true,
+          relayMode: 'cloud',
+        },
+      },
+    });
+
+    const banner = wrapper.find('[data-testid="lobby-server-banner"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toContain('Cloud Server Online');
+    expect(banner.text()).toContain('Share via Cloud Link / QR Code');
+  });
+
+  it('allows picking an avatar and passes the chosen avatar when hosting a game', async () => {
+    const wrapper = mount(LobbyView);
+
+    // Pick Rocket avatar
+    const rocketAvatarBtn = wrapper.find('[data-testid="lobby-avatar-option-🚀"]');
+    expect(rocketAvatarBtn.exists()).toBe(true);
+    await rocketAvatarBtn.trigger('click');
+
+    expect(rocketAvatarBtn.classes()).toContain('is-selected');
+
+    // Host game
+    const nameInput = wrapper.find('.host-card input');
+    await nameInput.setValue('RocketMaster');
+
+    const hostBtn = wrapper.find('.host-card .btn-tactile');
+    await hostBtn.trigger('click');
+
+    expect(wrapper.emitted('createRoom')?.[0]).toEqual([
+      {
+        playerName: 'RocketMaster',
+        avatar: '🚀',
+        preferredColor: 'random',
+      },
+    ]);
+  });
 });
 

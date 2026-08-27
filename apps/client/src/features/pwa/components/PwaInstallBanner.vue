@@ -170,18 +170,21 @@ function handleDismiss() {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   border-radius: var(--radius-pill);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 140ms ease;
+  font-size: var(--text-sm);
+  transition: background-color var(--duration-fast, 140ms) ease, color var(--duration-fast, 140ms) ease;
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 4px;
+  right: 4px;
 }
 
 @media (max-width: 600px) {

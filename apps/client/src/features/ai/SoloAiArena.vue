@@ -132,7 +132,7 @@ function handleExit() {
       </BaseButton>
 
       <div class="match-info-center">
-        <span class="match-mode-pill">SOLO AI MATCH</span>
+        <span class="match-mode-pill">Solo AI Match</span>
         <span class="opponent-name-tag">vs. {{ mascot.name }}</span>
       </div>
 
@@ -205,7 +205,7 @@ function handleExit() {
           class="active-hint-banner"
         >
           <div class="hint-banner-header">
-            <span class="hint-badge">💡 TACTICAL HINT</span>
+            <span class="hint-badge">💡 Tactical Hint</span>
             <button
               type="button"
               class="hint-close-btn"
@@ -507,7 +507,7 @@ function handleExit() {
 
 .history-slide-enter-active,
 .history-slide-leave-active {
-  transition: all var(--duration-fast) ease;
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
 .history-slide-enter-from,

@@ -85,7 +85,7 @@ async function handleCopy() {
 <template>
   <div class="qr-export-container">
     <!-- QR Code Canvas Frame -->
-    <div class="qr-canvas-frame" aria-label="QR Code containing user game progress">
+    <div class="qr-canvas-frame" role="img" aria-label="QR Code containing user game progress">
       <canvas ref="canvasRef" class="qr-canvas-element" width="240" height="240" />
     </div>
 
@@ -104,7 +104,7 @@ async function handleCopy() {
         @click="emit('downloadJson')"
       >
         <template #icon>💾</template>
-        Download funchess-save.json (1-Click Backup)
+        Download funchess-save.json (Instant Backup)
       </BaseButton>
 
       <BaseButton

@@ -41,7 +41,7 @@ const emit = defineEmits<{
           @click="emit('accept')"
         >
           <template #icon-left>⚔️</template>
-          Accept Rematch!
+          Accept Rematch
         </BaseButton>
 
         <BaseButton

@@ -23,6 +23,60 @@ describe('Scenarios Data Integrity & Chess Rules Validation', () => {
     expect(new Set(sectionIds)).toEqual(new Set(allIds));
   });
 
+  it('verifies cct-trigger and greek-gift-sacrifice have distinct setups and moves', () => {
+    const cct = SCENARIOS_MAP.get('cct-trigger');
+    const greek = SCENARIOS_MAP.get('greek-gift-sacrifice');
+    expect(cct).toBeDefined();
+    expect(greek).toBeDefined();
+    expect(cct!.steps[0].setupFen).not.toBe(greek!.steps[0].setupFen);
+  });
+
+  // Scenarios whose final step is explicitly designed to deliver Checkmate
+  const CHECKMATE_DELIVERY_SCENARIOS = [
+    'pawn-promotion',
+    'clearance-interference',
+    'bodens-mate',
+    'lolli-damiano-opera',
+    'anastasia-mate',
+    'hook-mate',
+    'two-bishops-mate',
+    'vukovic-mate',
+    'scholars-mate-attack',
+    'fools-mate',
+    'arabian-mate',
+    'balestra-blackburne',
+    'kill-box-railroad',
+    'blind-swine-seventh',
+    'king-queen-mate',
+    'king-rook-mate',
+    'legals-trap',
+  ];
+
+  it.each(CHECKMATE_DELIVERY_SCENARIOS)('verifies final step delivers true checkmate in %s', (scenarioId) => {
+    const scenario = SCENARIOS_MAP.get(scenarioId);
+    expect(scenario, `Scenario ${scenarioId} must exist`).toBeDefined();
+
+    const lastStep = scenario!.steps[scenario!.steps.length - 1];
+    expect(lastStep.allowedMoves, `Step ${lastStep.id} must have allowedMoves`).toBeDefined();
+    expect(lastStep.allowedMoves!.length).toBeGreaterThan(0);
+
+    const chess = new Chess();
+    chess.load(lastStep.setupFen);
+
+    const move = lastStep.allowedMoves![0];
+    const moveResult = chess.move({
+      from: move.from,
+      to: move.to,
+      promotion: move.promotion,
+    });
+
+    expect(moveResult, `Move ${move.from}->${move.to} must be legal in ${scenarioId}`).not.toBeNull();
+    expect(
+      chess.isCheckmate(),
+      `Final move in ${scenarioId} (step ${lastStep.id}) must deliver checkmate according to chess rules`
+    ).toBe(true);
+  });
+
   it.each(ALL_SCENARIOS)('validates scenario: $id ($title)', (scenario) => {
     expect(scenario.id).toBeTruthy();
     expect(scenario.title).toBeTruthy();
@@ -87,6 +141,18 @@ describe('Scenarios Data Integrity & Chess Rules Validation', () => {
           botResult,
           `Opponent move ${botMove.from}->${botMove.to} in step ${step.id} of scenario ${scenario.id} must be legal after player move`
         ).not.toBeNull();
+
+        // Step-to-step FEN continuity check for sequential interactive flows
+        const nextStep = scenario.steps[index + 1];
+        if (nextStep && step.opponentResponse) {
+          // Compare board piece placements (first token of FEN)
+          const resultingPiecePlacement = testChess.fen().split(' ')[0];
+          const expectedPiecePlacement = nextStep.setupFen.split(' ')[0];
+          expect(
+            resultingPiecePlacement,
+            `Step continuity mismatch between step ${step.id} and step ${nextStep.id} in ${scenario.id}`
+          ).toBe(expectedPiecePlacement);
+        }
       }
     });
   });

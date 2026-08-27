@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import type { PieceColor, MascotId, MascotPersona } from '@fun-chess/shared';
+import { PLAYER_AVATARS, DEFAULT_PLAYER_AVATAR } from '@fun-chess/shared';
 import { ALL_MASCOTS } from '../data/index.js';
 import BaseCard from '../../../components/base/BaseCard.vue';
 import BaseButton from '../../../components/base/BaseButton.vue';
@@ -8,17 +9,57 @@ import BaseButton from '../../../components/base/BaseButton.vue';
 interface Props {
   selectedMascotId?: MascotId;
   initialPlayerColor?: PieceColor | 'random';
+  initialAvatar?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   selectedMascotId: 'peanut',
   initialPlayerColor: 'w',
+  initialAvatar: undefined,
 });
 
 const emit = defineEmits<{
   select: [mascotId: MascotId];
-  start: [payload: { mascotId: MascotId; playerColor: PieceColor | 'random' }];
+  start: [payload: { mascotId: MascotId; playerColor: PieceColor | 'random'; avatar?: string }];
 }>();
+
+const STORAGE_KEY = 'fun_chess_player_avatar';
+
+function getSavedAvatar(): string {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved && (PLAYER_AVATARS as readonly string[]).includes(saved)) {
+        return saved;
+      }
+    } catch {
+      // Storage access error fallback
+    }
+  }
+  return DEFAULT_PLAYER_AVATAR;
+}
+
+const selectedAvatar = ref<string>(props.initialAvatar || getSavedAvatar());
+
+watch(
+  () => props.initialAvatar,
+  (newAvatar) => {
+    if (newAvatar && (PLAYER_AVATARS as readonly string[]).includes(newAvatar)) {
+      selectedAvatar.value = newAvatar;
+    }
+  }
+);
+
+function selectAvatar(avatar: string) {
+  selectedAvatar.value = avatar;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, avatar);
+    } catch {
+      // Storage access error fallback
+    }
+  }
+}
 
 const chosenColor = ref<PieceColor | 'random'>(props.initialPlayerColor);
 const hoveredMascotId = ref<MascotId | null>(null);
@@ -34,6 +75,7 @@ function handleSelectMascot(mascot: MascotPersona) {
   emit('start', {
     mascotId: mascot.id,
     playerColor: chosenColor.value,
+    avatar: selectedAvatar.value,
   });
 }
 
@@ -46,11 +88,32 @@ function getMascotColorClass(id: MascotId): string {
   <div class="ai-opponent-select" role="region" aria-label="Choose Chess Opponent">
     <!-- Header -->
     <header class="select-header">
-      <span class="header-badge">SINGLE-PLAYER CHESS 🤖</span>
+      <span class="header-badge">Single-Player Chess 🤖</span>
       <h1 class="select-title">Choose Your Opponent</h1>
       <p class="select-subtitle">
         Pick a friendly chess buddy! Each mascot has unique personalities and playing styles.
       </p>
+
+      <!-- Player Avatar Selection -->
+      <div class="avatar-picker-control" role="group" aria-label="Select Player Avatar">
+        <span class="picker-label">Your Avatar:</span>
+        <div class="avatar-options" role="radiogroup" aria-label="Choose your avatar emoji">
+          <button
+            v-for="emoji in PLAYER_AVATARS"
+            :key="emoji"
+            type="button"
+            class="avatar-option-btn"
+            :class="{ 'is-selected': selectedAvatar === emoji }"
+            :aria-checked="selectedAvatar === emoji"
+            :aria-label="`Select ${emoji} avatar`"
+            :data-testid="`avatar-option-${emoji}`"
+            role="radio"
+            @click="selectAvatar(emoji)"
+          >
+            {{ emoji }}
+          </button>
+        </div>
+      </div>
 
       <!-- Player Color Preference Segmented Control -->
       <div class="color-picker-control" role="group" aria-label="Select Piece Color">
@@ -95,7 +158,7 @@ function getMascotColorClass(id: MascotId): string {
           <div class="persona-details">
             <div class="name-elo-row">
               <h2 class="persona-name">{{ mascot.name }}</h2>
-              <span class="elo-pill">~{{ mascot.eloEstimate }} ELO</span>
+              <span class="elo-pill">~{{ mascot.eloEstimate }} Elo</span>
             </div>
 
             <span class="persona-title">{{ mascot.title }}</span>
@@ -172,6 +235,66 @@ function getMascotColorClass(id: MascotId): string {
   max-width: 540px;
 }
 
+/* Avatar Picker Control */
+.avatar-picker-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  max-width: 100%;
+  background-color: var(--bg-surface);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-medium);
+  box-shadow: var(--shadow-xs);
+  margin-top: var(--space-1);
+}
+
+.picker-label {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.avatar-options {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  flex-wrap: wrap;
+}
+
+.avatar-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  font-size: 1.35rem;
+  background-color: var(--bg-app);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-spring),
+              border-color var(--duration-fast) ease,
+              background-color var(--duration-fast) ease,
+              box-shadow var(--duration-fast) ease;
+}
+
+.avatar-option-btn:hover {
+  transform: translateY(-2px) scale(1.1);
+  border-color: var(--color-primary);
+}
+
+.avatar-option-btn.is-selected {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-subtle);
+  transform: translateY(-2px) scale(1.15);
+  box-shadow: var(--shadow-btn-accent, 0 3px 0 rgba(245, 130, 32, 0.45));
+}
+
 /* Color Picker Control */
 .color-picker-control {
   display: flex;
@@ -201,7 +324,7 @@ function getMascotColorClass(id: MascotId): string {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-spring);
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease, background-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .color-option-btn:hover {

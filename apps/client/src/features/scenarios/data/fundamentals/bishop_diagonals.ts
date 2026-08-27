@@ -26,8 +26,8 @@ export const bishopDiagonalsScenario: ChessScenario = {
     {
       id: 'bishop-step-2',
       stepNumber: 2,
-      instruction: 'Black’s Knight on f6 is hanging! Capture the Knight with your Bishop from c4 to f7... wait, capture the piece on f7!',
-      conceptExplanation: 'Look for pieces that are under attack by your long-range sniper Bishop!',
+      instruction: 'Black left their f7 pawn unprotected! Capture the f7 pawn with your Bishop from c4 to deliver check!',
+      conceptExplanation: 'Look for vulnerable targets under attack by your long-range sniper Bishop!',
       hint: 'Slide the Bishop from c4 all the way to f7 with check!',
       setupFen: 'r1bqk2r/pppp1ppp/2n5/4p3/2B1n3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 0 4',
       highlightSquares: ['c4', 'f7'],

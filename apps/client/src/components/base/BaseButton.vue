@@ -131,6 +131,12 @@ function handleClick(event: MouseEvent) {
   border-radius: var(--radius-md);
 }
 
+@media (pointer: coarse), (max-width: 640px) {
+  .btn-tactile--sm {
+    min-height: var(--touch-target-min, 44px);
+  }
+}
+
 .btn-tactile--md {
   font-size: var(--text-base);
   padding: var(--space-3) var(--space-5);

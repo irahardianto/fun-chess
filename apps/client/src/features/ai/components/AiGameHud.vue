@@ -134,6 +134,7 @@ const emit = defineEmits<{
   font-family: var(--font-display);
   font-weight: var(--weight-bold);
   min-height: 44px;
+  min-width: 44px;
   flex: 1 1 auto;
   max-width: 150px;
 }
@@ -190,6 +191,7 @@ const emit = defineEmits<{
     font-size: var(--text-xs);
     padding: var(--space-1-5) var(--space-2);
     min-height: 44px;
+    min-width: 44px;
     max-width: none;
   }
 }

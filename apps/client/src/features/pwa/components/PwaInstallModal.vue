@@ -237,7 +237,7 @@ async function handleNativeInstall() {
   height: 32px;
   border-radius: var(--radius-pill);
   background: var(--color-primary);
-  color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
   font-family: var(--font-display);
   font-size: var(--text-base);
   font-weight: var(--weight-bold);

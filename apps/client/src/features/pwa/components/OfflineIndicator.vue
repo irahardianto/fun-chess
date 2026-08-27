@@ -134,8 +134,8 @@ onUnmounted(() => {
         v-else
         type="button"
         class="offline-compact-chip"
-        title="Playing offline — click for info"
-        aria-label="Offline Mode active. Click to view offline info"
+        title="Playing offline — view info"
+        aria-label="Offline mode active. View offline info"
         data-testid="offline-compact-chip"
         @click="handleExpand"
       >
@@ -221,15 +221,16 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: all 140ms ease;
+  transition: background-color var(--duration-fast, 140ms) ease, color var(--duration-fast, 140ms) ease, transform var(--duration-fast, 140ms) ease;
 }
 
 .offline-dismiss-btn:hover {
@@ -265,7 +266,7 @@ onUnmounted(() => {
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   cursor: pointer;
-  transition: all 140ms ease;
+  transition: background-color var(--duration-fast, 140ms) ease, border-color var(--duration-fast, 140ms) ease, transform var(--duration-fast, 140ms) var(--ease-spring), box-shadow var(--duration-fast, 140ms) ease;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
 }
 
@@ -281,7 +282,7 @@ onUnmounted(() => {
 }
 
 .compact-icon {
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 
 .compact-label {
@@ -291,7 +292,7 @@ onUnmounted(() => {
 /* Transitions */
 .float-pill-enter-active,
 .float-pill-leave-active {
-  transition: all 240ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: opacity var(--duration-normal, 240ms) ease, transform var(--duration-normal, 240ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
 }
 
 .float-pill-enter-from,

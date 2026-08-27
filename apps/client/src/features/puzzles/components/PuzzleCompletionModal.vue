@@ -213,7 +213,7 @@ function handleReplay() {
   opacity: 0.25;
   filter: grayscale(1);
   transform: scale(0.9);
-  transition: all var(--duration-normal, 240ms) var(--ease-spring);
+  transition: opacity var(--duration-normal, 240ms) ease, transform var(--duration-normal, 240ms) var(--ease-spring), filter var(--duration-normal, 240ms) ease;
 }
 
 .star-item.is-earned,

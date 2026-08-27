@@ -132,7 +132,7 @@ describe('QrCodeModal.vue', () => {
 
     const errorEl = document.body.querySelector('[data-testid="qr-ip-error"]');
     expect(errorEl).not.toBeNull();
-    expect(errorEl?.textContent).toContain('Please enter a valid IPv4 address');
+    expect(errorEl?.textContent).toContain('Enter a valid IPv4 address');
     expect(customInput.getAttribute('aria-invalid')).toBe('true');
 
     // Enter valid IP
@@ -143,5 +143,32 @@ describe('QrCodeModal.vue', () => {
     const clearedErrorEl = document.body.querySelector('[data-testid="qr-ip-error"]');
     expect(clearedErrorEl).toBeNull();
     expect(customInput.getAttribute('aria-invalid')).toBe('false');
+  });
+
+  it('renders Cloud Server Online info and subtitle when isCloudRelay is true', async () => {
+    wrapper = mount(QrCodeModal, {
+      props: {
+        modelValue: true,
+        roomCode: 'HERO',
+        lanInfo: {
+          lanIp: '127.0.0.1',
+          port: 3000,
+          localUrl: 'https://chess.cloud.app',
+          joinUrl: 'https://chess.cloud.app/?join=HERO',
+          interfaces: [],
+          isCloudRelay: true,
+          relayMode: 'cloud',
+        },
+      },
+    });
+
+    await wrapper.vm.$nextTick();
+
+    const cloudStatus = document.body.querySelector('[data-testid="qr-cloud-status"]');
+    expect(cloudStatus).not.toBeNull();
+    expect(cloudStatus?.textContent).toContain('Cloud Server Online');
+
+    const subtitle = document.body.querySelector('.qr-subtitle');
+    expect(subtitle?.textContent).toContain('Share via Cloud Link / QR Code');
   });
 });

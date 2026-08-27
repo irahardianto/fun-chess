@@ -121,6 +121,15 @@ const isLocalhost = computed(() => {
   return host === 'localhost' || host === '127.0.0.1';
 });
 
+const isCloudMode = computed(() => {
+  const info = props.lanInfo || serverLanInfo.value;
+  return (
+    !!info?.isCloudRelay ||
+    info?.relayMode === 'cloud' ||
+    (typeof window !== 'undefined' && window.location.protocol === 'https:')
+  );
+});
+
 async function generateQr() {
   try {
     const url = await QRCode.toDataURL(effectiveJoinUrl.value, {
@@ -165,9 +174,9 @@ function applyCustomIp() {
     setLanIp(val);
     generateQr();
   } else if (val.length > 0) {
-    ipError.value = 'Please enter a valid IPv4 address (e.g., 192.168.1.15)';
+    ipError.value = 'Enter a valid IPv4 address (e.g. 192.168.1.15).';
   } else {
-    ipError.value = 'Please enter an IP address';
+    ipError.value = 'Enter an IP address.';
   }
 }
 
@@ -212,7 +221,11 @@ function handleClose() {
   >
     <div class="qr-modal-content">
       <p class="qr-subtitle">
-        Scan this QR code with any phone or tablet on the same Wi-Fi to join instantly!
+        {{
+          isCloudMode
+            ? 'Share via Cloud Link / QR Code — play with friends anywhere online!'
+            : 'Scan this QR code with any phone or tablet on the same Wi-Fi to join instantly!'
+        }}
       </p>
 
       <!-- 4-Letter Code Display Pill -->
@@ -221,7 +234,7 @@ function handleClose() {
         class="room-code-badge"
         :aria-label="`Room Code: ${props.roomCode}`"
       >
-        <span class="code-label">ROOM CODE</span>
+        <span class="code-label">Room Code</span>
         <span class="code-value">{{ props.roomCode }}</span>
       </div>
 
@@ -238,8 +251,19 @@ function handleClose() {
         </div>
       </div>
 
-      <!-- IP Configuration & Localhost Notice -->
-      <div class="lan-config-section" :class="{ 'is-warning-mode': isLocalhost }">
+      <!-- Cloud Relay Status Banner -->
+      <div v-if="isCloudMode" class="cloud-relay-card" data-testid="qr-cloud-status">
+        <span class="cloud-relay-icon">☁️</span>
+        <div class="cloud-relay-text">
+          <strong>☁️ Cloud Server Online</strong>
+          <p class="status-tip">
+            Your game room is live on the cloud! Anyone with the link or QR code can join from anywhere.
+          </p>
+        </div>
+      </div>
+
+      <!-- IP Configuration & Localhost Notice (LAN Mode) -->
+      <div v-else class="lan-config-section" :class="{ 'is-warning-mode': isLocalhost }">
         <div class="lan-status-header">
           <span class="lan-status-icon">{{ isLocalhost ? '⚠️' : '📡' }}</span>
           <div class="lan-status-text">
@@ -311,9 +335,30 @@ function handleClose() {
           <!-- Quick Prefill Subnet Buttons (when empty and on localhost) -->
           <div v-if="isLocalhost && !customIpInput" class="prefill-helpers">
             <span class="prefill-label">Quick prefill:</span>
-            <button type="button" class="prefill-tag" @click="prefillPrefix('192.168.1.')">192.168.1._</button>
-            <button type="button" class="prefill-tag" @click="prefillPrefix('192.168.0.')">192.168.0._</button>
-            <button type="button" class="prefill-tag" @click="prefillPrefix('10.0.0.')">10.0.0._</button>
+            <button
+              type="button"
+              class="prefill-tag"
+              :aria-label="'Prefill subnet prefix 192.168.1.'"
+              @click="prefillPrefix('192.168.1.')"
+            >
+              192.168.1._
+            </button>
+            <button
+              type="button"
+              class="prefill-tag"
+              :aria-label="'Prefill subnet prefix 192.168.0.'"
+              @click="prefillPrefix('192.168.0.')"
+            >
+              192.168.0._
+            </button>
+            <button
+              type="button"
+              class="prefill-tag"
+              :aria-label="'Prefill subnet prefix 10.0.0.'"
+              @click="prefillPrefix('10.0.0.')"
+            >
+              10.0.0._
+            </button>
           </div>
 
           <!-- Collapsible Help Guide -->
@@ -321,6 +366,7 @@ function handleClose() {
             <button
               type="button"
               class="help-toggle-btn"
+              :aria-expanded="showIpGuide"
               @click="showIpGuide = !showIpGuide"
             >
               {{ showIpGuide ? '▲ Hide IP help' : '❓ How to find your computer IP' }}
@@ -353,7 +399,8 @@ function handleClose() {
 
       <!-- Network Info Footer -->
       <div class="network-info-footer">
-        <span>📡 Wi-Fi Multiplayer • Host: {{ effectiveHost }}:{{ effectivePort }}</span>
+        <span v-if="isCloudMode">☁️ Cloud Multiplayer • Online Relay Active</span>
+        <span v-else>📡 Wi-Fi Multiplayer • Host: {{ effectiveHost }}:{{ effectivePort }}</span>
       </div>
     </div>
   </BaseModal>
@@ -366,6 +413,37 @@ function handleClose() {
   align-items: center;
   gap: var(--space-3);
   text-align: center;
+}
+
+.cloud-relay-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background-color: var(--color-primary-subtle, rgba(108, 92, 231, 0.12));
+  border: 1.5px solid var(--color-primary, #6c5ce7);
+  border-radius: var(--radius-lg, 16px);
+  padding: var(--space-3) var(--space-4);
+  width: 100%;
+  max-width: 380px;
+  box-sizing: border-box;
+  text-align: start;
+}
+
+.cloud-relay-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.cloud-relay-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cloud-relay-text strong {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--text-main);
 }
 
 .qr-subtitle {
@@ -441,7 +519,7 @@ function handleClose() {
   max-width: 380px;
   box-sizing: border-box;
   text-align: start;
-  transition: all var(--duration-fast);
+  transition: border-color var(--duration-fast) ease, background-color var(--duration-fast) ease;
 }
 
 .lan-config-section.is-warning-mode {
@@ -519,7 +597,7 @@ function handleClose() {
   background: var(--bg-surface);
   color: var(--text-main);
   cursor: pointer;
-  transition: all var(--duration-fast);
+  transition: border-color var(--duration-fast) ease, transform var(--duration-fast) ease, background-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .pill-btn:hover {
@@ -597,15 +675,19 @@ function handleClose() {
 }
 
 .prefill-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   background: var(--bg-surface);
   border: 1px dashed var(--border-medium);
-  padding: 2px 6px;
+  padding: 4px 8px;
+  min-height: 36px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--color-primary);
-  transition: all var(--duration-fast);
+  transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease;
 }
 
 .prefill-tag:hover {

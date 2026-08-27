@@ -68,7 +68,7 @@ const displayText = computed(() => {
   font-weight: 700;
   color: var(--text-main, #0f172a);
   user-select: none;
-  transition: all 240ms var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  transition: background var(--duration-normal, 240ms) ease, border-color var(--duration-normal, 240ms) ease, box-shadow var(--duration-normal, 240ms) ease, transform var(--duration-normal, 240ms) var(--ease-spring);
 }
 
 .streak-icon {
@@ -82,7 +82,7 @@ const displayText = computed(() => {
 
 .multiplier-pill {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   padding: 2px 6px;
@@ -99,8 +99,8 @@ const displayText = computed(() => {
 /* Stage: Spark (2x) */
 .stage--spark {
   background: linear-gradient(135deg, var(--flame-spark-start, #ffb300), var(--flame-spark-end, #f58220));
-  color: #ffffff;
-  border-color: #f58220;
+  color: var(--text-on-primary, #ffffff);
+  border-color: var(--flame-spark-end, #f58220);
   box-shadow: var(--flame-spark-glow, 0 0 12px rgba(255, 179, 0, 0.55));
   animation: flame-pop-in 320ms var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
 }
@@ -108,8 +108,8 @@ const displayText = computed(() => {
 /* Stage: Blaze (3-4x) */
 .stage--blaze {
   background: linear-gradient(135deg, var(--flame-blaze-start, #f97316), var(--flame-blaze-end, #ef4422));
-  color: #ffffff;
-  border-color: #ef4422;
+  color: var(--text-on-primary, #ffffff);
+  border-color: var(--flame-blaze-end, #ef4422);
   box-shadow: var(--flame-blaze-glow, 0 0 20px 4px rgba(249, 115, 22, 0.7));
   animation: flame-flicker 650ms infinite ease-in-out;
 }
@@ -117,8 +117,8 @@ const displayText = computed(() => {
 /* Stage: Inferno (5x+) */
 .stage--inferno {
   background: linear-gradient(135deg, var(--flame-inferno-start, #f43f5e), var(--flame-inferno-mid, #ea580c), var(--flame-inferno-end, #ffc107));
-  color: #ffffff;
-  border-color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
+  border-color: var(--text-on-primary, #ffffff);
   box-shadow: var(--flame-inferno-glow, 0 0 28px 8px rgba(244, 63, 94, 0.8), 0 0 10px rgba(255, 193, 7, 0.9));
   animation: flame-flicker 650ms infinite ease-in-out;
   transform: scale(1.05);
