@@ -99,7 +99,7 @@ const displayText = computed(() => {
 /* Stage: Spark (2x) */
 .stage--spark {
   background: linear-gradient(135deg, var(--flame-spark-start, #ffb300), var(--flame-spark-end, #f58220));
-  color: var(--text-on-primary, #ffffff);
+  color: var(--text-on-accent, #1e1b4b);
   border-color: var(--flame-spark-end, #f58220);
   box-shadow: var(--flame-spark-glow, 0 0 12px rgba(255, 179, 0, 0.55));
   animation: flame-pop-in 320ms var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));

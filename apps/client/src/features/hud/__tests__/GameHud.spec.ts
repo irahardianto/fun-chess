@@ -144,4 +144,21 @@ describe('GameHud.vue', () => {
     await wrapper.find('[data-testid="resign-btn"]').trigger('click');
     expect(wrapper.emitted('resign')).toHaveLength(1);
   });
+
+  it('renders .hud-toolbar wrapper with all action buttons for responsive wrap', () => {
+    const wrapper = mount(GameHud, {
+      props: {
+        whitePlayer: mockWhitePlayer,
+        blackPlayer: mockBlackPlayer,
+        currentTurn: 'w',
+        selfPlayerId: 'player-white',
+        gameState: mockGameState,
+        isMuted: false,
+      },
+    });
+
+    const toolbar = wrapper.find('.hud-toolbar');
+    expect(toolbar.exists()).toBe(true);
+    expect(toolbar.findAll('button')).toHaveLength(4);
+  });
 });

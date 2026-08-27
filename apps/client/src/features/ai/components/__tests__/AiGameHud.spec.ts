@@ -22,8 +22,10 @@ describe('AiGameHud.vue', () => {
     expect(wrapper.find('[data-testid="resign-btn"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="resign-btn"]').classes()).toContain('action-btn--subdued-danger');
 
+    expect(wrapper.classes()).toContain('hud-toolbar');
     expect(wrapper.find('.takeback-badge').text()).toBe('1');
     expect(wrapper.find('.hint-badge').text()).toBe('2');
+    expect(wrapper.find('.moves-count').text()).toBe('6');
     expect(wrapper.find('[data-testid="history-btn"]').text()).toContain('Moves (6)');
   });
 

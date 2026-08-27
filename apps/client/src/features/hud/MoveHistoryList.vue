@@ -124,6 +124,7 @@ watch(
   font-family: var(--font-body);
   font-size: var(--text-xs);
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .history-scroll-area {
@@ -136,6 +137,7 @@ watch(
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   scroll-behavior: smooth;
+  font-variant-numeric: tabular-nums;
 }
 
 .history-empty,
@@ -173,6 +175,7 @@ watch(
 .move-san {
   color: var(--text-main);
   font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
 }
 
 .move-san.is-latest {

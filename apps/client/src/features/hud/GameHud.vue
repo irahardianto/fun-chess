@@ -128,9 +128,10 @@ const emit = defineEmits<{
 
 .hud-toolbar {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3, 12px);
+  width: 100%;
   margin-top: var(--space-1);
 }
 </style>

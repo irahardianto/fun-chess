@@ -31,7 +31,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="ai-game-hud" role="toolbar" aria-label="Solo Game Actions">
+  <div class="ai-game-hud hud-toolbar" role="toolbar" aria-label="Solo Game Actions">
     <!-- Primary Learning Action: Takeback / Undo -->
     <BaseButton
       variant="ghost"
@@ -97,7 +97,7 @@ const emit = defineEmits<{
       <template #icon-left>
         <span class="hud-icon">📜</span>
       </template>
-      <span>Moves ({{ props.movesCount }})</span>
+      <span>Moves (<span class="moves-count">{{ props.movesCount }}</span>)</span>
     </BaseButton>
 
     <!-- Secondary Action: Resign Match -->
@@ -119,13 +119,13 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.ai-game-hud {
+.ai-game-hud,
+.hud-toolbar {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  width: 100%;
   flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3, 12px);
+  width: 100%;
   box-sizing: border-box;
   margin-top: var(--space-2);
 }
@@ -177,6 +177,10 @@ const emit = defineEmits<{
   padding: 1px 6px;
   border-radius: var(--radius-pill);
   margin-inline-start: var(--space-1);
+}
+
+.moves-count {
+  font-variant-numeric: tabular-nums;
 }
 
 .takeback-badge {
