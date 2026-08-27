@@ -1,4 +1,4 @@
-import { Chess } from 'chess.js';
+import { Chess } from "chess.js";
 import {
   GameOverPayload,
   GameOverReason,
@@ -8,8 +8,8 @@ import {
   PieceColor,
   Player,
   RoomState,
-} from '@fun-chess/shared';
-import { RoomStore } from '../rooms/room.store.js';
+} from "@fun-chess/shared";
+import { RoomStore } from "../rooms/room.store.js";
 import {
   RoomNotFoundError,
   GameNotActiveError,
@@ -18,8 +18,8 @@ import {
   InvalidMoveError,
   InvalidPayloadError,
   AppError,
-} from '../rooms/room.errors.js';
-import { ChessEngine } from './chess_engine.js';
+} from "../rooms/room.errors.js";
+import { ChessEngine } from "./chess_engine.js";
 
 export interface MoveApplicationResult {
   room: RoomState;
@@ -40,15 +40,15 @@ export class GameService {
    */
   public async makeMove(
     req: MakeMoveRequest,
-    socketId: string
+    socketId: string,
   ): Promise<MoveApplicationResult> {
-    const roomCode = (req.roomCode || '').trim().toUpperCase();
+    const roomCode = (req.roomCode || "").trim().toUpperCase();
     const room = await this.store.findByCode(roomCode);
     if (!room) {
       throw new RoomNotFoundError(roomCode);
     }
 
-    if (room.status !== 'playing') {
+    if (room.status !== "playing") {
       throw new GameNotActiveError(room.status);
     }
 
@@ -65,7 +65,7 @@ export class GameService {
       room.game.fen,
       req.move,
       player.color,
-      room.game.moveHistory
+      room.game.moveHistory,
     );
 
     if (!outcome.success) {
@@ -79,41 +79,48 @@ export class GameService {
     let gameOverPayload: GameOverPayload | undefined;
 
     if (outcome.nextState.isCheckmate) {
-      room.status = 'game_over';
-      const durationSeconds = Math.max(1, Math.round((Date.now() - room.createdAt) / 1000));
+      room.status = "game_over";
+      const durationSeconds = Math.max(
+        1,
+        Math.round((Date.now() - room.createdAt) / 1000),
+      );
       gameOverPayload = {
         winner: player.color,
         winnerName: player.name,
-        reason: 'checkmate',
+        reason: "checkmate",
         message: `Checkmate! ${player.name} won the match.`,
         finalFen: outcome.nextState.fen,
         totalMoves: outcome.nextState.moveCount,
         durationSeconds,
       };
     } else if (outcome.nextState.isDraw) {
-      room.status = 'game_over';
+      room.status = "game_over";
       const reason: GameOverReason = outcome.nextState.isStalemate
-        ? 'stalemate'
+        ? "stalemate"
         : outcome.nextState.isThreefoldRepetition
-        ? 'threefold_repetition'
-        : outcome.nextState.isInsufficientMaterial
-        ? 'insufficient_material'
-        : outcome.nextState.isFiftyMoveRule
-        ? 'fifty_move_rule'
-        : 'draw_agreement';
+          ? "threefold_repetition"
+          : outcome.nextState.isInsufficientMaterial
+            ? "insufficient_material"
+            : outcome.nextState.isFiftyMoveRule
+              ? "fifty_move_rule"
+              : "draw_agreement";
 
-      const durationSeconds = Math.max(1, Math.round((Date.now() - room.createdAt) / 1000));
+      const durationSeconds = Math.max(
+        1,
+        Math.round((Date.now() - room.createdAt) / 1000),
+      );
       gameOverPayload = {
-        winner: 'draw',
+        winner: "draw",
         reason,
-        message: `Draw by ${reason.replace(/_/g, ' ')}!`,
+        message: `Draw by ${reason.replace(/_/g, " ")}!`,
         finalFen: outcome.nextState.fen,
         totalMoves: outcome.nextState.moveCount,
         durationSeconds,
       };
     } else if (outcome.nextState.isCheck) {
       const chess = new Chess(outcome.nextState.fen);
-      const kingSquare = ChessEngine.getKingSquare(chess, outcome.nextState.turn) || 'e1';
+      const kingSquare =
+        ChessEngine.getKingSquare(chess, outcome.nextState.turn) || "e1";
       checkInfo = {
         inCheck: outcome.nextState.turn,
         kingSquare,
@@ -136,7 +143,7 @@ export class GameService {
    */
   public async resign(
     roomCode: string,
-    socketId: string
+    socketId: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload }> {
     const code = roomCode.trim().toUpperCase();
     const room = await this.store.findByCode(code);
@@ -144,7 +151,7 @@ export class GameService {
       throw new RoomNotFoundError(code);
     }
 
-    if (room.status !== 'playing') {
+    if (room.status !== "playing") {
       throw new GameNotActiveError(room.status);
     }
 
@@ -153,18 +160,22 @@ export class GameService {
       throw new PlayerNotInRoomError(socketId);
     }
 
-    const winnerColor: PieceColor = player.color === 'w' ? 'b' : 'w';
-    const winnerPlayer = winnerColor === 'w' ? room.whitePlayer : room.blackPlayer;
-    const winnerName = winnerPlayer?.name || 'Opponent';
+    const winnerColor: PieceColor = player.color === "w" ? "b" : "w";
+    const winnerPlayer =
+      winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
+    const winnerName = winnerPlayer?.name || "Opponent";
 
-    room.status = 'game_over';
+    room.status = "game_over";
     room.lastActivityAt = Date.now();
 
-    const durationSeconds = Math.max(1, Math.round((Date.now() - room.createdAt) / 1000));
+    const durationSeconds = Math.max(
+      1,
+      Math.round((Date.now() - room.createdAt) / 1000),
+    );
     const gameOverPayload: GameOverPayload = {
       winner: winnerColor,
       winnerName,
-      reason: 'resignation',
+      reason: "resignation",
       message: `${player.name} resigned. ${winnerName} won the match!`,
       finalFen: room.game.fen,
       totalMoves: room.game.moveCount,
@@ -180,15 +191,19 @@ export class GameService {
    */
   public async offerDraw(
     roomCode: string,
-    socketId: string
-  ): Promise<{ room: RoomState; fromPlayer: Player; opponentPlayer: Player | null }> {
+    socketId: string,
+  ): Promise<{
+    room: RoomState;
+    fromPlayer: Player;
+    opponentPlayer: Player | null;
+  }> {
     const code = roomCode.trim().toUpperCase();
     const room = await this.store.findByCode(code);
     if (!room) {
       throw new RoomNotFoundError(code);
     }
 
-    if (room.status !== 'playing') {
+    if (room.status !== "playing") {
       throw new GameNotActiveError(room.status);
     }
 
@@ -197,7 +212,7 @@ export class GameService {
       throw new PlayerNotInRoomError(socketId);
     }
 
-    const opponent = player.color === 'w' ? room.blackPlayer : room.whitePlayer;
+    const opponent = player.color === "w" ? room.blackPlayer : room.whitePlayer;
 
     return { room, fromPlayer: player, opponentPlayer: opponent };
   }
@@ -208,15 +223,20 @@ export class GameService {
   public async respondDraw(
     roomCode: string,
     socketId: string,
-    accept: boolean
-  ): Promise<{ room: RoomState; accept: boolean; byPlayerId: string; gameOverPayload?: GameOverPayload }> {
+    accept: boolean,
+  ): Promise<{
+    room: RoomState;
+    accept: boolean;
+    byPlayerId: string;
+    gameOverPayload?: GameOverPayload;
+  }> {
     const code = roomCode.trim().toUpperCase();
     const room = await this.store.findByCode(code);
     if (!room) {
       throw new RoomNotFoundError(code);
     }
 
-    if (room.status !== 'playing') {
+    if (room.status !== "playing") {
       throw new GameNotActiveError(room.status);
     }
 
@@ -229,14 +249,17 @@ export class GameService {
       return { room, accept: false, byPlayerId: player.id };
     }
 
-    room.status = 'game_over';
+    room.status = "game_over";
     room.lastActivityAt = Date.now();
 
-    const durationSeconds = Math.max(1, Math.round((Date.now() - room.createdAt) / 1000));
+    const durationSeconds = Math.max(
+      1,
+      Math.round((Date.now() - room.createdAt) / 1000),
+    );
     const gameOverPayload: GameOverPayload = {
-      winner: 'draw',
-      reason: 'draw_agreement',
-      message: 'Match concluded with a mutually agreed draw.',
+      winner: "draw",
+      reason: "draw_agreement",
+      message: "Match concluded with a mutually agreed draw.",
       finalFen: room.game.fen,
       totalMoves: room.game.moveCount,
       durationSeconds,
@@ -251,7 +274,7 @@ export class GameService {
    */
   public async requestRematch(
     roomCode: string,
-    socketId: string
+    socketId: string,
   ): Promise<{ room: RoomState; requestedBy: string; requesterName: string }> {
     const code = roomCode.trim().toUpperCase();
     const room = await this.store.findByCode(code);
@@ -259,8 +282,10 @@ export class GameService {
       throw new RoomNotFoundError(code);
     }
 
-    if (room.status !== 'game_over' && room.status !== 'rematch_pending') {
-      throw new GameNotActiveError('Rematches can only be requested after game over');
+    if (room.status !== "game_over" && room.status !== "rematch_pending") {
+      throw new GameNotActiveError(
+        "Rematches can only be requested after game over",
+      );
     }
 
     const player = this.getPlayerBySocketId(room, socketId);
@@ -271,9 +296,9 @@ export class GameService {
     room.rematch = {
       requestedBy: player.id,
       requestedAt: Date.now(),
-      status: 'pending',
+      status: "pending",
     };
-    room.status = 'rematch_pending';
+    room.status = "rematch_pending";
     room.lastActivityAt = Date.now();
 
     await this.store.save(room);
@@ -286,16 +311,23 @@ export class GameService {
   public async respondRematch(
     roomCode: string,
     socketId: string,
-    accept: boolean
-  ): Promise<{ room: RoomState; accept: boolean; byPlayerId: string; nextGameState?: GameState }> {
+    accept: boolean,
+  ): Promise<{
+    room: RoomState;
+    accept: boolean;
+    byPlayerId: string;
+    nextGameState?: GameState;
+  }> {
     const code = roomCode.trim().toUpperCase();
     const room = await this.store.findByCode(code);
     if (!room) {
       throw new RoomNotFoundError(code);
     }
 
-    if (!room.rematch || room.rematch.status !== 'pending') {
-      throw new GameNotActiveError('No pending rematch request found for this room');
+    if (!room.rematch || room.rematch.status !== "pending") {
+      throw new GameNotActiveError(
+        "No pending rematch request found for this room",
+      );
     }
 
     const player = this.getPlayerBySocketId(room, socketId);
@@ -304,12 +336,15 @@ export class GameService {
     }
 
     if (player.id === room.rematch.requestedBy) {
-      throw new InvalidPayloadError('rematch', 'Cannot accept or decline your own rematch request');
+      throw new InvalidPayloadError(
+        "rematch",
+        "Cannot accept or decline your own rematch request",
+      );
     }
 
     if (!accept) {
-      room.rematch.status = 'declined';
-      room.status = 'game_over';
+      room.rematch.status = "declined";
+      room.status = "game_over";
       room.lastActivityAt = Date.now();
       await this.store.save(room);
       return { room, accept: false, byPlayerId: player.id };
@@ -319,8 +354,8 @@ export class GameService {
     const whitePlayer = room.whitePlayer;
     const blackPlayer = room.blackPlayer;
 
-    if (whitePlayer) whitePlayer.color = 'b';
-    if (blackPlayer) blackPlayer.color = 'w';
+    if (whitePlayer) whitePlayer.color = "b";
+    if (blackPlayer) blackPlayer.color = "w";
 
     room.whitePlayer = blackPlayer;
     room.blackPlayer = whitePlayer;
@@ -328,15 +363,23 @@ export class GameService {
     // Reset board
     const initialChess = new Chess();
     room.game = ChessEngine.extractGameState(initialChess, null);
-    room.rematch.status = 'accepted';
-    room.status = 'playing';
+    room.rematch.status = "accepted";
+    room.status = "playing";
     room.lastActivityAt = Date.now();
 
     await this.store.save(room);
-    return { room, accept: true, byPlayerId: player.id, nextGameState: room.game };
+    return {
+      room,
+      accept: true,
+      byPlayerId: player.id,
+      nextGameState: room.game,
+    };
   }
 
-  private getPlayerBySocketId(room: RoomState, socketId: string): Player | null {
+  private getPlayerBySocketId(
+    room: RoomState,
+    socketId: string,
+  ): Player | null {
     if (room.whitePlayer?.socketId === socketId) return room.whitePlayer;
     if (room.blackPlayer?.socketId === socketId) return room.blackPlayer;
     return null;

@@ -1,7 +1,7 @@
-import { Logger } from './logger.interface.js';
+import { Logger } from "./logger.interface.js";
 
 export interface LogEntry {
-  level: 'info' | 'warn' | 'error' | 'debug';
+  level: "info" | "warn" | "error" | "debug";
   message: string;
   context?: Record<string, unknown>;
   timestamp: number;
@@ -22,7 +22,7 @@ export class NullLogger implements Logger {
 
   public info(message: string, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
-      level: 'info',
+      level: "info",
       message,
       context: { ...this.bindings, ...context },
       timestamp: Date.now(),
@@ -33,7 +33,7 @@ export class NullLogger implements Logger {
 
   public warn(message: string, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
-      level: 'warn',
+      level: "warn",
       message,
       context: { ...this.bindings, ...context },
       timestamp: Date.now(),
@@ -44,7 +44,7 @@ export class NullLogger implements Logger {
 
   public error(message: string, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
-      level: 'error',
+      level: "error",
       message,
       context: { ...this.bindings, ...context },
       timestamp: Date.now(),
@@ -55,7 +55,7 @@ export class NullLogger implements Logger {
 
   public debug(message: string, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
-      level: 'debug',
+      level: "debug",
       message,
       context: { ...this.bindings, ...context },
       timestamp: Date.now(),

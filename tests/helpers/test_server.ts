@@ -1,8 +1,8 @@
-import http from 'http';
-import os from 'os';
-import { Server as SocketIOServer, Socket } from 'socket.io';
-import { Chess } from 'chess.js';
-import { randomUUID } from 'crypto';
+import http from "http";
+import os from "os";
+import { Server as SocketIOServer, Socket } from "socket.io";
+import { Chess } from "chess.js";
+import { randomUUID } from "crypto";
 import {
   CreateRoomRequest,
   GameOverPayload,
@@ -26,7 +26,7 @@ import {
   RoomState,
   SocketErrorPayload,
   Square,
-} from '@fun-chess/shared';
+} from "@fun-chess/shared";
 
 export interface TestServerInstance {
   server: http.Server;
@@ -49,7 +49,9 @@ export class InMemoryRoomStore {
     return room ? { ...room } : null;
   }
 
-  public async findBySocketId(socketId: string): Promise<{ room: RoomState; player: Player } | null> {
+  public async findBySocketId(
+    socketId: string,
+  ): Promise<{ room: RoomState; player: Player } | null> {
     for (const room of this.rooms.values()) {
       if (room.whitePlayer?.socketId === socketId) {
         return { room: { ...room }, player: room.whitePlayer };
@@ -79,28 +81,47 @@ export class InMemoryRoomStore {
 }
 
 export class ChessEngine {
-  public static extractGameState(chess: Chess, lastMove: { from: string; to: string } | null = null): GameState {
+  public static extractGameState(
+    chess: Chess,
+    lastMove: { from: string; to: string } | null = null,
+  ): GameState {
     const board = chess.board();
     const capturedWhite: PieceType[] = [];
     const capturedBlack: PieceType[] = [];
 
     // Count current pieces on board
     const currentCounts: Record<string, number> = {
-      wp: 0, wn: 0, wb: 0, wr: 0, wq: 0,
-      bp: 0, bn: 0, bb: 0, br: 0, bq: 0,
+      wp: 0,
+      wn: 0,
+      wb: 0,
+      wr: 0,
+      wq: 0,
+      bp: 0,
+      bn: 0,
+      bb: 0,
+      br: 0,
+      bq: 0,
     };
 
     for (const row of board) {
       for (const square of row) {
-        if (square && square.type !== 'k') {
+        if (square && square.type !== "k") {
           currentCounts[`${square.color}${square.type}`]++;
         }
       }
     }
 
     const startingCounts: Record<string, number> = {
-      wp: 8, wn: 2, wb: 2, wr: 2, wq: 1,
-      bp: 8, bn: 2, bb: 2, br: 2, bq: 1,
+      wp: 8,
+      wn: 2,
+      wb: 2,
+      wr: 2,
+      wq: 1,
+      bp: 8,
+      bn: 2,
+      bb: 2,
+      br: 2,
+      bq: 1,
     };
 
     for (const [key, initial] of Object.entries(startingCounts)) {
@@ -109,7 +130,7 @@ export class ChessEngine {
       const color = key[0] as PieceColor;
       const piece = key[1] as PieceType;
       for (let i = 0; i < diff; i++) {
-        if (color === 'w') {
+        if (color === "w") {
           capturedWhite.push(piece);
         } else {
           capturedBlack.push(piece);
@@ -132,7 +153,7 @@ export class ChessEngine {
     for (const row of board) {
       for (const sq of row) {
         if (sq) {
-          if (sq.color === 'w') whiteMaterial += pieceValues[sq.type];
+          if (sq.color === "w") whiteMaterial += pieceValues[sq.type];
           else blackMaterial += pieceValues[sq.type];
         }
       }
@@ -143,7 +164,8 @@ export class ChessEngine {
     const isThreefold = chess.isThreefoldRepetition();
     const isInsufficient = chess.isInsufficientMaterial();
     const isDraw = chess.isDraw();
-    const isFiftyMove = isDraw && !isStalemate && !isThreefold && !isInsufficient;
+    const isFiftyMove =
+      isDraw && !isStalemate && !isThreefold && !isInsufficient;
 
     return {
       fen: chess.fen(),
@@ -172,14 +194,14 @@ export class ChessEngine {
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
         const piece = board[r][c];
-        if (piece && piece.type === 'k' && piece.color === color) {
-          const file = String.fromCharCode('a'.charCodeAt(0) + c);
+        if (piece && piece.type === "k" && piece.color === color) {
+          const file = String.fromCharCode("a".charCodeAt(0) + c);
           const rank = (8 - r).toString();
           return `${file}${rank}`;
         }
       }
     }
-    return '';
+    return "";
   }
 }
 
@@ -191,47 +213,52 @@ export function getLanInterfaces(): { lanIp: string; interfaces: string[] } {
     const netList = nets[name];
     if (!netList) continue;
     for (const net of netList) {
-      if (net.family === 'IPv4' && !net.internal) {
+      if (net.family === "IPv4" && !net.internal) {
         interfaces.push(net.address);
       }
     }
   }
 
-  const lanIp = interfaces.length > 0 ? interfaces[0] : '127.0.0.1';
+  const lanIp = interfaces.length > 0 ? interfaces[0] : "127.0.0.1";
   return { lanIp, interfaces };
 }
 
 export function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
   for (let i = 0; i < 4; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
 }
 
-export async function createTestServer(customPort = 0): Promise<TestServerInstance> {
+export async function createTestServer(
+  customPort = 0,
+): Promise<TestServerInstance> {
   const startTime = Date.now();
   const roomStore = new InMemoryRoomStore();
   let activeSocketCount = 0;
 
   const server = http.createServer(async (req, res) => {
-    const parsedUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const parsedUrl = new URL(
+      req.url || "/",
+      `http://${req.headers.host || "localhost"}`,
+    );
     const pathname = parsedUrl.pathname;
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-    if (req.method === 'OPTIONS') {
+    if (req.method === "OPTIONS") {
       res.writeHead(204);
       res.end();
       return;
     }
 
-    if (pathname === '/api/lan-info' && req.method === 'GET') {
+    if (pathname === "/api/lan-info" && req.method === "GET") {
       const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 3000;
+      const port = typeof address === "object" && address ? address.port : 3000;
       const { lanIp, interfaces } = getLanInterfaces();
 
       const response: LanInfoResponse = {
@@ -242,17 +269,26 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
         interfaces,
       };
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(response));
       return;
     }
 
-    if (pathname === '/api/health' && req.method === 'GET') {
+    if (pathname === "/healthz" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("OK");
+      return;
+    }
+
+    if (
+      (pathname === "/health" || pathname === "/api/health") &&
+      req.method === "GET"
+    ) {
       const activeRooms = await roomStore.count();
       const mem = process.memoryUsage();
 
       const response: HealthCheckResponse = {
-        status: 'ok',
+        status: "ok",
         uptimeSeconds: Math.round(((Date.now() - startTime) / 1000) * 10) / 10,
         timestamp: new Date().toISOString(),
         activeRooms,
@@ -262,42 +298,49 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
           heapTotal: Math.round((mem.heapTotal / (1024 * 1024)) * 10) / 10,
           heapUsed: Math.round((mem.heapUsed / (1024 * 1024)) * 10) / 10,
         },
+        relay: {
+          mode: "lan",
+        },
       };
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(response));
       return;
     }
 
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Not Found' }));
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Not Found" }));
   });
 
   const io = new SocketIOServer(server, {
-    cors: { origin: '*' },
+    cors: { origin: "*" },
     pingInterval: 10000,
     pingTimeout: 5000,
   });
 
-  io.on('connection', (socket: Socket) => {
+  io.on("connection", (socket: Socket) => {
     activeSocketCount++;
 
-    socket.on('disconnect', () => {
+    socket.on("disconnect", () => {
       activeSocketCount = Math.max(0, activeSocketCount - 1);
     });
 
     // 1. room:create
-    socket.on('room:create', async (payload: CreateRoomRequest, callback) => {
+    socket.on("room:create", async (payload: CreateRoomRequest, callback) => {
       const correlationId = randomUUID();
       try {
-        if (!payload || !payload.playerName || typeof payload.playerName !== 'string') {
+        if (
+          !payload ||
+          !payload.playerName ||
+          typeof payload.playerName !== "string"
+        ) {
           const err: SocketErrorPayload = {
-            code: 'ERR_INVALID_PAYLOAD',
-            message: 'Player name is required',
+            code: "ERR_INVALID_PAYLOAD",
+            message: "Player name is required",
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
@@ -306,18 +349,18 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
         const sessionToken = randomUUID();
 
         let hostColor: PieceColor;
-        if (payload.preferredColor === 'b') {
-          hostColor = 'b';
-        } else if (payload.preferredColor === 'w') {
-          hostColor = 'w';
+        if (payload.preferredColor === "b") {
+          hostColor = "b";
+        } else if (payload.preferredColor === "w") {
+          hostColor = "w";
         } else {
-          hostColor = Math.random() < 0.5 ? 'w' : 'b';
+          hostColor = Math.random() < 0.5 ? "w" : "b";
         }
 
         const hostPlayer: Player = {
           id: playerId,
           socketId: socket.id,
-          name: payload.playerName.trim() || 'Host',
+          name: payload.playerName.trim() || "Host",
           color: hostColor,
           isHost: true,
           isConnected: true,
@@ -329,10 +372,10 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
 
         const newRoom: RoomState = {
           roomCode,
-          status: 'lobby',
+          status: "lobby",
           hostId: playerId,
-          whitePlayer: hostColor === 'w' ? hostPlayer : null,
-          blackPlayer: hostColor === 'b' ? hostPlayer : null,
+          whitePlayer: hostColor === "w" ? hostPlayer : null,
+          blackPlayer: hostColor === "b" ? hostPlayer : null,
           spectators: [],
           game: initialGameState,
           rematch: null,
@@ -346,66 +389,66 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
         if (callback) {
           callback({ success: true, room: newRoom, sessionToken });
         }
-        socket.emit('room:created', newRoom);
+        socket.emit("room:created", newRoom);
       } catch (err: unknown) {
         const errorPayload: SocketErrorPayload = {
-          code: 'ERR_INTERNAL_SERVER',
-          message: (err as Error).message || 'Failed to create room',
+          code: "ERR_INTERNAL_SERVER",
+          message: (err as Error).message || "Failed to create room",
           correlationId,
         };
         if (callback) callback({ success: false, error: errorPayload });
-        socket.emit('error', errorPayload);
+        socket.emit("error", errorPayload);
       }
     });
 
     // 2. room:join
-    socket.on('room:join', async (payload: JoinRoomRequest, callback) => {
+    socket.on("room:join", async (payload: JoinRoomRequest, callback) => {
       const correlationId = randomUUID();
       try {
         if (!payload || !payload.roomCode || !payload.playerName) {
           const err: SocketErrorPayload = {
-            code: 'ERR_INVALID_PAYLOAD',
-            message: 'Room code and player name are required',
+            code: "ERR_INVALID_PAYLOAD",
+            message: "Room code and player name are required",
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
         const room = await roomStore.findByCode(payload.roomCode);
         if (!room) {
           const err: SocketErrorPayload = {
-            code: 'ERR_ROOM_NOT_FOUND',
+            code: "ERR_ROOM_NOT_FOUND",
             message: `Room with code '${payload.roomCode}' not found`,
             roomCode: payload.roomCode,
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
         if (room.whitePlayer && room.blackPlayer) {
           const err: SocketErrorPayload = {
-            code: 'ERR_ROOM_FULL',
+            code: "ERR_ROOM_FULL",
             message: `Room '${payload.roomCode}' is already full`,
             roomCode: payload.roomCode,
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
         const playerId = randomUUID();
         const sessionToken = randomUUID();
-        const assignedColor: PieceColor = room.whitePlayer ? 'b' : 'w';
+        const assignedColor: PieceColor = room.whitePlayer ? "b" : "w";
 
         const joinerPlayer: Player = {
           id: playerId,
           socketId: socket.id,
-          name: payload.playerName.trim() || 'Player 2',
+          name: payload.playerName.trim() || "Player 2",
           color: assignedColor,
           isHost: false,
           isConnected: true,
@@ -413,13 +456,13 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
           connectedAt: Date.now(),
         };
 
-        if (assignedColor === 'w') {
+        if (assignedColor === "w") {
           room.whitePlayer = joinerPlayer;
         } else {
           room.blackPlayer = joinerPlayer;
         }
 
-        room.status = 'playing';
+        room.status = "playing";
         room.lastActivityAt = Date.now();
         await roomStore.save(room);
 
@@ -428,86 +471,88 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
         if (callback) {
           callback({ success: true, room, player: joinerPlayer, sessionToken });
         }
-        socket.emit('room:joined', room);
-        socket.to(room.roomCode).emit('room:player_joined', { player: joinerPlayer, room });
-        io.to(room.roomCode).emit('game:started', room.game);
+        socket.emit("room:joined", room);
+        socket
+          .to(room.roomCode)
+          .emit("room:player_joined", { player: joinerPlayer, room });
+        io.to(room.roomCode).emit("game:started", room.game);
       } catch (err: unknown) {
         const errorPayload: SocketErrorPayload = {
-          code: 'ERR_INTERNAL_SERVER',
-          message: (err as Error).message || 'Failed to join room',
+          code: "ERR_INTERNAL_SERVER",
+          message: (err as Error).message || "Failed to join room",
           correlationId,
         };
         if (callback) callback({ success: false, error: errorPayload });
-        socket.emit('error', errorPayload);
+        socket.emit("error", errorPayload);
       }
     });
 
     // 3. game:move
-    socket.on('game:move', async (payload: MakeMoveRequest, callback) => {
+    socket.on("game:move", async (payload: MakeMoveRequest, callback) => {
       const correlationId = randomUUID();
       try {
         if (!payload || !payload.roomCode || !payload.move) {
           const err: SocketErrorPayload = {
-            code: 'ERR_INVALID_PAYLOAD',
-            message: 'Room code and move payload required',
+            code: "ERR_INVALID_PAYLOAD",
+            message: "Room code and move payload required",
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
         const room = await roomStore.findByCode(payload.roomCode);
         if (!room) {
           const err: SocketErrorPayload = {
-            code: 'ERR_ROOM_NOT_FOUND',
+            code: "ERR_ROOM_NOT_FOUND",
             message: `Room '${payload.roomCode}' not found`,
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
-        if (room.status !== 'playing') {
+        if (room.status !== "playing") {
           const err: SocketErrorPayload = {
-            code: 'ERR_GAME_NOT_ACTIVE',
+            code: "ERR_GAME_NOT_ACTIVE",
             message: `Game is not currently active (status: ${room.status})`,
             roomCode: payload.roomCode,
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
         // Determine player color
         let playerColor: PieceColor | null = null;
-        if (room.whitePlayer?.socketId === socket.id) playerColor = 'w';
-        else if (room.blackPlayer?.socketId === socket.id) playerColor = 'b';
+        if (room.whitePlayer?.socketId === socket.id) playerColor = "w";
+        else if (room.blackPlayer?.socketId === socket.id) playerColor = "b";
 
         if (!playerColor) {
           const err: SocketErrorPayload = {
-            code: 'ERR_PLAYER_NOT_IN_ROOM',
-            message: 'You are not an active player in this room',
+            code: "ERR_PLAYER_NOT_IN_ROOM",
+            message: "You are not an active player in this room",
             roomCode: payload.roomCode,
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
         const chess = new Chess(room.game.fen);
         if (chess.turn() !== playerColor) {
           const err: SocketErrorPayload = {
-            code: 'ERR_NOT_YOUR_TURN',
-            message: `Not your turn. Turn is for ${chess.turn() === 'w' ? 'White' : 'Black'}`,
+            code: "ERR_NOT_YOUR_TURN",
+            message: `Not your turn. Turn is for ${chess.turn() === "w" ? "White" : "Black"}`,
             roomCode: payload.roomCode,
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
@@ -524,13 +569,13 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
 
         if (!result) {
           const err: SocketErrorPayload = {
-            code: 'ERR_INVALID_MOVE',
+            code: "ERR_INVALID_MOVE",
             message: `Illegal move: ${payload.move.from}->${payload.move.to}`,
             roomCode: payload.roomCode,
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
@@ -544,8 +589,12 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
           san: result.san,
           piece: result.piece as PieceType,
           color: result.color as PieceColor,
-          captured: result.captured ? (result.captured as PieceType) : undefined,
-          promotion: result.promotion ? (result.promotion as PieceType) : undefined,
+          captured: result.captured
+            ? (result.captured as PieceType)
+            : undefined,
+          promotion: result.promotion
+            ? (result.promotion as PieceType)
+            : undefined,
           flags: result.flags,
           fen: chess.fen(),
           moveNumber: Math.ceil(nextMoveCount / 2),
@@ -559,14 +608,15 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
 
         // Check if game is over
         if (nextGameState.isCheckmate) {
-          room.status = 'game_over';
+          room.status = "game_over";
           const winner: PieceColor = playerColor;
-          const winnerPlayer = winner === 'w' ? room.whitePlayer : room.blackPlayer;
+          const winnerPlayer =
+            winner === "w" ? room.whitePlayer : room.blackPlayer;
           const gameOverPayload: GameOverPayload = {
             winner,
             winnerName: winnerPlayer?.name,
-            reason: 'checkmate',
-            message: `Checkmate! ${winnerPlayer?.name || (winner === 'w' ? 'White' : 'Black')} wins!`,
+            reason: "checkmate",
+            message: `Checkmate! ${winnerPlayer?.name || (winner === "w" ? "White" : "Black")} wins!`,
             finalFen: nextGameState.fen,
             totalMoves: nextGameState.moveCount,
             durationSeconds: Math.round((Date.now() - room.createdAt) / 1000),
@@ -574,31 +624,34 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
           await roomStore.save(room);
 
           if (callback) callback({ success: true, moveResult });
-          io.to(room.roomCode).emit('game:moved', { move: moveResult, gameState: nextGameState });
-          io.to(room.roomCode).emit('game:over', gameOverPayload);
+          io.to(room.roomCode).emit("game:moved", {
+            move: moveResult,
+            gameState: nextGameState,
+          });
+          io.to(room.roomCode).emit("game:over", gameOverPayload);
           return;
         }
 
         if (nextGameState.isDraw) {
-          room.status = 'game_over';
-          let reason: GameOverPayload['reason'] = 'stalemate';
-          let message = 'Game drawn!';
+          room.status = "game_over";
+          let reason: GameOverPayload["reason"] = "stalemate";
+          let message = "Game drawn!";
           if (nextGameState.isStalemate) {
-            reason = 'stalemate';
-            message = 'Stalemate! Game is a draw.';
+            reason = "stalemate";
+            message = "Stalemate! Game is a draw.";
           } else if (nextGameState.isThreefoldRepetition) {
-            reason = 'threefold_repetition';
-            message = 'Draw by threefold repetition.';
+            reason = "threefold_repetition";
+            message = "Draw by threefold repetition.";
           } else if (nextGameState.isInsufficientMaterial) {
-            reason = 'insufficient_material';
-            message = 'Draw by insufficient material.';
+            reason = "insufficient_material";
+            message = "Draw by insufficient material.";
           } else if (nextGameState.isFiftyMoveRule) {
-            reason = 'fifty_move_rule';
-            message = 'Draw by 50-move rule.';
+            reason = "fifty_move_rule";
+            message = "Draw by 50-move rule.";
           }
 
           const gameOverPayload: GameOverPayload = {
-            winner: 'draw',
+            winner: "draw",
             reason,
             message,
             finalFen: nextGameState.fen,
@@ -608,51 +661,61 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
           await roomStore.save(room);
 
           if (callback) callback({ success: true, moveResult });
-          io.to(room.roomCode).emit('game:moved', { move: moveResult, gameState: nextGameState });
-          io.to(room.roomCode).emit('game:over', gameOverPayload);
+          io.to(room.roomCode).emit("game:moved", {
+            move: moveResult,
+            gameState: nextGameState,
+          });
+          io.to(room.roomCode).emit("game:over", gameOverPayload);
           return;
         }
 
         await roomStore.save(room);
 
         if (callback) callback({ success: true, moveResult });
-        io.to(room.roomCode).emit('game:moved', { move: moveResult, gameState: nextGameState });
+        io.to(room.roomCode).emit("game:moved", {
+          move: moveResult,
+          gameState: nextGameState,
+        });
 
         if (nextGameState.isCheck) {
           const sideInCheck = nextGameState.turn;
           const kingSquare = ChessEngine.findKingSquare(chess, sideInCheck);
-          io.to(room.roomCode).emit('game:check', { inCheck: sideInCheck, kingSquare });
+          io.to(room.roomCode).emit("game:check", {
+            inCheck: sideInCheck,
+            kingSquare,
+          });
         }
       } catch (err: unknown) {
         const errorPayload: SocketErrorPayload = {
-          code: 'ERR_INTERNAL_SERVER',
-          message: (err as Error).message || 'Move failed',
+          code: "ERR_INTERNAL_SERVER",
+          message: (err as Error).message || "Move failed",
           correlationId,
         };
         if (callback) callback({ success: false, error: errorPayload });
-        socket.emit('error', errorPayload);
+        socket.emit("error", errorPayload);
       }
     });
 
     // 4. game:resign
-    socket.on('game:resign', async (payload: ResignRequest) => {
+    socket.on("game:resign", async (payload: ResignRequest) => {
       const room = await roomStore.findByCode(payload.roomCode);
-      if (!room || room.status !== 'playing') return;
+      if (!room || room.status !== "playing") return;
 
       let resigningColor: PieceColor | null = null;
-      if (room.whitePlayer?.socketId === socket.id) resigningColor = 'w';
-      else if (room.blackPlayer?.socketId === socket.id) resigningColor = 'b';
+      if (room.whitePlayer?.socketId === socket.id) resigningColor = "w";
+      else if (room.blackPlayer?.socketId === socket.id) resigningColor = "b";
       if (!resigningColor) return;
 
-      const winner: PieceColor = resigningColor === 'w' ? 'b' : 'w';
-      const winnerPlayer = winner === 'w' ? room.whitePlayer : room.blackPlayer;
-      const resigningPlayer = resigningColor === 'w' ? room.whitePlayer : room.blackPlayer;
+      const winner: PieceColor = resigningColor === "w" ? "b" : "w";
+      const winnerPlayer = winner === "w" ? room.whitePlayer : room.blackPlayer;
+      const resigningPlayer =
+        resigningColor === "w" ? room.whitePlayer : room.blackPlayer;
 
-      room.status = 'game_over';
+      room.status = "game_over";
       const gameOverPayload: GameOverPayload = {
         winner,
         winnerName: winnerPlayer?.name,
-        reason: 'resignation',
+        reason: "resignation",
         message: `${resigningPlayer?.name} resigned. ${winnerPlayer?.name} wins!`,
         finalFen: room.game.fen,
         totalMoves: room.game.moveCount,
@@ -660,142 +723,167 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
       };
 
       await roomStore.save(room);
-      io.to(room.roomCode).emit('game:over', gameOverPayload);
+      io.to(room.roomCode).emit("game:over", gameOverPayload);
     });
 
     // 5. game:offer_draw & game:respond_draw
-    socket.on('game:offer_draw', async (payload: OfferDrawRequest) => {
+    socket.on("game:offer_draw", async (payload: OfferDrawRequest) => {
       const room = await roomStore.findByCode(payload.roomCode);
-      if (!room || room.status !== 'playing') return;
+      if (!room || room.status !== "playing") return;
 
       let player: Player | null = null;
       if (room.whitePlayer?.socketId === socket.id) player = room.whitePlayer;
-      else if (room.blackPlayer?.socketId === socket.id) player = room.blackPlayer;
+      else if (room.blackPlayer?.socketId === socket.id)
+        player = room.blackPlayer;
       if (!player) return;
 
-      socket.to(room.roomCode).emit('game:draw_offered', {
+      socket.to(room.roomCode).emit("game:draw_offered", {
         fromPlayerId: player.id,
         fromPlayerName: player.name,
       });
     });
 
-    socket.on('game:respond_draw', async (payload: RespondDrawRequest) => {
+    socket.on("game:respond_draw", async (payload: RespondDrawRequest) => {
       const room = await roomStore.findByCode(payload.roomCode);
-      if (!room || room.status !== 'playing') return;
+      if (!room || room.status !== "playing") return;
 
       let player: Player | null = null;
       if (room.whitePlayer?.socketId === socket.id) player = room.whitePlayer;
-      else if (room.blackPlayer?.socketId === socket.id) player = room.blackPlayer;
+      else if (room.blackPlayer?.socketId === socket.id)
+        player = room.blackPlayer;
       if (!player) return;
 
       if (payload.accept) {
-        room.status = 'game_over';
+        room.status = "game_over";
         const gameOverPayload: GameOverPayload = {
-          winner: 'draw',
-          reason: 'draw_agreement',
-          message: 'Game drawn by mutual agreement.',
+          winner: "draw",
+          reason: "draw_agreement",
+          message: "Game drawn by mutual agreement.",
           finalFen: room.game.fen,
           totalMoves: room.game.moveCount,
           durationSeconds: Math.round((Date.now() - room.createdAt) / 1000),
         };
         await roomStore.save(room);
-        io.to(room.roomCode).emit('game:over', gameOverPayload);
+        io.to(room.roomCode).emit("game:over", gameOverPayload);
       } else {
-        io.to(room.roomCode).emit('game:draw_declined', { byPlayerId: player.id });
+        io.to(room.roomCode).emit("game:draw_declined", {
+          byPlayerId: player.id,
+        });
       }
     });
 
     // 6. game:request_rematch & game:respond_rematch
-    socket.on('game:request_rematch', async (payload: RequestRematchRequest) => {
-      const room = await roomStore.findByCode(payload.roomCode);
-      if (!room || room.status !== 'game_over') return;
+    socket.on(
+      "game:request_rematch",
+      async (payload: RequestRematchRequest) => {
+        const room = await roomStore.findByCode(payload.roomCode);
+        if (!room || room.status !== "game_over") return;
 
-      let player: Player | null = null;
-      if (room.whitePlayer?.socketId === socket.id) player = room.whitePlayer;
-      else if (room.blackPlayer?.socketId === socket.id) player = room.blackPlayer;
-      if (!player) return;
+        let player: Player | null = null;
+        if (room.whitePlayer?.socketId === socket.id) player = room.whitePlayer;
+        else if (room.blackPlayer?.socketId === socket.id)
+          player = room.blackPlayer;
+        if (!player) return;
 
-      room.rematch = {
-        requestedBy: player.id,
-        requestedAt: Date.now(),
-        status: 'pending',
-      };
-      await roomStore.save(room);
-
-      io.to(room.roomCode).emit('game:rematch_requested', {
-        requestedBy: player.id,
-        requesterName: player.name,
-      });
-    });
-
-    socket.on('game:respond_rematch', async (payload: RespondRematchRequest) => {
-      const room = await roomStore.findByCode(payload.roomCode);
-      if (!room || room.status !== 'game_over' || !room.rematch) return;
-
-      let player: Player | null = null;
-      if (room.whitePlayer?.socketId === socket.id) player = room.whitePlayer;
-      else if (room.blackPlayer?.socketId === socket.id) player = room.blackPlayer;
-      if (!player) return;
-
-      if (payload.accept) {
-        // Swap colors
-        const oldWhite = room.whitePlayer;
-        const oldBlack = room.blackPlayer;
-
-        if (oldWhite) oldWhite.color = 'b';
-        if (oldBlack) oldBlack.color = 'w';
-
-        room.whitePlayer = oldBlack;
-        room.blackPlayer = oldWhite;
-
-        const freshGameState = ChessEngine.extractGameState(new Chess());
-        room.game = freshGameState;
-        room.status = 'playing';
-        room.rematch = null;
-        room.lastActivityAt = Date.now();
-
+        room.rematch = {
+          requestedBy: player.id,
+          requestedAt: Date.now(),
+          status: "pending",
+        };
         await roomStore.save(room);
-        io.to(room.roomCode).emit('game:rematch_started', freshGameState);
-      } else {
-        room.rematch.status = 'declined';
-        await roomStore.save(room);
-        io.to(room.roomCode).emit('game:rematch_declined', { byPlayerId: player.id });
-      }
-    });
+
+        io.to(room.roomCode).emit("game:rematch_requested", {
+          requestedBy: player.id,
+          requesterName: player.name,
+        });
+      },
+    );
+
+    socket.on(
+      "game:respond_rematch",
+      async (payload: RespondRematchRequest) => {
+        const room = await roomStore.findByCode(payload.roomCode);
+        if (!room || room.status !== "game_over" || !room.rematch) return;
+
+        let player: Player | null = null;
+        if (room.whitePlayer?.socketId === socket.id) player = room.whitePlayer;
+        else if (room.blackPlayer?.socketId === socket.id)
+          player = room.blackPlayer;
+        if (!player) return;
+
+        if (payload.accept) {
+          // Swap colors
+          const oldWhite = room.whitePlayer;
+          const oldBlack = room.blackPlayer;
+
+          if (oldWhite) oldWhite.color = "b";
+          if (oldBlack) oldBlack.color = "w";
+
+          room.whitePlayer = oldBlack;
+          room.blackPlayer = oldWhite;
+
+          const freshGameState = ChessEngine.extractGameState(new Chess());
+          room.game = freshGameState;
+          room.status = "playing";
+          room.rematch = null;
+          room.lastActivityAt = Date.now();
+
+          await roomStore.save(room);
+          io.to(room.roomCode).emit("game:rematch_started", freshGameState);
+        } else {
+          room.rematch.status = "declined";
+          await roomStore.save(room);
+          io.to(room.roomCode).emit("game:rematch_declined", {
+            byPlayerId: player.id,
+          });
+        }
+      },
+    );
 
     // 7. room:reconnect
-    socket.on('room:reconnect', async (payload: ReconnectRequest, callback) => {
+    socket.on("room:reconnect", async (payload: ReconnectRequest, callback) => {
       const correlationId = randomUUID();
       try {
-        if (!payload || !payload.roomCode || !payload.playerId || !payload.sessionToken) {
+        if (
+          !payload ||
+          !payload.roomCode ||
+          !payload.playerId ||
+          !payload.sessionToken
+        ) {
           const err: SocketErrorPayload = {
-            code: 'ERR_INVALID_PAYLOAD',
-            message: 'roomCode, playerId, and sessionToken required',
+            code: "ERR_INVALID_PAYLOAD",
+            message: "roomCode, playerId, and sessionToken required",
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
         const room = await roomStore.findByCode(payload.roomCode);
         if (!room) {
           const err: SocketErrorPayload = {
-            code: 'ERR_ROOM_NOT_FOUND',
-            message: 'Room not found',
+            code: "ERR_ROOM_NOT_FOUND",
+            message: "Room not found",
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
         let player: Player | null = null;
-        if (room.whitePlayer?.id === payload.playerId && room.whitePlayer.sessionToken === payload.sessionToken) {
+        if (
+          room.whitePlayer?.id === payload.playerId &&
+          room.whitePlayer.sessionToken === payload.sessionToken
+        ) {
           room.whitePlayer.socketId = socket.id;
           room.whitePlayer.isConnected = true;
           player = room.whitePlayer;
-        } else if (room.blackPlayer?.id === payload.playerId && room.blackPlayer.sessionToken === payload.sessionToken) {
+        } else if (
+          room.blackPlayer?.id === payload.playerId &&
+          room.blackPlayer.sessionToken === payload.sessionToken
+        ) {
           room.blackPlayer.socketId = socket.id;
           room.blackPlayer.isConnected = true;
           player = room.blackPlayer;
@@ -803,12 +891,12 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
 
         if (!player) {
           const err: SocketErrorPayload = {
-            code: 'ERR_UNAUTHORIZED',
-            message: 'Invalid playerId or sessionToken',
+            code: "ERR_UNAUTHORIZED",
+            message: "Invalid playerId or sessionToken",
             correlationId,
           };
           if (callback) callback({ success: false, error: err });
-          socket.emit('error', err);
+          socket.emit("error", err);
           return;
         }
 
@@ -816,35 +904,37 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
         await roomStore.save(room);
 
         if (callback) callback({ success: true, room, player });
-        socket.to(room.roomCode).emit('room:player_reconnected', {
+        socket.to(room.roomCode).emit("room:player_reconnected", {
           playerId: player.id,
           playerName: player.name,
         });
       } catch (err: unknown) {
         const errorPayload: SocketErrorPayload = {
-          code: 'ERR_INTERNAL_SERVER',
-          message: (err as Error).message || 'Reconnect failed',
+          code: "ERR_INTERNAL_SERVER",
+          message: (err as Error).message || "Reconnect failed",
           correlationId,
         };
         if (callback) callback({ success: false, error: errorPayload });
-        socket.emit('error', errorPayload);
+        socket.emit("error", errorPayload);
       }
     });
 
     // 8. room:leave
-    socket.on('room:leave', async (payload: LeaveRoomRequest) => {
+    socket.on("room:leave", async (payload: LeaveRoomRequest) => {
       const room = await roomStore.findByCode(payload.roomCode);
       if (!room) return;
 
       let leavingPlayer: Player | null = null;
-      if (room.whitePlayer?.socketId === socket.id) leavingPlayer = room.whitePlayer;
-      else if (room.blackPlayer?.socketId === socket.id) leavingPlayer = room.blackPlayer;
+      if (room.whitePlayer?.socketId === socket.id)
+        leavingPlayer = room.whitePlayer;
+      else if (room.blackPlayer?.socketId === socket.id)
+        leavingPlayer = room.blackPlayer;
 
       if (leavingPlayer) {
-        socket.to(room.roomCode).emit('room:player_left', {
+        socket.to(room.roomCode).emit("room:player_left", {
           playerId: leavingPlayer.id,
           playerName: leavingPlayer.name,
-          reason: 'Left game',
+          reason: "Left game",
         });
         socket.leave(room.roomCode);
       }
@@ -852,11 +942,12 @@ export async function createTestServer(customPort = 0): Promise<TestServerInstan
   });
 
   await new Promise<void>((resolve) => {
-    server.listen(customPort, '127.0.0.1', () => resolve());
+    server.listen(customPort, "127.0.0.1", () => resolve());
   });
 
   const address = server.address();
-  const assignedPort = typeof address === 'object' && address ? address.port : customPort;
+  const assignedPort =
+    typeof address === "object" && address ? address.port : customPort;
   const url = `http://127.0.0.1:${assignedPort}`;
 
   const close = async () => {

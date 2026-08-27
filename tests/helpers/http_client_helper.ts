@@ -1,4 +1,4 @@
-import { LanInfoResponse, HealthCheckResponse } from '@fun-chess/shared';
+import { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
 
 export interface HttpResponse<T> {
   status: number;
@@ -6,7 +6,9 @@ export interface HttpResponse<T> {
   data: T;
 }
 
-export async function fetchLanInfo(baseUrl: string): Promise<HttpResponse<LanInfoResponse>> {
+export async function fetchLanInfo(
+  baseUrl: string,
+): Promise<HttpResponse<LanInfoResponse>> {
   const res = await fetch(`${baseUrl}/api/lan-info`);
   const data = (await res.json()) as LanInfoResponse;
   return {
@@ -16,7 +18,9 @@ export async function fetchLanInfo(baseUrl: string): Promise<HttpResponse<LanInf
   };
 }
 
-export async function fetchHealth(baseUrl: string): Promise<HttpResponse<HealthCheckResponse>> {
+export async function fetchHealth(
+  baseUrl: string,
+): Promise<HttpResponse<HealthCheckResponse>> {
   const res = await fetch(`${baseUrl}/api/health`);
   const data = (await res.json()) as HealthCheckResponse;
   return {

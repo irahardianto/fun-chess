@@ -1,4 +1,4 @@
-import { Chess, Square as ChessJsSquare } from 'chess.js';
+import { Chess, Square as ChessJsSquare } from "chess.js";
 import {
   GameState,
   MovePayload,
@@ -6,7 +6,7 @@ import {
   PieceColor,
   PieceType,
   Square,
-} from '@fun-chess/shared';
+} from "@fun-chess/shared";
 
 const PIECE_VALUES: Record<PieceType, number> = {
   p: 1,
@@ -26,8 +26,8 @@ const STARTING_PIECES: Record<PieceType, number> = {
   k: 1,
 };
 
-const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
-const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'] as const;
+const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
+const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 
 export interface ValidationSuccess {
   success: true;
@@ -54,17 +54,17 @@ export class ChessEngine {
     currentFen: string,
     move: MovePayload,
     expectedTurn: PieceColor,
-    currentHistory: MoveResult[] = []
+    currentHistory: MoveResult[] = [],
   ): MoveValidationOutcome {
     let chess: Chess;
     try {
       chess = new Chess(currentFen);
     } catch {
-      return { success: false, error: 'Invalid board FEN string' };
+      return { success: false, error: "Invalid board FEN string" };
     }
 
     if (chess.turn() !== expectedTurn) {
-      return { success: false, error: 'Not your turn' };
+      return { success: false, error: "Not your turn" };
     }
 
     try {
@@ -75,7 +75,7 @@ export class ChessEngine {
       });
 
       if (!result) {
-        return { success: false, error: 'Illegal move' };
+        return { success: false, error: "Illegal move" };
       }
 
       const moveResult: MoveResult = {
@@ -85,7 +85,9 @@ export class ChessEngine {
         piece: result.piece as PieceType,
         color: result.color as PieceColor,
         captured: result.captured ? (result.captured as PieceType) : undefined,
-        promotion: result.promotion ? (result.promotion as PieceType) : undefined,
+        promotion: result.promotion
+          ? (result.promotion as PieceType)
+          : undefined,
         flags: result.flags,
         fen: chess.fen(),
         moveNumber: currentHistory.length + 1,
@@ -93,13 +95,17 @@ export class ChessEngine {
       };
 
       const updatedHistory = [...currentHistory, moveResult];
-      const nextState = this.extractGameState(chess, { from: result.from, to: result.to }, updatedHistory);
+      const nextState = this.extractGameState(
+        chess,
+        { from: result.from, to: result.to },
+        updatedHistory,
+      );
 
       return { success: true, nextState, moveResult };
     } catch (err: unknown) {
       return {
         success: false,
-        error: (err as Error).message || 'Invalid move coordinates',
+        error: (err as Error).message || "Invalid move coordinates",
       };
     }
   }
@@ -110,7 +116,7 @@ export class ChessEngine {
   public static extractGameState(
     chess: Chess,
     lastMove: { from: string; to: string } | null,
-    moveHistory: MoveResult[] = []
+    moveHistory: MoveResult[] = [],
   ): GameState {
     const fen = chess.fen();
     const turn = chess.turn() as PieceColor;
@@ -121,12 +127,23 @@ export class ChessEngine {
     const isInsufficientMaterial = chess.isInsufficientMaterial();
 
     // FEN halfmove clock (5th token)
-    const fenTokens = fen.split(' ');
-    const halfMoveClock = parseInt(fenTokens[4] || '0', 10);
-    const isFiftyMoveRule = halfMoveClock >= 100 || (chess.isDraw() && !isStalemate && !isThreefoldRepetition && !isInsufficientMaterial);
-    const isDraw = chess.isDraw() || isStalemate || isThreefoldRepetition || isInsufficientMaterial || isFiftyMoveRule;
+    const fenTokens = fen.split(" ");
+    const halfMoveClock = parseInt(fenTokens[4] || "0", 10);
+    const isFiftyMoveRule =
+      halfMoveClock >= 100 ||
+      (chess.isDraw() &&
+        !isStalemate &&
+        !isThreefoldRepetition &&
+        !isInsufficientMaterial);
+    const isDraw =
+      chess.isDraw() ||
+      isStalemate ||
+      isThreefoldRepetition ||
+      isInsufficientMaterial ||
+      isFiftyMoveRule;
 
-    const { capturedWhite, capturedBlack, materialAdvantage } = this.calculateMaterialAndCaptures(chess);
+    const { capturedWhite, capturedBlack, materialAdvantage } =
+      this.calculateMaterialAndCaptures(chess);
 
     return {
       fen,
@@ -157,8 +174,22 @@ export class ChessEngine {
   } {
     const board = chess.board();
 
-    const whiteCounts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
-    const blackCounts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
+    const whiteCounts: Record<PieceType, number> = {
+      p: 0,
+      n: 0,
+      b: 0,
+      r: 0,
+      q: 0,
+      k: 0,
+    };
+    const blackCounts: Record<PieceType, number> = {
+      p: 0,
+      n: 0,
+      b: 0,
+      r: 0,
+      q: 0,
+      k: 0,
+    };
 
     let whiteMaterial = 0;
     let blackMaterial = 0;
@@ -171,7 +202,7 @@ export class ChessEngine {
         if (!piece) continue;
 
         const pType = piece.type as PieceType;
-        if (piece.color === 'w') {
+        if (piece.color === "w") {
           whiteCounts[pType]++;
           whiteMaterial += PIECE_VALUES[pType];
         } else {
@@ -185,15 +216,21 @@ export class ChessEngine {
     const capturedBlack: PieceType[] = [];
 
     // Pieces order: q, r, b, n, p
-    const pieceOrder: PieceType[] = ['q', 'r', 'b', 'n', 'p'];
+    const pieceOrder: PieceType[] = ["q", "r", "b", "n", "p"];
 
     for (const type of pieceOrder) {
-      const whiteMissing = Math.max(0, STARTING_PIECES[type] - whiteCounts[type]);
+      const whiteMissing = Math.max(
+        0,
+        STARTING_PIECES[type] - whiteCounts[type],
+      );
       for (let i = 0; i < whiteMissing; i++) {
         capturedWhite.push(type);
       }
 
-      const blackMissing = Math.max(0, STARTING_PIECES[type] - blackCounts[type]);
+      const blackMissing = Math.max(
+        0,
+        STARTING_PIECES[type] - blackCounts[type],
+      );
       for (let i = 0; i < blackMissing; i++) {
         capturedBlack.push(type);
       }
@@ -221,7 +258,7 @@ export class ChessEngine {
       if (!row) continue;
       for (let c = 0; c < 8; c++) {
         const piece = row[c];
-        if (piece && piece.type === 'k' && piece.color === color) {
+        if (piece && piece.type === "k" && piece.color === color) {
           const file = FILES[c];
           const rank = RANKS[r];
           if (file && rank) {

@@ -1,4 +1,4 @@
-import { Socket } from 'socket.io';
+import { Socket } from "socket.io";
 import {
   CreateRoomRequest,
   JoinRoomRequest,
@@ -6,11 +6,11 @@ import {
   ReconnectRequest,
   RoomState,
   Player,
-} from '@fun-chess/shared';
-import { Logger } from '../../platform/logger/logger.interface.js';
-import { wrapSocketHandler } from '../../platform/socket/socket_logging_middleware.js';
-import { RoomService } from './room.service.js';
-import { TypedSocketServer } from '../../platform/socket/socket_server.js';
+} from "@fun-chess/shared";
+import { Logger } from "../../platform/logger/logger.interface.js";
+import { wrapSocketHandler } from "../../platform/socket/socket_logging_middleware.js";
+import { RoomService } from "./room.service.js";
+import { TypedSocketServer } from "../../platform/socket/socket_server.js";
 
 export const DISCONNECT_GRACE_PERIOD_MS = 60_000;
 
@@ -19,11 +19,17 @@ export const DISCONNECT_GRACE_PERIOD_MS = 60_000;
  */
 export const disconnectTimers = new Map<string, NodeJS.Timeout>();
 
-export function getDisconnectTimerKey(roomCode: string, playerId: string): string {
+export function getDisconnectTimerKey(
+  roomCode: string,
+  playerId: string,
+): string {
   return `${roomCode.toUpperCase()}:${playerId}`;
 }
 
-export function cancelDisconnectTimer(roomCode: string, playerId: string): boolean {
+export function cancelDisconnectTimer(
+  roomCode: string,
+  playerId: string,
+): boolean {
   const key = getDisconnectTimerKey(roomCode, playerId);
   const timer = disconnectTimers.get(key);
   if (timer) {
@@ -58,96 +64,90 @@ export function registerRoomSocketHandlers(
   io: TypedSocketServer,
   socket: Socket,
   roomService: RoomService,
-  logger: Logger
+  logger: Logger,
 ): void {
   // 1. room:create
   socket.on(
-    'room:create',
-    wrapSocketHandler<CreateRoomRequest, { success: true; room: RoomState; sessionToken: string }>(
-      logger,
-      'room:create',
-      socket.id,
-      async (req) => {
-        const result = await roomService.createRoom(req, socket.id);
-        await socket.join(result.room.roomCode);
+    "room:create",
+    wrapSocketHandler<
+      CreateRoomRequest,
+      { success: true; room: RoomState; sessionToken: string }
+    >(logger, "room:create", socket.id, async (req) => {
+      const result = await roomService.createRoom(req, socket.id);
+      await socket.join(result.room.roomCode);
 
-        socket.emit('room:created', result.room);
-        return {
-          success: true,
-          room: result.room,
-          sessionToken: result.sessionToken,
-        };
-      }
-    )
+      socket.emit("room:created", result.room);
+      return {
+        success: true,
+        room: result.room,
+        sessionToken: result.sessionToken,
+      };
+    }),
   );
 
   // 2. room:join
   socket.on(
-    'room:join',
-    wrapSocketHandler<JoinRoomRequest, { success: true; room: RoomState; player: Player; sessionToken: string }>(
-      logger,
-      'room:join',
-      socket.id,
-      async (req) => {
-        const result = await roomService.joinRoom(req, socket.id);
-        const roomCode = result.room.roomCode;
-        await socket.join(roomCode);
+    "room:join",
+    wrapSocketHandler<
+      JoinRoomRequest,
+      { success: true; room: RoomState; player: Player; sessionToken: string }
+    >(logger, "room:join", socket.id, async (req) => {
+      const result = await roomService.joinRoom(req, socket.id);
+      const roomCode = result.room.roomCode;
+      await socket.join(roomCode);
 
-        socket.emit('room:joined', result.room);
-        socket.to(roomCode).emit('room:player_joined', {
-          player: result.player,
-          room: result.room,
-        });
+      socket.emit("room:joined", result.room);
+      socket.to(roomCode).emit("room:player_joined", {
+        player: result.player,
+        room: result.room,
+      });
 
-        if (result.room.status === 'playing') {
-          io.to(roomCode).emit('game:started', result.room.game);
-        }
-
-        return {
-          success: true,
-          room: result.room,
-          player: result.player,
-          sessionToken: result.sessionToken,
-        };
+      if (result.room.status === "playing") {
+        io.to(roomCode).emit("game:started", result.room.game);
       }
-    )
+
+      return {
+        success: true,
+        room: result.room,
+        player: result.player,
+        sessionToken: result.sessionToken,
+      };
+    }),
   );
 
   // 3. room:reconnect
   socket.on(
-    'room:reconnect',
-    wrapSocketHandler<ReconnectRequest, { success: true; room: RoomState; player: Player }>(
-      logger,
-      'room:reconnect',
-      socket.id,
-      async (req) => {
-        const result = await roomService.reconnect(req, socket.id);
-        const roomCode = result.room.roomCode;
-        await socket.join(roomCode);
+    "room:reconnect",
+    wrapSocketHandler<
+      ReconnectRequest,
+      { success: true; room: RoomState; player: Player }
+    >(logger, "room:reconnect", socket.id, async (req) => {
+      const result = await roomService.reconnect(req, socket.id);
+      const roomCode = result.room.roomCode;
+      await socket.join(roomCode);
 
-        // Cancel any pending disconnect timer for this reconnected player
-        cancelDisconnectTimer(roomCode, result.player.id);
+      // Cancel any pending disconnect timer for this reconnected player
+      cancelDisconnectTimer(roomCode, result.player.id);
 
-        socket.to(roomCode).emit('room:player_reconnected', {
-          playerId: result.player.id,
-          playerName: result.player.name,
-        });
+      socket.to(roomCode).emit("room:player_reconnected", {
+        playerId: result.player.id,
+        playerName: result.player.name,
+      });
 
-        return {
-          success: true,
-          room: result.room,
-          player: result.player,
-        };
-      }
-    )
+      return {
+        success: true,
+        room: result.room,
+        player: result.player,
+      };
+    }),
   );
 
   // 4. room:leave
   socket.on(
-    'room:leave',
+    "room:leave",
     wrapSocketHandler<LeaveRoomRequest, { success: true }>(
       logger,
-      'room:leave',
+      "room:leave",
       socket.id,
       async (req) => {
         const result = await roomService.leaveRoom(req.roomCode, socket.id);
@@ -160,16 +160,16 @@ export function registerRoomSocketHandlers(
         if (result.shouldDelete) {
           cancelAllDisconnectTimersForRoom(roomCode);
         } else {
-          socket.to(roomCode).emit('room:player_left', {
+          socket.to(roomCode).emit("room:player_left", {
             playerId: result.player.id,
             playerName: result.player.name,
-            reason: 'player_left',
+            reason: "player_left",
           });
         }
 
         return { success: true };
-      }
-    )
+      },
+    ),
   );
 }
 
@@ -182,21 +182,21 @@ export async function handleSocketDisconnect(
   socketId: string,
   roomService: RoomService,
   logger: Logger,
-  gracePeriodMs = DISCONNECT_GRACE_PERIOD_MS
+  gracePeriodMs = DISCONNECT_GRACE_PERIOD_MS,
 ): Promise<void> {
   const result = await roomService.handleDisconnect(socketId);
   if (!result) return;
 
   const { room, player, wasActiveGame } = result;
   logger.info(`Player disconnected from room ${room.roomCode}`, {
-    operation: 'player_disconnected',
+    operation: "player_disconnected",
     roomCode: room.roomCode,
     playerId: player.id,
     playerName: player.name,
     wasActiveGame,
   });
 
-  io.to(room.roomCode).emit('room:player_disconnected', {
+  io.to(room.roomCode).emit("room:player_disconnected", {
     playerId: player.id,
     gracePeriodMs,
   });
@@ -208,26 +208,39 @@ export async function handleSocketDisconnect(
     const timer = setTimeout(async () => {
       disconnectTimers.delete(getDisconnectTimerKey(room.roomCode, player.id));
       try {
-        const forfeitResult = await roomService.handleAbandonmentForfeit(room.roomCode, player.id);
+        const forfeitResult = await roomService.handleAbandonmentForfeit(
+          room.roomCode,
+          player.id,
+        );
         if (forfeitResult) {
-          logger.info(`Game forfeited by abandonment in room ${room.roomCode}`, {
-            operation: 'game_abandoned',
-            roomCode: room.roomCode,
-            playerId: player.id,
-            winner: forfeitResult.gameOverPayload.winner,
-          });
-          io.to(room.roomCode).emit('game:over', forfeitResult.gameOverPayload);
+          logger.info(
+            `Game forfeited by abandonment in room ${room.roomCode}`,
+            {
+              operation: "game_abandoned",
+              roomCode: room.roomCode,
+              playerId: player.id,
+              winner: forfeitResult.gameOverPayload.winner,
+            },
+          );
+          io.to(room.roomCode).emit("game:over", forfeitResult.gameOverPayload);
         }
       } catch (err) {
-        logger.error(`Error processing disconnect timeout for room ${room.roomCode}`, {
-          operation: 'abandonment_error',
-          roomCode: room.roomCode,
-          error: err instanceof Error ? { message: err.message } : { raw: err },
-        });
+        logger.error(
+          `Error processing disconnect timeout for room ${room.roomCode}`,
+          {
+            operation: "abandonment_error",
+            roomCode: room.roomCode,
+            error:
+              err instanceof Error ? { message: err.message } : { raw: err },
+          },
+        );
       }
     }, gracePeriodMs);
 
     timer.unref?.();
-    disconnectTimers.set(getDisconnectTimerKey(room.roomCode, player.id), timer);
+    disconnectTimers.set(
+      getDisconnectTimerKey(room.roomCode, player.id),
+      timer,
+    );
   }
 }

@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestServer, TestServerInstance } from '../helpers/test_server';
-import { fetchLanInfo, fetchHealth } from '../helpers/http_client_helper';
-import { LanInfoResponse, HealthCheckResponse } from '@fun-chess/shared';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { createTestServer, TestServerInstance } from "../helpers/test_server";
+import { fetchLanInfo, fetchHealth } from "../helpers/http_client_helper";
+import { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
 
-describe('HTTP API Contracts', () => {
+describe("HTTP API Contracts", () => {
   let serverInstance: TestServerInstance;
 
   beforeAll(async () => {
@@ -14,8 +14,8 @@ describe('HTTP API Contracts', () => {
     await serverInstance.close();
   });
 
-  describe('GET /api/lan-info', () => {
-    it('should return 200 OK with valid LanInfoResponse schema when requested', async () => {
+  describe("GET /api/lan-info", () => {
+    it("should return 200 OK with valid LanInfoResponse schema when requested", async () => {
       // Arrange & Act
       const { status, data } = await fetchLanInfo(serverInstance.url);
 
@@ -24,16 +24,16 @@ describe('HTTP API Contracts', () => {
       expect(data).toBeDefined();
 
       // Contract assertions for LanInfoResponse
-      expect(typeof data.lanIp).toBe('string');
+      expect(typeof data.lanIp).toBe("string");
       expect(data.lanIp.length).toBeGreaterThan(0);
-      expect(typeof data.port).toBe('number');
+      expect(typeof data.port).toBe("number");
       expect(data.port).toBe(serverInstance.port);
       expect(data.localUrl).toBe(`http://localhost:${serverInstance.port}`);
       expect(data.joinUrl).toBe(`http://${data.lanIp}:${serverInstance.port}`);
       expect(Array.isArray(data.interfaces)).toBe(true);
     });
 
-    it('should include valid URL formats for localUrl and joinUrl when returned', async () => {
+    it("should include valid URL formats for localUrl and joinUrl when returned", async () => {
       // Arrange & Act
       const { data } = await fetchLanInfo(serverInstance.url);
 
@@ -43,30 +43,31 @@ describe('HTTP API Contracts', () => {
     });
   });
 
-  describe('GET /api/health', () => {
-    it('should return 200 OK with valid HealthCheckResponse schema when healthy', async () => {
+  describe("GET /health", () => {
+    it("should return 200 OK with valid HealthCheckResponse schema at root /health", async () => {
       // Arrange & Act
-      const { status, data } = await fetchHealth(serverInstance.url);
+      const res = await fetch(`${serverInstance.url}/health`);
+      const data = (await res.json()) as HealthCheckResponse;
 
       // Assert
-      expect(status).toBe(200);
-      expect(data).toBeDefined();
+      expect(res.status).toBe(200);
+      expect(data.status).toBe("ok");
+      expect(data.activeRooms).toBe(0);
+      expect(data.activeSockets).toBe(0);
+      expect(data.relay).toBeDefined();
+    });
+  });
 
-      // Contract assertions for HealthCheckResponse
-      expect(data.status).toBe('ok');
-      expect(typeof data.uptimeSeconds).toBe('number');
-      expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
-      expect(typeof data.timestamp).toBe('string');
-      expect(new Date(data.timestamp).toISOString()).toBe(data.timestamp);
-      expect(typeof data.activeRooms).toBe('number');
-      expect(typeof data.activeSockets).toBe('number');
+  describe("GET /healthz", () => {
+    it('should return 200 OK with text/plain "OK" for container liveness/readiness probe', async () => {
+      // Arrange & Act
+      const res = await fetch(`${serverInstance.url}/healthz`);
+      const body = await res.text();
 
-      // Memory metrics
-      expect(data.memoryUsageMb).toBeDefined();
-      expect(typeof data.memoryUsageMb.rss).toBe('number');
-      expect(typeof data.memoryUsageMb.heapTotal).toBe('number');
-      expect(typeof data.memoryUsageMb.heapUsed).toBe('number');
-      expect(data.memoryUsageMb.rss).toBeGreaterThan(0);
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/plain");
+      expect(body).toBe("OK");
     });
   });
 });

@@ -1,12 +1,16 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import http, { Server } from 'node:http';
-import { createHttpServer } from '../http_server.js';
-import { MockRoomStore } from '../../../features/rooms/mock_room.store.js';
-import { LanService } from '../../../features/lan/lan.service.js';
-import { NullLogger } from '../../logger/null_logger.js';
-import { LanInfoResponse, HealthCheckResponse } from '@fun-chess/shared';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import http, { Server } from "node:http";
+import { createHttpServer } from "../http_server.js";
+import { MockRoomStore } from "../../../features/rooms/mock_room.store.js";
+import { LanService } from "../../../features/lan/lan.service.js";
+import {
+  RelayAddressService,
+  MockRelayAddressService,
+} from "../../../features/lan/relay_address.service.js";
+import { NullLogger } from "../../logger/null_logger.js";
+import { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
 
-describe('createHttpServer', () => {
+describe("createHttpServer", () => {
   let server: Server;
   let port: number;
   let store: MockRoomStore;
@@ -15,10 +19,15 @@ describe('createHttpServer', () => {
     store = new MockRoomStore();
     const logger = new NullLogger();
     const lanService = new LanService();
+    const relayAddressService = new RelayAddressService({
+      lanIp: "192.168.1.50",
+      port: 3000,
+    });
 
     const handler = createHttpServer({
       roomStore: store,
       lanService,
+      relayAddressService,
       logger,
       port: 3000,
       getActiveSocketCount: () => 2,
@@ -26,9 +35,9 @@ describe('createHttpServer', () => {
 
     server = http.createServer(handler);
     await new Promise<void>((resolve) => {
-      server.listen(0, '127.0.0.1', () => {
+      server.listen(0, "127.0.0.1", () => {
         const addr = server.address();
-        if (typeof addr === 'object' && addr) {
+        if (typeof addr === "object" && addr) {
           port = addr.port;
         }
         resolve();
@@ -42,44 +51,144 @@ describe('createHttpServer', () => {
     });
   });
 
-  it('responds to GET /api/lan-info with valid LAN info JSON', async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`);
+  it('responds to GET /healthz with container probe "OK" and text/plain content type', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toContain('application/json');
-    expect(res.headers.get('access-control-allow-origin')).toBe('*');
-
-    const data = (await res.json()) as LanInfoResponse;
-    expect(data.port).toBe(3000);
-    expect(data.localUrl).toBe('http://localhost:3000');
-    expect(data.joinUrl).toBeDefined();
+    expect(res.headers.get("content-type")).toContain("text/plain");
+    const body = await res.text();
+    expect(body).toBe("OK");
   });
 
-  it('responds to GET /api/health with health statistics JSON', async () => {
+  it("responds to GET /health with full operational telemetry", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/health`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+
+    const data = (await res.json()) as HealthCheckResponse;
+    expect(data.status).toBe("ok");
+    expect(data.activeSockets).toBe(2);
+    expect(data.activeRooms).toBe(0);
+    expect(data.memoryUsageMb.heapUsed).toBeGreaterThan(0);
+    expect(data.memoryUsageMb.heapTotal).toBeGreaterThan(0);
+    expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(data.timestamp).toBeDefined();
+    expect(data.relay).toBeDefined();
+    expect(data.relay?.mode).toBe("lan");
+  });
+
+  it("responds to GET /api/health with health statistics JSON (alias)", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/health`);
     expect(res.status).toBe(200);
 
     const data = (await res.json()) as HealthCheckResponse;
-    expect(data.status).toBe('ok');
+    expect(data.status).toBe("ok");
     expect(data.activeSockets).toBe(2);
     expect(data.memoryUsageMb.heapUsed).toBeGreaterThan(0);
     expect(data.timestamp).toBeDefined();
   });
 
-  it('handles CORS OPTIONS preflight with 204 No Content', async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
-      method: 'OPTIONS',
-    });
-    expect(res.status).toBe(204);
-    expect(res.headers.get('access-control-allow-origin')).toBe('*');
-    expect(res.headers.get('access-control-allow-methods')).toContain('GET');
+  it("responds to GET /api/lan-info with valid LAN info JSON and relay mode metadata", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+
+    const data = (await res.json()) as LanInfoResponse;
+    expect(data.port).toBe(3000);
+    expect(data.localUrl).toBe("http://localhost:3000");
+    expect(data.joinUrl).toBe("http://192.168.1.50:3000");
+    expect(data.relayMode).toBe("lan");
+    expect(data.isCloudRelay).toBe(false);
   });
 
-  it('serves SPA fallback HTML for web routes', async () => {
+  it("handles CORS OPTIONS preflight with 204 No Content", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
+      method: "OPTIONS",
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(res.headers.get("access-control-allow-methods")).toContain("GET");
+  });
+
+  it("serves SPA fallback HTML for web routes", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/lobby`);
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toContain('text/html');
+    expect(res.headers.get("content-type")).toContain("text/html");
 
     const body = await res.text();
-    expect(body).toContain('Fun Chess');
+    expect(body).toContain("Fun Chess");
+  });
+
+  it("responds with 404 JSON for unsupported API / non-existent endpoints", async () => {
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/non-existent-endpoint`,
+      {
+        method: "POST",
+      },
+    );
+    expect(res.status).toBe(404);
+    const json = (await res.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(json.error.code).toBe("ERR_NOT_FOUND");
+  });
+
+  describe("Cloud Relay Mode", () => {
+    let cloudServer: Server;
+    let cloudPort: number;
+
+    beforeAll(async () => {
+      const mockRelayService = new MockRelayAddressService(
+        {
+          joinUrl: "https://fun-chess-prod.a.run.app",
+          publicUrl: "https://fun-chess-prod.a.run.app",
+          relayMode: "cloud",
+          isCloudRelay: true,
+          lanIp: "fun-chess-prod.a.run.app",
+        },
+        true,
+      );
+
+      const handler = createHttpServer({
+        roomStore: new MockRoomStore(),
+        relayAddressService: mockRelayService,
+        logger: new NullLogger(),
+        port: 8080,
+      });
+
+      cloudServer = http.createServer(handler);
+      await new Promise<void>((resolve) => {
+        cloudServer.listen(0, "127.0.0.1", () => {
+          const addr = cloudServer.address();
+          if (typeof addr === "object" && addr) {
+            cloudPort = addr.port;
+          }
+          resolve();
+        });
+      });
+    });
+
+    afterAll(async () => {
+      await new Promise<void>((resolve) => {
+        cloudServer.close(() => resolve());
+      });
+    });
+
+    it("returns cloud relay mode in /health endpoint", async () => {
+      const res = await fetch(`http://127.0.0.1:${cloudPort}/health`);
+      expect(res.status).toBe(200);
+      const data = (await res.json()) as HealthCheckResponse;
+      expect(data.relay?.mode).toBe("cloud");
+      expect(data.relay?.publicUrl).toBe("https://fun-chess-prod.a.run.app");
+    });
+
+    it("returns cloud relay joinUrl in /api/lan-info endpoint", async () => {
+      const res = await fetch(`http://127.0.0.1:${cloudPort}/api/lan-info`);
+      expect(res.status).toBe(200);
+      const data = (await res.json()) as LanInfoResponse;
+      expect(data.relayMode).toBe("cloud");
+      expect(data.isCloudRelay).toBe(true);
+      expect(data.joinUrl).toBe("https://fun-chess-prod.a.run.app");
+    });
   });
 });

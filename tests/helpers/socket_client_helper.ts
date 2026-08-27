@@ -1,11 +1,16 @@
-import { io as ioClient, Socket } from 'socket.io-client';
-import { ClientToServerEvents, ServerToClientEvents } from '@fun-chess/shared';
+import { io as ioClient, Socket } from "socket.io-client";
+import { ClientToServerEvents, ServerToClientEvents } from "@fun-chess/shared";
 
-export type TypedSocketClient = Socket<ServerToClientEvents, ClientToServerEvents>;
+export type TypedSocketClient = Socket<
+  ServerToClientEvents,
+  ClientToServerEvents
+>;
 
-export async function createConnectedSocketClient(url: string): Promise<TypedSocketClient> {
+export async function createConnectedSocketClient(
+  url: string,
+): Promise<TypedSocketClient> {
   const socket: TypedSocketClient = ioClient(url, {
-    transports: ['websocket'],
+    transports: ["websocket"],
     forceNew: true,
     reconnection: false,
   });
@@ -16,12 +21,12 @@ export async function createConnectedSocketClient(url: string): Promise<TypedSoc
       reject(new Error(`Socket connection timed out to ${url}`));
     }, 5000);
 
-    socket.on('connect', () => {
+    socket.on("connect", () => {
       clearTimeout(timer);
       resolve();
     });
 
-    socket.on('connect_error', (err) => {
+    socket.on("connect_error", (err) => {
       clearTimeout(timer);
       reject(err);
     });
@@ -33,12 +38,16 @@ export async function createConnectedSocketClient(url: string): Promise<TypedSoc
 export function waitForEvent<T = any>(
   socket: TypedSocketClient,
   event: keyof ServerToClientEvents | string,
-  timeoutMs = 4000
+  timeoutMs = 4000,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.off(event as any, listener);
-      reject(new Error(`Timed out waiting for event '${String(event)}' after ${timeoutMs}ms`));
+      reject(
+        new Error(
+          `Timed out waiting for event '${String(event)}' after ${timeoutMs}ms`,
+        ),
+      );
     }, timeoutMs);
 
     const listener = (data: any) => {
@@ -54,13 +63,17 @@ export function waitForEvent<T = any>(
 export function expectNoEvent(
   socket: TypedSocketClient,
   event: keyof ServerToClientEvents | string,
-  durationMs = 300
+  durationMs = 300,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const listener = (data: any) => {
       socket.off(event as any, listener);
       clearTimeout(timer);
-      reject(new Error(`Unexpected event '${String(event)}' received: ${JSON.stringify(data)}`));
+      reject(
+        new Error(
+          `Unexpected event '${String(event)}' received: ${JSON.stringify(data)}`,
+        ),
+      );
     };
 
     const timer = setTimeout(() => {
@@ -76,11 +89,15 @@ export function emitAck<TReq, TRes>(
   socket: TypedSocketClient,
   event: keyof ClientToServerEvents,
   payload: TReq,
-  timeoutMs = 4000
+  timeoutMs = 4000,
 ): Promise<TRes> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`Timed out waiting for ack on '${String(event)}' after ${timeoutMs}ms`));
+      reject(
+        new Error(
+          `Timed out waiting for ack on '${String(event)}' after ${timeoutMs}ms`,
+        ),
+      );
     }, timeoutMs);
 
     (socket.emit as any)(event, payload, (res: TRes) => {
@@ -90,7 +107,9 @@ export function emitAck<TReq, TRes>(
   });
 }
 
-export function disconnectSockets(...sockets: (TypedSocketClient | null | undefined)[]): void {
+export function disconnectSockets(
+  ...sockets: (TypedSocketClient | null | undefined)[]
+): void {
   for (const s of sockets) {
     if (s && s.connected) {
       s.disconnect();

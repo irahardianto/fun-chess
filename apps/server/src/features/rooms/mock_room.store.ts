@@ -1,5 +1,5 @@
-import { RoomState } from '@fun-chess/shared';
-import { RoomStore } from './room.store.js';
+import { RoomState } from "@fun-chess/shared";
+import { RoomStore } from "./room.store.js";
 
 /**
  * Unit test double for RoomStore.
@@ -22,7 +22,9 @@ export class MockRoomStore implements RoomStore {
     return room ? structuredClone(room) : null;
   }
 
-  public async findBySocketId(socketId: string): Promise<{ room: RoomState; playerId: string } | null> {
+  public async findBySocketId(
+    socketId: string,
+  ): Promise<{ room: RoomState; playerId: string } | null> {
     for (const room of this.rooms.values()) {
       if (room.whitePlayer?.socketId === socketId) {
         return { room: structuredClone(room), playerId: room.whitePlayer.id };

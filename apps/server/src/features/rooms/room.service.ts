@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import { Chess } from 'chess.js';
+import { randomUUID } from "node:crypto";
+import { Chess } from "chess.js";
 import {
   CreateRoomRequest,
   GameOverPayload,
@@ -8,8 +8,8 @@ import {
   Player,
   ReconnectRequest,
   RoomState,
-} from '@fun-chess/shared';
-import { RoomStore } from './room.store.js';
+} from "@fun-chess/shared";
+import { RoomStore } from "./room.store.js";
 import {
   RoomNotFoundError,
   RoomFullError,
@@ -17,10 +17,10 @@ import {
   UnauthorizedError,
   PlayerNotInRoomError,
   InvalidPayloadError,
-} from './room.errors.js';
-import { ChessEngine } from '../game/chess_engine.js';
+} from "./room.errors.js";
+import { ChessEngine } from "../game/chess_engine.js";
 
-const ROOM_CODE_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excludes 0, O, 1, I
+const ROOM_CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Excludes 0, O, 1, I
 const ROOM_CODE_LENGTH = 4;
 
 /**
@@ -34,14 +34,20 @@ export class RoomService {
    */
   public async createRoom(
     req: CreateRoomRequest,
-    socketId: string
+    socketId: string,
   ): Promise<{ room: RoomState; sessionToken: string }> {
     const rawName = req.playerName?.trim();
     if (!rawName || rawName.length === 0) {
-      throw new InvalidPayloadError('playerName', 'Player name cannot be empty');
+      throw new InvalidPayloadError(
+        "playerName",
+        "Player name cannot be empty",
+      );
     }
     if (rawName.length > 20) {
-      throw new InvalidPayloadError('playerName', 'Player name must be 20 characters or fewer');
+      throw new InvalidPayloadError(
+        "playerName",
+        "Player name must be 20 characters or fewer",
+      );
     }
 
     const roomCode = await this.generateUniqueRoomCode();
@@ -49,8 +55,8 @@ export class RoomService {
     const sessionToken = randomUUID();
 
     let hostColor: PieceColor;
-    if (req.preferredColor === 'random' || !req.preferredColor) {
-      hostColor = Math.random() < 0.5 ? 'w' : 'b';
+    if (req.preferredColor === "random" || !req.preferredColor) {
+      hostColor = Math.random() < 0.5 ? "w" : "b";
     } else {
       hostColor = req.preferredColor;
     }
@@ -70,10 +76,10 @@ export class RoomService {
 
     const newRoom: RoomState = {
       roomCode,
-      status: 'lobby',
+      status: "lobby",
       hostId: playerId,
-      whitePlayer: hostColor === 'w' ? hostPlayer : null,
-      blackPlayer: hostColor === 'b' ? hostPlayer : null,
+      whitePlayer: hostColor === "w" ? hostPlayer : null,
+      blackPlayer: hostColor === "b" ? hostPlayer : null,
       spectators: [],
       game: initialGameState,
       rematch: null,
@@ -90,19 +96,25 @@ export class RoomService {
    */
   public async joinRoom(
     req: JoinRoomRequest,
-    socketId: string
+    socketId: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }> {
-    const normalizedCode = (req.roomCode || '').trim().toUpperCase();
+    const normalizedCode = (req.roomCode || "").trim().toUpperCase();
     if (!normalizedCode || normalizedCode.length !== ROOM_CODE_LENGTH) {
-      throw new InvalidRoomCodeError(req.roomCode || '');
+      throw new InvalidRoomCodeError(req.roomCode || "");
     }
 
     const rawName = req.playerName?.trim();
     if (!rawName || rawName.length === 0) {
-      throw new InvalidPayloadError('playerName', 'Player name cannot be empty');
+      throw new InvalidPayloadError(
+        "playerName",
+        "Player name cannot be empty",
+      );
     }
     if (rawName.length > 20) {
-      throw new InvalidPayloadError('playerName', 'Player name must be 20 characters or fewer');
+      throw new InvalidPayloadError(
+        "playerName",
+        "Player name must be 20 characters or fewer",
+      );
     }
 
     const room = await this.store.findByCode(normalizedCode);
@@ -116,7 +128,7 @@ export class RoomService {
 
     const playerId = randomUUID();
     const sessionToken = randomUUID();
-    const assignedColor: PieceColor = room.whitePlayer ? 'b' : 'w';
+    const assignedColor: PieceColor = room.whitePlayer ? "b" : "w";
 
     const player: Player = {
       id: playerId,
@@ -129,13 +141,13 @@ export class RoomService {
       connectedAt: Date.now(),
     };
 
-    if (assignedColor === 'w') {
+    if (assignedColor === "w") {
       room.whitePlayer = player;
     } else {
       room.blackPlayer = player;
     }
 
-    room.status = 'playing';
+    room.status = "playing";
     room.lastActivityAt = Date.now();
 
     await this.store.save(room);
@@ -147,9 +159,9 @@ export class RoomService {
    */
   public async reconnect(
     req: ReconnectRequest,
-    socketId: string
+    socketId: string,
   ): Promise<{ room: RoomState; player: Player }> {
-    const normalizedCode = (req.roomCode || '').trim().toUpperCase();
+    const normalizedCode = (req.roomCode || "").trim().toUpperCase();
     const room = await this.store.findByCode(normalizedCode);
     if (!room) {
       throw new RoomNotFoundError(normalizedCode);
@@ -165,20 +177,20 @@ export class RoomService {
     }
 
     if (!targetPlayer) {
-      throw new UnauthorizedError('Player not found in room');
+      throw new UnauthorizedError("Player not found in room");
     }
 
     if (targetPlayer.sessionToken !== req.sessionToken) {
-      throw new UnauthorizedError('Invalid session token');
+      throw new UnauthorizedError("Invalid session token");
     }
 
     targetPlayer.socketId = socketId;
     targetPlayer.isConnected = true;
 
     // If game was paused waiting for disconnect, resume if both players now connected
-    if (room.status === 'paused_disconnect') {
+    if (room.status === "paused_disconnect") {
       if (room.whitePlayer?.isConnected && room.blackPlayer?.isConnected) {
-        room.status = 'playing';
+        room.status = "playing";
       }
     }
 
@@ -193,7 +205,7 @@ export class RoomService {
    */
   public async leaveRoom(
     roomCode: string,
-    socketId: string
+    socketId: string,
   ): Promise<{ room: RoomState; player: Player; shouldDelete: boolean }> {
     const normalizedCode = roomCode.trim().toUpperCase();
     const room = await this.store.findByCode(normalizedCode);
@@ -223,7 +235,7 @@ export class RoomService {
     const shouldDelete =
       leavingPlayer.isHost ||
       (!room.whitePlayer && !room.blackPlayer) ||
-      room.status === 'lobby';
+      room.status === "lobby";
 
     if (shouldDelete) {
       await this.store.delete(normalizedCode);
@@ -238,9 +250,11 @@ export class RoomService {
   /**
    * Handles unexpected socket drop. Marks player disconnected and pauses active match.
    */
-  public async handleDisconnect(
-    socketId: string
-  ): Promise<{ room: RoomState; player: Player; wasActiveGame: boolean } | null> {
+  public async handleDisconnect(socketId: string): Promise<{
+    room: RoomState;
+    player: Player;
+    wasActiveGame: boolean;
+  } | null> {
     const match = await this.store.findBySocketId(socketId);
     if (!match) return null;
 
@@ -263,9 +277,9 @@ export class RoomService {
 
     if (!droppedPlayer) return null;
 
-    const wasActiveGame = room.status === 'playing';
+    const wasActiveGame = room.status === "playing";
     if (wasActiveGame) {
-      room.status = 'paused_disconnect';
+      room.status = "paused_disconnect";
     }
 
     room.lastActivityAt = Date.now();
@@ -280,14 +294,14 @@ export class RoomService {
    */
   public async handleAbandonmentForfeit(
     roomCode: string,
-    disconnectedPlayerId: string
+    disconnectedPlayerId: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload } | null> {
     const normalizedCode = roomCode.trim().toUpperCase();
     const room = await this.store.findByCode(normalizedCode);
     if (!room) return null;
 
     // Only forfeit if room is still paused waiting for reconnect
-    if (room.status !== 'paused_disconnect') return null;
+    if (room.status !== "paused_disconnect") return null;
 
     // Check if disconnected player is still disconnected
     let disconnectedPlayer: Player | null = null;
@@ -301,18 +315,23 @@ export class RoomService {
       return null;
     }
 
-    const winnerColor: PieceColor = disconnectedPlayer.color === 'w' ? 'b' : 'w';
-    const winnerPlayer = winnerColor === 'w' ? room.whitePlayer : room.blackPlayer;
-    const winnerName = winnerPlayer?.name || 'Opponent';
+    const winnerColor: PieceColor =
+      disconnectedPlayer.color === "w" ? "b" : "w";
+    const winnerPlayer =
+      winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
+    const winnerName = winnerPlayer?.name || "Opponent";
 
-    room.status = 'game_over';
+    room.status = "game_over";
     room.lastActivityAt = Date.now();
 
-    const durationSeconds = Math.max(1, Math.round((Date.now() - room.createdAt) / 1000));
+    const durationSeconds = Math.max(
+      1,
+      Math.round((Date.now() - room.createdAt) / 1000),
+    );
     const gameOverPayload: GameOverPayload = {
       winner: winnerColor,
       winnerName,
-      reason: 'abandonment',
+      reason: "abandonment",
       message: `${disconnectedPlayer.name} disconnected. ${winnerName} won by abandonment!`,
       finalFen: room.game.fen,
       totalMoves: room.game.moveCount,
@@ -333,7 +352,9 @@ export class RoomService {
   /**
    * Cleans up stale rooms inactive for longer than maxAgeMs (default 10 minutes).
    */
-  public async cleanupAbandonedRooms(maxAgeMs = 10 * 60 * 1000): Promise<number> {
+  public async cleanupAbandonedRooms(
+    maxAgeMs = 10 * 60 * 1000,
+  ): Promise<number> {
     const rooms = await this.store.listActiveRooms();
     const now = Date.now();
     let cleaned = 0;
@@ -354,7 +375,7 @@ export class RoomService {
   private async generateUniqueRoomCode(): Promise<string> {
     let attempts = 0;
     while (attempts < 100) {
-      let code = '';
+      let code = "";
       for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
         const idx = Math.floor(Math.random() * ROOM_CODE_CHARSET.length);
         code += ROOM_CODE_CHARSET.charAt(idx);

@@ -1,5 +1,5 @@
-import pino, { Logger as PinoInstance, LoggerOptions } from 'pino';
-import { Logger } from './logger.interface.js';
+import pino, { Logger as PinoInstance, LoggerOptions } from "pino";
+import { Logger } from "./logger.interface.js";
 
 export interface PinoLoggerOptions extends LoggerOptions {
   isDev?: boolean;
@@ -13,11 +13,11 @@ export class PinoLogger implements Logger {
   private readonly logger: PinoInstance;
 
   constructor(options?: PinoLoggerOptions | PinoInstance) {
-    if (options && typeof (options as PinoInstance).info === 'function') {
+    if (options && typeof (options as PinoInstance).info === "function") {
       this.logger = options as PinoInstance;
     } else {
       const opts = (options as PinoLoggerOptions) || {};
-      const level = opts.level || (process.env.LOG_LEVEL ?? 'info');
+      const level = opts.level || (process.env.LOG_LEVEL ?? "info");
       this.logger = pino({
         level,
         ...opts,

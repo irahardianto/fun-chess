@@ -1,6 +1,6 @@
-import os, { NetworkInterfaceInfo } from 'node:os';
-import QRCode from 'qrcode';
-import { LanInfoResponse } from '@fun-chess/shared';
+import os, { NetworkInterfaceInfo } from "node:os";
+import QRCode from "qrcode";
+import { LanInfoResponse } from "@fun-chess/shared";
 
 /**
  * Service for local network interface discovery, IP resolution, and QR code generation.
@@ -9,7 +9,9 @@ export class LanService {
   /**
    * Retrieves all non-internal IPv4 network interface addresses.
    */
-  public getAllLanInterfaces(customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>): string[] {
+  public getAllLanInterfaces(
+    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
+  ): string[] {
     const addresses: string[] = [];
 
     const envIp = process.env.LAN_IP || process.env.HOST_IP;
@@ -25,7 +27,7 @@ export class LanService {
 
       for (const net of netList) {
         // Skip internal (127.0.0.1) and non-IPv4 addresses
-        if (net.family === 'IPv4' && !net.internal) {
+        if (net.family === "IPv4" && !net.internal) {
           if (!addresses.includes(net.address)) {
             addresses.push(net.address);
           }
@@ -40,7 +42,9 @@ export class LanService {
    * Discovers the best local LAN IPv4 address for hosting.
    * Prioritizes common local subnet ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x).
    */
-  public getLocalLanIp(customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>): string {
+  public getLocalLanIp(
+    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
+  ): string {
     const envIp = process.env.LAN_IP || process.env.HOST_IP;
     if (envIp) {
       return envIp;
@@ -49,14 +53,14 @@ export class LanService {
     const addresses = this.getAllLanInterfaces(customInterfaces);
 
     if (addresses.length === 0) {
-      return '127.0.0.1';
+      return "127.0.0.1";
     }
 
     // Sort prioritizing 192.168.*, then 10.*, then 172.16-31.*
-    const preferred = addresses.find((ip) => ip.startsWith('192.168.'));
+    const preferred = addresses.find((ip) => ip.startsWith("192.168."));
     if (preferred) return preferred;
 
-    const tenNet = addresses.find((ip) => ip.startsWith('10.'));
+    const tenNet = addresses.find((ip) => ip.startsWith("10."));
     if (tenNet) return tenNet;
 
     const oneSevenTwo = addresses.find((ip) => {
@@ -68,13 +72,17 @@ export class LanService {
     if (oneSevenTwo) return oneSevenTwo;
 
     const firstAddress = addresses[0];
-    return firstAddress ?? '127.0.0.1';
+    return firstAddress ?? "127.0.0.1";
   }
 
   /**
    * Generates a join URL for players on the LAN.
    */
-  public generateJoinUrl(port: number, roomCode?: string, customIp?: string): string {
+  public generateJoinUrl(
+    port: number,
+    roomCode?: string,
+    customIp?: string,
+  ): string {
     const ip = customIp || this.getLocalLanIp();
     const base = `http://${ip}:${port}`;
     if (roomCode) {
@@ -88,11 +96,11 @@ export class LanService {
    */
   public async generateQrCodeSvg(text: string): Promise<string> {
     return QRCode.toString(text, {
-      type: 'svg',
+      type: "svg",
       margin: 2,
       color: {
-        dark: '#1a1a2e',
-        light: '#ffffff',
+        dark: "#1a1a2e",
+        light: "#ffffff",
       },
     });
   }
@@ -104,8 +112,8 @@ export class LanService {
     return QRCode.toDataURL(text, {
       margin: 2,
       color: {
-        dark: '#1a1a2e',
-        light: '#ffffff',
+        dark: "#1a1a2e",
+        light: "#ffffff",
       },
     });
   }
