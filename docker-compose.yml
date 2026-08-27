@@ -4,11 +4,13 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: fun-chess
-    ports:
-      - "3000:3000"
+    network_mode: host
     environment:
       - PORT=3000
       - NODE_ENV=production
+      - LAN_IP=${LAN_IP:-}
+      - HOST_IP=${HOST_IP:-}
+      - PUBLIC_URL=${PUBLIC_URL:-}
     restart: unless-stopped
     healthcheck:
       test:

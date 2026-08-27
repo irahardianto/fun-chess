@@ -4,6 +4,7 @@ resource "google_cloud_run_v2_service" "default" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
+    timeout          = "3600s"
     session_affinity = true
 
     scaling {

@@ -8,14 +8,14 @@
     "apps/client"
   ],
   "scripts": {
-    "start": "npm run start --workspace=@fun-chess/server",
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present && npm run test:integration",
+    "start": "pnpm --filter @fun-chess/server start",
+    "build": "pnpm -r --if-present run build",
+    "test": "pnpm -r --if-present run test && pnpm run test:integration",
     "test:integration": "vitest run --config vitest.config.ts",
     "test:contracts": "vitest run tests/contracts",
-    "dev": "npm run build --workspace=@fun-chess/shared && (npm run dev --workspace=@fun-chess/server & npm run dev --workspace=@fun-chess/client)",
-    "dev:client": "npm run dev --workspace=@fun-chess/client",
-    "dev:server": "npm run dev --workspace=@fun-chess/server"
+    "dev": "pnpm --filter @fun-chess/shared build && (pnpm --filter @fun-chess/server dev & pnpm --filter @fun-chess/client dev)",
+    "dev:client": "pnpm --filter @fun-chess/client dev",
+    "dev:server": "pnpm --filter @fun-chess/server dev"
   },
   "devDependencies": {
     "typescript": "^5.8.0"
