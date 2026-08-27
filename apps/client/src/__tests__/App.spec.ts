@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import App from '../App.vue';
 import { ALL_SCENARIOS } from '../features/scenarios/data';
+import { usePwaInstall } from '../features/pwa/composables/usePwaInstall';
 
 // Mock Socket.io state
 const mockSocketId = ref('mock-socket-1');
@@ -46,8 +47,30 @@ vi.mock('@/composables/useSocket', () => {
 });
 
 describe('App.vue Shell & Navigation Integration', () => {
+  let mockStorage: Record<string, string> = {};
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStorage = {};
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn((key: string) => mockStorage[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        mockStorage[key] = value;
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete mockStorage[key];
+      }),
+      clear: vi.fn(() => {
+        mockStorage = {};
+      }),
+    });
+
+    const { resetSnooze, setDeferredPrompt, setInstalled, closeInstallModal } = usePwaInstall();
+    resetSnooze();
+    setDeferredPrompt(null);
+    setInstalled(false);
+    closeInstallModal();
+
     mockSocketId.value = 'mock-socket-1';
     mockIsConnected.value = false;
     mockCurrentRoom.value = null;
@@ -240,7 +263,7 @@ describe('App.vue Shell & Navigation Integration', () => {
 
     const disconnectBanner = wrapper.find('.disconnect-warning-banner');
     expect(disconnectBanner.exists()).toBe(true);
-    expect(disconnectBanner.text()).toContain('Opponent disconnected!');
+    expect(disconnectBanner.text()).toContain('Opponent disconnected');
   });
 
   it('renders draw-offer-banner and handles accept and decline buttons', async () => {
@@ -305,6 +328,45 @@ describe('App.vue Shell & Navigation Integration', () => {
     expect(appVueContent).toMatch(/\.draw-offer-banner\s*\{[^}]*position:\s*absolute;/);
     expect(appVueContent).toMatch(/\.draw-offer-banner\s*\{[^}]*top:\s*8px;/);
     expect(appVueContent).toMatch(/\.draw-offer-banner\s*\{[^}]*z-index:\s*var\(--z-overlay-alert,\s*30\);/);
+  });
+
+  it('renders navbar Install App button and keeps it visible even after snoozing floating banner', async () => {
+    const { resetSnooze, setDeferredPrompt, setInstalled } = usePwaInstall();
+    resetSnooze();
+    setDeferredPrompt(null);
+    setInstalled(false);
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const navInstallBtn = wrapper.find('[data-testid="pwa-install-btn"]');
+    expect(navInstallBtn.exists()).toBe(true);
+    expect(navInstallBtn.text()).toContain('Install App');
+
+    // Trigger snooze via composable
+    const { snoozePrompt, isSnoozed, showInstallBanner, canInstall } = usePwaInstall();
+    snoozePrompt(7);
+    await flushPromises();
+
+    expect(isSnoozed.value).toBe(true);
+    expect(showInstallBanner.value).toBe(false);
+    expect(canInstall.value).toBe(true);
+
+    // Navbar install button must STILL be visible and accessible
+    expect(wrapper.find('[data-testid="pwa-install-btn"]').exists()).toBe(true);
+  });
+
+  it('renders accessible skip-to-content link pointing to main viewport (WCAG 2.4.1)', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const skipLink = wrapper.find('.skip-link');
+    expect(skipLink.exists()).toBe(true);
+    expect(skipLink.attributes('href')).toBe('#main-content');
+    expect(skipLink.text()).toBe('Skip to main content');
+
+    const mainContent = wrapper.find('main#main-content');
+    expect(mainContent.exists()).toBe(true);
   });
 });
 

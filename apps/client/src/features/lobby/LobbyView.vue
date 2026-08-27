@@ -19,6 +19,7 @@ import { PuzzleHubView } from '../puzzles/components';
 import { useLanDiscovery } from '../../composables/useLanDiscovery';
 import { useScenarioProgress } from '../scenarios/composables/useScenarioProgress';
 import { useNetworkStatus } from '../pwa/composables/useNetworkStatus';
+import { usePwaInstall } from '../pwa/composables/usePwaInstall';
 import type { PuzzleTheme } from '@fun-chess/shared';
 
 interface Props {
@@ -78,6 +79,7 @@ watch(
 const { serverLanInfo, activeLanIp } = useLanDiscovery();
 const scenarioProgress = useScenarioProgress();
 const { isOffline } = useNetworkStatus();
+const { canInstall, isStandalone, promptInstall } = usePwaInstall();
 
 const activeProgressMap = computed(() => {
   return props.progressMap ?? scenarioProgress.progressMap.value;
@@ -184,6 +186,16 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
         <span v-if="isOffline" class="offline-badge-pill" data-testid="lobby-offline-badge">
           ✈️ 100% Offline Mode
         </span>
+        <button
+          v-if="canInstall && !isStandalone"
+          type="button"
+          class="quick-install-btn"
+          data-testid="lobby-install-btn"
+          title="Install App for Offline Play"
+          @click="promptInstall"
+        >
+          <span aria-hidden="true">📲</span> Install App
+        </button>
         <button
           type="button"
           class="quick-sync-btn"
@@ -376,15 +388,42 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   font-weight: var(--weight-bold, 700);
 }
 
+.quick-install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill, 9999px);
+  background-color: var(--color-primary-subtle, rgba(108, 92, 231, 0.14));
+  border: 1.5px solid var(--color-primary, #6c5ce7);
+  color: var(--text-main);
+  font-family: var(--font-display);
+  font-size: var(--text-xs, 12px);
+  font-weight: var(--weight-bold, 700);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+}
+
+.quick-install-btn:hover {
+  transform: translateY(-2px);
+  background-color: var(--color-primary, #6c5ce7);
+  color: #ffffff;
+  box-shadow: 0 4px 12px var(--color-primary-subtle, rgba(108, 92, 231, 0.25));
+}
+
+.quick-install-btn:active {
+  transform: translateY(0);
+}
+
 .quick-sync-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
   border-radius: var(--radius-pill, 9999px);
-  background-color: var(--bg-surface-raised, #28284e);
-  border: 1.5px solid var(--border-medium, rgba(255, 255, 255, 0.16));
-  color: var(--text-primary, #f8fafc);
+  background-color: var(--bg-surface-raised);
+  border: 1.5px solid var(--border-medium);
+  color: var(--text-main);
   font-family: var(--font-display);
   font-size: var(--text-xs, 12px);
   font-weight: var(--weight-bold, 700);
@@ -394,8 +433,8 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
 
 .quick-sync-btn:hover {
   transform: translateY(-2px);
-  border-color: var(--accent-primary, #7c3aed);
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px var(--color-primary-subtle);
 }
 
 .quick-sync-btn:active {

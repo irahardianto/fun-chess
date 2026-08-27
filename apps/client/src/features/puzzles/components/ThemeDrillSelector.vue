@@ -47,6 +47,34 @@ function handleSelect(theme: PuzzleTheme) {
   emit('select-theme', theme);
   emit('selectTheme', theme);
 }
+
+function handleCategoryKeyDown(event: KeyboardEvent, currentId: PuzzleThemeCategory | 'all') {
+  const currentIndex = categories.findIndex((c) => c.id === currentId);
+  let nextIndex = currentIndex;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    nextIndex = (currentIndex + 1) % categories.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    nextIndex = (currentIndex - 1 + categories.length) % categories.length;
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    nextIndex = categories.length - 1;
+  } else {
+    return;
+  }
+
+  const nextCat = categories[nextIndex];
+  if (nextCat) {
+    activeCategoryTab.value = nextCat.id;
+    const tabEl = document.querySelector<HTMLElement>(`[data-testid="${nextCat.id === 'all' ? 'filter-tab-all' : `filter-tab-${nextCat.id}`}"]`);
+    tabEl?.focus();
+  }
+}
 </script>
 
 <template>
@@ -60,9 +88,11 @@ function handleSelect(theme: PuzzleTheme) {
         role="tab"
         :data-testid="cat.id === 'all' ? 'filter-tab-all' : `filter-tab-${cat.id}`"
         :aria-selected="activeCategoryTab === cat.id"
+        :tabindex="activeCategoryTab === cat.id ? 0 : -1"
         class="category-tab-btn"
         :class="{ 'is-active': activeCategoryTab === cat.id }"
         @click="activeCategoryTab = cat.id"
+        @keydown="handleCategoryKeyDown($event, cat.id)"
       >
         <span class="tab-icon">{{ cat.icon }}</span>
         <span class="tab-label">{{ cat.label }}</span>
@@ -79,7 +109,12 @@ function handleSelect(theme: PuzzleTheme) {
         class="theme-drill-card"
         :class="{ 'is-selected': props.selectedTheme === desc.id }"
         :data-testid="`theme-card-${desc.id}`"
+        role="button"
+        tabindex="0"
+        :aria-label="`Select ${desc.name} tactical drill`"
         @click="handleSelect(desc.id)"
+        @keydown.enter.prevent="handleSelect(desc.id)"
+        @keydown.space.prevent="handleSelect(desc.id)"
       >
         <div class="card-top-row">
           <span class="theme-icon-badge">{{ desc.icon }}</span>

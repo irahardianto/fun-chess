@@ -21,7 +21,7 @@ describe('GameOverModal.vue', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders victory title and message when isWinner is true', () => {
+  it('renders victory title, is-victory styling class, and message when isWinner is true', () => {
     wrapper = mount(GameOverModal, {
       props: {
         modelValue: true,
@@ -30,12 +30,15 @@ describe('GameOverModal.vue', () => {
       },
     });
 
-    expect(document.body.textContent).toContain('VICTORY! 🏆🎉');
+    expect(document.body.textContent).toContain('Victory! 🏆🎉');
+    const headline = document.body.querySelector('.banner-headline');
+    expect(headline?.classList.contains('is-victory')).toBe(true);
+
     const msg = document.body.querySelector('[data-testid="game-over-message"]');
     expect(msg?.textContent).toContain('Checkmate! SpeedKnight wins!');
   });
 
-  it('renders draw title when isDraw is true', () => {
+  it('renders draw title without victory class when isDraw is true', () => {
     wrapper = mount(GameOverModal, {
       props: {
         modelValue: true,
@@ -50,6 +53,8 @@ describe('GameOverModal.vue', () => {
     });
 
     expect(document.body.textContent).toContain("It's a Draw! ⚖️");
+    const headline = document.body.querySelector('.banner-headline');
+    expect(headline?.classList.contains('is-victory')).toBe(false);
   });
 
   it('renders match stats correctly', () => {
@@ -66,7 +71,7 @@ describe('GameOverModal.vue', () => {
     expect(document.body.textContent).toContain('45s'); // durationSeconds
   });
 
-  it('emits rematch event on primary button click', async () => {
+  it('emits rematch event on verb-first Request Rematch button click', async () => {
     wrapper = mount(GameOverModal, {
       props: {
         modelValue: true,
@@ -76,12 +81,13 @@ describe('GameOverModal.vue', () => {
 
     const rematchBtn = document.body.querySelector('[data-testid="request-rematch-btn"]') as HTMLButtonElement;
     expect(rematchBtn).not.toBeNull();
+    expect(rematchBtn.textContent).toContain('Request Rematch');
     rematchBtn.click();
 
     expect(wrapper.emitted('rematch')).toHaveLength(1);
   });
 
-  it('emits lobby event on secondary button click', async () => {
+  it('emits lobby event on verb-first Return to Lobby button click', async () => {
     wrapper = mount(GameOverModal, {
       props: {
         modelValue: true,
@@ -91,6 +97,7 @@ describe('GameOverModal.vue', () => {
 
     const lobbyBtn = document.body.querySelector('[data-testid="return-lobby-btn"]') as HTMLButtonElement;
     expect(lobbyBtn).not.toBeNull();
+    expect(lobbyBtn.textContent).toContain('Return to Lobby');
     lobbyBtn.click();
 
     expect(wrapper.emitted('lobby')).toHaveLength(1);

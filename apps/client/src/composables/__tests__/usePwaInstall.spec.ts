@@ -54,7 +54,7 @@ describe('usePwaInstall composable', () => {
     }
   });
 
-  it('initializes with canInstall as false and isStandalone as false by default', () => {
+  it('initializes with canInstall as true (non-standalone) and isStandalone as false by default', () => {
     // Arrange & Act
     const scope = effectScope();
     let pwa: ReturnType<typeof usePwaInstall> | undefined;
@@ -63,13 +63,16 @@ describe('usePwaInstall composable', () => {
     });
 
     // Assert
-    expect(pwa?.canInstall.value).toBe(false);
+    expect(pwa?.canInstall.value).toBe(true);
+    expect(pwa?.isInstallAvailable.value).toBe(true);
+    expect(pwa?.hasInstallPrompt.value).toBe(false);
+    expect(pwa?.showInstallBanner.value).toBe(false);
     expect(pwa?.isStandalone.value).toBe(false);
     expect(pwa?.isIosSafari.value).toBe(false);
     scope.stop();
   });
 
-  it('captures beforeinstallprompt event, calls preventDefault, and sets canInstall to true', () => {
+  it('captures beforeinstallprompt event, calls preventDefault, and sets showInstallBanner to true', () => {
     // Arrange
     const scope = effectScope();
     let pwa: ReturnType<typeof usePwaInstall> | undefined;
@@ -86,6 +89,7 @@ describe('usePwaInstall composable', () => {
     // Assert
     expect(preventDefaultSpy).toHaveBeenCalled();
     expect(pwa?.canInstall.value).toBe(true);
+    expect(pwa?.hasInstallPrompt.value).toBe(true);
     expect(pwa?.showInstallBanner.value).toBe(true);
     scope.stop();
   });
@@ -145,7 +149,7 @@ describe('usePwaInstall composable', () => {
     scope.stop();
   });
 
-  it('snoozes install prompt for 7 days in localStorage', () => {
+  it('snoozes install prompt for 7 days in localStorage while keeping canInstall active', () => {
     // Arrange
     const scope = effectScope();
     let pwa: ReturnType<typeof usePwaInstall> | undefined;
@@ -161,6 +165,7 @@ describe('usePwaInstall composable', () => {
 
     pwa?.setDeferredPrompt(mockPromptEvent);
     expect(pwa?.showInstallBanner.value).toBe(true);
+    expect(pwa?.canInstall.value).toBe(true);
 
     // Act - Dismiss/Snooze
     pwa?.snoozePrompt(7);
@@ -168,13 +173,14 @@ describe('usePwaInstall composable', () => {
     // Assert
     expect(pwa?.isSnoozed.value).toBe(true);
     expect(pwa?.showInstallBanner.value).toBe(false);
+    expect(pwa?.canInstall.value).toBe(true);
 
     const storedTimestamp = Number(mockStorage[SNOOZE_STORAGE_KEY]);
     expect(storedTimestamp).toBeGreaterThan(Date.now());
     scope.stop();
   });
 
-  it('suppresses showInstallBanner when 7-day snooze is active', () => {
+  it('suppresses showInstallBanner when 7-day snooze is active while retaining canInstall', () => {
     // Arrange: set snooze timestamp 3 days into future
     const threeDaysFromNow = Date.now() + 3 * 24 * 60 * 60 * 1000;
     mockStorage[SNOOZE_STORAGE_KEY] = String(threeDaysFromNow);
@@ -194,8 +200,9 @@ describe('usePwaInstall composable', () => {
     // Act
     pwa?.setDeferredPrompt(mockPromptEvent);
 
-    // Assert: should remain false due to active snooze
+    // Assert: should remain false due to active snooze, but manual trigger remains available
     expect(pwa?.showInstallBanner.value).toBe(false);
+    expect(pwa?.canInstall.value).toBe(true);
     scope.stop();
   });
 

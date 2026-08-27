@@ -33,6 +33,16 @@ const statusText = computed(() => {
     role="region"
     :aria-label="`${props.mascot.name}, AI Level ${props.mascot.difficulty}, playing as ${resolvedColor === 'w' ? 'White' : 'Black'}`"
   >
+    <!-- Persistent Live Region for Screen Readers -->
+    <div
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {{ props.dialogue ? `${props.mascot.name} says: "${props.dialogue}"` : props.isThinking ? `${props.mascot.name} is calculating...` : props.isCurrentTurn ? `${props.mascot.name} is thinking...` : '' }}
+    </div>
+
     <!-- Top Row: Avatar, Identity Info, and Turn / Thinking status -->
     <div
       class="badge-card"
@@ -56,7 +66,7 @@ const statusText = computed(() => {
       <!-- Mascot Info -->
       <div class="mascot-info">
         <div class="name-row">
-          <span class="mascot-name">{{ props.mascot.name }}</span>
+          <span class="mascot-name" :title="props.mascot.name">{{ props.mascot.name }}</span>
           <span class="elo-badge">~{{ props.mascot.eloEstimate }}</span>
           <span class="bot-tag">AI</span>
         </div>
@@ -80,8 +90,6 @@ const statusText = computed(() => {
       <div
         v-if="props.isCurrentTurn"
         class="turn-status-pill"
-        role="status"
-        aria-live="polite"
       >
         <span class="turn-text">{{ statusText }}</span>
       </div>
@@ -94,8 +102,6 @@ const statusText = computed(() => {
         :key="props.dialogue"
         data-testid="mascot-dialogue-bubble"
         class="mascot-speech-bubble"
-        role="status"
-        aria-live="polite"
       >
         <span class="bubble-icon" aria-hidden="true">💬</span>
         <span class="bubble-text">"{{ props.dialogue }}"</span>
@@ -154,8 +160,8 @@ const statusText = computed(() => {
 
 .thinking-indicator-dot {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
+  inset-block-end: -2px;
+  inset-inline-end: -2px;
   width: 12px;
   height: 12px;
   border-radius: var(--radius-pill);
@@ -202,8 +208,8 @@ const statusText = computed(() => {
 
 .bot-tag {
   font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: var(--weight-heavy);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
   background-color: var(--border-strong);
   color: var(--text-inverse);
   padding: 1px 5px;
@@ -278,7 +284,7 @@ const statusText = computed(() => {
   font-weight: var(--weight-heavy);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-pill);
-  margin-left: auto;
+  margin-inline-start: auto;
   white-space: nowrap;
   box-shadow: var(--shadow-xs);
 }
@@ -287,8 +293,7 @@ const statusText = computed(() => {
 .mascot-speech-bubble {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  inset-inline: 0;
   z-index: var(--z-overlay-dialogue, 20);
   display: flex;
   align-items: center;
@@ -313,11 +318,11 @@ const statusText = computed(() => {
   content: '';
   position: absolute;
   top: -7px;
-  left: 24px;
+  inset-inline-start: 24px;
   width: 12px;
   height: 12px;
   background-color: var(--bg-surface);
-  border-left: 2px solid var(--border-medium);
+  border-inline-start: 2px solid var(--border-medium);
   border-top: 2px solid var(--border-medium);
   transform: rotate(45deg);
 }
@@ -384,5 +389,17 @@ const statusText = computed(() => {
   .turn-status-pill {
     display: none;
   }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 </style>

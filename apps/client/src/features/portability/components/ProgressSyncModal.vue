@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import BaseModal from '@/components/base/BaseModal.vue';
+import BaseButton from '@/components/base/BaseButton.vue';
 import QrExportView from './QrExportView.vue';
 import QrScannerView from './QrScannerView.vue';
 import ProgressConflictModal from './ProgressConflictModal.vue';
 import { useProgressSync } from '../composables/useProgressSync';
 import { defaultProgressFileService } from '../services/progress_file.service';
+import { usePwaInstall } from '@/features/pwa/composables/usePwaInstall';
 
 const modelValue = defineModel<boolean>({ default: false });
 
 const activeTab = ref<'export' | 'import'>('export');
 const qrString = ref('');
+
+const { canInstall, isStandalone, promptInstall } = usePwaInstall();
 
 const {
   isLoading,
@@ -86,9 +90,17 @@ function handleConflictResolved() {
 }
 
 function handleTabKeyDown(event: KeyboardEvent) {
-  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'Home' || event.key === 'End') {
     event.preventDefault();
-    activeTab.value = activeTab.value === 'export' ? 'import' : 'export';
+    if (event.key === 'Home') {
+      activeTab.value = 'export';
+    } else if (event.key === 'End') {
+      activeTab.value = 'import';
+    } else {
+      activeTab.value = activeTab.value === 'export' ? 'import' : 'export';
+    }
+    const tabEl = document.getElementById(activeTab.value === 'export' ? 'tab-export' : 'tab-import');
+    tabEl?.focus();
   }
 }
 </script>
@@ -136,7 +148,7 @@ function handleTabKeyDown(event: KeyboardEvent) {
           :class="{ 'is-active': activeTab === 'export' }"
           :aria-selected="activeTab === 'export'"
           aria-controls="panel-export"
-          tabindex="0"
+          :tabindex="activeTab === 'export' ? 0 : -1"
           @click="activeTab = 'export'"
         >
           📤 Export Progress
@@ -149,7 +161,7 @@ function handleTabKeyDown(event: KeyboardEvent) {
           :class="{ 'is-active': activeTab === 'import' }"
           :aria-selected="activeTab === 'import'"
           aria-controls="panel-import"
-          tabindex="0"
+          :tabindex="activeTab === 'import' ? 0 : -1"
           @click="activeTab = 'import'"
         >
           📥 Import Progress
@@ -186,6 +198,31 @@ function handleTabKeyDown(event: KeyboardEvent) {
           @file="handleImportFile"
         />
       </div>
+
+      <!-- PWA Install / Offline Play Section -->
+      <div
+        v-if="canInstall && !isStandalone"
+        class="sync-pwa-install-card"
+        data-testid="sync-pwa-install-section"
+      >
+        <div class="pwa-card-details">
+          <span class="pwa-card-icon" aria-hidden="true">📲</span>
+          <div class="pwa-card-texts">
+            <h4 class="pwa-card-title">Install App & Offline Play</h4>
+            <p class="pwa-card-desc">Install Fun Chess on your device for instant launch and 100% offline access.</p>
+          </div>
+        </div>
+        <BaseButton
+          variant="primary"
+          size="sm"
+          data-testid="sync-pwa-install-btn"
+          class="sync-pwa-install-action"
+          @click="promptInstall"
+        >
+          <template #icon-left>🚀</template>
+          Install App
+        </BaseButton>
+      </div>
     </div>
   </BaseModal>
 
@@ -213,14 +250,14 @@ function handleTabKeyDown(event: KeyboardEvent) {
   font-family: var(--font-display);
   font-size: var(--text-modal-h2, 22px);
   font-weight: var(--weight-bold);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
   line-height: 1.2;
 }
 
 .sync-modal-subtitle {
   font-family: var(--font-body);
   font-size: var(--text-caption, 12px);
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
 }
 
 .sync-modal-content {
@@ -236,9 +273,9 @@ function handleTabKeyDown(event: KeyboardEvent) {
   gap: var(--space-2, 8px);
   padding: 10px 14px;
   background-color: var(--status-danger-bg, rgba(239, 68, 68, 0.15));
-  border: 1.5px solid var(--status-danger, #ef4444);
+  border: 1.5px solid var(--color-danger, #ef4444);
   border-radius: var(--radius-md, 12px);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
   font-family: var(--font-body);
   font-size: var(--text-body-base, 14px);
   animation: float-pill-in 240ms ease-out;
@@ -256,7 +293,7 @@ function handleTabKeyDown(event: KeyboardEvent) {
 .error-dismiss-btn {
   background: transparent;
   border: none;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
   font-weight: bold;
   cursor: pointer;
   padding: 4px 8px;
@@ -266,7 +303,7 @@ function handleTabKeyDown(event: KeyboardEvent) {
 
 .error-dismiss-btn:hover {
   background-color: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 /* Tab Bar */
@@ -274,10 +311,10 @@ function handleTabKeyDown(event: KeyboardEvent) {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2, 8px);
-  background-color: var(--bg-primary, #0f0f1b);
+  background-color: var(--bg-app);
   padding: var(--space-1, 4px);
   border-radius: var(--radius-xl, 22px);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border-subtle);
 }
 
 .sync-tab-btn {
@@ -293,25 +330,100 @@ function handleTabKeyDown(event: KeyboardEvent) {
   font-family: var(--font-display);
   font-size: var(--text-card-h4, 16px);
   font-weight: var(--weight-bold);
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 180ms ease;
 }
 
 .sync-tab-btn:hover {
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
   background-color: rgba(255, 255, 255, 0.04);
 }
 
 .sync-tab-btn.is-active {
-  background-color: var(--accent-primary, #7c3aed);
+  background-color: var(--color-primary);
   color: #ffffff;
-  box-shadow: 0 4px 14px var(--accent-primary-glow, rgba(124, 58, 237, 0.45));
+  box-shadow: 0 4px 14px var(--color-primary-subtle);
 }
 
 .sync-tab-panel {
   width: 100%;
   animation: modal-fade-in 180ms ease-out;
+}
+
+/* PWA Install Card */
+.sync-pwa-install-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--color-primary-subtle, rgba(108, 92, 231, 0.1));
+  border: 1.5px solid var(--color-primary, #6c5ce7);
+  border-radius: var(--radius-lg, 16px);
+  box-sizing: border-box;
+  margin-top: var(--space-1, 4px);
+}
+
+.pwa-card-details {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-card-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill, 9999px);
+  background-color: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-medium);
+}
+
+.pwa-card-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pwa-card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm, 14px);
+  font-weight: var(--weight-bold, 700);
+  color: var(--text-main);
+  margin: 0;
+}
+
+.pwa-card-desc {
+  font-family: var(--font-body);
+  font-size: var(--text-xs, 12px);
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.sync-pwa-install-action {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 540px) {
+  .sync-pwa-install-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3, 12px);
+  }
+
+  .sync-pwa-install-action {
+    width: 100%;
+  }
 }
 
 @keyframes modal-fade-in {

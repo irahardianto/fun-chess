@@ -174,7 +174,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
 
     try {
       if (!rawStringOrJson || typeof rawStringOrJson !== 'string') {
-        throw new Error('Please provide valid save data or scan a QR code.');
+        throw new Error('Select a valid save file (.json) or scan a QR code.');
       }
 
       const trimmed = rawStringOrJson.trim();
@@ -192,7 +192,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
           throw new Error('Invalid JSON format in save data.');
         }
       } else {
-        throw new Error('Unrecognized save data format. Please scan a Fun Chess QR code or select a funchess-save.json file.');
+        throw new Error('Unrecognized save data format. Scan a Fun Chess QR code or select a funchess-save.json file.');
       }
 
       let local = currentProgress.value;
@@ -218,7 +218,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       }
     } catch (err: any) {
       console.error('[FC_PROGRESS_SYNC] Import validation failed', err);
-      syncError.value = err?.message || 'Failed to import save data. Please check your QR code or file.';
+      syncError.value = err?.message || 'Failed to import save data. Check your QR code or save file.';
       return false;
     } finally {
       isLoading.value = false;

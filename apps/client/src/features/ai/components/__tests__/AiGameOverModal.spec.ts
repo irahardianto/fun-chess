@@ -31,7 +31,7 @@ describe('AiGameOverModal.vue', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders victory headline, mascot dialogue, and match statistics when player wins', () => {
+  it('renders victory headline, is-victory styling class, mascot dialogue, and match statistics when player wins', () => {
     wrapper = mount(AiGameOverModal, {
       props: {
         modelValue: true,
@@ -44,6 +44,13 @@ describe('AiGameOverModal.vue', () => {
     });
 
     expect(document.body.textContent).toContain('VICTORY!');
+    const headline = document.body.querySelector('.banner-headline');
+    expect(headline?.classList.contains('is-victory')).toBe(true);
+
+    const region = document.body.querySelector('[role="region"]');
+    expect(region).not.toBeNull();
+    expect(region?.getAttribute('aria-label')).toBe('Game Over Summary');
+
     expect(document.body.textContent).toContain('Peanut the Pup');
     expect(document.body.textContent).toContain('45s');
     expect(document.body.textContent).toContain('8'); // total moves
@@ -51,7 +58,7 @@ describe('AiGameOverModal.vue', () => {
     expect(document.body.textContent).toContain('2'); // hintsCount
   });
 
-  it('emits "rematch" when Play Again button is clicked', async () => {
+  it('emits "rematch" when verb-first Play Again button is clicked', async () => {
     wrapper = mount(AiGameOverModal, {
       props: {
         modelValue: true,
@@ -63,13 +70,14 @@ describe('AiGameOverModal.vue', () => {
 
     const rematchBtn = document.body.querySelector('[data-testid="ai-rematch-btn"]') as HTMLButtonElement;
     expect(rematchBtn).not.toBeNull();
+    expect(rematchBtn.textContent).toContain('Play Again with Peanut');
     rematchBtn.click();
 
     expect(wrapper.emitted('rematch')).toBeTruthy();
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false]);
   });
 
-  it('emits "changeOpponent" when Choose Another Mascot button is clicked', async () => {
+  it('emits "changeOpponent" when verb-first Choose Another Mascot button is clicked', async () => {
     wrapper = mount(AiGameOverModal, {
       props: {
         modelValue: true,
@@ -80,13 +88,14 @@ describe('AiGameOverModal.vue', () => {
 
     const changeOpponentBtn = document.body.querySelector('[data-testid="ai-change-opponent-btn"]') as HTMLButtonElement;
     expect(changeOpponentBtn).not.toBeNull();
+    expect(changeOpponentBtn.textContent).toContain('Choose Another Mascot');
     changeOpponentBtn.click();
 
     expect(wrapper.emitted('changeOpponent')).toBeTruthy();
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false]);
   });
 
-  it('emits "lobby" when Return to Main Menu button is clicked', async () => {
+  it('emits "lobby" when verb-first Return to Main Menu button is clicked', async () => {
     wrapper = mount(AiGameOverModal, {
       props: {
         modelValue: true,
@@ -97,6 +106,7 @@ describe('AiGameOverModal.vue', () => {
 
     const lobbyBtn = document.body.querySelector('[data-testid="ai-return-lobby-btn"]') as HTMLButtonElement;
     expect(lobbyBtn).not.toBeNull();
+    expect(lobbyBtn.textContent).toContain('Return to Main Menu');
     lobbyBtn.click();
 
     expect(wrapper.emitted('lobby')).toBeTruthy();

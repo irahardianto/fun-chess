@@ -94,11 +94,11 @@ function handleDismiss() {
 <style scoped>
 .pwa-install-banner-wrapper {
   position: fixed;
-  bottom: 20px;
+  bottom: max(20px, calc(12px + env(safe-area-inset-bottom, 0px)));
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-pwa-banner, 45);
-  width: calc(100% - 32px);
+  width: min(580px, calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   max-width: 580px;
   pointer-events: none;
 }

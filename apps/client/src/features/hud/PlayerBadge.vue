@@ -60,7 +60,7 @@ const turnText = computed(() => {
     <!-- Name & Details -->
     <div class="player-info">
       <div class="name-row">
-        <span class="player-name">{{ displayName }}</span>
+        <span class="player-name" :title="displayName">{{ displayName }}</span>
         <span v-if="props.isSelf" class="self-tag">(You)</span>
         <span v-if="props.isHost" class="host-tag" title="Room Host">👑</span>
       </div>
@@ -122,8 +122,8 @@ const turnText = computed(() => {
 
 .status-dot {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
+  inset-block-end: -2px;
+  inset-inline-end: -2px;
   width: 12px;
   height: 12px;
   border-radius: var(--radius-pill);
@@ -201,7 +201,7 @@ const turnText = computed(() => {
   font-family: var(--font-body);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  color: var(--color-accent);
+  color: var(--color-accent-text, #92400e);
 }
 
 .turn-badge--active {
@@ -216,7 +216,7 @@ const turnText = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  margin-left: auto;
+  margin-inline-start: auto;
   white-space: nowrap;
 }
 

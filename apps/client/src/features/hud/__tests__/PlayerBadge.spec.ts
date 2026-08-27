@@ -64,4 +64,19 @@ describe('PlayerBadge.vue', () => {
     expect(wrapper.classes()).toContain('is-disconnected');
     expect(wrapper.find('.connection-dot').classes()).toContain('is-offline');
   });
+
+  it('renders title attribute on player-name for accessible tooltip and truncation', () => {
+    const longName = 'Grandmaster Alexander The Great Chess Champion';
+    const wrapper = mount(PlayerBadge, {
+      props: {
+        playerName: longName,
+        color: 'w',
+        isCurrentTurn: false,
+      },
+    });
+
+    const nameEl = wrapper.find('.player-name');
+    expect(nameEl.attributes('title')).toBe(longName);
+    expect(nameEl.text()).toBe(longName);
+  });
 });

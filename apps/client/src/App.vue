@@ -32,8 +32,9 @@ import type { PuzzleTheme } from '@fun-chess/shared';
 
 // --- Theme Management ---
 const isDarkMode = ref(false);
-function toggleTheme() {
-  isDarkMode.value = !isDarkMode.value;
+
+function applyTheme(dark: boolean) {
+  isDarkMode.value = dark;
   if (typeof document !== 'undefined') {
     // Suppress CSS transitions temporarily during theme switch to prevent visual smearing
     const style = document.createElement('style');
@@ -43,23 +44,26 @@ function toggleTheme() {
     );
     document.head.appendChild(style);
 
-    // Force layout reflow
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    document.body.offsetHeight;
-
-    if (isDarkMode.value) {
+    if (dark) {
       document.documentElement.setAttribute('data-theme', 'dark');
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
 
+    // Force layout reflow
+    const _flushReflow = document.body.offsetHeight;
+    void _flushReflow;
+
     requestAnimationFrame(() => {
-      const el = document.getElementById('theme-transition-suppress');
-      if (el && el.parentNode) {
-        el.parentNode.removeChild(el);
-      }
+      requestAnimationFrame(() => {
+        style.remove();
+      });
     });
   }
+}
+
+function toggleTheme() {
+  applyTheme(!isDarkMode.value);
 }
 
 // --- Inline Notifications / Error State ---
@@ -70,6 +74,7 @@ interface AppNotification {
 }
 
 const activeNotification = ref<AppNotification | null>(null);
+const notificationAnnouncement = computed(() => activeNotification.value?.message || '');
 let notificationTimer: ReturnType<typeof setTimeout> | null = null;
 
 function showNotification(message: string, type: 'error' | 'info' | 'success' = 'info', durationMs = 5000) {
@@ -259,7 +264,7 @@ onMounted(async () => {
     }
 
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      toggleTheme();
+      applyTheme(true);
     }
   }
 });
@@ -483,7 +488,7 @@ function handlePromotionSelect(piece: 'q' | 'r' | 'b' | 'n') {
 
 function handleResign() {
   if (!currentRoom.value) return;
-  if (confirm('Are you sure you want to resign this match? 🏳️')) {
+  if (confirm('Resign this match and award victory to your opponent?')) {
     resign(currentRoom.value.roomCode);
   }
 }
@@ -522,7 +527,7 @@ function handleDeclineRematch() {
 
 function handleLeaveRoom() {
   if (!currentRoom.value) return;
-  if (confirm('Return to Lobby?')) {
+  if (confirm('Leave match and return to lobby? Your active game will be forfeited.')) {
     leaveRoom(currentRoom.value.roomCode);
     showGameOverModal.value = false;
     currentAppMode.value = 'lobby';
@@ -532,6 +537,9 @@ function handleLeaveRoom() {
 
 <template>
   <div class="app-shell" data-testid="app-shell">
+    <!-- Accessible Skip to Main Content Link (WCAG 2.4.1) -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <!-- Reassuring Offline Status Pill -->
     <OfflineIndicator />
 
@@ -684,7 +692,10 @@ function handleLeaveRoom() {
     </header>
 
     <!-- Main Dynamic Viewport -->
-    <main class="app-viewport">
+    <main id="main-content" class="app-viewport">
+      <!-- Persistent Live Region for Screen Readers -->
+      <div class="sr-only" role="status" aria-live="polite">{{ notificationAnnouncement }}</div>
+
       <!-- Accessible Inline Notification Banner -->
       <Transition name="notification-slide">
         <div
@@ -755,7 +766,7 @@ function handleLeaveRoom() {
           class="disconnect-warning-banner"
           role="alert"
         >
-          <span>⚠️ Opponent disconnected! Grace period running (60s)...</span>
+          <span>⚠️ Opponent disconnected. Waiting for reconnection (60s)...</span>
         </div>
 
         <!-- Draw Offer Alert Banner -->
@@ -982,6 +993,31 @@ function handleLeaveRoom() {
 </template>
 
 <style scoped>
+.skip-link {
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--color-primary);
+  color: var(--text-on-primary, #ffffff);
+  padding: 8px 16px;
+  border-radius: var(--radius-md, 12px);
+  z-index: 1000;
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold, 700);
+  font-size: var(--text-sm, 14px);
+  text-decoration: none;
+  box-shadow: var(--shadow-lg);
+  transition: top var(--duration-fast, 140ms) var(--ease-spring);
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 12px;
+  outline: 2px solid var(--text-on-primary, #ffffff);
+  outline-offset: 2px;
+}
+
 .app-shell {
   min-height: 100vh;
   min-height: 100dvh;
@@ -1000,6 +1036,9 @@ function handleLeaveRoom() {
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
+  padding-block-start: max(var(--space-2), calc(var(--space-2) + env(safe-area-inset-top, 0px)));
+  padding-inline-start: max(var(--space-4), calc(var(--space-4) + env(safe-area-inset-left, 0px)));
+  padding-inline-end: max(var(--space-4), calc(var(--space-4) + env(safe-area-inset-right, 0px)));
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-xs);
@@ -1023,7 +1062,7 @@ function handleLeaveRoom() {
   padding: 0;
   font: inherit;
   color: inherit;
-  text-align: left;
+  text-align: start;
   transition: transform var(--duration-fast, 150ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
 }
 
@@ -1036,7 +1075,8 @@ function handleLeaveRoom() {
 }
 
 .navbar-brand:focus-visible {
-  outline: none;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
   box-shadow: var(--focus-ring, 0 0 0 3px hsl(var(--color-primary-h, 255) 85% 60% / 0.45));
   border-radius: var(--radius-sm, 8px);
 }
@@ -1082,7 +1122,8 @@ function handleLeaveRoom() {
 }
 
 .room-code-chip:focus-visible {
-  outline: none;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
   box-shadow: var(--focus-ring, 0 0 0 3px hsl(var(--color-primary-h, 255) 85% 60% / 0.45));
 }
 
@@ -1175,6 +1216,9 @@ function handleLeaveRoom() {
   align-items: center;
   justify-content: flex-start;
   padding: var(--space-4) var(--space-4) var(--space-8);
+  padding-block-end: max(var(--space-8), calc(var(--space-4) + env(safe-area-inset-bottom, 0px)));
+  padding-inline-start: max(var(--space-4), calc(var(--space-4) + env(safe-area-inset-left, 0px)));
+  padding-inline-end: max(var(--space-4), calc(var(--space-4) + env(safe-area-inset-right, 0px)));
   max-width: 880px;
   width: 100%;
   margin: 0 auto;
@@ -1187,6 +1231,7 @@ function handleLeaveRoom() {
   position: fixed;
   top: 68px;
   left: 50%;
+  inset-inline-start: 50%;
   transform: translateX(-50%);
   z-index: var(--z-global-notification, 100);
   display: flex;
@@ -1251,7 +1296,7 @@ function handleLeaveRoom() {
 
 .notification-message {
   flex: 1 1 auto;
-  text-align: left;
+  text-align: start;
 }
 
 .notification-dismiss-btn {
@@ -1274,7 +1319,8 @@ function handleLeaveRoom() {
 }
 
 .notification-dismiss-btn:focus-visible {
-  outline: none;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
   box-shadow: var(--focus-ring, 0 0 0 3px hsl(var(--color-primary-h, 255) 85% 60% / 0.45));
 }
 
@@ -1335,7 +1381,7 @@ function handleLeaveRoom() {
   font-weight: var(--weight-bold);
   color: var(--text-main);
   box-sizing: border-box;
-  transition: all var(--duration-fast);
+  transition: transform var(--duration-fast), background-color var(--duration-fast), border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 
 .arena-turn-indicator.is-my-turn {
@@ -1354,8 +1400,8 @@ function handleLeaveRoom() {
 }
 
 .arena-turn-indicator.is-my-turn .turn-indicator-dot {
-  background-color: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background-color: var(--status-online, #10b981);
+  box-shadow: 0 0 8px var(--status-online, #10b981);
   animation: pulse-valid-dot 1.4s infinite ease-in-out;
 }
 
@@ -1367,6 +1413,7 @@ function handleLeaveRoom() {
   position: absolute;
   top: 8px;
   left: 50%;
+  inset-inline-start: 50%;
   transform: translateX(-50%);
   z-index: var(--z-overlay-alert, 30);
   width: calc(100% - 16px);
@@ -1388,6 +1435,7 @@ function handleLeaveRoom() {
   position: absolute;
   top: 8px;
   left: 50%;
+  inset-inline-start: 50%;
   transform: translateX(-50%);
   z-index: var(--z-overlay-alert, 30);
   width: calc(100% - 16px);
@@ -1512,12 +1560,13 @@ function handleLeaveRoom() {
 
   .in-game-toolbar {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-2, 8px);
   }
 
   .in-game-toolbar :deep(button) {
-    padding: 6px 2px;
+    min-height: 44px;
+    padding: 6px 4px;
     font-size: var(--text-xs);
     min-width: 0;
   }

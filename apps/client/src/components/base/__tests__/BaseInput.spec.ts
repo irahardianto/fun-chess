@@ -43,16 +43,38 @@ describe('BaseInput.vue', () => {
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['LION']);
   });
 
-  it('displays error message and sets aria-invalid', () => {
+  it('displays error message, role="alert", aria-invalid, and links aria-describedby', () => {
     const wrapper = mount(BaseInput, {
       props: {
+        id: 'test-room-input',
         error: 'Room not found',
       },
     });
 
     expect(wrapper.classes()).toContain('has-error');
-    expect(wrapper.find('.base-input-error').text()).toContain('Room not found');
-    expect(wrapper.find('input').attributes('aria-invalid')).toBe('true');
+    const errorMsg = wrapper.find('.base-input-error');
+    expect(errorMsg.exists()).toBe(true);
+    expect(errorMsg.text()).toContain('Room not found');
+    expect(errorMsg.attributes('role')).toBe('alert');
+    expect(errorMsg.attributes('id')).toBe('test-room-input-error');
+
+    const input = wrapper.find('input');
+    expect(input.attributes('aria-invalid')).toBe('true');
+    expect(input.attributes('aria-describedby')).toBe('test-room-input-error');
+  });
+
+  it('links aria-describedby to hint id when hint is provided without error', () => {
+    const wrapper = mount(BaseInput, {
+      props: {
+        id: 'test-hint-input',
+        hint: '4 uppercase letters',
+      },
+    });
+
+    expect(wrapper.find('.base-input-hint').text()).toContain('4 uppercase letters');
+    const input = wrapper.find('input');
+    expect(input.attributes('aria-invalid')).toBe('false');
+    expect(input.attributes('aria-describedby')).toBe('test-hint-input-hint');
   });
 
   it('clears value when clear button is clicked', async () => {
@@ -69,6 +91,31 @@ describe('BaseInput.vue', () => {
     await clearBtn.trigger('click');
     expect(wrapper.emitted('update:modelValue')).toContainEqual(['']);
     expect(wrapper.emitted('clear')).toHaveLength(1);
+  });
+
+  it('renders prefix and suffix slots with accessible attributes', () => {
+    const wrapper = mount(BaseInput, {
+      slots: {
+        'icon-left': '<span class="prefix-icon">🔑</span>',
+        'icon-right': '<span class="suffix-icon">✨</span>',
+      },
+    });
+
+    expect(wrapper.find('.prefix-icon').text()).toBe('🔑');
+    expect(wrapper.find('.suffix-icon').text()).toBe('✨');
+  });
+
+  it('emits enter event on Enter keydown', async () => {
+    const wrapper = mount(BaseInput, {
+      props: {
+        modelValue: 'STAR',
+      },
+    });
+
+    const input = wrapper.find('input');
+    await input.trigger('keydown', { key: 'Enter' });
+
+    expect(wrapper.emitted('enter')).toHaveLength(1);
   });
 
   it('renders input control with proper structure and accessible attributes', () => {

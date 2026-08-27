@@ -61,4 +61,41 @@ describe('LobbyModeSelector.vue', () => {
     expect(activeTab.attributes('role')).toBe('tab');
     expect(activeTab.attributes('aria-controls')).toBe('mode-panel-puzzle_hub');
   });
+
+  it('implements roving tabindex (:tabindex="0" for active, "-1" for inactive)', () => {
+    const wrapper = mount(LobbyModeSelector, {
+      props: {
+        modelValue: 'solo_ai',
+      },
+    });
+
+    const lanTab = wrapper.find('[data-testid="mode-tab-multiplayer_lan"]');
+    const soloAiTab = wrapper.find('[data-testid="mode-tab-solo_ai"]');
+    const academyTab = wrapper.find('[data-testid="mode-tab-academy"]');
+    const puzzleHubTab = wrapper.find('[data-testid="mode-tab-puzzle_hub"]');
+
+    expect(lanTab.attributes('tabindex')).toBe('-1');
+    expect(soloAiTab.attributes('tabindex')).toBe('0');
+    expect(academyTab.attributes('tabindex')).toBe('-1');
+    expect(puzzleHubTab.attributes('tabindex')).toBe('-1');
+  });
+
+  it('navigates tabs using ArrowRight, ArrowLeft, Home, and End keys', async () => {
+    const wrapper = mount(LobbyModeSelector, {
+      props: {
+        modelValue: 'multiplayer_lan',
+      },
+    });
+
+    const lanTab = wrapper.find('[data-testid="mode-tab-multiplayer_lan"]');
+    await lanTab.trigger('keydown', { key: 'ArrowRight' });
+
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['solo_ai']);
+
+    await lanTab.trigger('keydown', { key: 'End' });
+    expect(wrapper.emitted('update:modelValue')?.[1]).toEqual(['puzzle_hub']);
+
+    await lanTab.trigger('keydown', { key: 'Home' });
+    expect(wrapper.emitted('update:modelValue')?.[2]).toEqual(['multiplayer_lan']);
+  });
 });

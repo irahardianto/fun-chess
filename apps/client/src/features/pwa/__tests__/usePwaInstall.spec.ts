@@ -19,20 +19,31 @@ describe('usePwaInstall Composable', () => {
       }),
     });
 
-    const { setDeferredPrompt, setInstalled, resetSnooze } = usePwaInstall();
+    const { setDeferredPrompt, setInstalled, resetSnooze, closeInstallModal } = usePwaInstall();
     setDeferredPrompt(null);
     setInstalled(false);
     resetSnooze();
+    closeInstallModal();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('captures beforeinstallprompt event and updates canInstall & showInstallBanner', () => {
-    const { canInstall, showInstallBanner, setDeferredPrompt } = usePwaInstall();
+  it('initializes with canInstall as true (when non-standalone) and showInstallBanner as false before prompt event', () => {
+    const { canInstall, isInstallAvailable, hasInstallPrompt, showInstallBanner } = usePwaInstall();
 
-    expect(canInstall.value).toBe(false);
+    expect(canInstall.value).toBe(true);
+    expect(isInstallAvailable.value).toBe(true);
+    expect(hasInstallPrompt.value).toBe(false);
+    expect(showInstallBanner.value).toBe(false);
+  });
+
+  it('captures beforeinstallprompt event and updates hasInstallPrompt & showInstallBanner', () => {
+    const { canInstall, hasInstallPrompt, showInstallBanner, setDeferredPrompt } = usePwaInstall();
+
+    expect(canInstall.value).toBe(true);
+    expect(hasInstallPrompt.value).toBe(false);
     expect(showInstallBanner.value).toBe(false);
 
     const mockPromptEvent = {
@@ -44,11 +55,12 @@ describe('usePwaInstall Composable', () => {
     setDeferredPrompt(mockPromptEvent);
 
     expect(canInstall.value).toBe(true);
+    expect(hasInstallPrompt.value).toBe(true);
     expect(showInstallBanner.value).toBe(true);
   });
 
-  it('snoozes install prompt for specified days in localStorage', () => {
-    const { showInstallBanner, setDeferredPrompt, snoozePrompt, isSnoozed, resetSnooze } =
+  it('snoozes floating banner without disabling manual canInstall capability', () => {
+    const { showInstallBanner, canInstall, isInstallAvailable, setDeferredPrompt, snoozePrompt, isSnoozed, resetSnooze } =
       usePwaInstall();
 
     const mockPromptEvent = {
@@ -59,10 +71,15 @@ describe('usePwaInstall Composable', () => {
 
     setDeferredPrompt(mockPromptEvent);
     expect(showInstallBanner.value).toBe(true);
+    expect(canInstall.value).toBe(true);
 
     snoozePrompt(7);
     expect(isSnoozed.value).toBe(true);
+    // Floating banner is snoozed
     expect(showInstallBanner.value).toBe(false);
+    // Manual install capability REMAINS active
+    expect(canInstall.value).toBe(true);
+    expect(isInstallAvailable.value).toBe(true);
 
     const storedSnooze = mockStorage[SNOOZE_STORAGE_KEY];
     expect(storedSnooze).toBeDefined();
@@ -74,7 +91,7 @@ describe('usePwaInstall Composable', () => {
   });
 
   it('executes promptInstall successfully when deferredPrompt is available', async () => {
-    const { setDeferredPrompt, promptInstall, isInstalled } = usePwaInstall();
+    const { setDeferredPrompt, promptInstall, isInstalled, canInstall } = usePwaInstall();
 
     const mockPrompt = vi.fn().mockResolvedValue(undefined);
     const mockPromptEvent = {
@@ -89,6 +106,17 @@ describe('usePwaInstall Composable', () => {
     expect(mockPrompt).toHaveBeenCalled();
     expect(result).toBe(true);
     expect(isInstalled.value).toBe(true);
+    expect(canInstall.value).toBe(false);
+  });
+
+  it('falls back to opening install modal when promptInstall is called without deferredPrompt', async () => {
+    const { isInstallModalOpen, promptInstall, setDeferredPrompt } = usePwaInstall();
+    setDeferredPrompt(null);
+
+    expect(isInstallModalOpen.value).toBe(false);
+    const result = await promptInstall();
+    expect(result).toBe(true);
+    expect(isInstallModalOpen.value).toBe(true);
   });
 
   it('opens modal for iOS or manual trigger', () => {

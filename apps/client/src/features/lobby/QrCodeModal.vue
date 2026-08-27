@@ -440,7 +440,7 @@ function handleClose() {
   width: 100%;
   max-width: 380px;
   box-sizing: border-box;
-  text-align: left;
+  text-align: start;
   transition: all var(--duration-fast);
 }
 
@@ -580,7 +580,7 @@ function handleClose() {
   font-weight: var(--weight-bold, 700);
   color: var(--color-danger, #ef4444);
   margin: 0;
-  text-align: left;
+  text-align: start;
 }
 
 .prefill-helpers {
@@ -650,7 +650,7 @@ function handleClose() {
   border-radius: 3px;
   padding: 1px 4px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .ip-guide-box code {

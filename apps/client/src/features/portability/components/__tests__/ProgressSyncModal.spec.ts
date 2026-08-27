@@ -93,4 +93,25 @@ describe('ProgressSyncModal.vue', () => {
 
     expect(wrapper.findComponent(QrScannerView).exists()).toBe(true);
   });
+
+  it('renders PWA install section and triggers promptInstall when clicked', async () => {
+    const wrapper = mount(ProgressSyncModal, {
+      props: {
+        modelValue: true,
+      },
+      global: {
+        stubs: {
+          Teleport: true,
+        },
+      },
+    });
+
+    const pwaSection = wrapper.find('[data-testid="sync-pwa-install-section"]');
+    expect(pwaSection.exists()).toBe(true);
+    expect(pwaSection.text()).toContain('Install App & Offline Play');
+
+    const installBtn = wrapper.find('[data-testid="sync-pwa-install-btn"]');
+    expect(installBtn.exists()).toBe(true);
+    await installBtn.trigger('click');
+  });
 });

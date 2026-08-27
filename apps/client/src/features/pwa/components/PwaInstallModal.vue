@@ -122,7 +122,7 @@ async function handleNativeInstall() {
             data-testid="ios-install-done-btn"
             @click="handleClose"
           >
-            Got it, Let's Play! ♟️
+            Start playing
           </BaseButton>
         </div>
       </template>

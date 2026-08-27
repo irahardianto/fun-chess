@@ -53,4 +53,17 @@ describe('ScenarioArena.vue', () => {
     expect(wrapper.findComponent({ name: 'ChessBoard' }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'ScenarioGuideOverlay' }).exists()).toBe(true);
   });
+
+  it('integrates ProgressiveHintLayer with showControls disabled to avoid duplicate buttons', () => {
+    const wrapper = mount(ScenarioArena, {
+      props: {
+        scenario: mockScenario,
+      },
+    });
+
+    const hintLayer = wrapper.findComponent({ name: 'ProgressiveHintLayer' });
+    expect(hintLayer.exists()).toBe(true);
+    expect(hintLayer.props('showControls')).toBe(false);
+    expect(wrapper.find('[data-testid="request-hint-btn"]').exists()).toBe(false);
+  });
 });

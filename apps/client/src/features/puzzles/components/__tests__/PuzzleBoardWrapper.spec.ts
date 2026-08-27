@@ -323,4 +323,42 @@ describe('PuzzleBoardWrapper.vue', () => {
       expect(wrapper.emitted('move')).toBeUndefined();
     });
   });
+
+  describe('Hint Controls Visibility & Interaction (Decoupled Layout)', () => {
+    it('renders hint action button and meter by default when showHintControls is true', () => {
+      wrapper = mountWrapper({
+        fen: STARTING_FEN,
+        showHintControls: true,
+      });
+
+      expect(wrapper.find('[data-testid="request-hint-btn"]').exists()).toBe(true);
+      expect(wrapper.find('.hint-tier-meter').exists()).toBe(true);
+    });
+
+    it('hides hint action button and meter when showHintControls is false (e.g. in Blitz / Rush modes)', () => {
+      wrapper = mountWrapper({
+        fen: STARTING_FEN,
+        showHintControls: false,
+      });
+
+      expect(wrapper.find('[data-testid="request-hint-btn"]').exists()).toBe(false);
+      expect(wrapper.find('.hint-tier-meter').exists()).toBe(false);
+    });
+
+    it('emits request-hint and requestHint when hint button is clicked', async () => {
+      wrapper = mountWrapper({
+        fen: STARTING_FEN,
+        hintLevel: 0,
+        showHintControls: true,
+      });
+
+      const hintBtn = wrapper.find('[data-testid="request-hint-btn"]');
+      expect(hintBtn.exists()).toBe(true);
+
+      await hintBtn.trigger('click');
+
+      expect(wrapper.emitted('request-hint')).toHaveLength(1);
+      expect(wrapper.emitted('requestHint')).toHaveLength(1);
+    });
+  });
 });

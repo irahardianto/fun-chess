@@ -93,6 +93,7 @@ const tierInfo = computed(() => {
   font-size: var(--text-xl);
   color: var(--color-primary);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .streak-pill {

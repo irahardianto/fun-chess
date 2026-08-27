@@ -39,4 +39,19 @@ describe('ThemeDrillSelector.vue', () => {
     expect(wrapper.emitted('selectTheme')).toBeTruthy();
     expect(wrapper.emitted('selectTheme')![0]).toEqual(['fork']);
   });
+
+  it('supports keyboard selection with role="button", tabindex="0", Enter, and Space keys', async () => {
+    const wrapper = mount(ThemeDrillSelector);
+    const forkCard = wrapper.find('[data-testid="theme-card-fork"]');
+
+    expect(forkCard.attributes('role')).toBe('button');
+    expect(forkCard.attributes('tabindex')).toBe('0');
+    expect(forkCard.attributes('aria-label')).toBe('Select Royal Forks 🍴 tactical drill');
+
+    await forkCard.trigger('keydown.enter');
+    expect(wrapper.emitted('selectTheme')?.[0]).toEqual(['fork']);
+
+    await forkCard.trigger('keydown.space');
+    expect(wrapper.emitted('selectTheme')?.[1]).toEqual(['fork']);
+  });
 });

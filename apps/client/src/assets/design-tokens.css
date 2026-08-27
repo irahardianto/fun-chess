@@ -86,9 +86,10 @@
   --text-on-primary:    #ffffff;
   --text-on-accent:     #1e1b4b;
   --text-on-danger:     #ffffff;
-  --text-on-success:    #ffffff;
+  --text-on-success:    #0f172a;
   --color-primary-text: hsl(var(--color-primary-h) 65% 38%);
   --color-accent-text:  #92400e;
+  --color-success-text: #166534;
 
   /* Interactive Buttons & Accents */
   --color-primary:        hsl(var(--color-primary-h) var(--color-primary-s) var(--color-primary-l));
@@ -146,12 +147,12 @@
   /* Sync Conflict Stats Highlight */
   --stat-better-bg:         rgba(16, 185, 129, 0.18);
   --stat-better-border:     #10b981;
-  --stat-better-text:       #34d399;
-  --stat-better-badge:      #059669;
+  --stat-better-text:       #166534; /* High-contrast emerald green for light mode (>= 4.5:1) */
+  --stat-better-badge:      #047857;
 
   --stat-neutral-bg:        rgba(148, 163, 184, 0.10);
   --stat-neutral-border:    rgba(148, 163, 184, 0.25);
-  --stat-neutral-text:      #94a3b8;
+  --stat-neutral-text:      #475569; /* High-contrast neutral slate for light mode (>= 4.5:1) */
 
   /* Drag & Drop File Zone */
   --dropzone-bg:            rgba(124, 58, 237, 0.06);
@@ -171,7 +172,7 @@
   --board-light-sq:          #f0d9b5; /* Warm creamy sand */
   --board-dark-sq:           #b58863; /* Warm caramel timber */
   --board-coord-light:       #7d5538; /* Coordinate labels on light sq (contrast >= 4.5:1) */
-  --board-coord-dark:        #f0d9b5; /* Coordinate labels on dark sq */
+  --board-coord-dark:        #3d220f; /* Coordinate labels on dark sq */
   --board-rim:               #7d5538; /* Sturdy outer wooden border */
   --board-rim-dark:          #533722;
 
@@ -191,7 +192,7 @@
 
   /* Turn Indicators */
   --turn-active-bg:          #22c55e;
-  --turn-active-text:        #ffffff;
+  --turn-active-text:        #0f172a;
   --turn-waiting-bg:         #64748b; /* Accessible contrast >= 4.5:1 */
   --turn-waiting-text:       #ffffff;
 
@@ -379,6 +380,7 @@
   --text-faint:         hsl(220, 10%, 46%);
   --color-primary-text: hsl(255 95% 78%);
   --color-accent-text:  hsl(42 100% 75%);
+  --color-success-text: #34d399;
 
   --border-subtle:        hsl(225, 20%, 24%);
   --border-medium:        hsl(225, 20%, 32%);
@@ -450,6 +452,10 @@
   --status-offline-bg:     rgba(245, 158, 11, 0.16);
   --status-offline-border: #f59e0b;
   --status-offline-text:   #fef3c7;
+
+  /* Sync Conflict Stats Dark Overrides */
+  --stat-better-text:      #34d399;
+  --stat-neutral-text:     #94a3b8;
 }
 
 /* --------------------------------------------------------------------------
@@ -457,7 +463,7 @@
    -------------------------------------------------------------------------- */
 :root {
   /* Font Families */
-  --font-display: 'Fredoka', cursive, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-body:    'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono:    'JetBrains Mono', monospace;
 
@@ -1032,4 +1038,20 @@ button, input, select, textarea {
     background-color: var(--check-danger-bg) !important;
     box-shadow: inset 0 0 10px var(--color-danger) !important;
   }
+}
+
+/* --------------------------------------------------------------------------
+   9. ACCESSIBILITY UTILITY CLASSES
+   -------------------------------------------------------------------------- */
+/* Screen reader only utility (WCAG AA standard) */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border-width: 0 !important;
 }

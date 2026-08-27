@@ -34,7 +34,7 @@ function onHostSubmit() {
       </div>
     </template>
 
-    <div class="host-form">
+    <form class="host-form" @submit.prevent="onHostSubmit">
       <BaseInput
         v-model="hostNickname"
         label="Your Nickname"
@@ -61,7 +61,7 @@ function onHostSubmit() {
           >
             <span class="color-btn-icon" aria-hidden="true">⚪</span>
             <span class="color-btn-title">White</span>
-            <span class="color-btn-desc">Play First</span>
+            <span class="color-btn-desc">First Move</span>
           </button>
 
           <button
@@ -97,6 +97,7 @@ function onHostSubmit() {
       </div>
 
       <BaseButton
+        type="submit"
         variant="primary"
         size="lg"
         full-width
@@ -107,7 +108,7 @@ function onHostSubmit() {
         <template #icon-left>⚔️</template>
         Host Game
       </BaseButton>
-    </div>
+    </form>
   </BaseCard>
 </template>
 

@@ -148,7 +148,7 @@ async function handleCopy() {
   background-color: var(--qr-canvas-bg, #ffffff);
   border-radius: var(--radius-xl, 22px);
   box-shadow: var(--qr-canvas-shadow, 0 8px 24px rgba(0, 0, 0, 0.25));
-  border: 4px solid var(--accent-primary, #7c3aed);
+  border: 4px solid var(--color-primary);
 }
 
 .qr-canvas-element {
@@ -162,7 +162,7 @@ async function handleCopy() {
 .export-guide-text {
   font-family: var(--font-body);
   font-size: var(--text-body-base, 14px);
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
   line-height: 1.4;
   max-width: 440px;
 }
@@ -182,16 +182,16 @@ async function handleCopy() {
   flex-wrap: wrap;
   gap: var(--space-2, 8px);
   padding: 8px 16px;
-  background-color: var(--bg-surface-raised, #28284e);
-  border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.16));
+  background-color: var(--bg-surface-raised);
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-pill, 9999px);
   font-family: var(--font-body);
   font-size: var(--text-caption, 12px);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
   margin-top: var(--space-1, 4px);
 }
 
 .pill-divider {
-  color: var(--text-faint, #64748b);
+  color: var(--text-faint);
 }
 </style>

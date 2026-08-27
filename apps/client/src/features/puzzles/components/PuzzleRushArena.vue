@@ -248,6 +248,7 @@ defineExpose({
         :last-move="rush.runner.lastMove.value"
         :interactive="!isGameOverActive && rush.runner.isPlayerTurn.value"
         :disabled="isGameOverActive"
+        :show-hint-controls="false"
         @select="handleSelectSquare"
         @move="handlePlayerMove"
         @promotion-required="handlePromotionRequired"
@@ -329,7 +330,7 @@ defineExpose({
 <style scoped>
 .puzzle-rush-arena {
   width: 100%;
-  max-width: 800px;
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -337,6 +338,7 @@ defineExpose({
   gap: var(--space-3, 12px);
   position: relative;
   box-sizing: border-box;
+  padding: 0;
 }
 
 .rush-hud-bar {
@@ -399,7 +401,7 @@ defineExpose({
   top: -24px;
   right: 0;
   background: var(--color-success, #22c55e);
-  color: #ffffff;
+  color: var(--text-on-success, #ffffff);
   font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
   font-size: var(--text-xs, 12px);
   font-weight: 800;

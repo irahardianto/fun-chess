@@ -142,8 +142,8 @@ describe('ProgressConflictModal.vue', () => {
     // Assert
     const explanation = document.body.querySelector('.merge-info-callout');
     expect(explanation).not.toBeNull();
-    expect(explanation?.textContent).toContain('Smart Merge');
-    expect(explanation?.textContent).toContain('No data is lost');
+    expect(explanation?.textContent).toContain('Smart merge');
+    expect(explanation?.textContent).toContain('without data loss');
   });
 
   it('emits resolve event with "smart_merge" when Smart Merge button is clicked', async () => {

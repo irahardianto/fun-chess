@@ -103,5 +103,15 @@ describe('LobbyView.vue', () => {
     ]);
     expect(wrapper.emitted('joinRoom')).toHaveLength(1);
   });
+
+  it('renders Install App button in header badges and allows triggering install', async () => {
+    const wrapper = mount(LobbyView);
+
+    const installBtn = wrapper.find('[data-testid="lobby-install-btn"]');
+    expect(installBtn.exists()).toBe(true);
+    expect(installBtn.text()).toContain('Install App');
+
+    await installBtn.trigger('click');
+  });
 });
 

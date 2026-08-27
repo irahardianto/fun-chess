@@ -351,9 +351,9 @@ function handleBack() {
   align-items: center;
   gap: var(--space-4, 16px);
   width: 100%;
-  max-width: 960px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: var(--space-3, 12px) var(--space-4, 16px);
+  padding: 0;
   box-sizing: border-box;
 }
 

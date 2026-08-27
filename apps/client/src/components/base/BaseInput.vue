@@ -249,11 +249,11 @@ function handleKeyDown(event: KeyboardEvent) {
 }
 
 .prefix-slot {
-  padding-left: var(--space-3);
+  padding-inline-start: var(--space-3);
 }
 
 .suffix-slot {
-  padding-right: var(--space-3);
+  padding-inline-end: var(--space-3);
 }
 
 .base-input-clear-btn {

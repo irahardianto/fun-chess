@@ -7,6 +7,7 @@ interface Props {
   modelValue?: boolean;
   isOpen?: boolean;
   title?: string;
+  ariaLabel?: string;
   closeOnBackdrop?: boolean;
   closeOnEsc?: boolean;
   showCloseButton?: boolean;
@@ -17,6 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
   modelValue: undefined,
   isOpen: undefined,
   title: undefined,
+  ariaLabel: undefined,
   closeOnBackdrop: true,
   closeOnEsc: true,
   showCloseButton: true,
@@ -202,7 +204,8 @@ onUnmounted(() => {
           :class="`base-modal--${props.size}`"
           role="dialog"
           aria-modal="true"
-          :aria-labelledby="props.title || $slots.header ? titleId : undefined"
+          :aria-label="props.ariaLabel"
+          :aria-labelledby="props.ariaLabel ? undefined : (props.title || $slots.header ? titleId : undefined)"
           @click.stop
         >
           <!-- Header -->
@@ -251,6 +254,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
+  padding-block: max(var(--space-4), calc(var(--space-4) + env(safe-area-inset-top, 0px))) max(var(--space-4), calc(var(--space-4) + env(safe-area-inset-bottom, 0px)));
+  padding-inline: max(var(--space-4), calc(var(--space-4) + env(safe-area-inset-left, 0px))) max(var(--space-4), calc(var(--space-4) + env(safe-area-inset-right, 0px)));
   background-color: var(--bg-overlay);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -263,6 +268,7 @@ onUnmounted(() => {
   flex-direction: column;
   width: 100%;
   max-height: calc(100vh - var(--space-8));
+  max-height: min(calc(100vh - 32px), calc(100dvh - 32px));
   background-color: var(--bg-surface);
   border-radius: var(--radius-modal);
   border: 1px solid var(--border-medium);
@@ -288,6 +294,7 @@ onUnmounted(() => {
 .base-modal--full {
   max-width: calc(100vw - var(--space-8));
   min-height: calc(100vh - var(--space-8));
+  min-height: min(calc(100vh - 32px), calc(100dvh - 32px));
 }
 
 .base-modal-header {
@@ -319,8 +326,8 @@ onUnmounted(() => {
   border-radius: var(--radius-pill);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--duration-fast) ease;
-  margin-left: auto;
+  transition: transform var(--duration-fast) ease, background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease;
+  margin-inline-start: auto;
 }
 
 .base-modal-close-btn:hover {

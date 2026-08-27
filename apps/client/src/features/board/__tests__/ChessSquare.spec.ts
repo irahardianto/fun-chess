@@ -107,4 +107,54 @@ describe('ChessSquare.vue', () => {
     expect(wrapper.emitted('drop')).toHaveLength(1);
     expect(wrapper.emitted('drop')?.[0]).toEqual(['e2', 'e4']);
   });
+
+  it('manages roving tabindex (0 for active square, -1 for inactive)', () => {
+    const wrapperInactive = mount(ChessSquare, {
+      props: {
+        square: 'e4',
+        isLight: true,
+        isSquareActive: false,
+      },
+    });
+    expect(wrapperInactive.attributes('tabindex')).toBe('-1');
+
+    const wrapperActive = mount(ChessSquare, {
+      props: {
+        square: 'e4',
+        isLight: true,
+        isSquareActive: true,
+      },
+    });
+    expect(wrapperActive.attributes('tabindex')).toBe('0');
+  });
+
+  it('handles Enter and Space keydown to trigger selection', async () => {
+    const wrapper = mount(ChessSquare, {
+      props: {
+        square: 'c5',
+        isLight: true,
+        isSquareActive: true,
+      },
+    });
+
+    await wrapper.trigger('keydown', { key: 'Enter' });
+    expect(wrapper.emitted('select')?.[0]).toEqual(['c5']);
+
+    await wrapper.trigger('keydown', { key: ' ' });
+    expect(wrapper.emitted('select')?.[1]).toEqual(['c5']);
+  });
+
+  it('emits keydown with event and square when arrow key is pressed', async () => {
+    const wrapper = mount(ChessSquare, {
+      props: {
+        square: 'e4',
+        isLight: true,
+        isSquareActive: true,
+      },
+    });
+
+    await wrapper.trigger('keydown', { key: 'ArrowUp' });
+    expect(wrapper.emitted('keydown')).toBeDefined();
+    expect(wrapper.emitted('keydown')?.[0][1]).toBe('e4');
+  });
 });

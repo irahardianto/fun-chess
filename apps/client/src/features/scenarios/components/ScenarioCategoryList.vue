@@ -57,9 +57,42 @@ const filteredSections = computed(() => {
   return props.sections.filter((s) => s.id === activeFilter.value);
 });
 
+const categoryTabsList = computed<(ScenarioCategory | 'all')[]>(() => {
+  return ['all', ...props.sections.map((s) => s.id)];
+});
+
 function handleFilterChange(cat: ScenarioCategory | 'all') {
   activeFilter.value = cat;
   emit('selectCategory', cat);
+}
+
+function handleTabKeyDown(event: KeyboardEvent, currentId: ScenarioCategory | 'all') {
+  const tabs = categoryTabsList.value;
+  const currentIndex = tabs.indexOf(currentId);
+  let nextIndex = currentIndex;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    nextIndex = (currentIndex + 1) % tabs.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    nextIndex = tabs.length - 1;
+  } else {
+    return;
+  }
+
+  const nextId = tabs[nextIndex];
+  if (nextId) {
+    handleFilterChange(nextId);
+    const tabEl = document.getElementById(`academy-tab-${nextId}`);
+    tabEl?.focus();
+  }
 }
 
 function handlePlayScenario(scenario: ChessScenario) {
@@ -131,12 +164,15 @@ function getSectionStats(section: CurriculumSection) {
     <!-- Category Filter Tabs -->
     <nav class="academy-category-tabs" role="tablist" aria-label="Curriculum categories">
       <button
+        id="academy-tab-all"
         type="button"
         role="tab"
         :aria-selected="activeFilter === 'all'"
+        :tabindex="activeFilter === 'all' ? 0 : -1"
         class="category-tab-btn"
         :class="{ 'is-active': activeFilter === 'all' }"
         @click="handleFilterChange('all')"
+        @keydown="handleTabKeyDown($event, 'all')"
       >
         ✨ All Lessons ({{ totalScenariosCount }})
       </button>
@@ -144,12 +180,15 @@ function getSectionStats(section: CurriculumSection) {
       <button
         v-for="sec in props.sections"
         :key="sec.id"
+        :id="`academy-tab-${sec.id}`"
         type="button"
         role="tab"
         :aria-selected="activeFilter === sec.id"
+        :tabindex="activeFilter === sec.id ? 0 : -1"
         class="category-tab-btn"
         :class="{ 'is-active': activeFilter === sec.id }"
         @click="handleFilterChange(sec.id)"
+        @keydown="handleTabKeyDown($event, sec.id)"
       >
         <span class="tab-icon" aria-hidden="true">{{ sec.icon }}</span>
         <span>{{ sec.title }}</span>

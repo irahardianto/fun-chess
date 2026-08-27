@@ -157,27 +157,28 @@ function handleNextLesson() {
       <!-- Chessboard Container with Progressive Hint Overlay -->
       <div class="arena-board-slot">
         <div class="scenario-board-relative-frame">
-          <ChessBoard
-            :fen="runner.currentFen.value"
-            :orientation="runner.playerColor.value"
-            :turn="runner.playerColor.value"
-            :my-color="runner.playerColor.value"
-            :selected-square="runner.selectedSquare.value"
-            :legal-moves="[...runner.legalMoves.value]"
-            :last-move="runner.lastMove.value"
-            :interactive="!runner.isWaitingForBotResponse.value && !runner.isCompleted.value"
-            @select="runner.selectSquare"
-            @move="handleBoardMove"
-            @promotion-required="handlePromotionRequired"
-          />
-
           <ProgressiveHintLayer
             :hint-level="progressiveHintLevel"
             :source-square="runner.hintGlowSquare.value"
             :target-square="runner.hintTargetSquare.value"
             :orientation="runner.playerColor.value"
             :fen="runner.currentFen.value"
-          />
+            :show-controls="false"
+          >
+            <ChessBoard
+              :fen="runner.currentFen.value"
+              :orientation="runner.playerColor.value"
+              :turn="runner.playerColor.value"
+              :my-color="runner.playerColor.value"
+              :selected-square="runner.selectedSquare.value"
+              :legal-moves="[...runner.legalMoves.value]"
+              :last-move="runner.lastMove.value"
+              :interactive="!runner.isWaitingForBotResponse.value && !runner.isCompleted.value"
+              @select="runner.selectSquare"
+              @move="handleBoardMove"
+              @promotion-required="handlePromotionRequired"
+            />
+          </ProgressiveHintLayer>
         </div>
       </div>
     </div>
@@ -212,9 +213,9 @@ function handleNextLesson() {
   align-items: center;
   gap: var(--space-4);
   width: 100%;
-  max-width: 960px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: var(--space-3) var(--space-4);
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -292,8 +293,7 @@ function handleNextLesson() {
 .scenario-board-relative-frame {
   position: relative;
   width: 100%;
-  max-width: min(92vw, calc(78vh - 120px), 580px);
-  aspect-ratio: 1 / 1;
+  max-width: 580px;
   display: flex;
   justify-content: center;
   align-items: center;

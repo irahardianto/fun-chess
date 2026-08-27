@@ -23,6 +23,8 @@ describe('Zero-CLS Layout Stability & Visual Layering Invariants', () => {
   const aiOpponentSelectPath = path.resolve(__dirname, '../features/ai/components/AiOpponentSelect.vue');
   const scenarioCategoryListPath = path.resolve(__dirname, '../features/scenarios/components/ScenarioCategoryList.vue');
   const puzzleHubViewPath = path.resolve(__dirname, '../features/puzzles/components/PuzzleHubView.vue');
+  const puzzleBoardWrapperPath = path.resolve(__dirname, '../features/puzzles/components/PuzzleBoardWrapper.vue');
+  const progressiveHintLayerPath = path.resolve(__dirname, '../features/puzzles/components/ProgressiveHintLayer.vue');
   const designTokensPath = path.resolve(__dirname, '../assets/design-tokens.css');
 
   const aiMascotBadgeSrc = fs.readFileSync(aiMascotBadgePath, 'utf-8');
@@ -37,6 +39,8 @@ describe('Zero-CLS Layout Stability & Visual Layering Invariants', () => {
   const aiOpponentSelectSrc = fs.readFileSync(aiOpponentSelectPath, 'utf-8');
   const scenarioCategoryListSrc = fs.readFileSync(scenarioCategoryListPath, 'utf-8');
   const puzzleHubViewSrc = fs.readFileSync(puzzleHubViewPath, 'utf-8');
+  const puzzleBoardWrapperSrc = fs.readFileSync(puzzleBoardWrapperPath, 'utf-8');
+  const progressiveHintLayerSrc = fs.readFileSync(progressiveHintLayerPath, 'utf-8');
   const designTokensSrc = fs.readFileSync(designTokensPath, 'utf-8');
 
   describe('1. Solo AI Arena Layout Stability & Positioning', () => {
@@ -46,7 +50,7 @@ describe('Zero-CLS Layout Stability & Visual Layering Invariants', () => {
       
       // Absolute floating speech bubble positioned below badge
       expect(aiMascotBadgeSrc).toMatch(/\.mascot-speech-bubble\s*\{[^}]*position:\s*absolute/s);
-      expect(aiMascotBadgeSrc).toMatch(/\.mascot-speech-bubble\s*\{[^}]*top:\s*calc\(100%\s*\+\s*4px\)/s);
+      expect(aiMascotBadgeSrc).toMatch(/\.mascot-speech-bubble\s*\{[^}]*(?:top|inset-block-start):\s*calc\(100%\s*\+\s*4px\)/s);
       expect(aiMascotBadgeSrc).toMatch(/\.mascot-speech-bubble\s*\{[^}]*z-index:\s*var\(--z-overlay-dialogue,\s*20\)/s);
       expect(aiMascotBadgeSrc).toMatch(/\.mascot-speech-bubble\s*\{[^}]*pointer-events:\s*auto/s);
     });
@@ -349,6 +353,51 @@ describe('Zero-CLS Layout Stability & Visual Layering Invariants', () => {
       // Scenario grid
       expect(scenarioCategoryListSrc).toMatch(/\.scenario-grid\s*\{[^}]*width:\s*100%/s);
       expect(scenarioCategoryListSrc).toMatch(/\.scenario-grid\s*\{[^}]*box-sizing:\s*border-box/s);
+    });
+  });
+
+  describe('8. Chessboard Sizing Standardization Across All Modes (SC-1 Invariants)', () => {
+    it('ScenarioArena.vue unifies layout width to 100% and removes double padding', () => {
+      expect(scenarioArenaSrc).toMatch(/\.scenario-arena-layout\s*\{[^}]*width:\s*100%/s);
+      expect(scenarioArenaSrc).toMatch(/\.scenario-arena-layout\s*\{[^}]*max-width:\s*100%/s);
+      expect(scenarioArenaSrc).toMatch(/\.scenario-arena-layout\s*\{[^}]*padding:\s*0/s);
+      expect(scenarioArenaSrc).toMatch(/\.scenario-arena-layout\s*\{[^}]*box-sizing:\s*border-box/s);
+    });
+
+    it('PuzzleArena.vue unifies layout width to 100% and removes double padding', () => {
+      expect(puzzleArenaSrc).toMatch(/\.puzzle-arena-layout\s*\{[^}]*width:\s*100%/s);
+      expect(puzzleArenaSrc).toMatch(/\.puzzle-arena-layout\s*\{[^}]*max-width:\s*100%/s);
+      expect(puzzleArenaSrc).toMatch(/\.puzzle-arena-layout\s*\{[^}]*padding:\s*0/s);
+      expect(puzzleArenaSrc).toMatch(/\.puzzle-arena-layout\s*\{[^}]*box-sizing:\s*border-box/s);
+    });
+
+    it('PuzzleRushArena.vue unifies layout width to 100% and removes double padding', () => {
+      expect(puzzleRushArenaSrc).toMatch(/\.puzzle-rush-arena\s*\{[^}]*width:\s*100%/s);
+      expect(puzzleRushArenaSrc).toMatch(/\.puzzle-rush-arena\s*\{[^}]*max-width:\s*100%/s);
+      expect(puzzleRushArenaSrc).toMatch(/\.puzzle-rush-arena\s*\{[^}]*padding:\s*0/s);
+      expect(puzzleRushArenaSrc).toMatch(/\.puzzle-rush-arena\s*\{[^}]*box-sizing:\s*border-box/s);
+    });
+
+    it('ProgressiveHintLayer.vue anchors 1:1 square board frame and decouples in-flow controls', () => {
+      // 1:1 square frame anchor for board and overlays
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-board-anchor\s*\{[^}]*position:\s*relative/s);
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-board-anchor\s*\{[^}]*max-width:\s*min\(92vw,\s*calc\(78vh\s*-\s*120px\),\s*580px\)/s);
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-board-anchor\s*\{[^}]*aspect-ratio:\s*1\s*\/\s*1/s);
+
+      // Visual overlays positioned absolutely over the square board
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-nudge-square[^{]*\{[^}]*position:\s*absolute/s);
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-nudge-square[^{]*\{[^}]*inset:\s*0/s);
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-nudge-square[^{]*\{[^}]*pointer-events:\s*none/s);
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-nudge-square[^{]*\{[^}]*z-index:\s*var\(--z-board-indicator,\s*8\)/s);
+
+      // Decoupled in-flow controls wrapper below the board
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-controls-wrapper\s*\{[^}]*display:\s*flex/s);
+      expect(progressiveHintLayerSrc).toMatch(/\.hint-controls-wrapper\s*\{[^}]*max-width:\s*580px/s);
+    });
+
+    it('PuzzleBoardWrapper.vue contains relative frame with 580px max-width', () => {
+      expect(puzzleBoardWrapperSrc).toMatch(/\.board-relative-frame\s*\{[^}]*position:\s*relative/s);
+      expect(puzzleBoardWrapperSrc).toMatch(/\.board-relative-frame\s*\{[^}]*max-width:\s*580px/s);
     });
   });
 });

@@ -175,7 +175,7 @@ function handleLobby() {
 
         <BaseButton
           data-testid="ai-change-opponent-btn"
-          variant="accent"
+          variant="ghost"
           size="md"
           full-width
           @click="handleChangeOpponent"
@@ -243,7 +243,7 @@ function handleLobby() {
 }
 
 .banner-headline.is-victory {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   text-shadow: 0 2px 8px rgba(255, 179, 0, 0.4);
 }
 
@@ -311,6 +311,7 @@ function handleLobby() {
   font-size: var(--text-base);
   font-weight: var(--weight-bold);
   color: var(--text-main);
+  font-variant-numeric: tabular-nums;
 }
 
 .action-buttons-group {

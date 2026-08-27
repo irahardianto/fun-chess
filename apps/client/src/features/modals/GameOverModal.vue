@@ -42,7 +42,7 @@ const titleEmoji = computed(() => {
 });
 
 const bannerTitle = computed(() => {
-  if (props.isWinner) return 'VICTORY! 🏆🎉';
+  if (props.isWinner) return 'Victory! 🏆🎉';
   if (props.isDraw) return "It's a Draw! ⚖️";
   return 'Good Game! 🤝';
 });
@@ -188,7 +188,7 @@ function handleReturnToLobby() {
 }
 
 .banner-headline.is-victory {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   text-shadow: 0 2px 8px rgba(255, 179, 0, 0.4);
 }
 
@@ -227,6 +227,7 @@ function handleReturnToLobby() {
   font-size: var(--text-base);
   font-weight: var(--weight-bold);
   color: var(--text-main);
+  font-variant-numeric: tabular-nums;
 }
 
 .rematch-status-alert {

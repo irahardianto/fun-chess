@@ -49,6 +49,34 @@ function selectMode(modeId: AppGameMode) {
   emit('update:modelValue', modeId);
   emit('select', modeId);
 }
+
+function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
+  const currentIndex = modeOptions.findIndex((m) => m.id === currentModeId);
+  let nextIndex = currentIndex;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    nextIndex = (currentIndex + 1) % modeOptions.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    nextIndex = (currentIndex - 1 + modeOptions.length) % modeOptions.length;
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    nextIndex = modeOptions.length - 1;
+  } else {
+    return;
+  }
+
+  const nextMode = modeOptions[nextIndex];
+  if (nextMode) {
+    selectMode(nextMode.id);
+    const tabEl = document.getElementById(`mode-tab-${nextMode.id}`);
+    tabEl?.focus();
+  }
+}
 </script>
 
 <template>
@@ -64,6 +92,7 @@ function selectMode(modeId: AppGameMode) {
       :id="`mode-tab-${mode.id}`"
       type="button"
       role="tab"
+      :tabindex="props.modelValue === mode.id ? 0 : -1"
       :aria-selected="props.modelValue === mode.id"
       :aria-controls="`mode-panel-${mode.id}`"
       :data-testid="`mode-tab-${mode.id}`"
@@ -73,6 +102,7 @@ function selectMode(modeId: AppGameMode) {
         { 'is-active': props.modelValue === mode.id },
       ]"
       @click="selectMode(mode.id)"
+      @keydown="handleKeyDown($event, mode.id)"
     >
       <span class="mode-icon" aria-hidden="true">{{ mode.icon }}</span>
       <div class="mode-text-group">

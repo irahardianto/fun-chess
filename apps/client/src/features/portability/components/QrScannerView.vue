@@ -174,7 +174,9 @@ function handleManualSubmit() {
       </button>
 
       <div v-if="isManualOpen" class="manual-input-drawer">
+        <label for="manual-backup-input" class="sr-only">Paste backup code or JSON text</label>
         <textarea
+          id="manual-backup-input"
           v-model="manualText"
           class="manual-textarea"
           placeholder="Paste Version 12 code string (FC1:...) or JSON backup here..."
@@ -214,7 +216,7 @@ function handleManualSubmit() {
   overflow: hidden;
   margin: 0 auto;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.40);
-  border: 2px solid var(--border-medium, rgba(255, 255, 255, 0.16));
+  border: 2px solid var(--border-medium);
 }
 
 .scanner-video-feed {
@@ -320,7 +322,7 @@ function handleManualSubmit() {
   height: 100%;
   padding: var(--space-4, 16px);
   text-align: center;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
   gap: var(--space-2, 8px);
 }
 
@@ -331,7 +333,7 @@ function handleManualSubmit() {
 .scanner-error-text {
   font-family: var(--font-body);
   font-size: var(--text-caption, 12px);
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
   max-width: 260px;
 }
 
@@ -348,14 +350,14 @@ function handleManualSubmit() {
 .or-line {
   flex: 1;
   height: 1px;
-  background: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background: var(--border-subtle);
 }
 
 .or-text {
   font-family: var(--font-display);
   font-size: var(--text-caption, 12px);
   font-weight: var(--weight-bold);
-  color: var(--text-faint, #64748b);
+  color: var(--text-faint);
   letter-spacing: 0.05em;
 }
 
@@ -370,7 +372,7 @@ function handleManualSubmit() {
   max-width: 440px;
   padding: var(--space-4, 16px);
   background-color: var(--dropzone-bg, rgba(124, 58, 237, 0.06));
-  border: var(--dropzone-border, 2px dashed var(--accent-primary, #7c3aed));
+  border: var(--dropzone-border, 2px dashed var(--color-primary));
   border-radius: var(--radius-lg, 16px);
   text-align: center;
   transition: all 180ms ease;
@@ -401,13 +403,13 @@ function handleManualSubmit() {
   font-family: var(--font-display);
   font-size: var(--text-body-base, 14px);
   font-weight: var(--weight-bold);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
 }
 
 .dropzone-subtitle {
   font-family: var(--font-body);
   font-size: var(--text-caption, 12px);
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
 }
 
 /* Manual Drawer */
@@ -422,7 +424,7 @@ function handleManualSubmit() {
 .manual-drawer-toggle {
   background: none;
   border: none;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
   font-family: var(--font-display);
   font-size: var(--text-caption, 12px);
   font-weight: var(--weight-semibold);
@@ -433,8 +435,8 @@ function handleManualSubmit() {
 }
 
 .manual-drawer-toggle:hover {
-  color: var(--text-primary, #f8fafc);
-  background-color: var(--bg-surface-raised, #28284e);
+  color: var(--text-main);
+  background-color: var(--bg-surface-raised);
 }
 
 .manual-input-drawer {
@@ -449,19 +451,19 @@ function handleManualSubmit() {
   width: 100%;
   min-height: 70px;
   padding: var(--space-2-5, 10px);
-  background-color: var(--bg-primary, #0f0f1b);
-  border: 1.5px solid var(--border-medium, rgba(255, 255, 255, 0.16));
+  background-color: var(--bg-app);
+  border: 1.5px solid var(--border-medium);
   border-radius: var(--radius-md, 12px);
   font-family: var(--font-mono, monospace);
-  font-size: var(--text-caption, 12px);
-  color: var(--text-primary, #f8fafc);
+  font-size: 16px;
+  color: var(--text-main);
   resize: vertical;
   box-sizing: border-box;
 }
 
 .manual-textarea:focus {
-  border-color: var(--accent-primary, #7c3aed);
+  border-color: var(--color-primary);
   outline: none;
-  box-shadow: var(--focus-ring, 0 0 0 3px rgba(124, 58, 237, 0.50));
+  box-shadow: var(--focus-ring);
 }
 </style>

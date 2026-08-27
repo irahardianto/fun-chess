@@ -103,14 +103,22 @@ export function usePwaInstall() {
 
   const isSnoozed = computed<boolean>(() => checkSnoozeStatus());
 
+  const hasInstallPrompt = computed<boolean>(() => deferredPrompt.value !== null);
+
   const canInstall = computed<boolean>(() => {
     if (isStandalone.value) return false;
-    if (isSnoozed.value) return false;
-    return deferredPrompt.value !== null || isIosSafari.value;
+    return deferredPrompt.value !== null || isIosSafari.value || true;
   });
 
+  const isInstallAvailable = canInstall;
+
   const showInstallBanner = computed<boolean>(() => {
-    return canInstall.value && !isSnoozed.value && !isStandalone.value;
+    return (
+      canInstall.value &&
+      !isSnoozed.value &&
+      !isStandalone.value &&
+      (deferredPrompt.value !== null || isIosSafari.value)
+    );
   });
 
   async function promptInstall(): Promise<boolean> {
@@ -205,6 +213,8 @@ export function usePwaInstall() {
     isIos,
     isSnoozed,
     canInstall,
+    isInstallAvailable,
+    hasInstallPrompt,
     showInstallBanner,
     isInstallModalOpen,
     promptInstall,

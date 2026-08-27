@@ -12,6 +12,8 @@ interface Props {
   isValidMove?: boolean;
   isCapturable?: boolean;
   isCaptureTarget?: boolean;
+  isSquareActive?: boolean;
+  isFocused?: boolean;
   showRankLabel?: boolean;
   showFileLabel?: boolean;
   rankLabel?: string;
@@ -28,6 +30,8 @@ const props = withDefaults(defineProps<Props>(), {
   isValidMove: false,
   isCapturable: false,
   isCaptureTarget: false,
+  isSquareActive: false,
+  isFocused: false,
   showRankLabel: undefined,
   showFileLabel: undefined,
   rankLabel: undefined,
@@ -40,10 +44,12 @@ const emit = defineEmits<{
   select: [square: Square];
   click: [square: Square];
   drop: [fromSquare: string, toSquare: Square];
+  keydown: [event: KeyboardEvent, square: Square];
 }>();
 
 const checkedState = computed(() => props.isCheck || props.isInCheck);
 const capturableState = computed(() => props.isCapturable || props.isCaptureTarget);
+const isSquareActive = computed(() => props.isSquareActive || props.isFocused || false);
 
 const squareClasses = computed(() => [
   'chess-square',
@@ -89,6 +95,20 @@ function handleClick() {
   emit('click', props.square);
 }
 
+function handleSquareArrowNav(event: KeyboardEvent) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    handleClick();
+    return;
+  }
+
+  const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'];
+  if (navKeys.includes(event.key)) {
+    event.preventDefault();
+    emit('keydown', event, props.square);
+  }
+}
+
 function handleDrop(event: DragEvent) {
   event.preventDefault();
   const fromSquare = event.dataTransfer?.getData('text/plain') || '';
@@ -106,11 +126,11 @@ function handleDragOver(event: DragEvent) {
     :data-square="props.square"
     role="gridcell"
     :aria-label="ariaLabel"
-    tabindex="0"
+    :tabindex="isSquareActive ? 0 : -1"
     @click="handleClick"
     @drop="handleDrop"
     @dragover="handleDragOver"
-    @keydown.enter.space.prevent="handleClick"
+    @keydown="handleSquareArrowNav"
   >
     <!-- Rank Coordinate Label (Top Left) -->
     <span
@@ -239,7 +259,7 @@ function handleDragOver(event: DragEvent) {
 
 .square-coord {
   position: absolute;
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--weight-heavy);
   line-height: 1;
@@ -248,13 +268,13 @@ function handleDragOver(event: DragEvent) {
 }
 
 .square-coord--rank {
-  top: 4px;
-  left: 5px;
+  inset-block-start: 4px;
+  inset-inline-start: 5px;
 }
 
 .square-coord--file {
-  bottom: 4px;
-  right: 5px;
+  inset-block-end: 4px;
+  inset-inline-end: 5px;
 }
 
 .coord-on-light {
@@ -262,6 +282,6 @@ function handleDragOver(event: DragEvent) {
 }
 
 .coord-on-dark {
-  color: var(--board-coord-dark, #ffffff);
+  color: var(--board-coord-dark, #3d220f);
 }
 </style>

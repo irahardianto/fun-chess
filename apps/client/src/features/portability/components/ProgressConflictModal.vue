@@ -104,7 +104,7 @@ function handleClose() {
       <div class="conflict-modal-header">
         <h2 class="conflict-modal-title">Merge Progress or Overwrite? ⚠️</h2>
         <p class="conflict-modal-subtitle">
-          We found existing progress on this device and new progress in your save!
+          Existing progress on this device conflicts with the imported save file.
         </p>
       </div>
     </template>
@@ -200,7 +200,7 @@ function handleClose() {
         <span class="callout-icon" aria-hidden="true">✨</span>
         <div class="callout-text">
           <strong>SMART MERGE EXPLANATION:</strong>
-          Smart Merge combines both saves safely! It keeps your highest Elo rating, all solved puzzles + lessons, and maximum star records. No data is lost!
+          Smart merge combines both saves safely without data loss. It keeps your highest Elo rating, all solved puzzles + lessons, and maximum star records.
         </div>
       </div>
 
@@ -225,7 +225,7 @@ function handleClose() {
             @click="handleAction('replace_local')"
           >
             <template #icon>⚠️</template>
-            Overwrite (Replace This Device)
+            Overwrite Device Progress
           </BaseButton>
 
           <BaseButton
@@ -252,14 +252,14 @@ function handleClose() {
   font-family: var(--font-display);
   font-size: var(--text-modal-h2, 22px);
   font-weight: var(--weight-bold);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
   line-height: 1.2;
 }
 
 .conflict-modal-subtitle {
   font-family: var(--font-body);
   font-size: var(--text-caption, 12px);
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-muted);
 }
 
 .conflict-modal-content {
@@ -286,14 +286,14 @@ function handleClose() {
   flex-direction: column;
   gap: var(--space-2, 8px);
   padding: var(--space-3, 12px);
-  background-color: var(--bg-surface-raised, #28284e);
-  border: 2px solid var(--border-medium, rgba(255, 255, 255, 0.16));
+  background-color: var(--bg-surface-raised);
+  border: 2px solid var(--border-medium);
   border-radius: var(--radius-xl, 22px);
 }
 
 .conflict-card.is-imported {
-  border-color: var(--accent-primary, #7c3aed);
-  background-color: rgba(124, 58, 237, 0.08);
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-subtle);
 }
 
 .conflict-card-header {
@@ -303,9 +303,9 @@ function handleClose() {
   font-family: var(--font-display);
   font-size: var(--text-card-h4, 16px);
   font-weight: var(--weight-bold);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
   padding-bottom: var(--space-1, 4px);
-  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .conflict-stats-list {
@@ -320,24 +320,24 @@ function handleClose() {
   justify-content: space-between;
   padding: 6px 10px;
   border-radius: var(--radius-sm, 8px);
-  background-color: var(--bg-surface, #1e1e38);
+  background-color: var(--bg-surface);
   font-family: var(--font-body);
   font-size: var(--text-body-base, 14px);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
 }
 
 .stat-diff-row.is-winner {
   background-color: var(--stat-better-bg, rgba(16, 185, 129, 0.18));
   border: 1px solid var(--stat-better-border, #10b981);
-  color: var(--stat-better-text, #34d399);
+  color: var(--stat-better-text, #166534);
   font-weight: var(--weight-bold, 700);
 }
 
 .stat-winner-badge {
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: var(--weight-bold, 700);
-  background-color: var(--stat-better-badge, #059669);
+  background-color: var(--stat-better-badge, #047857);
   color: #ffffff;
   padding: 2px 6px;
   border-radius: var(--radius-pill, 9999px);
@@ -352,7 +352,7 @@ function handleClose() {
   background-color: rgba(16, 185, 129, 0.12);
   border: 1.5px solid #10b981;
   border-radius: var(--radius-lg, 16px);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-main);
   font-family: var(--font-body);
   font-size: var(--text-body-base, 14px);
   line-height: 1.4;

@@ -58,7 +58,7 @@ describe('MascotFeedbackModal.vue', () => {
       expect(avatarEmoji.text()).toBe('🐿️');
 
       expect(wrapper.text()).toContain('Coach Tip! 💡');
-      expect(wrapper.find('[data-testid="mascot-confirm-btn"]').text()).toBe('Got It! 👍');
+      expect(wrapper.find('[data-testid="mascot-confirm-btn"]').text()).toBe('Continue');
     });
 
     const mascots: Array<{ id: MascotId; name: string; avatar: string }> = [

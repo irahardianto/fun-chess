@@ -117,14 +117,14 @@ const sortedPieces = computed(() => {
   justify-content: center;
   width: 22px;
   height: 22px;
-  margin-left: -6px;
+  margin-inline-start: -6px;
   color-scheme: only light !important;
   forced-color-adjust: none !important;
   transition: transform var(--duration-fast) ease;
 }
 
 .captured-piece-item:first-child {
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 
 .captured-piece-item:hover {

@@ -73,12 +73,20 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Persistent Live Region for Screen Readers -->
+  <div
+    class="sr-only"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+  >
+    {{ isActuallyOffline ? `${offlineHeadline}. ${offlineSubtext}` : '' }}
+  </div>
+
   <Transition name="float-pill">
     <div
       v-if="isActuallyOffline"
       class="offline-indicator-wrapper"
-      role="status"
-      aria-live="polite"
       data-testid="offline-indicator"
     >
       <!-- 1. Expanded Hero Floating Reassurance Mode -->
@@ -142,11 +150,11 @@ onUnmounted(() => {
 /* Container: Floating zero-CLS overlay */
 .offline-indicator-wrapper {
   position: fixed;
-  top: 68px;
+  top: max(68px, calc(56px + env(safe-area-inset-top, 0px) + 12px));
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-floating-indicator, 40);
-  width: calc(100% - 32px);
+  width: min(580px, calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   max-width: 580px;
   pointer-events: none; /* Allows clicks through empty surrounding area */
   display: flex;
@@ -290,5 +298,17 @@ onUnmounted(() => {
 .float-pill-leave-to {
   opacity: 0;
   transform: translateY(-20px) scale(0.92);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 </style>

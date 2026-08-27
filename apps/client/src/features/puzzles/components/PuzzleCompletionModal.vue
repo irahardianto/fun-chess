@@ -70,7 +70,7 @@ function handleReplay() {
   <BaseModal
     :model-value="props.modelValue"
     size="md"
-    title="🎉 PUZZLE CRUSHED! 🎉"
+    title="🎉 Puzzle Solved! 🎉"
     data-testid="puzzle-completion-modal"
     @close="emit('update:modelValue', false)"
   >
@@ -306,14 +306,15 @@ function handleReplay() {
   font-size: var(--text-sm, 14px);
   font-weight: 800;
   color: var(--text-main, #0f172a);
+  font-variant-numeric: tabular-nums;
 }
 
 .text-success {
-  color: var(--color-success, #22c55e);
+  color: var(--color-success-text, #166534);
 }
 
 .metric-lbl {
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   color: var(--text-muted, #64748b);
   font-weight: 600;
 }

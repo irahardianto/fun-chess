@@ -187,14 +187,22 @@ function handleExit() {
         </div>
       </div>
 
+      <!-- Persistent Live Region for Screen Readers -->
+      <div
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {{ activeHint ? `Tactical Hint: ${activeHint.explanation}` : '' }}
+      </div>
+
       <!-- 2. Active Hint Banner (Revealed when hint is requested) -->
       <transition name="hint-slide">
         <div
           v-if="activeHint"
           data-testid="active-hint-banner"
           class="active-hint-banner"
-          role="status"
-          aria-live="polite"
         >
           <div class="hint-banner-header">
             <span class="hint-badge">💡 TACTICAL HINT</span>
@@ -337,8 +345,8 @@ function handleExit() {
 
 .match-mode-pill {
   font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: var(--weight-heavy);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
   color: var(--color-primary);
   letter-spacing: var(--tracking-wide);
 }
@@ -506,5 +514,17 @@ function handleExit() {
 .history-slide-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 </style>

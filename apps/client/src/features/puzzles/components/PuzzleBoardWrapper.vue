@@ -16,6 +16,7 @@ interface Props {
   disabled?: boolean;
   hintLevel?: HintLevel;
   hintData?: HintData | null;
+  showHintControls?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -30,6 +31,7 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   hintLevel: 0,
   hintData: null,
+  showHintControls: true,
 });
 
 const emit = defineEmits<{
@@ -44,23 +46,6 @@ const emit = defineEmits<{
 <template>
   <div class="puzzle-board-wrapper" data-testid="puzzle-board-wrapper">
     <div class="board-relative-frame">
-      <ChessBoard
-        :fen="props.fen"
-        :orientation="props.orientation"
-        :turn="props.turn"
-        :my-color="props.myColor"
-        :selected-square="props.selectedSquare"
-        :legal-moves="props.legalMoves"
-        :last-move="props.lastMove"
-        :king-in-check-square="props.kingInCheckSquare"
-        :interactive="props.interactive"
-        :disabled="props.disabled"
-        @select="emit('select', $event)"
-        @move="emit('move', $event)"
-        @promotion-required="emit('promotionRequired', $event)"
-      />
-
-      <!-- Progressive 3-Tier Hint Layer Overlay -->
       <ProgressiveHintLayer
         :hint-level="props.hintLevel"
         :hint-data="props.hintData"
@@ -69,8 +54,25 @@ const emit = defineEmits<{
         :orientation="props.orientation"
         :fen="props.fen"
         :disabled="props.disabled || !props.interactive"
+        :show-controls="props.showHintControls"
         @request-hint="emit('request-hint'); emit('requestHint')"
-      />
+      >
+        <ChessBoard
+          :fen="props.fen"
+          :orientation="props.orientation"
+          :turn="props.turn"
+          :my-color="props.myColor"
+          :selected-square="props.selectedSquare"
+          :legal-moves="props.legalMoves"
+          :last-move="props.lastMove"
+          :king-in-check-square="props.kingInCheckSquare"
+          :interactive="props.interactive"
+          :disabled="props.disabled"
+          @select="emit('select', $event)"
+          @move="emit('move', $event)"
+          @promotion-required="emit('promotionRequired', $event)"
+        />
+      </ProgressiveHintLayer>
     </div>
   </div>
 </template>
@@ -87,10 +89,11 @@ const emit = defineEmits<{
 .board-relative-frame {
   position: relative;
   width: 100%;
-  max-width: min(92vw, calc(78vh - 120px), 580px);
-  aspect-ratio: 1 / 1;
+  max-width: 580px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
 </style>
+

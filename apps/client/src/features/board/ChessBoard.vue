@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue';
+import { computed, ref, watch, useTemplateRef } from 'vue';
 import type { PieceColor, PieceType, Square } from '@fun-chess/shared';
 import ChessSquare from './ChessSquare.vue';
 import ChessPiece from './ChessPiece.vue';
@@ -40,6 +40,24 @@ const { playPickup, playError } = useAudio();
 const boardRef = useTemplateRef<HTMLElement>('boardRef');
 
 const isBoardInteractive = computed(() => props.interactive && !props.disabled);
+
+// Active/focused square for ARIA roving tabindex
+const focusedSquare = ref<Square | null>(props.selectedSquare ?? null);
+
+const activeSquare = computed<Square>(() => {
+  if (focusedSquare.value) return focusedSquare.value;
+  if (props.selectedSquare) return props.selectedSquare;
+  return squaresList.value[0]?.square ?? 'e2';
+});
+
+watch(
+  () => props.selectedSquare,
+  (newVal) => {
+    if (newVal) {
+      focusedSquare.value = newVal;
+    }
+  }
+);
 
 // Parse board grid from FEN
 const boardMatrix = computed(() => {
@@ -166,6 +184,7 @@ function isPieceDraggable(piece: { type: PieceType; color: PieceColor } | null):
 
 function handleSquareClick(sq: Square) {
   if (!isBoardInteractive.value) return;
+  focusedSquare.value = sq;
 
   if (props.selectedSquare && props.legalMoves.includes(sq)) {
     const from = props.selectedSquare;
@@ -185,6 +204,57 @@ function handleSquareClick(sq: Square) {
   }
 
   emit('select', sq);
+}
+
+function handleSquareKeyDown(event: KeyboardEvent, currentSquare: Square) {
+  if (!isBoardInteractive.value) return;
+
+  const currIdx = squaresList.value.findIndex((s) => s.square === currentSquare);
+  const safeIdx = currIdx >= 0 ? currIdx : 0;
+  const row = Math.floor(safeIdx / 8);
+  const col = safeIdx % 8;
+
+  let nextRow = row;
+  let nextCol = col;
+
+  switch (event.key) {
+    case 'ArrowUp':
+      nextRow = Math.max(0, row - 1);
+      break;
+    case 'ArrowDown':
+      nextRow = Math.min(7, row + 1);
+      break;
+    case 'ArrowLeft':
+      nextCol = Math.max(0, col - 1);
+      break;
+    case 'ArrowRight':
+      nextCol = Math.min(7, col + 1);
+      break;
+    case 'Home':
+      nextCol = 0;
+      if (event.ctrlKey) nextRow = 0;
+      break;
+    case 'End':
+      nextCol = 7;
+      if (event.ctrlKey) nextRow = 7;
+      break;
+    case 'PageUp':
+      nextRow = 0;
+      break;
+    case 'PageDown':
+      nextRow = 7;
+      break;
+    default:
+      return;
+  }
+
+  const nextIdx = nextRow * 8 + nextCol;
+  const nextSquare = squaresList.value[nextIdx]?.square;
+  if (nextSquare) {
+    focusedSquare.value = nextSquare;
+    const targetEl = boardRef.value?.querySelector(`[data-square="${nextSquare}"]`) as HTMLElement | null;
+    targetEl?.focus();
+  }
 }
 
 function handlePieceSelect(sq: Square) {
@@ -246,11 +316,13 @@ function handleDragEnd(
         :is-check="isSquareInCheck(item.square)"
         :is-valid-move="isLegalMove(item.square)"
         :is-capturable="isCapturableSquare(item.square, item.piece)"
+        :is-square-active="activeSquare === item.square"
         :file-label="item.fileLabel"
         :rank-label="item.rankLabel"
         :has-piece="!!item.piece"
         :piece-description="item.piece ? `${item.piece.color === 'w' ? 'White' : 'Black'} ${item.piece.type}` : undefined"
         @select="handleSquareClick"
+        @keydown="handleSquareKeyDown"
       >
         <ChessPiece
           v-if="item.piece"

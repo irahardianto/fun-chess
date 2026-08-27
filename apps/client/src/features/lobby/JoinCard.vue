@@ -20,7 +20,8 @@ const emit = defineEmits<{
 }>();
 
 const joinNickname = ref('');
-const roomCode = ref(props.initialRoomCode);
+const roomCode = ref(props.initialRoomCode ? props.initialRoomCode.toUpperCase() : '');
+const nicknameError = ref('');
 const localError = ref('');
 
 watch(
@@ -33,11 +34,14 @@ watch(
 );
 
 function onJoinSubmit() {
+  nicknameError.value = '';
+  localError.value = '';
+
   const name = joinNickname.value.trim();
   const code = roomCode.value.trim().toUpperCase();
 
   if (!name) {
-    localError.value = 'Please enter your name!';
+    nicknameError.value = 'Enter a nickname to join';
     return;
   }
   if (!code || code.length !== 4) {
@@ -45,7 +49,6 @@ function onJoinSubmit() {
     return;
   }
 
-  localError.value = '';
   emit('join', { roomCode: code, playerName: name });
 }
 </script>
@@ -59,11 +62,12 @@ function onJoinSubmit() {
       </div>
     </template>
 
-    <div class="join-form">
+    <form class="join-form" @submit.prevent="onJoinSubmit">
       <BaseInput
         v-model="joinNickname"
         label="Your Nickname"
         placeholder="e.g. ShadowBishop 🐼"
+        :error="nicknameError"
         clearable
         data-testid="join-nickname-input"
       >
@@ -84,6 +88,7 @@ function onJoinSubmit() {
       </BaseInput>
 
       <BaseButton
+        type="submit"
         variant="accent"
         size="lg"
         full-width
@@ -94,7 +99,7 @@ function onJoinSubmit() {
         <template #icon-left>🚀</template>
         Join Game
       </BaseButton>
-    </div>
+    </form>
   </BaseCard>
 </template>
 

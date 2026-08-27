@@ -167,6 +167,7 @@ watch(
 .move-index {
   color: var(--text-faint);
   font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 .move-san {

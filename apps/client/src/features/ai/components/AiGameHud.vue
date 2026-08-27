@@ -189,7 +189,7 @@ const emit = defineEmits<{
   .hud-btn {
     font-size: var(--text-xs);
     padding: var(--space-1-5) var(--space-2);
-    min-height: 40px;
+    min-height: 44px;
     max-width: none;
   }
 }

@@ -19,17 +19,33 @@ export interface ConfettiOptions {
 
 export class ConfettiTrigger {
   private confettiFn: typeof defaultConfetti;
+  private isCustomFn: boolean;
 
   constructor(injectedConfetti?: typeof defaultConfetti) {
     this.confettiFn = injectedConfetti || defaultConfetti;
+    this.isCustomFn = !!injectedConfetti;
+  }
+
+  private shouldReduceMotion(): boolean {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  private canExecute(): boolean {
+    if (this.shouldReduceMotion()) return false;
+    if (this.isCustomFn) return true;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+    try {
+      const testCanvas = document.createElement('canvas');
+      return !!testCanvas.getContext?.('2d');
+    } catch {
+      return false;
+    }
   }
 
   public triggerVictoryConfetti(): void {
     try {
-      if (typeof window !== 'undefined') {
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (prefersReducedMotion) return;
-      }
+      if (!this.canExecute()) return;
 
       const colors = ['#ffb300', '#6c5ce7', '#22c55e', '#ef4444', '#0ea5e9'];
 
@@ -53,6 +69,7 @@ export class ConfettiTrigger {
       // Center burst fired after 300ms
       setTimeout(() => {
         try {
+          if (this.shouldReduceMotion()) return;
           this.confettiFn({
             particleCount: 80,
             spread: 100,
@@ -70,6 +87,8 @@ export class ConfettiTrigger {
 
   public triggerDrawCelebration(): void {
     try {
+      if (!this.canExecute()) return;
+
       this.confettiFn({
         particleCount: 40,
         spread: 70,
@@ -83,6 +102,7 @@ export class ConfettiTrigger {
 
   public triggerCustom(options: ConfettiOptions = {}): void {
     try {
+      if (!this.canExecute()) return;
       this.confettiFn(options as any);
     } catch {
       // Ignore

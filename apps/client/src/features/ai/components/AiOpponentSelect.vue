@@ -174,9 +174,12 @@ function getMascotColorClass(id: MascotId): string {
 
 /* Color Picker Control */
 .color-picker-control {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: var(--space-1);
+  justify-content: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  max-width: 100%;
   background-color: var(--bg-surface);
   padding: 4px;
   border-radius: var(--radius-pill);
@@ -322,7 +325,7 @@ function getMascotColorClass(id: MascotId): string {
   font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
-  color: var(--color-accent);
+  color: var(--color-accent-text, #92400e);
 }
 
 .persona-desc {

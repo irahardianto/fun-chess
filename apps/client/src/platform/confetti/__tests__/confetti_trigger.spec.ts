@@ -74,6 +74,28 @@ describe('ConfettiTrigger', () => {
     expect(mockConfetti).toHaveBeenCalledWith({ particleCount: 25, spread: 45 });
   });
 
+  it('should suppress all celebrations when prefers-reduced-motion is active', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    trigger.triggerVictoryConfetti();
+    trigger.triggerDrawCelebration();
+    trigger.triggerCustom({ particleCount: 50 });
+
+    expect(mockConfetti).not.toHaveBeenCalled();
+  });
+
   it('should not throw if confetti function throws or fails', () => {
     const errorConfetti = vi.fn(() => {
       throw new Error('Canvas not supported');

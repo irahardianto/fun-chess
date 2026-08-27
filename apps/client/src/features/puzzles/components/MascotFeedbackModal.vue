@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
   mascotId: 'sparky',
   title: 'Coach Tip! 💡',
   variant: 'solve',
-  confirmText: 'Got It! 👍',
+  confirmText: 'Continue',
   triggerConfetti: false,
 });
 
