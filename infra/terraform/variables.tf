@@ -1,7 +1,6 @@
 variable "gcp_project_id" {
   type        = string
-  description = "GCP Project ID"
-  default     = "fun-chess-506800"
+  description = "Google Cloud Project ID"
 }
 
 variable "gcp_region" {
@@ -18,19 +17,18 @@ variable "service_name" {
 
 variable "container_image" {
   type        = string
-  description = "Container image URI"
-  default     = "asia-southeast1-docker.pkg.dev/fun-chess-506800/fun-chess-repo/fun-chess:latest"
+  description = "Container image URI (e.g. gcr.io/PROJECT_ID/fun-chess:latest or LOCATION-docker.pkg.dev/PROJECT_ID/REPO/fun-chess:latest)"
 }
 
 variable "min_instances" {
   type        = number
-  description = "Minimum number of Cloud Run instances (scale-to-zero)"
+  description = "Minimum number of Cloud Run instances (0 for scale-to-zero)"
   default     = 0
 }
 
 variable "max_instances" {
   type        = number
-  description = "Maximum number of Cloud Run instances (set to 1 for in-memory room store to prevent room splitting across instances)"
+  description = "Maximum number of Cloud Run instances (set to 1 for zero-database in-memory room store to prevent room splitting across instances)"
   default     = 1
 }
 
@@ -48,6 +46,7 @@ variable "memory_limit" {
 
 variable "public_url" {
   type        = string
-  description = "Public URL for Cloud Relay"
-  default     = "https://fun-chess-753683872274.asia-southeast1.run.app"
+  description = "Public URL for Cloud Relay (optional override for join links; leave empty for auto-detection)"
+  default     = ""
 }
+

@@ -3,10 +3,11 @@ node_modules/
 .pnp
 .pnp.js
 
-# Build Outputs
+# Build & Compilation Outputs
 dist/
 build/
 *.tsbuildinfo
+.turbo/
 
 # Logs
 logs/
@@ -15,23 +16,68 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
-# Environment
+# Test & Coverage Artifacts
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+
+# Environment & Secrets (NEVER commit secrets or real env files)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.cert
 
-# Editor & OS
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# Agent & Temp
-.agentwork/
-
-# Terraform
+# Terraform (State, Variables, Plan, Overrides & Locks)
 **/.terraform/
 *.tfstate
 *.tfstate.*
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+*.tfplan
+*.tfplan.*
 .terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Python & Tooling Cache (used by generator scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Editor & OS Metadata
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Agent & Workspace Cache
+.agentwork/
+.gemini/
+

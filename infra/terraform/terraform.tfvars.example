@@ -1,0 +1,27 @@
+# Example Terraform variables for Fun Chess Cloud Run deployment
+# Copy this file to terraform.tfvars and fill in your values.
+# NEVER commit your actual terraform.tfvars file to version control!
+
+# Required: Your Google Cloud Project ID
+gcp_project_id = "your-gcp-project-id"
+
+# Required: Container image URI in Artifact Registry or Container Registry
+container_image = "asia-southeast1-docker.pkg.dev/your-gcp-project-id/fun-chess-repo/fun-chess:latest"
+
+# Optional: Deployment region (default: "asia-southeast1")
+gcp_region = "asia-southeast1"
+
+# Optional: Service name (default: "fun-chess")
+service_name = "fun-chess"
+
+# Optional: Instance scaling (1 max instance recommended for zero-db in-memory room store)
+min_instances = 0
+max_instances = 1
+
+# Optional: Resource limits
+cpu_limit    = "1"
+memory_limit = "512Mi"
+
+# Optional: Public URL (e.g. custom domain or pre-allocated Cloud Run domain)
+# If left empty, join links will automatically adapt to the incoming host.
+public_url = ""
