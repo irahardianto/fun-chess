@@ -152,6 +152,7 @@ export interface RoomState {
   spectators: Player[];
   game: GameState;
   rematch: RematchState | null;
+  drawOffer?: { offeredBy: string; offeredAt: number } | null;
   createdAt: number;
   lastActivityAt: number;
 }

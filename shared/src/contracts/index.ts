@@ -10,3 +10,4 @@ export * from "./puzzle.js";
 export * from "./puzzle_engine.js";
 export * from "./rating_engine.js";
 export * from "./sync.js";
+export * from "./avatar.js";

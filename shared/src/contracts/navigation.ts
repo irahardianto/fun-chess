@@ -7,7 +7,7 @@ import type { PuzzleMode, PuzzleTheme } from "./puzzle.js";
  */
 export type AppGameMode =
   | "lobby" // Main menu mode selector
-  | "multiplayer_lan" // Local Wi-Fi / LAN Room match
+  | "multiplayer_lan" // Play with Friends (Online or Wi-Fi Multiplayer)
   | "solo_ai" // Single-player match against Mascot AI
   | "academy" // Interactive Chess Academy & Guided Lessons
   | "puzzle_hub"; // Gamified Tactical Puzzle Hub (Drills, Ladder, Rush)

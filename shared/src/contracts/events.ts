@@ -86,7 +86,10 @@ export interface ServerToClientEvents {
     requestedBy: string;
     requesterName: string;
   }) => void;
-  "game:rematch_started": (gameState: GameState) => void;
+  "game:rematch_started": (data: {
+    gameState: GameState;
+    room: RoomState;
+  }) => void;
   "game:rematch_declined": (data: { byPlayerId: string }) => void;
   error: (error: SocketErrorPayload) => void;
 }

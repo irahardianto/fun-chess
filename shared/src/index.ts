@@ -11,6 +11,7 @@ export * from "./contracts/puzzle.js";
 export * from "./contracts/puzzle_engine.js";
 export * from "./contracts/rating_engine.js";
 export * from "./contracts/sync.js";
+export * from "./contracts/avatar.js";
 
 // Sync Codec & Algorithm Utilities
 export * from "./utils/checksum_crc32.js";
