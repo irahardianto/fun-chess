@@ -1,16 +1,12 @@
 import type {
   Puzzle,
   PlayerMoveAction,
-  MoveValidationOutcome,
-  ExtendedHintData,
-  HintLevel,
   PuzzleAnalysisResult,
   MaterialAdvantageSummary,
   PlayerMistakeRefutation,
   PuzzleStepExplanation,
   PuzzleTheme,
 } from "./puzzle.js";
-import type { StarRating } from "./scenario.js";
 import type { PieceColor } from "./models.js";
 
 /**

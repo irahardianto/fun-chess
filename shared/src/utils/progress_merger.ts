@@ -5,7 +5,7 @@ import type {
   ProgressDiffPreview,
 } from "../types/progress_sync.js";
 import { UNIFIED_PROGRESS_SCHEMA_VERSION } from "../types/progress_sync.js";
-import type { ScenarioProgress, StarRating } from "../contracts/scenario.js";
+import type { StarRating } from "../contracts/scenario.js";
 import type {
   PuzzleTheme,
   ThemeMasteryProgress,
