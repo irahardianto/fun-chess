@@ -29,15 +29,15 @@ function onHostSubmit() {
   <BaseCard variant="raised" padding="lg" class="host-card" data-testid="host-card">
     <template #header>
       <div class="card-header-inner">
-        <span class="card-badge">⚔️ Host Match</span>
-        <h3 class="card-title">Start a New Game</h3>
+        <span class="card-badge">⚔️ Host match</span>
+        <h3 class="card-title">Start a new game</h3>
       </div>
     </template>
 
     <form class="host-form" @submit.prevent="onHostSubmit">
       <BaseInput
         v-model="hostNickname"
-        label="Your Nickname"
+        label="Your nickname"
         placeholder="e.g. MasterKnight 🦁"
         :error="errorMsg"
         clearable
@@ -47,21 +47,20 @@ function onHostSubmit() {
       </BaseInput>
 
       <div class="color-picker-section">
-        <label class="section-label">Choose Your Piece Color:</label>
-        <div class="color-options-grid" role="radiogroup" aria-label="Choose your piece color">
+        <label class="section-label">Choose your piece color:</label>
+        <div class="color-picker-control" role="radiogroup" aria-label="Choose your piece color">
           <button
             type="button"
             class="color-option-btn"
             :class="{ 'is-selected': preferredColor === 'w' }"
             role="radio"
             :aria-checked="preferredColor === 'w'"
-            aria-label="Play as White (Play First)"
+            aria-label="Play as white (first move)"
             data-testid="color-white-btn"
             @click="preferredColor = 'w'"
           >
-            <span class="color-btn-icon" aria-hidden="true">⚪</span>
-            <span class="color-btn-title">White</span>
-            <span class="color-btn-desc">First Move</span>
+            <span class="color-option-icon" aria-hidden="true">⚪</span>
+            <span class="color-option-label">White</span>
           </button>
 
           <button
@@ -70,13 +69,12 @@ function onHostSubmit() {
             :class="{ 'is-selected': preferredColor === 'random' }"
             role="radio"
             :aria-checked="preferredColor === 'random'"
-            aria-label="Play as Random Color (Surprise Me)"
+            aria-label="Play as random color (surprise me)"
             data-testid="color-random-btn"
             @click="preferredColor = 'random'"
           >
-            <span class="color-btn-icon" aria-hidden="true">🎲</span>
-            <span class="color-btn-title">Random</span>
-            <span class="color-btn-desc">Surprise Me</span>
+            <span class="color-option-icon" aria-hidden="true">🎲</span>
+            <span class="color-option-label">Random</span>
           </button>
 
           <button
@@ -85,13 +83,12 @@ function onHostSubmit() {
             :class="{ 'is-selected': preferredColor === 'b' }"
             role="radio"
             :aria-checked="preferredColor === 'b'"
-            aria-label="Play as Black (Defend)"
+            aria-label="Play as black (defend)"
             data-testid="color-black-btn"
             @click="preferredColor = 'b'"
           >
-            <span class="color-btn-icon" aria-hidden="true">⚫</span>
-            <span class="color-btn-title">Black</span>
-            <span class="color-btn-desc">Defend</span>
+            <span class="color-option-icon" aria-hidden="true">⚫</span>
+            <span class="color-option-label">Black</span>
           </button>
         </div>
       </div>
@@ -102,6 +99,7 @@ function onHostSubmit() {
         size="lg"
         full-width
         :loading="loading"
+        class="host-submit-btn"
         data-testid="host-game-btn"
         @click="onHostSubmit"
       >
@@ -115,6 +113,15 @@ function onHostSubmit() {
 <style scoped>
 .host-card {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.host-card :deep(.base-card-body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
 }
 
 .card-header-inner {
@@ -142,7 +149,10 @@ function onHostSubmit() {
 .host-form {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  justify-content: space-between;
   gap: var(--space-4);
+  height: 100%;
 }
 
 .color-picker-section {
@@ -158,26 +168,41 @@ function onHostSubmit() {
   color: var(--text-muted);
 }
 
-.color-options-grid {
+/* Standardized Segmented Tactile Pill Control */
+.color-picker-control {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
+  gap: 4px;
+  background-color: var(--bg-surface-raised, var(--bg-surface));
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-medium);
+  box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.06);
 }
 
 .color-option-btn {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  padding: var(--space-2) var(--space-1);
-  border: 2px solid var(--border-medium);
-  border-radius: var(--radius-md);
-  background-color: var(--bg-surface);
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-spring), border-color var(--duration-fast) ease, background-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  transition: transform var(--duration-fast) var(--ease-spring),
+              box-shadow var(--duration-fast) ease,
+              background-color var(--duration-fast) ease,
+              color var(--duration-fast) ease;
 }
 
 .color-option-btn:hover {
-  border-color: var(--color-primary);
+  color: var(--text-main);
   background-color: var(--color-primary-subtle);
 }
 
@@ -187,33 +212,28 @@ function onHostSubmit() {
   box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
 }
 
-.color-option-btn:active {
-  transform: translateY(4px) scale(0.96);
-}
-
 .color-option-btn.is-selected {
-  border-color: var(--color-primary);
-  background-color: var(--color-primary-subtle);
-  box-shadow: 0 0 0 2px var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--text-on-primary, #ffffff);
+  box-shadow: 0 3px 0 var(--color-primary-bevel, hsl(255, 70%, 45%)), var(--shadow-sm);
+  transform: scale(1.02);
 }
 
 .color-option-btn.is-selected:active {
-  transform: translateY(4px) scale(0.96);
+  transform: translateY(2px) scale(0.98);
 }
 
-.color-btn-icon {
-  font-size: 1.4rem;
+.color-option-icon {
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
-.color-btn-title {
-  font-family: var(--font-display);
-  font-weight: var(--weight-bold);
-  font-size: var(--text-sm);
-  color: var(--text-main);
+.color-option-label {
+  line-height: 1;
 }
 
-.color-btn-desc {
-  font-size: var(--text-xs);
-  color: var(--text-faint);
+.host-submit-btn {
+  margin-top: auto;
+  min-height: 52px;
 }
 </style>

@@ -46,6 +46,16 @@ export class AudioSynthesizer {
     return this.ctx;
   }
 
+  public initContext(): AudioContext | null {
+    return this.getContext();
+  }
+
+  public resumeContext(): void {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+  }
+
   public isMuted(): boolean {
     return this._isMuted;
   }
@@ -546,3 +556,31 @@ function timeOffset(_freq: number): number {
 }
 
 export const audioSynthesizer = new AudioSynthesizer();
+
+// Proactive user gesture unlock & mobile sleep/resume lifecycle handling
+if (typeof window !== 'undefined') {
+  const unlockEvents = ['pointerdown', 'touchstart', 'keydown', 'click'];
+  const unlockHandler = () => {
+    audioSynthesizer.initContext();
+    unlockEvents.forEach((evt) => {
+      try {
+        window.removeEventListener(evt, unlockHandler, true);
+      } catch {}
+    });
+  };
+
+  unlockEvents.forEach((evt) => {
+    try {
+      window.addEventListener(evt, unlockHandler, { once: true, capture: true, passive: true });
+    } catch {}
+  });
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        audioSynthesizer.resumeContext();
+      }
+    });
+  }
+}
+

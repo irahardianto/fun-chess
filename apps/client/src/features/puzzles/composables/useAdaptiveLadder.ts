@@ -31,9 +31,6 @@ export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
     onSolve: (puzzle, stars, hintsUsed, _mistakes) => {
       handleSolve(puzzle, stars, hintsUsed);
     },
-    onMistake: (puzzle) => {
-      handleSkipOrFail(puzzle);
-    },
   });
 
   function pickNextLadderPuzzle(): Puzzle {
@@ -42,7 +39,8 @@ export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
     const sorted = [...pool].sort(
       (a, b) => Math.abs(a.rating - target) - Math.abs(b.rating - target)
     );
-    const chosen = sorted[0] || pool[0];
+    const topCandidates = sorted.slice(0, Math.min(5, sorted.length));
+    const chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)] || pool[0];
     currentPuzzle.value = chosen;
     if (chosen) {
       runner.loadPuzzle(chosen);

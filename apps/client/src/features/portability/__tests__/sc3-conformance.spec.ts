@@ -41,7 +41,7 @@ describe('Scope Card SC-3 Conformance Tests (Lobby & Portability Sync)', () => {
   });
 
   it('Finding 12: ProgressConflictModal.vue uses direct, calm, conflict-appropriate copy tone', () => {
-    expect(conflictModal).toContain('Existing progress on this device conflicts with the imported save file.');
+    expect(conflictModal).toContain('Scanned progress has different stats than this device. Choose how to merge:');
     expect(conflictModal).toContain('Smart merge combines both saves safely without data loss.');
     expect(conflictModal).not.toContain('We found existing progress on this device and new progress in your save!');
     expect(conflictModal).not.toContain('No data is lost!');

@@ -114,7 +114,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       return payload;
     } catch (err: any) {
       console.error('[FC_PROGRESS_SYNC] Failed to load unified progress', err);
-      syncError.value = 'Failed to load progress from storage.';
+      syncError.value = 'Unable to load progress. Refresh the page to try again.';
       throw err;
     } finally {
       isLoading.value = false;
@@ -138,7 +138,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       return envelopeJson;
     } catch (err: any) {
       console.error('[FC_PROGRESS_SYNC] Failed to export JSON backup', err);
-      syncError.value = err?.message || 'Failed to export backup file.';
+      syncError.value = err?.message || 'Unable to export backup file. Check storage permissions and try again.';
       throw err;
     } finally {
       isLoading.value = false;

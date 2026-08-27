@@ -152,6 +152,36 @@ export function useSocket(injectedSocket?: TypedSocket) {
       // Room state updated
     });
 
+    s.on('room:player_disconnected', (data: { playerId: string; gracePeriodMs: number }) => {
+      if (currentRoom.value) {
+        currentRoom.value = {
+          ...currentRoom.value,
+          status: 'paused_disconnect',
+        };
+        if (currentRoom.value.whitePlayer?.id === data.playerId) {
+          currentRoom.value.whitePlayer.isConnected = false;
+        } else if (currentRoom.value.blackPlayer?.id === data.playerId) {
+          currentRoom.value.blackPlayer.isConnected = false;
+        }
+      }
+    });
+
+    s.on('room:player_reconnected', (data: { playerId: string; playerName: string }) => {
+      if (currentRoom.value) {
+        if (currentRoom.value.whitePlayer?.id === data.playerId) {
+          currentRoom.value.whitePlayer.isConnected = true;
+        } else if (currentRoom.value.blackPlayer?.id === data.playerId) {
+          currentRoom.value.blackPlayer.isConnected = true;
+        }
+        if (currentRoom.value.whitePlayer?.isConnected && currentRoom.value.blackPlayer?.isConnected) {
+          currentRoom.value = {
+            ...currentRoom.value,
+            status: 'playing',
+          };
+        }
+      }
+    });
+
     s.on('game:started', (gameState: GameState) => {
       if (currentRoom.value) {
         currentRoom.value = {
@@ -172,6 +202,7 @@ export function useSocket(injectedSocket?: TypedSocket) {
         };
       }
       kingInCheck.value = null;
+      drawOfferedBy.value = null;
 
       // Play audio feedback for opponent moves
       if (currentPlayer.value && data.move?.color && data.move.color !== currentPlayer.value.color) {
@@ -270,13 +301,14 @@ export function useSocket(injectedSocket?: TypedSocket) {
 
   async function createRoom(
     playerName: string,
-    preferredColor: 'w' | 'b' | 'random' = 'random'
+    preferredColor: 'w' | 'b' | 'random' = 'random',
+    avatar?: string
   ): Promise<{ success: true; room: RoomState; sessionToken: string } | { success: false; error: SocketErrorPayload }> {
     const s = socket.value || initSocket();
     if (!s.connected) s.connect();
 
     return new Promise((resolve) => {
-      const payload: CreateRoomRequest = { playerName, preferredColor };
+      const payload: CreateRoomRequest = { playerName, preferredColor, avatar };
       const timer = setTimeout(() => {
         const err: SocketErrorPayload = {
           code: 'ERR_SOCKET_TIMEOUT',
@@ -313,13 +345,14 @@ export function useSocket(injectedSocket?: TypedSocket) {
 
   async function joinRoom(
     roomCode: string,
-    playerName: string
+    playerName: string,
+    avatar?: string
   ): Promise<{ success: true; room: RoomState; player: Player; sessionToken: string } | { success: false; error: SocketErrorPayload }> {
     const s = socket.value || initSocket();
     if (!s.connected) s.connect();
 
     return new Promise((resolve) => {
-      const payload: JoinRoomRequest = { roomCode: roomCode.toUpperCase(), playerName };
+      const payload: JoinRoomRequest = { roomCode: roomCode.toUpperCase(), playerName, avatar };
       const timer = setTimeout(() => {
         const err: SocketErrorPayload = {
           code: 'ERR_SOCKET_TIMEOUT',

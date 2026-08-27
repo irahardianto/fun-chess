@@ -175,7 +175,7 @@ describe('ProgressConflictModal.vue', () => {
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false]);
   });
 
-  it('emits resolve with replace_local on Overwrite button click', async () => {
+  it('emits resolve with replace_local on Replace button click and displays clear overwrite warning subtext', async () => {
     const wrapper = mount(ProgressConflictModal, {
       props: {
         modelValue: true,
@@ -190,10 +190,14 @@ describe('ProgressConflictModal.vue', () => {
       },
     });
 
-    const overwriteBtn = wrapper.findAll('button').find((b) => b.text().includes('Overwrite'));
-    expect(overwriteBtn).toBeDefined();
+    expect(wrapper.text()).toContain('Scanned progress has different stats than this device. Choose how to merge:');
+    expect(wrapper.text()).toContain('Replace Device Progress');
+    expect(wrapper.text()).toContain('Replaces all stars and puzzle ratings on this device with incoming save');
 
-    await overwriteBtn?.trigger('click');
+    const replaceBtn = wrapper.findAll('button').find((b) => b.text().includes('Replace Device Progress'));
+    expect(replaceBtn).toBeDefined();
+
+    await replaceBtn?.trigger('click');
     expect(wrapper.emitted('resolve')?.[0]).toEqual(['replace_local']);
   });
 

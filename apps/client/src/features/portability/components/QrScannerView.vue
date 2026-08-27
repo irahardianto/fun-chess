@@ -112,7 +112,7 @@ function handleManualSubmit() {
       <!-- Camera Error / Empty State Fallback -->
       <div v-if="cameraError || !hasCamera" class="scanner-empty-state">
         <span class="scanner-empty-icon" aria-hidden="true">📷 ⚠️</span>
-        <p class="scanner-error-text">{{ cameraError || 'Camera unavailable.' }}</p>
+        <p class="scanner-error-text">{{ cameraError || 'Camera unavailable. Allow camera access in browser settings or upload a save file below.' }}</p>
         <BaseButton
           variant="ghost"
           size="sm"

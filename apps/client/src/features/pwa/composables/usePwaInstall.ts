@@ -95,8 +95,10 @@ export function usePwaInstall() {
     if (typeof navigator === 'undefined') return false;
     const ua = navigator.userAgent || '';
     const isIosDevice = /iPhone|iPad|iPod/.test(ua);
+    const isIpadDesktopMode =
+      navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1;
     const isMSStream = !!(window as unknown as { MSStream?: unknown })?.MSStream;
-    return isIosDevice && !isMSStream;
+    return (isIosDevice || isIpadDesktopMode) && !isMSStream;
   });
 
   const isIos = isIosSafari;

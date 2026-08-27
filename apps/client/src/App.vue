@@ -53,6 +53,12 @@ function applyTheme(dark: boolean) {
       document.documentElement.removeAttribute('data-theme');
     }
 
+    // Synchronize <meta name="theme-color"> with active theme
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', dark ? '#0f0f1b' : '#ffffff');
+    }
+
     // Force layout reflow
     const _flushReflow = document.body.offsetHeight;
     void _flushReflow;
@@ -452,12 +458,12 @@ async function handleHostGame(payload: { playerName: string; avatar?: string; pr
   }
   isActionLoading.value = true;
   try {
-    const res = await createRoom(payload.playerName, payload.preferredColor);
+    const res = await createRoom(payload.playerName, payload.preferredColor, payload.avatar);
     if (res.success) {
       showQrModal.value = true;
     } else {
       playError();
-      showNotification(res.error?.message || 'Failed to create room', 'error');
+      showNotification(res.error?.message || 'Unable to create room. Check your connection and try again.', 'error');
     }
   } finally {
     isActionLoading.value = false;
@@ -470,10 +476,10 @@ async function handleJoinGame(payload: { roomCode: string; playerName: string; a
   }
   isActionLoading.value = true;
   try {
-    const res = await joinRoom(payload.roomCode, payload.playerName);
+    const res = await joinRoom(payload.roomCode, payload.playerName, payload.avatar);
     if (!res.success) {
       playError();
-      showNotification(res.error?.message || 'Failed to join room', 'error');
+      showNotification(res.error?.message || 'Unable to join room. Check the 4-letter room code and try again.', 'error');
     }
   } finally {
     isActionLoading.value = false;
@@ -611,9 +617,9 @@ function handleLeaveRoom() {
 
       <!-- Quick Action Controls -->
       <div class="navbar-actions">
-        <!-- PWA Install Pill (Mobile/Desktop) -->
+        <!-- PWA Install Pill (Mobile/Desktop Lobby only) -->
         <BaseButton
-          v-if="canInstall && !isStandalone"
+          v-if="canInstall && !isStandalone && !currentRoom && currentAppMode === 'lobby'"
           variant="primary"
           size="sm"
           data-testid="pwa-install-btn"
@@ -835,7 +841,7 @@ function handleLeaveRoom() {
             :is-connected="opponentPlayer?.isConnected ?? true"
             :is-host="opponentPlayer?.isHost ?? false"
             :is-self="false"
-            avatar="🐼"
+            :avatar="opponentPlayer?.avatar || '🐼'"
           />
           <CapturedTray
             :captured-pieces="opponentPlayer?.color === 'b' ? capturedWhite : capturedBlack"
@@ -897,7 +903,7 @@ function handleLeaveRoom() {
             @click="flipBoard"
           >
             <template #icon-left>🔄</template>
-            Flip Board
+            Flip board
           </BaseButton>
 
           <BaseButton
@@ -908,12 +914,13 @@ function handleLeaveRoom() {
             @click="handleOfferDraw"
           >
             <template #icon-left>🤝</template>
-            Offer Draw
+            Offer draw
           </BaseButton>
 
           <BaseButton
-            variant="danger"
+            variant="ghost"
             size="md"
+            class="action-btn--subdued-danger"
             data-testid="resign-action"
             :disabled="currentRoom.status !== 'playing'"
             @click="handleResign"
@@ -929,7 +936,7 @@ function handleLeaveRoom() {
             @click="showHistory = !showHistory"
           >
             <template #icon-left>📜</template>
-            {{ showHistory ? 'Hide Moves' : 'View Moves' }} ({{ chessEngine.moveHistory.value.length }})
+            {{ showHistory ? 'Hide moves' : 'View moves' }} ({{ chessEngine.moveHistory.value.length }})
           </BaseButton>
         </div>
 
@@ -1525,6 +1532,23 @@ function handleLeaveRoom() {
   margin-top: var(--space-1);
 }
 
+.action-btn--subdued-danger {
+  color: var(--color-danger, #ef4444) !important;
+  border-color: var(--border-medium) !important;
+  background-color: transparent !important;
+}
+
+.action-btn--subdued-danger:hover:not(:disabled) {
+  background-color: var(--color-danger-subtle, rgba(239, 68, 68, 0.16)) !important;
+  border-color: var(--color-danger, #ef4444) !important;
+  color: var(--color-danger, #ef4444) !important;
+}
+
+.action-btn--subdued-danger:active:not(:disabled) {
+  background-color: var(--color-danger-subtle, rgba(239, 68, 68, 0.24)) !important;
+  border-color: var(--color-danger, #ef4444) !important;
+}
+
 .history-card-wrapper {
   width: 100%;
   margin-top: var(--space-2);
@@ -1554,6 +1578,12 @@ function handleLeaveRoom() {
   .room-code-chip {
     padding: 4px 8px;
     font-size: var(--text-xs);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .nav-install-btn {
+    display: none;
   }
 
   .exit-text {

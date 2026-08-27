@@ -128,4 +128,31 @@ describe('usePwaInstall Composable', () => {
     closeInstallModal();
     expect(isInstallModalOpen.value).toBe(false);
   });
+
+  it('detects iPadOS 13+ desktop Safari via MacIntel platform and maxTouchPoints', () => {
+    const originalPlatform = navigator.platform;
+    const originalMaxTouchPoints = navigator.maxTouchPoints;
+
+    Object.defineProperty(navigator, 'platform', {
+      value: 'MacIntel',
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      value: 5,
+      configurable: true,
+    });
+
+    const { isIosSafari } = usePwaInstall();
+    expect(isIosSafari.value).toBe(true);
+
+    // Restore
+    Object.defineProperty(navigator, 'platform', {
+      value: originalPlatform,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      value: originalMaxTouchPoints,
+      configurable: true,
+    });
+  });
 });

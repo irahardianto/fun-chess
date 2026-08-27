@@ -81,7 +81,7 @@
   /* Typography Colors */
   --text-main:          hsl(var(--color-text-h) var(--color-text-s) var(--color-text-l));
   --text-muted:         hsl(var(--color-text-h) 16% 42%);
-  --text-faint:         hsl(var(--color-text-h) 12% 64%);
+  --text-faint:         hsl(var(--color-text-h) 16% 47%); /* #64748b */
   --text-inverse:       #ffffff;
   --text-on-primary:    #ffffff;
   --text-on-accent:     #1e1b4b;
@@ -136,6 +136,13 @@
 
   --status-online:         #10b981; /* Emerald Green */
   --status-online-glow:    rgba(16, 185, 129, 0.40);
+  --status-danger-bg:      rgba(239, 68, 68, 0.15);
+
+  /* Soft Status Containers (Light Mode) */
+  --soft-success-border:   hsl(145, 60%, 75%);
+  --soft-success-text:     hsl(145, 80%, 22%);
+  --soft-info-border:      hsl(198, 80%, 75%);
+  --soft-info-text:        hsl(198, 90%, 25%);
 
   /* QR Scanner Viewport & Laser */
   --qr-scanner-bg:          #000000;
@@ -435,8 +442,15 @@
   --soft-error-text:       hsl(350, 85%, 90%);
   --soft-error-glass:      rgba(45, 20, 25, 0.94);
 
+  --soft-success-border:   hsl(145, 50%, 35%);
+  --soft-success-text:     hsl(145, 85%, 90%);
+  --soft-info-border:      hsl(198, 50%, 35%);
+  --soft-info-text:        hsl(198, 85%, 90%);
+
   --soft-info-glass:       rgba(20, 38, 50, 0.94);
   --soft-success-glass:    rgba(20, 45, 30, 0.94);
+
+  --status-danger-bg:      rgba(239, 68, 68, 0.20);
 
   /* Puzzle Hub Dark Overrides */
   --mode-drills-bg:     hsl(244, 40%, 18%);
@@ -985,6 +999,11 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: var(--weight-bold);
   line-height: var(--leading-snug);
   color: var(--text-main);
+  text-wrap: balance;
+}
+
+p, .description, .card-desc, .modal-desc, .step-desc {
+  text-wrap: pretty;
 }
 
 button, input, select, textarea {
@@ -1054,4 +1073,31 @@ button, input, select, textarea {
   clip: rect(0, 0, 0, 0) !important;
   white-space: nowrap !important;
   border-width: 0 !important;
+}
+
+/* Typography Wrap Utilities */
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
+
+/* Subdued Destructive Action Button */
+.action-btn--subdued-danger {
+  color: var(--color-danger, #ef4444) !important;
+  border-color: var(--border-medium) !important;
+  background-color: transparent !important;
+}
+
+.action-btn--subdued-danger:hover:not(:disabled) {
+  background-color: var(--color-danger-subtle, rgba(239, 68, 68, 0.16)) !important;
+  border-color: var(--color-danger, #ef4444) !important;
+  color: var(--color-danger, #ef4444) !important;
+}
+
+.action-btn--subdued-danger:active:not(:disabled) {
+  background-color: var(--color-danger-subtle, rgba(239, 68, 68, 0.24)) !important;
+  border-color: var(--color-danger, #ef4444) !important;
 }

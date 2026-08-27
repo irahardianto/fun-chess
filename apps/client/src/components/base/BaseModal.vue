@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, watch, onMounted, onUnmounted, useId, ref, nextTick } from 'vue';
 
+defineOptions({
+  inheritAttrs: false,
+});
+
 export type ModalSize = 'sm' | 'md' | 'lg' | 'full';
 
 interface Props {
@@ -206,6 +210,7 @@ onUnmounted(() => {
           aria-modal="true"
           :aria-label="props.ariaLabel"
           :aria-labelledby="props.ariaLabel ? undefined : (props.title || $slots.header ? titleId : undefined)"
+          v-bind="$attrs"
           @click.stop
         >
           <!-- Header -->
@@ -306,12 +311,16 @@ onUnmounted(() => {
   gap: var(--space-3);
 }
 
-.base-modal-title {
+.base-modal-title,
+.base-modal-header :deep(h1),
+.base-modal-header :deep(h2),
+.base-modal-header :deep(h3) {
   font-family: var(--font-display);
   font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
   color: var(--text-main);
   line-height: var(--leading-tight);
+  text-wrap: balance;
 }
 
 .base-modal-close-btn {
@@ -357,6 +366,14 @@ onUnmounted(() => {
   font-family: var(--font-body);
   font-size: var(--text-base);
   color: var(--text-main);
+  text-wrap: pretty;
+}
+
+.base-modal-body :deep(p),
+.base-modal-body :deep(.modal-desc),
+.base-modal-body :deep(.modal-description),
+.base-modal-body :deep(.step-desc) {
+  text-wrap: pretty;
 }
 
 .base-modal-footer {

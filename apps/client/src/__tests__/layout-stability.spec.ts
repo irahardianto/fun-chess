@@ -295,10 +295,10 @@ describe('Zero-CLS Layout Stability & Visual Layering Invariants', () => {
       expect(lobbyViewSrc).toMatch(/\.lan-mode-panel\s*\{[^}]*max-width:\s*100%/s);
     });
 
-    it('LobbyView.vue centers avatar picker group and emoji options symmetrically above cards', () => {
-      expect(lobbyViewSrc).toMatch(/\.avatar-picker-group\s*\{[^}]*align-items:\s*center/s);
-      expect(lobbyViewSrc).toMatch(/\.avatar-picker-group\s*\{[^}]*text-align:\s*center/s);
-      expect(lobbyViewSrc).toMatch(/\.section-label\s*\{[^}]*text-align:\s*center/s);
+    it('LobbyView.vue centers avatar picker control and emoji options symmetrically above cards', () => {
+      expect(lobbyViewSrc).toMatch(/\.avatar-picker-control\s*\{[^}]*align-items:\s*center/s);
+      expect(lobbyViewSrc).toMatch(/\.avatar-picker-control\s*\{[^}]*justify-content:\s*center/s);
+      expect(lobbyViewSrc).toMatch(/\.picker-label\s*\{[^}]*color:\s*var\(--text-muted\)/s);
       expect(lobbyViewSrc).toMatch(/\.avatar-options\s*\{[^}]*justify-content:\s*center/s);
     });
 

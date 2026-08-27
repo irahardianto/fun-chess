@@ -47,4 +47,27 @@ describe('useNetworkStatus Composable', () => {
     expect(isOnline.value).toBe(true);
     expect(isOffline.value).toBe(false);
   });
+
+  it('performs active checkConnectivity probe when invoked', async () => {
+    const { checkConnectivity, isOnline } = useNetworkStatus();
+
+    // Mock fetch success
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true }) as Response;
+
+    const result = await checkConnectivity('/favicon.svg');
+    expect(result).toBe(true);
+    expect(isOnline.value).toBe(true);
+
+    // Mock fetch network failure
+    globalThis.fetch = async () => {
+      throw new Error('Network error');
+    };
+
+    const failResult = await checkConnectivity('/favicon.svg');
+    expect(failResult).toBe(false);
+    expect(isOnline.value).toBe(false);
+
+    globalThis.fetch = originalFetch;
+  });
 });

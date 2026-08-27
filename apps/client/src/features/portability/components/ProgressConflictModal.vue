@@ -104,7 +104,7 @@ function handleClose() {
       <div class="conflict-modal-header">
         <h2 class="conflict-modal-title">Merge Progress or Overwrite? ⚠️</h2>
         <p class="conflict-modal-subtitle">
-          Existing progress on this device conflicts with the imported save file.
+          Scanned progress has different stats than this device. Choose how to merge:
         </p>
       </div>
     </template>
@@ -218,15 +218,18 @@ function handleClose() {
         </BaseButton>
 
         <div class="secondary-actions-row">
-          <BaseButton
-            variant="danger"
-            size="sm"
-            :loading="props.loading"
-            @click="handleAction('replace_local')"
-          >
-            <template #icon>⚠️</template>
-            Overwrite Device Progress
-          </BaseButton>
+          <div class="replace-action-col">
+            <BaseButton
+              variant="danger"
+              size="sm"
+              :loading="props.loading"
+              @click="handleAction('replace_local')"
+            >
+              <template #icon>⚠️</template>
+              Replace Device Progress
+            </BaseButton>
+            <span class="action-subtext">Replaces all stars and puzzle ratings on this device with incoming save</span>
+          </div>
 
           <BaseButton
             variant="ghost"
@@ -380,5 +383,19 @@ function handleClose() {
   .secondary-actions-row {
     grid-template-columns: 1fr;
   }
+}
+
+.replace-action-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.action-subtext {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.2;
+  text-align: center;
 }
 </style>

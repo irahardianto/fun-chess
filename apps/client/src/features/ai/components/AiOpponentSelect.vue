@@ -240,13 +240,13 @@ function getMascotColorClass(id: MascotId): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   flex-wrap: wrap;
   max-width: 100%;
   background-color: var(--bg-surface);
-  padding: 6px 14px;
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border-medium);
+  border: 1.5px solid var(--border-medium);
   box-shadow: var(--shadow-xs);
   margin-top: var(--space-1);
 }
@@ -262,7 +262,7 @@ function getMascotColorClass(id: MascotId): string {
 .avatar-options {
   display: flex;
   align-items: center;
-  gap: var(--space-1-5);
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -270,9 +270,9 @@ function getMascotColorClass(id: MascotId): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  font-size: 1.35rem;
+  width: 44px;
+  height: 44px;
+  font-size: 1.5rem;
   background-color: var(--bg-app);
   border: 2px solid var(--border-medium);
   border-radius: var(--radius-pill);
@@ -284,15 +284,21 @@ function getMascotColorClass(id: MascotId): string {
 }
 
 .avatar-option-btn:hover {
-  transform: translateY(-2px) scale(1.1);
+  transform: translateY(-2px) scale(1.08);
   border-color: var(--color-primary);
+}
+
+.avatar-option-btn:focus-visible {
+  outline: 2px solid var(--border-focus, var(--color-primary));
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
 }
 
 .avatar-option-btn.is-selected {
   border-color: var(--color-accent);
   background-color: var(--color-accent-subtle);
-  transform: translateY(-2px) scale(1.15);
-  box-shadow: var(--shadow-btn-accent, 0 3px 0 rgba(245, 130, 32, 0.45));
+  transform: translateY(-2px) scale(1.12);
+  box-shadow: 0 0 0 2px var(--color-accent), var(--shadow-btn-accent, 0 3px 0 rgba(245, 130, 32, 0.45));
 }
 
 /* Color Picker Control */
@@ -300,21 +306,23 @@ function getMascotColorClass(id: MascotId): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   flex-wrap: wrap;
   max-width: 100%;
-  background-color: var(--bg-surface);
+  background-color: var(--bg-surface-raised, var(--bg-surface));
   padding: 4px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border-medium);
-  box-shadow: var(--shadow-xs);
+  border: 1.5px solid var(--border-medium);
+  box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.06);
   margin-top: var(--space-2);
 }
 
 .color-option-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1-5);
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
   font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
@@ -324,7 +332,11 @@ function getMascotColorClass(id: MascotId): string {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease, background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+  transition: transform var(--duration-fast) var(--ease-spring),
+              box-shadow var(--duration-fast) ease,
+              border-color var(--duration-fast) ease,
+              background-color var(--duration-fast) ease,
+              color var(--duration-fast) ease;
 }
 
 .color-option-btn:hover {
@@ -332,10 +344,16 @@ function getMascotColorClass(id: MascotId): string {
   background-color: var(--color-primary-subtle);
 }
 
+.color-option-btn:focus-visible {
+  outline: 2px solid var(--border-focus, var(--color-primary));
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
+}
+
 .color-option-btn.is-selected {
   background-color: var(--color-primary);
-  color: var(--text-on-primary);
-  box-shadow: var(--shadow-sm);
+  color: var(--text-on-primary, #ffffff);
+  box-shadow: 0 3px 0 var(--color-primary-bevel, hsl(255, 70%, 45%)), var(--shadow-sm);
   transform: scale(1.02);
 }
 

@@ -41,7 +41,7 @@ describe('PwaInstallBanner.vue', () => {
     expect(banner.text()).toContain('Install Fun Chess on your Device!');
     expect(banner.text()).toContain('Play anywhere, even without Wi-Fi or internet!');
     expect(banner.text()).toContain('Install App');
-    expect(banner.text()).toContain('Maybe Later');
+    expect(banner.text()).toContain('Remind me later');
   });
 
   it('emits install event and calls promptInstall when Install App button is clicked', async () => {
@@ -55,7 +55,7 @@ describe('PwaInstallBanner.vue', () => {
     expect(wrapper.emitted('install')).toHaveLength(1);
   });
 
-  it('emits dismiss event and snoozes prompt when Maybe Later or Close is clicked', async () => {
+  it('emits dismiss event and snoozes prompt when Remind me later or Close is clicked', async () => {
     const wrapper = mount(PwaInstallBanner, {
       props: { forceShow: true },
     });

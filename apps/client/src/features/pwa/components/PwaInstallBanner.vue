@@ -61,7 +61,7 @@ function handleDismiss() {
             data-testid="pwa-banner-dismiss-btn"
             @click="handleDismiss"
           >
-            Maybe Later
+            Remind me later
           </BaseButton>
 
           <BaseButton
@@ -184,7 +184,7 @@ function handleDismiss() {
   transition: background-color var(--duration-fast, 140ms) ease, color var(--duration-fast, 140ms) ease;
   position: absolute;
   top: 4px;
-  right: 4px;
+  inset-inline-end: 4px;
 }
 
 @media (max-width: 600px) {

@@ -207,7 +207,10 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
         mistakesCount.value
       );
     } else if (outcome.botReplyMove) {
-      // Advance to interim FEN before bot reply, then apply bot reply after realistic kid pacing
+      // Advance to interim FEN immediately so player sees their piece move without visual lag
+      if (outcome.intermediateFen) {
+        currentFen.value = outcome.intermediateFen;
+      }
       isWaitingForBot.value = true;
       if (botTimer) {
         clearTimeout(botTimer);

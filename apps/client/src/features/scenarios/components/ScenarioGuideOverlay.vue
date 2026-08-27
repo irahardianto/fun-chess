@@ -148,6 +148,12 @@ function handleResetStep() {
   background-color: var(--soft-error-bg);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .scenario-guide-container.is-shaking {
+    animation: none;
+  }
+}
+
 .scenario-guide-container.is-success {
   border-color: var(--color-success);
   background-color: hsl(150, 75%, 96%);

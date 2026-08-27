@@ -124,4 +124,29 @@ describe('AudioSynthesizer', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('supports initContext and resumeContext lifecycle methods', () => {
+    const mockAudioContext = {
+      currentTime: 0,
+      state: 'suspended',
+      destination: {},
+      createGain: vi.fn(() => ({
+        gain: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      })),
+      resume: vi.fn().mockResolvedValue(undefined),
+    };
+
+    vi.stubGlobal('AudioContext', vi.fn(() => mockAudioContext));
+
+    const audioSynth = new AudioSynthesizer();
+    const ctx = audioSynth.initContext();
+    expect(ctx).toBeDefined();
+    expect(mockAudioContext.resume).toHaveBeenCalled();
+
+    audioSynth.resumeContext();
+    expect(mockAudioContext.resume).toHaveBeenCalledTimes(2);
+
+    vi.unstubAllGlobals();
+  });
 });

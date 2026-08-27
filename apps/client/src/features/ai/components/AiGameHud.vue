@@ -64,7 +64,7 @@ const emit = defineEmits<{
       <template #icon-left>
         <span class="hud-icon pulse-glow">💡</span>
       </template>
-      <span>Ask Hint</span>
+      <span>Show hint</span>
       <span v-if="props.hintsCount > 0" class="hud-badge hint-badge">
         {{ props.hintsCount }}
       </span>
@@ -102,10 +102,10 @@ const emit = defineEmits<{
 
     <!-- Secondary Action: Resign Match -->
     <BaseButton
-      variant="danger"
+      variant="ghost"
       size="md"
       data-testid="resign-btn"
-      class="hud-btn resign-btn"
+      class="hud-btn resign-btn action-btn--subdued-danger"
       :disabled="props.isGameOver"
       aria-label="Resign match"
       @click="emit('resign')"
@@ -152,6 +152,17 @@ const emit = defineEmits<{
   box-shadow: var(--shadow-btn-accent);
 }
 
+.action-btn--subdued-danger {
+  color: var(--text-muted);
+  border-color: var(--border-medium);
+}
+
+.action-btn--subdued-danger:hover:not(:disabled) {
+  background-color: var(--color-danger-subtle);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
 .hud-icon {
   font-size: 1.15rem;
   line-height: 1;
@@ -162,9 +173,10 @@ const emit = defineEmits<{
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
   padding: 1px 6px;
   border-radius: var(--radius-pill);
-  margin-left: 4px;
+  margin-inline-start: var(--space-1);
 }
 
 .takeback-badge {

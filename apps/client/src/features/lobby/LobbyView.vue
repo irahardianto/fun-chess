@@ -10,7 +10,6 @@ import type {
   PieceColor,
 } from '@fun-chess/shared';
 import { PLAYER_AVATARS, DEFAULT_PLAYER_AVATAR } from '@fun-chess/shared';
-import BaseCard from '../../components/base/BaseCard.vue';
 import HostCard from './HostCard.vue';
 import JoinCard from './JoinCard.vue';
 import LobbyModeSelector from './LobbyModeSelector.vue';
@@ -262,28 +261,26 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
       class="mode-panel lan-mode-panel"
       data-testid="lan-mode-panel"
     >
-      <!-- Avatar Picker -->
-      <BaseCard variant="flat" padding="sm" class="avatar-card">
-        <div class="avatar-picker-group">
-          <label class="section-label">Select Your Avatar Emoji:</label>
-          <div class="avatar-options" role="radiogroup" aria-label="Choose your avatar emoji">
-            <button
-              v-for="emoji in PLAYER_AVATARS"
-              :key="emoji"
-              type="button"
-              class="avatar-option-btn"
-              :class="{ 'is-selected': selectedAvatar === emoji }"
-              :aria-checked="selectedAvatar === emoji"
-              :aria-label="`Select ${emoji} avatar`"
-              :data-testid="`lobby-avatar-option-${emoji}`"
-              role="radio"
-              @click="selectAvatar(emoji)"
-            >
-              {{ emoji }}
-            </button>
-          </div>
+      <!-- Avatar Picker Control -->
+      <div class="avatar-picker-control" role="group" aria-label="Select Player Avatar">
+        <span class="picker-label">Your Avatar:</span>
+        <div class="avatar-options" role="radiogroup" aria-label="Choose your avatar emoji">
+          <button
+            v-for="emoji in PLAYER_AVATARS"
+            :key="emoji"
+            type="button"
+            class="avatar-option-btn"
+            :class="{ 'is-selected': selectedAvatar === emoji }"
+            :aria-checked="selectedAvatar === emoji"
+            :aria-label="`Select ${emoji} avatar`"
+            :data-testid="`lobby-avatar-option-${emoji}`"
+            role="radio"
+            @click="selectAvatar(emoji)"
+          >
+            {{ emoji }}
+          </button>
         </div>
-      </BaseCard>
+      </div>
 
       <!-- Action Cards: Host or Join -->
       <div class="lobby-actions-grid">
@@ -502,32 +499,34 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   max-width: 100%;
 }
 
-.avatar-card {
-  width: 100%;
-}
-
-.avatar-picker-group {
+/* Avatar Picker Control */
+.avatar-picker-control {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
-  gap: var(--space-2);
-  width: 100%;
+  justify-content: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  max-width: 100%;
+  background-color: var(--bg-surface);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-medium);
+  box-shadow: var(--shadow-xs);
 }
 
-.section-label {
+.picker-label {
   font-family: var(--font-display);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--weight-bold);
   color: var(--text-muted);
-  text-align: center;
+  white-space: nowrap;
 }
 
 .avatar-options {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -535,26 +534,35 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  font-size: 1.6rem;
+  width: 44px;
+  height: 44px;
+  font-size: 1.5rem;
   background-color: var(--bg-app);
   border: 2px solid var(--border-medium);
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease, background-color var(--duration-fast) ease;
+  transition: transform var(--duration-fast) var(--ease-spring),
+              box-shadow var(--duration-fast) ease,
+              border-color var(--duration-fast) ease,
+              background-color var(--duration-fast) ease;
 }
 
 .avatar-option-btn:hover {
-  transform: translateY(-3px) scale(1.1);
+  transform: translateY(-2px) scale(1.08);
   border-color: var(--color-primary);
+}
+
+.avatar-option-btn:focus-visible {
+  outline: 2px solid var(--border-focus, var(--color-primary));
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
 }
 
 .avatar-option-btn.is-selected {
   border-color: var(--color-accent);
   background-color: var(--color-accent-subtle);
-  transform: translateY(-3px) scale(1.15);
-  box-shadow: var(--shadow-btn-accent);
+  transform: translateY(-2px) scale(1.12);
+  box-shadow: 0 0 0 2px var(--color-accent), var(--shadow-btn-accent, 0 3px 0 rgba(245, 130, 32, 0.45));
 }
 
 .lobby-actions-grid {
@@ -562,6 +570,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
   width: 100%;
+  align-items: stretch;
 }
 
 @media (max-width: 600px) {

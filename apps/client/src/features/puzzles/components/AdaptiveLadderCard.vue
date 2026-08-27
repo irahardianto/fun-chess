@@ -197,6 +197,7 @@ const progressPercent = computed<number>(() => tierProgress.value.percent);
   font-family: var(--font-mono, monospace);
   font-size: var(--text-base, 16px);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--mode-ladder-primary, #9333ea);
 }
 

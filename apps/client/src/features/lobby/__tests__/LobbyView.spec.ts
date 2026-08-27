@@ -64,7 +64,7 @@ describe('LobbyView.vue', () => {
     const nameInput = wrapper.find('.host-card input');
     await nameInput.setValue('GrandmasterLeo');
 
-    const whiteBtn = wrapper.find('.host-card .color-options-grid button');
+    const whiteBtn = wrapper.find('.host-card [data-testid="color-white-btn"]');
     await whiteBtn.trigger('click');
 
     const hostBtn = wrapper.find('.host-card .btn-tactile');

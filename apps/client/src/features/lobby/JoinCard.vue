@@ -93,6 +93,7 @@ function onJoinSubmit() {
         size="lg"
         full-width
         :loading="loading"
+        class="join-submit-btn"
         data-testid="join-game-btn"
         @click="onJoinSubmit"
       >
@@ -106,6 +107,15 @@ function onJoinSubmit() {
 <style scoped>
 .join-card {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.join-card :deep(.base-card-body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
 }
 
 .card-header-inner {
@@ -133,6 +143,14 @@ function onJoinSubmit() {
 .join-form {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  justify-content: space-between;
   gap: var(--space-4);
+  height: 100%;
+}
+
+.join-submit-btn {
+  margin-top: auto;
+  min-height: 52px;
 }
 </style>

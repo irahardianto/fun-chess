@@ -160,4 +160,35 @@ describe('useProgressSync Composable', () => {
     expect(result).toBe(false);
     expect(syncError.value).toBeDefined();
   });
+
+  it('sets actionable error message when loadCurrentProgress fails', async () => {
+    const failingStorage = {
+      getUnifiedProgress: vi.fn().mockRejectedValue(new Error('Storage disk full')),
+      saveUnifiedProgress: vi.fn(),
+    };
+
+    const { loadCurrentProgress, syncError } = useProgressSync({
+      storage: failingStorage,
+    });
+
+    await expect(loadCurrentProgress()).rejects.toThrow('Storage disk full');
+    expect(syncError.value).toBe('Unable to load progress. Refresh the page to try again.');
+  });
+
+  it('sets actionable error message when exportJson fails', async () => {
+    const failingFileService = {
+      downloadProgressFile: vi.fn().mockImplementation(() => {
+        throw new Error('Permission denied');
+      }),
+      readProgressFile: vi.fn(),
+    };
+
+    const { exportJson, syncError } = useProgressSync({
+      storage: mockStorage,
+      fileService: failingFileService as any,
+    });
+
+    await expect(exportJson()).rejects.toThrow('Permission denied');
+    expect(syncError.value).toContain('Permission denied');
+  });
 });

@@ -131,10 +131,12 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       score.value = solveResult.newScore;
       currentStreak.value = solveResult.newStreak;
       comboMultiplier.value = solveResult.comboMultiplier;
-      lastTimeBonus.value = 5;
+      lastTimeBonus.value = solveResult.timeBonusSeconds;
 
-      // Always grant +5s bonus in blitz on solve
-      timeRemainingSeconds.value += 5;
+      // Only grant bonus in blitz if solve was fast (<5s)
+      if (solveResult.timeBonusSeconds > 0) {
+        timeRemainingSeconds.value += solveResult.timeBonusSeconds;
+      }
 
       if (solveResult.isNewHighScore) {
         isNewHighScore.value = true;

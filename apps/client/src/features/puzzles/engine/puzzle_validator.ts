@@ -168,6 +168,7 @@ export function validatePuzzleMove(
     };
   }
 
+  const intermediateFen = chess.fen();
   const nextMoveIdx = currentMoveIndex + 1;
 
   // Case 1: Player executed the final ply of the puzzle
@@ -175,7 +176,8 @@ export function validatePuzzleMove(
     return {
       isCorrect: true,
       isPuzzleComplete: true,
-      nextFen: chess.fen(),
+      intermediateFen,
+      nextFen: intermediateFen,
       nextMoveIndex: nextMoveIdx,
       feedback: 'Brilliant! You solved the puzzle! 🎉',
     };
@@ -187,7 +189,8 @@ export function validatePuzzleMove(
     return {
       isCorrect: true,
       isPuzzleComplete: true,
-      nextFen: chess.fen(),
+      intermediateFen,
+      nextFen: intermediateFen,
       nextMoveIndex: nextMoveIdx,
       feedback: 'Brilliant! You solved the puzzle! 🎉',
     };
@@ -221,6 +224,7 @@ export function validatePuzzleMove(
   return {
     isCorrect: true,
     isPuzzleComplete: isCompleteAfterBot,
+    intermediateFen,
     nextFen: chess.fen(),
     botReplyMove,
     nextMoveIndex: playerNextIdx,

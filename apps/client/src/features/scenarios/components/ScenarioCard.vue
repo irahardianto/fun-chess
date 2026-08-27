@@ -173,33 +173,33 @@ function handlePlay() {
 }
 
 .diff-pill--beginner {
-  background-color: hsl(150, 75%, 92%);
-  color: hsl(150, 80%, 25%);
+  background-color: var(--cat-fundamentals-bg);
+  color: var(--cat-fundamentals);
 }
 
 .diff-pill--intermediate {
-  background-color: hsl(45, 95%, 92%);
-  color: hsl(45, 90%, 25%);
+  background-color: var(--cat-endgame-bg);
+  color: var(--cat-endgame);
 }
 
 .diff-pill--advanced {
-  background-color: hsl(265, 85%, 93%);
-  color: hsl(265, 80%, 30%);
+  background-color: var(--cat-tactics-bg);
+  color: var(--cat-tactics);
 }
 
 [data-theme='dark'] .diff-pill--beginner {
-  background-color: hsl(150, 40%, 20%);
-  color: hsl(150, 80%, 80%);
+  background-color: var(--cat-fundamentals-bg);
+  color: var(--color-success-text);
 }
 
 [data-theme='dark'] .diff-pill--intermediate {
-  background-color: hsl(45, 50%, 20%);
-  color: hsl(45, 90%, 80%);
+  background-color: var(--cat-endgame-bg);
+  color: var(--color-accent-text);
 }
 
 [data-theme='dark'] .diff-pill--advanced {
-  background-color: hsl(265, 45%, 22%);
-  color: hsl(265, 85%, 85%);
+  background-color: var(--cat-tactics-bg);
+  color: var(--color-primary-text);
 }
 
 .scenario-steps-badge {

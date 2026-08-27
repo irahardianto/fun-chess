@@ -1,12 +1,38 @@
 {
+  "id": "/",
   "name": "Fun Chess! ♟️✨",
   "short_name": "FunChess",
   "description": "Kid-friendly, offline-first chess academy and tactical puzzles with smart progress sync!",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "theme_color": "#1e1e38",
   "background_color": "#0f0f1b",
+  "categories": ["games", "education", "kids", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Quick Match",
+      "short_name": "Play",
+      "description": "Start a quick chess match vs AI or Friend",
+      "url": "/?mode=bot",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tactical Puzzles",
+      "short_name": "Puzzles",
+      "description": "Solve fun chess puzzles & tactical challenges",
+      "url": "/?mode=puzzles",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Chess Academy",
+      "short_name": "Academy",
+      "description": "Interactive lessons and master classes",
+      "url": "/?mode=academy",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",

@@ -43,7 +43,7 @@ const currentBestStreak = computed(() => rush.bestStreak.value || activeStreak.v
 const currentComboMultiplier = computed(() => rush.comboMultiplier.value);
 const isGameOverActive = computed(() => rush.isGameOver.value);
 const currentHighScore = computed(() => rush.highScore.value);
-const isNewHighScore = computed(() => rush.isNewHighScore.value || (currentScore.value > 0 && currentScore.value >= currentHighScore.value));
+const isNewHighScore = computed(() => rush.isNewHighScore.value || (currentScore.value > 0 && currentScore.value > currentHighScore.value));
 
 const formattedTime = computed(() => {
   const m = Math.floor(currentTimeRemaining.value / 60);

@@ -418,8 +418,10 @@ function handleThemeSelected(theme: PuzzleTheme) {
 .theme-tags-row {
   display: flex;
   align-items: center;
-  gap: var(--space-1-5, 6px);
+  gap: var(--space-2, 8px);
   flex-wrap: wrap;
+  margin-top: var(--space-1, 4px);
+  margin-bottom: var(--space-3, 12px);
 }
 
 .theme-tag {
@@ -427,10 +429,20 @@ function handleThemeSelected(theme: PuzzleTheme) {
   font-size: var(--text-xs, 12px);
   font-weight: 700;
   background: var(--bg-surface, #ffffff);
-  border: 1px solid var(--mode-drills-border, hsl(244, 70%, 82%));
+  border: 1.5px solid var(--mode-drills-border, hsl(244, 70%, 82%));
   border-radius: var(--radius-pill, 9999px);
-  padding: 4px 10px;
+  padding: 6px 12px;
   color: var(--mode-drills-primary, #4f46e5);
+  transition: transform var(--duration-fast, 140ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+}
+
+.theme-tag:hover {
+  transform: translateY(-1px);
+}
+
+.card-footer-action {
+  margin-top: auto;
+  width: 100%;
 }
 
 .drills-cta-btn {
@@ -499,7 +511,6 @@ function handleThemeSelected(theme: PuzzleTheme) {
 .survivor-btn {
   width: 100%;
   background: var(--color-success, #22c55e) !important;
-  color: #ffffff !important;
   box-shadow: 0 5px 0 var(--color-success-bevel, hsl(145, 68%, 34%)), 0 8px 15px rgba(34, 197, 94, 0.35) !important;
 }
 </style>

@@ -9,16 +9,43 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons/*.png', 'assets/pieces/*.svg'],
+      includeManifestIcons: false,
       manifest: {
+        id: '/',
         name: 'Fun Chess! ♟️✨',
         short_name: 'FunChess',
         description:
           'Kid-friendly, offline-first chess academy and tactical puzzles with smart progress sync!',
+        start_url: '/',
+        scope: '/',
         theme_color: '#1e1e38',
         background_color: '#0f0f1b',
         display: 'standalone',
         orientation: 'portrait-primary',
+        categories: ['games', 'education', 'kids', 'entertainment'],
+        shortcuts: [
+          {
+            name: 'Quick Match',
+            short_name: 'Play',
+            description: 'Start a quick chess match vs AI or Friend',
+            url: '/?mode=bot',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+          },
+          {
+            name: 'Tactical Puzzles',
+            short_name: 'Puzzles',
+            description: 'Solve fun chess puzzles & tactical challenges',
+            url: '/?mode=puzzles',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+          },
+          {
+            name: 'Chess Academy',
+            short_name: 'Academy',
+            description: 'Interactive lessons and master classes',
+            url: '/?mode=academy',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+          },
+        ],
         icons: [
           {
             src: '/icons/icon-192.png',
@@ -44,44 +71,27 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\/.*/, /^\/socket\.io\/.*/],
         runtimeCaching: [
           {
-            urlPattern: /\/assets\/pieces\/.*\.svg$/,
-            handler: 'CacheFirst',
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'chess-pieces-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 24 * 60 * 60, // 60 days
+              cacheName: 'google-fonts-stylesheets',
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },
           {
-            urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'google-fonts-cache',
+              cacheName: 'google-fonts-webfonts',
               expiration: {
                 maxEntries: 30,
                 maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
               },
-            },
-          },
-          {
-            urlPattern: /\/icons\/.*\.png$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'pwa-icons-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 24 * 60 * 60, // 60 days
+              cacheableResponse: {
+                statuses: [0, 200],
               },
-            },
-          },
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'html-cache',
-              networkTimeoutSeconds: 3,
             },
           },
           {
@@ -92,6 +102,35 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/chess.js')) {
+            return 'vendor-chess';
+          }
+          if (id.includes('node_modules/pako')) {
+            return 'vendor-pako';
+          }
+          if (id.includes('node_modules/canvas-confetti')) {
+            return 'vendor-confetti';
+          }
+          if (id.includes('node_modules/jsqr') || id.includes('node_modules/qrcode')) {
+            return 'vendor-qr';
+          }
+          if (id.includes('node_modules/socket.io-client')) {
+            return 'vendor-socket';
+          }
+          if (id.includes('/features/scenarios/data/')) {
+            return 'curriculum-data';
+          }
+          if (id.includes('/features/puzzles/data/')) {
+            return 'puzzles-data';
+          }
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

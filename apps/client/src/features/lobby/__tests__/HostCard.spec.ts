@@ -7,12 +7,12 @@ describe('HostCard.vue (Accessibility & Interactions)', () => {
     const wrapper = mount(HostCard);
 
     expect(wrapper.find('[data-testid="host-card"]').exists()).toBe(true);
-    expect(wrapper.find('.card-title').text()).toBe('Start a New Game');
-    expect(wrapper.find('.card-badge').text()).toContain('Host Match');
+    expect(wrapper.find('.card-title').text()).toBe('Start a new game');
+    expect(wrapper.find('.card-badge').text()).toContain('Host match');
 
     const input = wrapper.find('[data-testid="host-nickname-input"]');
     expect(input.exists()).toBe(true);
-    expect(input.find('label').text()).toBe('Your Nickname');
+    expect(input.find('label').text()).toBe('Your nickname');
 
     const radiogroup = wrapper.find('[role="radiogroup"]');
     expect(radiogroup.exists()).toBe(true);
