@@ -29,3 +29,9 @@ Thumbs.db
 
 # Agent & Temp
 .agentwork/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
