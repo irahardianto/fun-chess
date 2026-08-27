@@ -3,6 +3,7 @@
 A modern, playful, and responsive web-based chess application designed for kids, parents, and friends. Featuring local LAN multiplayer, kid-friendly AI mascots, interactive tactic puzzles, progressive drills, step-by-step curriculum scenarios, and seamless offline PWA support.
 
 Zero database, zero accounts, zero public internet required — 100% private, accessible, and fast!
+
 ---
 
 ## ✨ Features & Game Modes
