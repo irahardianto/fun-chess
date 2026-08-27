@@ -1,936 +1,553 @@
-# Fun Chess — Academy Expansion & Gamified Puzzle Hub API Contracts
+# Architectural API Contracts: Progress Sync, Deflate Codec, & Cloud Relay
 
-**Document Version:** `2.0.0`  
-**Status:** `FROZEN CONTRACT`  
-**Target Audience:** Children aged 7 to 15 (School Chess Clubs, Beginners & Intermediate Learners)  
-**Monorepo Package:** `@fun-chess/shared` (`shared/src/contracts/`)  
-**Author:** `@architect` (System Architecture Authority)  
-
----
-
-## 1. Executive Architectural Overview
-
-Fun Chess is expanding its pedagogical capabilities with two major pillars:
-1. **Academy Curriculum Expansion:** Adding intermediate tactical motifs, checkmate pattern families, endgame conversions, and classic opening traps to the guided interactive scenario engine.
-2. **Gamified Standalone Puzzle Hub:** Introducing an offline-first, zero-database puzzle hub featuring **Themed Drills**, an **Adaptive Rating Ladder**, and high-energy **Puzzle Rush / Streak Survivor** modes.
-
-```
-+-------------------------------------------------------------------------------+
-|                             @fun-chess/shared                                 |
-|                                                                               |
-|   +--------------------------+   +----------------------------------------+   |
-|   |    Scenario Contracts    |   |            Puzzle Contracts            |   |
-|   |  - ScenarioCategory      |   |  - Puzzle & PuzzleTheme                |   |
-|   |  - ChessScenario         |   |  - PuzzleMode & PuzzleSessionState     |   |
-|   |  - ScenarioProgressStore |   |  - HintLevel & HintData (3-Tier)       |   |
-|   |  - ScenarioRunnerState   |   |  - AdaptiveRatingState & Elo Engine    |   |
-|   +--------------------------+   |  - PuzzleProgress & PuzzleProgressStore|   |
-|                                  +----------------------------------------+   |
-+-------------------------------------------------------------------------------+
-                                      │
-               ┌──────────────────────┴──────────────────────┐
-               ▼                                             ▼
-+-----------------------------+               +-----------------------------+
-|    apps/client (Vue 3)      |               |     apps/server (Node)      |
-|  - features/scenarios/      |               |  - LAN Discovery / WebSockets|
-|  - features/puzzles/        |               |  - Zero Database            |
-|  - Offline Puzzle Packs     |               |  - Stateless Multiplay Hub  |
-|  - LocalStorage Repositories|               +-----------------------------+
-+-----------------------------+
-```
-
-### Architectural Principles (Non-Negotiable)
-1. **Rule 1 (I/O Isolation):** All persistence is abstracted behind strict interfaces (`ScenarioProgressStore`, `PuzzleProgressStore`). Production uses defensive `LocalStorage` adapters with in-memory fallbacks; unit tests use pure `InMemory` adapters.
-2. **Rule 2 (Pure Business Logic):** All move validation, rating calculation (Elo/Glicko), puzzle progression, combo scoring, and hint generation are pure functions operating on immutable data structures.
-3. **Rule 3 (Dependency Inversion):** UI components and composables depend on shared interfaces, never on concrete storage or filesystem implementations.
-4. **Foolproof & Non-Punitive UX:** Designed for kids aged 7–15 with 3-tier progressive hints, unlimited non-punitive retries, gentle shake animations, and positive mascot reinforcement.
+**Status:** FROZEN ARCHITECTURAL CONTRACT  
+**Version:** 1.0.0  
+**Initiative:** Cloud-Ready Zero-Database PWA, Ephemeral Cloud Relay & Deflate-QR Progress Synchronization  
+**Target Packages:** `@fun-chess/shared`, `@fun-chess/server`, `@fun-chess/client`, `infra`  
+**Date:** 2026-08-27  
 
 ---
 
-## 2. Shared Core Contracts (`@fun-chess/shared`)
+## 1. Executive Summary & Design Invariants
 
-### 2.1 Navigation & App Shell Updates (`contracts/navigation.ts`)
+This document establishes the frozen architectural contracts for:
+1. **Unified Progress Portability**: Client-side, zero-database schema bundling Academy lessons progress and Tactical Puzzle ratings/stats into an exportable, importable, and mergeable entity.
+2. **High-Density Deflate-QR Codec & Dictionary Mapping**: Compact dictionary tokenization combined with raw Deflate compression and CRC-32 integrity validation designed to fit complete user progress into **QR Code Version 12 (~560 bytes)**.
+3. **Smart Merge & Conflict Engine**: Deterministic, pure mathematical merging algorithms (`Math.max`, set union, Glicko confidence minimization) protecting user progress from regressions across devices.
+4. **Cloud Run Ready Ephemeral Addressing & Health Probes**: Enhanced server network resolution (`RelayAddressService`) supporting `PUBLIC_URL` / `HOST` cloud environments alongside local LAN discovery, with container liveness/readiness probes (`/health`, `/healthz`).
+
+---
+
+## 2. Unified Progress Data Contracts (`@fun-chess/shared`)
+
+### 2.1 Domain Interfaces
 
 ```typescript
-import type { PieceColor } from './models.js';
-import type { MascotId } from './ai.js';
-import type { PuzzleMode, PuzzleTheme } from './puzzle.js';
+import type { ScenarioProgressMap, ScenarioProgress, StarRating } from './scenario.js';
+import type {
+  PuzzleProgress,
+  AdaptiveRatingState,
+  ThemeMasteryProgress,
+  PuzzleArcadeStats,
+  SolvedPuzzleRecord,
+  PuzzleTheme,
+} from './puzzle.js';
 
 /**
- * Primary game modes available within Fun Chess.
+ * Magic header prefix for Fun Chess compressed transport payloads.
+ * Format: FC<version>:<base64url_payload>
+ * Example: "FC1:eJy1V...794="
  */
-export type AppGameMode =
-  | 'lobby'             // Main menu mode selector
-  | 'multiplayer_lan'   // Local Wi-Fi / LAN Room match
-  | 'solo_ai'           // Single-player match against Mascot AI
-  | 'academy'           // Interactive Chess Academy & Guided Lessons
-  | 'puzzle_hub';       // Gamified Tactical Puzzle Hub (Drills, Ladder, Rush)
+export const FUN_CHESS_PAYLOAD_MAGIC_PREFIX = 'FC1:';
 
 /**
- * Launch configuration for the Puzzle Hub.
+ * Supported schema version for progress serialization.
  */
-export interface PuzzleHubLaunchConfig {
-  readonly mode: PuzzleMode;
-  readonly theme?: PuzzleTheme;
-  readonly targetRating?: number;
+export const UNIFIED_PROGRESS_SCHEMA_VERSION = 1;
+
+/**
+ * Top-level payload containing complete user progress across all single-player modes.
+ * Adheres to Rule 2 (Pure Business Logic) and operates 100% database-free.
+ */
+export interface UnifiedProgressPayload {
+  /** Schema specification version (default: 1) */
+  readonly version: number;
+  /** Epoch millisecond timestamp when the export package was created */
+  readonly exportedAt: number;
+  /** Optional client application semantic version string (e.g. "1.2.0") */
+  readonly clientVersion?: string;
+  /** Academy curriculum progress indexed by scenario ID */
+  readonly scenarios: ScenarioProgressMap;
+  /** Puzzle Hub progress including Elo ratings, theme masteries, arcade scores, and solved puzzles */
+  readonly puzzles: PuzzleProgress;
 }
 
 /**
- * Configuration payload for launching a specific Academy Scenario.
+ * Envelope structure used when exporting to `.json` file backup.
+ * Provides integrity checksum and file identification.
  */
-export interface AcademyLaunchConfig {
-  readonly scenarioId: string;
-  readonly autoStartStep?: number;
-}
-
-/**
- * Unified application state governing top-level view routing.
- */
-export interface AppShellState {
-  readonly currentMode: AppGameMode;
-  readonly soloAiConfig: SoloAiLaunchConfig | null;
-  readonly academyConfig: AcademyLaunchConfig | null;
-  readonly puzzleHubConfig: PuzzleHubLaunchConfig | null;
-  readonly isMuted: boolean;
-  readonly isDarkMode: boolean;
-}
-
-/**
- * Navigation actions emitted by sub-views to the top-level shell.
- */
-export type AppShellEventMap = {
-  'navigate:lobby': void;
-  'navigate:multiplayer': void;
-  'navigate:solo_ai': SoloAiLaunchConfig;
-  'navigate:academy': AcademyLaunchConfig | undefined;
-  'navigate:puzzle_hub': PuzzleHubLaunchConfig | undefined;
-};
-```
-
----
-
-## 3. Academy & Scenario Curriculum Contracts (`contracts/scenario.ts`)
-
-### 3.1 Expanded Category Taxonomy
-
-```typescript
-import type { Square, PieceColor } from './models.js';
-
-/**
- * High-level topic category for chess learning curriculum.
- * Expanded to include intermediate tactical motifs, checkmate pattern families,
- * endgame conversions, and classic opening traps.
- */
-export type ScenarioCategory =
-  | 'fundamentals'          // Piece movements, captures, board geometry
-  | 'rules_and_basics'      // Alias for fundamentals / rules
-  | 'special_moves'         // Castling, en passant, pawn promotion
-  | 'tactical_patterns'     // Basic tactics: forks, pins, skewers, discovered attacks
-  | 'intermediate_tactics'  // Advanced tactics: CCT, deflection, decoy, interference, clearance, Greek Gift, windmill, zwischenzug, desperado
-  | 'checkmate_patterns'    // Basic checkmates: Scholar's Mate, Back-Rank, Fool's Mate
-  | 'checkmate_families'    // Named checkmate patterns: Anastasia, Arabian, Hook, Vukovic, Boden, Balestra, Blackburne, Lolli, Damiano, Kill Box, Railroad, Blind Swine
-  | 'endgame_basics'        // Basic endgames: King+Queen, King+Rook, pawn races
-  | 'endgame_conversions'   // Lucena position, Philidor defense, Two Bishops mate
-  | 'opening_traps';        // Famous traps: Legal's Trap, Fried Liver Attack, Noah's Ark
-
-/**
- * Scenario difficulty calibrated for young learners (ages 7–15).
- */
-export type ScenarioDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'master';
-
-/**
- * Recommended target age cohort for pedagogical pacing and text tone.
- */
-export type TargetAgeGroup = '5-8' | '7-10' | '11-15' | 'all';
-
-/**
- * Performance star rating for completing a scenario attempt.
- * - 3 Stars: Solved cleanly with 0 hints used and 0 mistakes.
- * - 2 Stars: Solved using <= 1 hint or <= 1 retry.
- * - 1 Star:  Solved with multiple hints or retries (always awards at least 1 star for completion).
- */
-export type StarRating = 1 | 2 | 3;
-
-/**
- * Constrained move definition specifying acceptable source and target squares.
- */
-export interface StepMoveConstraint {
-  readonly from: Square;
-  readonly to: Square;
-  readonly promotion?: 'q' | 'r' | 'b' | 'n';
-}
-
-/**
- * Automated bot response executed after player successfully executes a step move.
- */
-export interface StepOpponentResponse {
-  readonly from: Square;
-  readonly to: Square;
-  readonly promotion?: 'q' | 'r' | 'b' | 'n';
-  readonly delayMs?: number;
-  readonly dialogue?: string;
-}
-
-/**
- * Individual interactive step within a multi-step tutorial scenario.
- */
-export interface TutorialStep {
-  readonly id: string;
-  readonly stepNumber: number;
-  readonly instruction: string;
-  readonly conceptExplanation?: string;
-  readonly hint: string;
-  readonly setupFen: string;
-  readonly highlightSquares?: readonly Square[];
-  readonly threatSquares?: readonly Square[];
-  readonly playerColor?: PieceColor;
-  readonly allowedMoves?: readonly StepMoveConstraint[];
-  readonly opponentResponse?: StepOpponentResponse;
-  readonly explanationOnSuccess: string;
-}
-
-/**
- * Full tutorial scenario definition comprising multiple interactive steps.
- */
-export interface ChessScenario {
-  readonly id: string;
-  readonly title: string;
-  readonly subtitle: string;
-  readonly category: ScenarioCategory;
-  readonly difficulty: ScenarioDifficulty;
-  readonly targetAgeGroup: TargetAgeGroup;
-  readonly icon: string;
-  readonly description: string;
-  readonly estimatedMinutes: number;
-  readonly steps: readonly TutorialStep[];
-}
-
-/**
- * Curriculum section grouping related scenarios in the Academy overview.
- */
-export interface CurriculumSection {
-  readonly id: ScenarioCategory;
-  readonly title: string;
-  readonly subtitle: string;
-  readonly icon: string;
-  readonly scenarios: readonly ChessScenario[];
-}
-
-/**
- * Scenario user progress record persisted locally.
- */
-export interface ScenarioProgress {
-  readonly scenarioId: string;
-  readonly starsEarned: StarRating;
-  readonly attemptsCount: number;
-  readonly hintsUsedTotal: number;
-  readonly firstCompletedAt: number;
-  readonly lastCompletedAt: number;
-}
-
-export type ScenarioProgressMap = Record<string, ScenarioProgress>;
-
-/**
- * Storage abstraction for persisting Scenario progress.
- * Adheres to I/O Isolation Rule (Rule 1).
- */
-export interface ScenarioProgressStore {
-  getProgressMap(): Promise<ScenarioProgressMap>;
-  getProgress(scenarioId: string): Promise<ScenarioProgress | null>;
-  saveProgress(scenarioId: string, stars: StarRating, hintsUsed: number): Promise<ScenarioProgress>;
-  resetAllProgress(): Promise<void>;
-}
-
-/**
- * Reactive state machine for active scenario playback.
- */
-export interface ScenarioRunnerState {
-  readonly scenario: ChessScenario | null;
-  readonly currentStepIndex: number;
-  readonly currentStep: TutorialStep | null;
-  readonly currentFen: string;
-  readonly totalSteps: number;
-  readonly isCompleted: boolean;
-  readonly hintsUsedCurrentAttempt: number;
-  readonly mistakesCurrentAttempt: number;
-  readonly activeHint: string | null;
-  readonly hintGlowSquare: Square | null;
-  readonly hintTargetSquare: Square | null;
-  readonly isWaitingForBotResponse: boolean;
-  readonly feedbackMessage: string | null;
-  readonly isStepSuccess: boolean;
-  readonly isShaking: boolean;
-  readonly calculatedStars: StarRating;
+export interface UnifiedProgressEnvelope {
+  /** Envelope magic string for file type validation */
+  readonly magic: 'FC_PROGRESS_V1';
+  /** Schema specification version */
+  readonly schemaVersion: number;
+  /** Formatted export timestamp (ISO 8601) */
+  readonly exportedAt: string;
+  /** Formatted CRC-32 checksum (8-character uppercase hex) of the stringified payload */
+  readonly checksum: string;
+  /** Complete progress payload */
+  readonly payload: UnifiedProgressPayload;
 }
 ```
 
----
-
-## 4. Gamified Puzzle Hub Contracts (`contracts/puzzle.ts`)
-
-### 4.1 Puzzle Themes & Tactical Taxonomy
-
-```typescript
-import type { Square, PieceColor } from './models.js';
-
-/**
- * Comprehensive tactical and positional motif themes for curated puzzles.
- * Grouped into 5 pedagogical domains.
- */
-export type PuzzleTheme =
-  // --- Domain 1: Fundamental Tactics ---
-  | 'fork'
-  | 'pin'
-  | 'skewer'
-  | 'discovered_attack'
-  | 'discovered_check'
-  | 'double_check'
-  | 'hanging_piece'
-  | 'trapped_piece'
-  // --- Domain 2: Intermediate Tactical Motifs ---
-  | 'captures_checks_threats' // CCT calculation discipline
-  | 'knight_outpost'
-  | 'cross_pin'
-  | 'battery'
-  | 'deflection'
-  | 'decoy'
-  | 'interference'
-  | 'clearance'
-  | 'greek_gift'
-  | 'windmill'
-  | 'zwischenzug'             // In-between move
-  | 'desperado'
-  | 'overloaded_piece'
-  | 'x_ray_attack'
-  // --- Domain 3: Checkmate Pattern Families ---
-  | 'mate_in_1'
-  | 'mate_in_2'
-  | 'mate_in_3'
-  | 'back_rank_mate'
-  | 'scholars_mate'
-  | 'smothered_mate'
-  | 'anastasia_mate'
-  | 'arabian_mate'
-  | 'hook_mate'
-  | 'vukovic_mate'
-  | 'boden_mate'
-  | 'balestra_mate'
-  | 'blackburne_mate'
-  | 'lolli_mate'
-  | 'damiano_mate'
-  | 'kill_box_mate'
-  | 'railroad_mate'
-  | 'blind_swine_mate'
-  | 'dovetail_mate'
-  // --- Domain 4: Endgame Conversions ---
-  | 'pawn_endgame'
-  | 'rook_endgame'
-  | 'queen_endgame'
-  | 'minor_piece_endgame'
-  | 'lucena_position'
-  | 'philidor_defense'
-  | 'two_bishops_mate'
-  // --- Domain 5: Opening Traps & Defenses ---
-  | 'legals_trap'
-  | 'fried_liver'
-  | 'noahs_ark_trap'
-  | 'fools_mate';
-
-/**
- * High-level theme category for drill filtering.
- */
-export type PuzzleThemeCategory =
-  | 'basic_tactics'
-  | 'advanced_tactics'
-  | 'checkmate_patterns'
-  | 'endgame_technique'
-  | 'opening_traps';
-
-/**
- * Metadata descriptor for rendering theme cards in Themed Drills.
- */
-export interface PuzzleThemeDescriptor {
-  readonly id: PuzzleTheme;
-  readonly category: PuzzleThemeCategory;
-  readonly name: string;
-  readonly icon: string;
-  readonly description: string;
-  readonly kidFriendlyTip: string;
-  readonly estimatedRatingRange: readonly [number, number];
-}
-
-/**
- * Calibrated puzzle difficulty tier based on target ELO.
- */
-export type PuzzleDifficultyTier =
-  | 'novice'       // 600 - 900  (1-move captures / simple mate in 1)
-  | 'easy'         // 900 - 1200 (2-ply forks, pins, simple mates)
-  | 'medium'       // 1200 - 1500 (3-4 ply intermediate tactics)
-  | 'hard'         // 1500 - 1800 (Complex multi-ply combinations)
-  | 'expert';      // 1800+       (Subtle sacrifices & endgame accuracy)
-```
-
----
-
-### 4.2 Puzzle Data Entity & Pack Specifications
+### 2.2 Merge Strategy & Conflict Preview Contracts
 
 ```typescript
 /**
- * Core immutable puzzle representation derived from curated offline CC0 positions.
+ * Resolution strategies when importing progress onto a device with existing data.
  */
-export interface Puzzle {
-  /** Unique puzzle identifier, e.g. "puz_fork_001" */
-  readonly id: string;
-  /** Initial board FEN position before the setup move or player move */
-  readonly fen: string;
-  /**
-   * Solution line represented as standard UCI move strings (e.g. ["e2e4", "e7e5", "g1f3"]).
-   * If initialPly is odd, moves[0] is the opponent's setup move to trigger the puzzle position.
-   */
-  readonly moves: readonly string[];
-  /** Calibrated difficulty rating (Elo / Glicko) */
-  readonly rating: number;
-  /** Rating deviation / confidence (Glicko RD) */
-  readonly ratingDeviation: number;
-  /** Identified tactical themes and motifs */
-  readonly themes: readonly PuzzleTheme[];
-  /** Primary theme of the puzzle for categorized drills */
-  readonly primaryTheme: PuzzleTheme;
-  /** Difficulty tier classification */
-  readonly difficulty: PuzzleDifficultyTier;
-  /** Kid-friendly puzzle title, e.g. "The Royal Knight Leap! ♞" */
-  readonly title: string;
-  /** Catchy subtitle or hint clue */
-  readonly subtitle?: string;
-  /** Side to move for the player ('w' | 'b') */
-  readonly playerColor: PieceColor;
-  /** Number of half-moves in the complete solution */
-  readonly solutionPlies: number;
-}
+export type SyncMergeStrategy =
+  | 'smart_merge'    // (Recommended) Non-destructive union: highest Elo, max stars, union of solved puzzles/scenarios
+  | 'replace_local'   // Overwrite local device state entirely with imported data
+  | 'keep_local';     // Discard imported data and maintain existing local state
 
 /**
- * Offline puzzle pack metadata header.
+ * Itemized statistical comparison between Local and Incoming progress.
+ * Consumed by UI components (`ProgressConflictModal.vue`) to render diff previews.
  */
-export interface PuzzlePackMetadata {
-  readonly version: string;
-  readonly generatedAt: string;
-  readonly totalPuzzles: number;
-  readonly themeDistribution: Record<PuzzleTheme, number>;
-  readonly ratingDistribution: {
-    readonly novice: number;
-    readonly easy: number;
-    readonly medium: number;
-    readonly hard: number;
-    readonly expert: number;
+export interface ProgressDiffPreview {
+  readonly academy: {
+    readonly localCompletedCount: number;
+    readonly incomingCompletedCount: number;
+    readonly mergedCompletedCount: number;
+    readonly localTotalStars: number;
+    readonly incomingTotalStars: number;
+    readonly mergedTotalStars: number;
+    readonly newCompletedScenarios: readonly string[];
+    readonly starUpgrades: readonly {
+      readonly scenarioId: string;
+      readonly fromStars: StarRating;
+      readonly toStars: StarRating;
+    }[];
+  };
+  readonly puzzles: {
+    readonly localSolvedCount: number;
+    readonly incomingSolvedCount: number;
+    readonly mergedSolvedCount: number;
+    readonly localRating: number;
+    readonly incomingRating: number;
+    readonly mergedRating: number;
+    readonly localPeakRating: number;
+    readonly incomingPeakRating: number;
+    readonly mergedPeakRating: number;
+    readonly newPuzzlesSolvedCount: number;
+  };
+  readonly arcade: {
+    readonly localRushHighScore: number;
+    readonly incomingRushHighScore: number;
+    readonly mergedRushHighScore: number;
+    readonly localSurvivorHighScore: number;
+    readonly incomingSurvivorHighScore: number;
+    readonly mergedSurvivorHighScore: number;
+  };
+  readonly metadata: {
+    readonly localLastActiveAt: number;
+    readonly incomingLastActiveAt: number;
+    readonly incomingExportedAt: number;
+    readonly isIncomingNewer: boolean;
+  };
+  /** Indicates whether the incoming payload differs from local data */
+  readonly hasDifferences: boolean;
+  /** Indicates whether smart_merge would result in any upgrades to local data */
+  readonly hasUpgrades: boolean;
+}
+```
+
+---
+
+## 3. Token Dictionary Mapping Specification (`DictionaryMapper`)
+
+To achieve maximum compression density for QR Code Version 12 (~560 bytes), verbose JSON keys and object structures are mapped to a compact array/tuple DTO before Deflate compression.
+
+### 3.1 Compact DTO Specification (`CompactProgressDto`)
+
+```typescript
+/**
+ * Compact Academy Scenario Tuple:
+ * [0]: scenarioId (string)
+ * [1]: starsEarned (1 | 2 | 3)
+ * [2]: attemptsCount (number)
+ * [3]: hintsUsedTotal (number)
+ * [4]: firstCompletedAt (epoch ms / 1000 - unix seconds)
+ * [5]: lastCompletedAt (epoch ms / 1000 - unix seconds)
+ */
+export type CompactScenarioTuple = [
+  string, // 0: id
+  number, // 1: stars (1-3)
+  number, // 2: attempts
+  number, // 3: hints
+  number, // 4: firstCompletedSec
+  number  // 5: lastCompletedSec
+];
+
+/**
+ * Compact Puzzle Rating Profile Tuple:
+ * [0]: rating (Elo: 500-3000)
+ * [1]: ratingDeviation (RD: 50-500)
+ * [2]: peakRating (Elo: 500-3000)
+ * [3]: totalAttempted (number)
+ * [4]: totalSolved (number)
+ * [5]: bestStreak (number)
+ */
+export type CompactRatingProfileTuple = [
+  number, // 0: rating
+  number, // 1: rd
+  number, // 2: peakRating
+  number, // 3: totalAttempted
+  number, // 4: totalSolved
+  number  // 5: bestStreak
+];
+
+/**
+ * Compact Theme Mastery Tuple:
+ * [0]: themeKey (e.g. 'fork', 'pin', 'back_rank_mate')
+ * [1]: attempted (number)
+ * [2]: solved (number)
+ * [3]: starsEarned (number)
+ * [4]: lastPracticedSec (epoch seconds)
+ */
+export type CompactThemeMasteryTuple = [
+  string, // 0: theme
+  number, // 1: attempted
+  number, // 2: solved
+  number, // 3: stars
+  number  // 4: lastPracticedSec
+];
+
+/**
+ * Compact Solved Puzzle Tuple:
+ * [0]: puzzleId (string, e.g. "puz_fork_001")
+ * [1]: stars (1 | 2 | 3)
+ * [2]: solvedAtSec (epoch seconds)
+ */
+export type CompactSolvedPuzzleTuple = [
+  string, // 0: puzzleId
+  number, // 1: stars
+  number  // 2: solvedAtSec
+];
+
+/**
+ * Compact Arcade Stats Tuple:
+ * [0]: puzzleRushHighScore
+ * [1]: puzzleRushBestStreak
+ * [2]: streakSurvivorHighScore
+ * [3]: totalRushRuns
+ */
+export type CompactArcadeStatsTuple = [
+  number, // 0: rushHigh
+  number, // 1: rushStreak
+  number, // 2: survivorHigh
+  number  // 3: totalRuns
+];
+
+/**
+ * Ultra-compact Dictionary Transfer Object representation.
+ * Keys are minimal 1-2 character tokens.
+ */
+export interface CompactProgressDto {
+  /** v: Schema Version (1) */
+  readonly v: number;
+  /** t: ExportedAt Unix Epoch Seconds */
+  readonly t: number;
+  /** c: Client Version (Optional) */
+  readonly c?: string;
+  /** sc: List of compact scenario progress tuples */
+  readonly sc: readonly CompactScenarioTuple[];
+  /** pz: Compact puzzle container */
+  readonly pz: {
+    /** r: Rating profile tuple */
+    readonly r: CompactRatingProfileTuple;
+    /** tm: List of compact theme mastery tuples */
+    readonly tm: readonly CompactThemeMasteryTuple[];
+    /** ac: Arcade stats tuple */
+    readonly ac: CompactArcadeStatsTuple;
+    /** sp: List of compact solved puzzle tuples */
+    readonly sp: readonly CompactSolvedPuzzleTuple[];
+    /** ca: Profile CreatedAt Unix Epoch Seconds */
+    readonly ca: number;
+    /** la: Profile LastActiveAt Unix Epoch Seconds */
+    readonly la: number;
   };
 }
+```
 
-/**
- * Complete offline bundle format loaded client-side.
- */
-export interface PuzzleBundle {
-  readonly metadata: PuzzlePackMetadata;
-  readonly puzzles: readonly Puzzle[];
+### 3.2 Dictionary Mapper Interface
+
+```typescript
+export interface DictionaryMapper {
+  /**
+   * Compresses a full domain UnifiedProgressPayload into a CompactProgressDto.
+   * Converts millisecond timestamps to second granularity to reduce integer digit width.
+   */
+  toCompact(payload: UnifiedProgressPayload): CompactProgressDto;
+
+  /**
+   * Expands a CompactProgressDto back into the full domain UnifiedProgressPayload.
+   * Reconstitutes millisecond timestamps and full object models.
+   */
+  fromCompact(compact: CompactProgressDto): UnifiedProgressPayload;
+}
+```
+
+### 3.3 Byte Budget & Density Analysis for QR Code Version 12
+
+| Stage | Data Representation | Typical Byte Size (50 Scenarios + 50 Puzzles) |
+|---|---|---|
+| 1. Domain Object | Raw `UnifiedProgressPayload` JSON | ~12,400 bytes |
+| 2. Compact DTO | `CompactProgressDto` Minified JSON | ~1,250 bytes |
+| 3. Raw Deflate | RFC 1951 Deflate Stream (Level 9) | ~390 – 460 bytes |
+| 4. Base64URL | URL-Safe Base64 string + Magic Prefix (`FC1:`) | ~525 – 615 characters |
+
+**QR Code Version 12 Capacity:**
+- Error Correction Level **L** (7% recovery): **686 alphanumeric / 535 binary bytes**
+- Error Correction Level **M** (15% recovery): **535 alphanumeric / 419 binary bytes**
+- *Result:* Standard player progress fits cleanly in **QR Code Version 10–12**. For massive datasets (>150 puzzles), QR Version 14–16 seamlessly scales up while remaining scannable by standard mobile device cameras.
+
+---
+
+## 4. Deflate + CRC-32 Codec & Validation Contracts (`@fun-chess/shared`)
+
+### 4.1 Checksum Contract (`ChecksumCrc32`)
+
+Uses standard IEEE 802.3 32-bit Cyclic Redundancy Check (`0xEDB88320` polynomial):
+
+```typescript
+export interface ChecksumCrc32 {
+  /**
+   * Calculates the 32-bit unsigned CRC-32 integer for the provided byte array or UTF-8 string.
+   */
+  calculate(input: Uint8Array | string): number;
+
+  /**
+   * Returns standard 8-character uppercase hexadecimal representation (e.g. "8A3F12C9").
+   */
+  toHex(crc: number): string;
+
+  /**
+   * Verifies input against an expected 8-character hex checksum.
+   */
+  verify(input: Uint8Array | string, expectedHex: string): boolean;
+}
+```
+
+### 4.2 Progress Codec Interface (`ProgressCodec`)
+
+```typescript
+export interface CodecEncodeOptions {
+  /** Deflate compression level (1-9, default: 9 for max QR density) */
+  readonly level?: number;
+  /** Include client version tag */
+  readonly clientVersion?: string;
+}
+
+export interface ProgressCodec {
+  /**
+   * Encodes a domain progress payload into a compact QR-compatible string (`FC1:<base64url>`).
+   * Pipeline: Validate -> toCompact -> JSON -> Deflate -> CRC32 -> Base64URL.
+   */
+  encodeToQrString(payload: UnifiedProgressPayload, options?: CodecEncodeOptions): Promise<string>;
+
+  /**
+   * Decodes and validates a QR string back into a sanitized UnifiedProgressPayload.
+   * Pipeline: Parse Prefix -> Base64URL Decode -> Verify CRC32 -> Inflate -> JSON -> fromCompact -> Sanitize.
+   */
+  decodeFromQrString(qrString: string): Promise<UnifiedProgressPayload>;
+
+  /**
+   * Encodes payload into a human-readable JSON backup envelope for 1-click file export (`funchess-save.json`).
+   */
+  encodeToEnvelopeJson(payload: UnifiedProgressPayload): string;
+
+  /**
+   * Decodes and validates a JSON backup envelope string.
+   */
+  decodeFromEnvelopeJson(jsonString: string): UnifiedProgressPayload;
+}
+```
+
+### 4.3 Defensive Schema Validation & Clamping (`SchemaValidator`)
+
+Adheres strictly to the **Rugged Software Constitution**: all incoming data is treated as untrusted and potentially malformed.
+
+```typescript
+export interface ValidationResult<T> {
+  readonly success: boolean;
+  readonly data?: T;
+  readonly errors?: readonly string[];
+}
+
+export interface SchemaValidator {
+  /**
+   * Validates and defensively sanitizes an unknown object into a clean UnifiedProgressPayload.
+   * Clamping Rules:
+   * - Elo Rating: clamped to [500, 3000]
+   * - Rating Deviation: clamped to [50, 500]
+   * - Star Ratings: clamped to {1, 2, 3}
+   * - Counts & High Scores: clamped to Math.max(0, Math.floor(value))
+   * - Timestamps: clamped to [0, Date.now() + 86400000] (rejects future overflow timestamps)
+   * - String IDs: trimmed and stripped of non-printable characters
+   */
+  sanitizeAndValidate(raw: unknown): ValidationResult<UnifiedProgressPayload>;
+
+  /**
+   * Fast assertion that returns sanitized payload or throws descriptive ValidationError.
+   */
+  assertValid(raw: unknown): UnifiedProgressPayload;
+}
+```
+
+### 4.4 Merge Engine Contract (`ProgressMergeEngine`)
+
+Pure calculation contract implementing the three-step pattern: **Fetch dependencies -> Pure logic -> Persist result**.
+
+```typescript
+export interface ProgressMergeEngine {
+  /**
+   * Pure merge calculation combining local and incoming progress using the specified strategy.
+   * Invariants for 'smart_merge':
+   * - Scenarios: Union of all scenario IDs. If scenario present in both, starsEarned = Math.max(local, incoming),
+   *   attempts = local.attempts + incoming.attempts, hints = local.hints + incoming.hints,
+   *   firstCompletedAt = Math.min(local, incoming), lastCompletedAt = Math.max(local, incoming).
+   * - Puzzle Rating: Math.max(local.rating, incoming.rating).
+   * - Peak Rating: Math.max(local.peakRating, incoming.peakRating, mergedRating).
+   * - Rating Deviation: Math.min(local.RD, incoming.RD) (favors higher confidence).
+   * - Puzzle Counts: totalAttempted = local + incoming, totalSolved = local + incoming, bestStreak = Math.max(local, incoming).
+   * - Solved Puzzles: Map union. If puzzle in both, stars = Math.max(local.stars, incoming.stars),
+   *   solvedAt = Math.min(local.solvedAt, incoming.solvedAt).
+   * - Theme Mastery: Union by theme. attempted = local + incoming, solved = local + incoming,
+   *   starsEarned = local + incoming, lastPracticedAt = Math.max(local, incoming),
+   *   masteryLevel recalculated (>=20 master, >=8 apprentice, else novice).
+   * - Arcade Stats: puzzleRushHighScore = Math.max(local, incoming), puzzleRushBestStreak = Math.max(local, incoming),
+   *   streakSurvivorHighScore = Math.max(local, incoming), totalRushRuns = local.totalRushRuns + incoming.totalRushRuns.
+   */
+  merge(
+    local: UnifiedProgressPayload,
+    incoming: UnifiedProgressPayload,
+    strategy: SyncMergeStrategy
+  ): UnifiedProgressPayload;
+
+  /**
+   * Generates side-by-side diff preview without mutating any state.
+   */
+  calculateDiff(
+    local: UnifiedProgressPayload,
+    incoming: UnifiedProgressPayload
+  ): ProgressDiffPreview;
 }
 ```
 
 ---
 
-### 4.3 3-Tier Progressive Hint System (`contracts/puzzle.ts`)
+## 5. Server HTTP Health & Cloud Relay Contracts (`@fun-chess/server`)
+
+### 5.1 Health Check Endpoints
+
+#### Endpoint: `GET /health`
+Full operational telemetry for monitoring, dashboards, and debugging.
+
+- **Status Code:** `200 OK` (or `503 Service Unavailable` if degraded)
+- **Response Headers:** `Content-Type: application/json; charset=utf-8`, `X-Correlation-ID: <uuid>`
+- **Response Body (`HealthCheckResponse`):**
 
 ```typescript
-/**
- * Three progressive tiers of assistance designed for zero-frustration learning.
- * - Tier 1 (Nudge): Highlights the source square of the piece that needs to move.
- * - Tier 2 (Target): Highlights the destination target square / zone with tactical rationale.
- * - Tier 3 (Solution): Displays the complete solution move arrow and exact UCI move.
- */
-export type HintLevel = 0 | 1 | 2 | 3;
-
-export type HintTierName = 'none' | 'piece_nudge' | 'target_glow' | 'full_solution';
-
-/**
- * Structured hint payload returned to the UI when a hint is requested.
- */
-export interface HintData {
-  /** Current active hint level (1, 2, or 3) */
-  readonly level: HintLevel;
-  /** Friendly tier name */
-  readonly tier: HintTierName;
-  /** Source square of the piece that should move (revealed in Tier 1+) */
-  readonly sourceSquare?: Square;
-  /** Destination target square (revealed in Tier 2+) */
-  readonly targetSquare?: Square;
-  /** Kid-friendly hint message explaining the concept */
-  readonly message: string;
-  /** Full algebraic move string (e.g. "Nf7#", revealed in Tier 3) */
-  readonly solutionSan?: string;
-  /** UCI move format (e.g. "d5f7", revealed in Tier 3) */
-  readonly solutionUci?: string;
-  /** Mascot dialogue accompanying the hint */
-  readonly mascotDialogue?: string;
-}
-```
-
----
-
-### 4.4 Puzzle Hub Game Modes & Session States
-
-```typescript
-/**
- * Game modes available within the Puzzle Hub.
- */
-export type PuzzleMode =
-  | 'themed_drills'     // Untimed targeted practice by motif/theme
-  | 'adaptive_ladder'   // Adaptive Elo rating climb with dynamic difficulty
-  | 'puzzle_rush'       // 3-minute timed rapid-fire challenge
-  | 'streak_survivor';  // 3-strike survival mode (how far can you go?)
-
-/**
- * Result state for a single puzzle attempt within a session.
- */
-export type PuzzleAttemptResult =
-  | 'unsolved'
-  | 'solved_first_try'
-  | 'solved_with_hints'
-  | 'solved_with_retries'
-  | 'failed';
-
-/**
- * Base state for any active puzzle session.
- */
-export interface BasePuzzleSessionState {
-  readonly mode: PuzzleMode;
-  readonly currentPuzzle: Puzzle | null;
-  readonly currentFen: string;
-  readonly currentMoveIndex: number;      // Current ply index in puzzle.moves
-  readonly isPlayerTurn: boolean;
-  readonly isCompleted: boolean;
-  readonly isSolvedSuccessfully: boolean;
-  readonly attemptResult: PuzzleAttemptResult;
-  readonly currentHintLevel: HintLevel;
-  readonly activeHint: HintData | null;
-  readonly mistakesCount: number;
-  readonly selectedSquare: Square | null;
-  readonly legalMoves: readonly Square[];
-  readonly lastMove: { readonly from: Square; readonly to: Square } | null;
-  readonly isShaking: boolean;
-  readonly feedbackMessage: string | null;
-}
-
-/**
- * Themed Drills Session State (Untimed practice).
- */
-export interface ThemedDrillsSessionState extends BasePuzzleSessionState {
-  readonly mode: 'themed_drills';
-  readonly activeTheme: PuzzleTheme;
-  readonly puzzlesSolvedInSession: number;
-  readonly totalPuzzlesInTheme: number;
-  readonly sessionAccuracyPercent: number;
-}
-
-/**
- * Adaptive Rating Ladder Session State.
- */
-export interface AdaptiveLadderSessionState extends BasePuzzleSessionState {
-  readonly mode: 'adaptive_ladder';
-  readonly currentRating: number;
-  readonly initialSessionRating: number;
-  readonly ratingDelta: number;
-  readonly ratingConfidence: number;      // RD
-  readonly streakCount: number;
-  readonly bestStreakSession: number;
-  readonly targetPuzzleRating: number;
-}
-
-/**
- * Puzzle Rush Session State (3-minute blitz sprint).
- */
-export interface PuzzleRushSessionState extends BasePuzzleSessionState {
-  readonly mode: 'puzzle_rush';
-  readonly timeRemainingSeconds: number;
-  readonly initialTimeSeconds: number;    // default: 180s (3 min)
-  readonly score: number;                 // Total puzzles solved correctly
-  readonly strikes: number;               // Strikes accumulated (max: 3)
-  readonly maxStrikes: number;            // default: 3
-  readonly comboMultiplier: number;       // 1x, 2x, 3x on consecutive correct solves
-  readonly currentStreak: number;
-  readonly isTimerRunning: boolean;
-  readonly isGameOver: boolean;
-  readonly timeBonusEarnedSeconds: number;// +5s bonus on fast streak solves
-}
-
-/**
- * Streak Survivor Session State (Untimed 3-strike survival).
- */
-export interface StreakSurvivorSessionState extends BasePuzzleSessionState {
-  readonly mode: 'streak_survivor';
-  readonly livesRemaining: number;        // default: 3
-  readonly maxLives: number;
-  readonly currentStreak: number;
-  readonly bestStreakAllTime: number;
-  readonly score: number;
-  readonly isGameOver: boolean;
-}
-
-/**
- * Union type for all active session states.
- */
-export type PuzzleSessionState =
-  | ThemedDrillsSessionState
-  | AdaptiveLadderSessionState
-  | PuzzleRushSessionState
-  | StreakSurvivorSessionState;
-```
-
----
-
-### 4.5 Adaptive Rating & Progress Contracts (`contracts/puzzle.ts`)
-
-```typescript
-/**
- * Adaptive Elo Rating State for a young learner.
- * Uses child-friendly floor protections (rating cannot drop below 500)
- * and generous bonus scaling on clean streaks.
- */
-export interface AdaptiveRatingState {
-  /** Current calibrated puzzle Elo (default: 800 for beginners) */
-  readonly rating: number;
-  /** Rating deviation / volatility (default: 350) */
-  readonly ratingDeviation: number;
-  /** Peak Elo achieved all-time */
-  readonly peakRating: number;
-  /** Total puzzles attempted across all modes */
-  readonly totalAttempted: number;
-  /** Total puzzles solved cleanly */
-  readonly totalSolved: number;
-  /** All-time longest solve streak without mistakes */
-  readonly bestStreak: number;
-  /** History of rating adjustments for chart rendering (last 50 data points) */
-  readonly ratingHistory: readonly {
-    readonly timestamp: number;
-    readonly rating: number;
-    readonly puzzleId: string;
-    readonly delta: number;
-  }[];
-}
-
-/**
- * Performance summary for a single puzzle theme.
- */
-export interface ThemeMasteryProgress {
-  readonly theme: PuzzleTheme;
-  readonly attempted: number;
-  readonly solved: number;
-  readonly starsEarned: number;
-  readonly masteryLevel: 'novice' | 'apprentice' | 'master';
-  readonly lastPracticedAt: number;
-}
-
-/**
- * High scores record for arcade modes.
- */
-export interface PuzzleArcadeStats {
-  readonly puzzleRushHighScore: number;
-  readonly puzzleRushBestStreak: number;
-  readonly streakSurvivorHighScore: number;
-  readonly totalRushRuns: number;
-}
-
-/**
- * Overall persistent user progress across the entire Puzzle Hub.
- */
-export interface PuzzleProgress {
-  /** Player's adaptive Elo rating profile */
-  readonly ratingProfile: AdaptiveRatingState;
-  /** Theme-by-theme mastery stats */
-  readonly themeMastery: Record<PuzzleTheme, ThemeMasteryProgress>;
-  /** Arcade high scores */
-  readonly arcadeStats: PuzzleArcadeStats;
-  /** Map of solved puzzle IDs with best star rating (1-3) */
-  readonly solvedPuzzles: Record<string, { readonly stars: StarRating; readonly solvedAt: number }>;
-  /** Epoch ms timestamp when profile was created */
-  readonly createdAt: number;
-  /** Epoch ms timestamp when profile was last updated */
-  readonly lastActiveAt: number;
-}
-
-/**
- * Storage abstraction for persisting Puzzle Hub progress.
- * Adheres to Rule 1 (I/O Isolation).
- */
-export interface PuzzleProgressStore {
-  /** Retrieves full player puzzle progress record */
-  getProgress(): Promise<PuzzleProgress>;
-  /** Updates adaptive rating profile after a ladder match */
-  updateRating(newRatingState: AdaptiveRatingState): Promise<void>;
-  /** Records a solved or attempted puzzle result */
-  recordPuzzleAttempt(
-    puzzleId: string,
-    theme: PuzzleTheme,
-    result: PuzzleAttemptResult,
-    stars: StarRating
-  ): Promise<PuzzleProgress>;
-  /** Updates Puzzle Rush or Streak Survivor high scores */
-  saveArcadeResult(mode: 'puzzle_rush' | 'streak_survivor', score: number, streak: number): Promise<PuzzleProgress>;
-  /** Resets all puzzle progress (user data reset) */
-  resetAll(): Promise<void>;
-}
-```
-
----
-
-## 5. Pure Business Logic Engine Contracts (`contracts/puzzle_engine.ts`)
-
-All engine functions are pure (Input $\to$ Output), zero I/O, zero DOM, and independently testable.
-
-### 5.1 Puzzle Move Validator & State Advance
-
-```typescript
-import type { Square } from './models.js';
-import type { Puzzle, HintLevel, HintData, PuzzleAttemptResult } from './puzzle.js';
-
-export interface PlayerMoveAction {
-  readonly from: Square;
-  readonly to: Square;
-  readonly promotion?: 'q' | 'r' | 'b' | 'n';
-}
-
-export interface MoveValidationOutcome {
-  /** Whether the move matches the puzzle's expected solution ply */
-  readonly isCorrect: boolean;
-  /** Whether the complete puzzle solution is now finished */
-  readonly isPuzzleComplete: boolean;
-  /** Next FEN string after applying player move and optional bot response */
-  readonly nextFen: string;
-  /** Automated bot counter-move if puzzle continues */
-  readonly botReplyMove?: {
-    readonly from: Square;
-    readonly to: Square;
-    readonly promotion?: 'q' | 'r' | 'b' | 'n';
-    readonly san: string;
-    readonly uci: string;
+export interface HealthCheckResponse {
+  readonly status: 'ok' | 'degraded';
+  readonly uptimeSeconds: number;
+  readonly timestamp: string; // ISO 8601
+  readonly activeRooms: number;
+  readonly activeSockets: number;
+  readonly memoryUsageMb: {
+    readonly rss: number;
+    readonly heapTotal: number;
+    readonly heapUsed: number;
   };
-  /** Next ply index in solution */
-  readonly nextMoveIndex: number;
-  /** Encouraging feedback message */
-  readonly feedback: string;
-}
-
-/**
- * Validates a player move against the current solution ply of a puzzle.
- * Pure function adhering to Rule 2.
- */
-export interface PuzzleEngineService {
-  /**
-   * Evaluates player move against puzzle moves array.
-   */
-  validateMove(
-    puzzle: Puzzle,
-    currentMoveIndex: number,
-    currentFen: string,
-    playerMove: PlayerMoveAction
-  ): MoveValidationOutcome;
-
-  /**
-   * Generates progressive 3-tier hint for the current puzzle state.
-   */
-  generateHint(
-    puzzle: Puzzle,
-    currentMoveIndex: number,
-    currentFen: string,
-    requestedLevel: HintLevel
-  ): HintData;
-
-  /**
-   * Calculates star rating (1-3) based on hints and mistakes.
-   */
-  calculatePuzzleStars(hintsUsed: number, mistakesCount: number): StarRating;
+  readonly relay?: {
+    readonly mode: 'cloud' | 'lan';
+    readonly publicUrl?: string;
+  };
 }
 ```
 
+#### Endpoint: `GET /healthz`
+Lightweight Kubernetes / Cloud Run liveness and readiness probe endpoint.
+
+- **Status Code:** `200 OK`
+- **Response Headers:** `Content-Type: text/plain; charset=utf-8`
+- **Response Body:** `"OK"`
+
 ---
 
-### 5.2 Adaptive Elo Calculator (`contracts/rating_engine.ts`)
+### 5.2 LAN & Cloud Relay Discovery Endpoint
+
+#### Endpoint: `GET /api/lan-info`
+Provides connection addressing for local Wi-Fi players and Cloud Run remote players.
+
+- **Status Code:** `200 OK`
+- **Response Headers:** `Content-Type: application/json; charset=utf-8`, `X-Correlation-ID: <uuid>`
+- **Response Body (`LanInfoResponse`):**
 
 ```typescript
-export interface RatingAdjustmentParams {
-  readonly playerRating: number;
-  readonly playerRd: number;
-  readonly puzzleRating: number;
-  readonly isSuccess: boolean;
-  readonly hintsUsed: number;
-  readonly currentStreak: number;
+export interface LanInfoResponse {
+  /** Resolved host IP or domain name for multiplayer connection */
+  readonly lanIp: string;
+  /** Active listening port */
+  readonly port: number;
+  /** Localhost base URL */
+  readonly localUrl: string;
+  /** Full join URL for remote/LAN players (e.g. "https://fun-chess-xyz.a.run.app" or "http://192.168.1.50:3000") */
+  readonly joinUrl: string;
+  /** Detected physical IPv4 interfaces */
+  readonly interfaces: readonly string[];
+  /** Addressing mode: 'cloud' when running with PUBLIC_URL, 'lan' for local network */
+  readonly relayMode: 'cloud' | 'lan';
+  /** Flag indicating whether the server is acting as an internet cloud relay */
+  readonly isCloudRelay: boolean;
+  /** Public base URL when deployed to Cloud Run or behind a reverse proxy */
+  readonly publicUrl?: string;
+}
+```
+
+---
+
+### 5.3 Server `RelayAddressService` Specification
+
+Replaces hardcoded OS network interface resolution with intelligent cloud/container aware host discovery.
+
+```typescript
+export interface RelayAddressConfig {
+  /** Override URL for Cloud Run deployments (e.g. "https://fun-chess.a.run.app") */
+  readonly publicUrl?: string;
+  /** Listening host binding (default: "0.0.0.0") */
+  readonly host?: string;
+  /** Listening port (default: 3000) */
+  readonly port?: number;
+  /** Optional manual LAN IP override */
+  readonly lanIp?: string;
 }
 
-export interface RatingAdjustmentResult {
-  readonly newRating: number;
-  readonly newRd: number;
-  readonly delta: number;
-  readonly streakBonus: number;
-  readonly isProtectedByFloor: boolean;
-}
-
-/**
- * Pure calculation functions for dynamic Elo progression tailored for kids.
- */
-export interface AdaptiveRatingCalculator {
+export interface RelayAddressService {
   /**
-   * Computes Elo delta using kid-calibrated K-factor:
-   * - K = 32 for standard solves
-   * - Floor protection at 500 ELO (no negative frustration)
-   * - Non-punitive loss scaling on failed attempts with multiple hints
-   * - Streak multipliers on consecutive clean solves (+2 to +10 bonus)
+   * Resolves comprehensive LAN / Cloud addressing info.
+   * Priority Resolution Order:
+   * 1. `process.env.PUBLIC_URL` -> Sets relayMode: 'cloud', joinUrl: `${PUBLIC_URL}`, isCloudRelay: true
+   * 2. `process.env.LAN_IP` / `process.env.HOST_IP` -> Sets relayMode: 'lan', joinUrl: `http://${LAN_IP}:${port}`
+   * 3. Discovered local IPv4 interface (192.168.x.x -> 10.x.x.x -> 172.16-31.x.x)
+   * 4. Fallback to `127.0.0.1`
    */
-  calculateAdjustment(params: RatingAdjustmentParams): RatingAdjustmentResult;
+  getAddressingInfo(port: number): LanInfoResponse;
 
   /**
-   * Selects the next recommended puzzle from an offline candidate pool
-   * matching the player's current rating band with optimal win-rate targeting (~70%).
+   * Generates a game room invitation URL for QR code generation.
    */
-  selectTargetPuzzleRating(currentRating: number, streak: number): number;
+  generateJoinUrl(port: number, roomCode?: string): string;
+
+  /**
+   * Checks whether the current instance is configured as a public Cloud relay.
+   */
+  isCloudRelay(): boolean;
 }
 ```
 
 ---
 
-### 5.3 Puzzle Rush & Streak Engine
+## 6. Contract Verification Checklist
 
-```typescript
-export interface RushTickResult {
-  readonly timeRemainingSeconds: number;
-  readonly isExpired: boolean;
-}
-
-export interface RushSolveResult {
-  readonly newScore: number;
-  readonly newStreak: number;
-  readonly comboMultiplier: number;
-  readonly timeBonusSeconds: number;
-  readonly isNewHighScore: boolean;
-}
-
-export interface RushStrikeResult {
-  readonly newStrikes: number;
-  readonly isGameOver: boolean;
-  readonly comboReset: boolean;
-}
-
-/**
- * Pure logic for managing Puzzle Rush arcade rules.
- */
-export interface PuzzleRushRules {
-  applySolve(currentScore: number, currentStreak: number, highScore: number, solveTimeMs: number): RushSolveResult;
-  applyStrike(currentStrikes: number, maxStrikes?: number): RushStrikeResult;
-  calculateTimeTick(currentSeconds: number, deltaSeconds: number): RushTickResult;
-}
-```
-
----
-
-## 6. State Machine Transitions & Flows (Mermaid)
-
-### 6.1 Puzzle Runner Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle: Initialize Session
-    Idle --> LoadingPuzzle: loadPuzzle(puzzleId)
-    LoadingPuzzle --> PlayerTurn: Board Setup & Orientation Set
-    
-    state PlayerTurn {
-        [*] --> AwaitingInput
-        AwaitingInput --> SelectingPiece: Tap Friendly Piece
-        SelectingPiece --> MoveAttempted: Drag / Tap Target Square
-        AwaitingInput --> HintRequested: Tap 💡 Hint Button
-        
-        HintRequested --> AwaitingInput: Tier 1 (Nudge) / Tier 2 (Target) / Tier 3 (Solution)
-    }
-
-    MoveAttempted --> ValidateMove
-    
-    state ValidateMove <<choice>>
-    ValidateMove --> ValidMove: Move Matches Solution Ply
-    ValidateMove --> InvalidMove: Wrong Move
-    
-    InvalidMove --> AwaitingInput: Trigger Soft Shake & Non-punitive Tip (+1 Mistake)
-    
-    ValidMove --> CheckPuzzleComplete
-    
-    state CheckPuzzleComplete <<choice>>
-    CheckPuzzleComplete --> BotResponding: More Plies in Solution
-    CheckPuzzleComplete --> Solved: Final Move Executed
-    
-    BotResponding --> PlayerTurn: Auto-play Opponent Reply (400ms delay)
-    
-    Solved --> Celebration: Confetti + Sound FX + Star Award
-    Celebration --> RecordProgress: Update LocalStorage / Rating
-    RecordProgress --> [*]: Load Next Puzzle / Return to Menu
-```
-
----
-
-### 6.2 3-Tier Progressive Hint Flow
-
-```mermaid
-flowchart TD
-    A["Player taps 💡 'Ask Hint'"] --> B{"Current Hint Level"}
-    B -->|Level 0| C["Tier 1: Piece Nudge 🟡<br/>Highlight source square<br/>Mascot clue: 'Which piece can jump?'"]
-    B -->|Level 1| D["Tier 2: Target Glow 🟢<br/>Highlight source + target square<br/>Explain 'Why': 'Attack the undefended Rook!'"]
-    B -->|Level 2| E["Tier 3: Full Solution 🎯<br/>Draw arrow + reveal exact SAN (e.g. Nf7#)<br/>Complete explanation"]
-    
-    C --> F["Increment hintsUsed (+1)<br/>Set hintLevel = 1"]
-    D --> G["Increment hintsUsed (+1)<br/>Set hintLevel = 2"]
-    E --> H["Increment hintsUsed (+1)<br/>Set hintLevel = 3"]
-    
-    F --> I["Update Board Overlay & Chat Bubble"]
-    G --> I
-    H --> I
-```
-
----
-
-## 7. Error Contracts & Defensive Runtime Handling (`contracts/errors.ts`)
-
-```typescript
-export type PuzzleErrorCode =
-  | 'ERR_PUZZLE_NOT_FOUND'
-  | 'ERR_INVALID_PUZZLE_FEN'
-  | 'ERR_MALFORMED_SOLUTION_LINE'
-  | 'ERR_STORAGE_UNAVAILABLE'
-  | 'ERR_STORAGE_PARSE_FAILED'
-  | 'ERR_INVALID_THEME'
-  | 'ERR_RUSH_ALREADY_FINISHED';
-
-export interface PuzzleErrorPayload {
-  readonly code: PuzzleErrorCode;
-  readonly message: string;
-  readonly puzzleId?: string;
-  readonly details?: Record<string, unknown>;
-}
-```
-
-### Defensive Runtime Rules
-1. **Corrupted Pack Protection:** If an offline puzzle entry contains an unparseable FEN or corrupted UCI moves, the engine skips it gracefully, logs an internal warning, and loads the next puzzle in the pack without crashing.
-2. **LocalStorage Quota Defense:** If `localStorage.setItem()` throws a `QuotaExceededError`, the storage adapter seamlessly reverts to the in-memory fallback cache so the child never experiences game interruption.
-3. **Safe Type Narrowing:** All raw JSON reads from `localStorage` pass through a pure sanitizer (`sanitizePuzzleProgress`) validating property types before mutating runtime state.
-
----
-
-## 8. Export Consolidation (`shared/src/index.ts`)
-
-All contracts detailed above are re-exported at the root of `@fun-chess/shared`:
-
-```typescript
-export * from './contracts/models.js';
-export * from './contracts/errors.js';
-export * from './contracts/api.js';
-export * from './contracts/events.js';
-export * from './contracts/scenario.js';
-export * from './contracts/ai.js';
-export * from './contracts/navigation.js';
-export * from './contracts/audio.js';
-export * from './contracts/puzzle.js';
-export * from './contracts/puzzle_engine.js';
-export * from './contracts/rating_engine.js';
-```
+| Contract Area | Verification Requirement | Automated Test Target |
+|---|---|---|
+| **Deflate Codec** | Round-trip lossless decode matches original payload | `shared/src/__tests__/progress_codec.spec.ts` |
+| **Dictionary Mapper** | Compact representation compresses to <560 bytes | `shared/src/__tests__/dictionary_mapper.spec.ts` |
+| **CRC-32 Checksum** | Detects 1-bit corrupted payloads and rejects import | `shared/src/__tests__/checksum_crc32.spec.ts` |
+| **Schema Validator** | Enforces range clamping [500, 3000] and rejects malformed types | `shared/src/__tests__/schema_validator.spec.ts` |
+| **Merge Engine** | Non-destructive `Math.max` properties and union sets verified | `shared/src/__tests__/progress_merge_engine.spec.ts` |
+| **HTTP Health** | `GET /health` returns 200 OK with memory & uptime; `GET /healthz` returns 200 "OK" | `tests/contracts/http_api.contract.spec.ts` |
+| **Relay Address** | `PUBLIC_URL` overrides local IP resolution cleanly in Cloud Run mode | `apps/server/src/features/lan/__tests__/relay_address.service.spec.ts` |

@@ -1,4 +1,4 @@
-import type { Square, PieceColor } from './models.js';
+import type { Square, PieceColor } from "./models.js";
 
 /**
  * High-level topic category for chess learning curriculum.
@@ -6,26 +6,27 @@ import type { Square, PieceColor } from './models.js';
  * endgame conversions, and classic opening traps.
  */
 export type ScenarioCategory =
-  | 'fundamentals'          // Piece movements, captures, board geometry
-  | 'rules_and_basics'      // Alias for fundamentals / rules
-  | 'special_moves'         // Castling, en passant, pawn promotion
-  | 'tactical_patterns'     // Basic tactics: forks, pins, skewers, discovered attacks
-  | 'intermediate_tactics'  // Advanced tactics: CCT, deflection, decoy, interference, clearance, Greek Gift, windmill, zwischenzug, desperado
-  | 'checkmate_patterns'    // Basic checkmates: Scholar's Mate, Back-Rank, Fool's Mate
-  | 'checkmate_families'    // Named checkmate patterns: Anastasia, Arabian, Hook, Vukovic, Boden, Balestra, Blackburne, Lolli, Damiano, Kill Box, Railroad, Blind Swine
-  | 'endgame_basics'        // Basic endgames: King+Queen, King+Rook, pawn races
-  | 'endgame_conversions'   // Lucena position, Philidor defense, Two Bishops mate
-  | 'opening_traps';        // Famous traps: Legal's Trap, Fried Liver Attack, Noah's Ark
+  | "fundamentals" // Piece movements, captures, board geometry
+  | "rules_and_basics" // Alias for fundamentals / rules
+  | "special_moves" // Castling, en passant, pawn promotion
+  | "tactical_patterns" // Basic tactics: forks, pins, skewers, discovered attacks
+  | "intermediate_tactics" // Advanced tactics: CCT, deflection, decoy, interference, clearance, Greek Gift, windmill, zwischenzug, desperado
+  | "checkmate_patterns" // Basic checkmates: Scholar's Mate, Back-Rank, Fool's Mate
+  | "checkmate_families" // Named checkmate patterns: Anastasia, Arabian, Hook, Vukovic, Boden, Balestra, Blackburne, Lolli, Damiano, Kill Box, Railroad, Blind Swine
+  | "endgame_basics" // Basic endgames: King+Queen, King+Rook, pawn races
+  | "endgame_conversions" // Lucena position, Philidor defense, Two Bishops mate
+  | "opening_traps"; // Famous traps: Legal's Trap, Fried Liver Attack, Noah's Ark
 
 /**
  * Scenario difficulty calibrated for young learners (ages 7–15).
  */
-export type ScenarioDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'master';
+export type ScenarioDifficulty =
+  "beginner" | "intermediate" | "advanced" | "master";
 
 /**
  * Recommended target age cohort for pedagogical pacing and text tone.
  */
-export type TargetAgeGroup = '5-8' | '7-10' | '11-15' | 'all';
+export type TargetAgeGroup = "5-8" | "7-10" | "11-15" | "all";
 
 /**
  * Performance star rating for completing a scenario attempt.
@@ -44,7 +45,7 @@ export interface StepMoveConstraint {
   /** Destination square required for the move (e.g. 'e4' or 'c8') */
   readonly to: Square;
   /** Required promotion piece type if applicable */
-  readonly promotion?: 'q' | 'r' | 'b' | 'n';
+  readonly promotion?: "q" | "r" | "b" | "n";
 }
 
 /**
@@ -56,7 +57,7 @@ export interface StepOpponentResponse {
   /** Destination square for the bot reply */
   readonly to: Square;
   /** Required promotion piece if applicable */
-  readonly promotion?: 'q' | 'r' | 'b' | 'n';
+  readonly promotion?: "q" | "r" | "b" | "n";
   /** Delay in milliseconds before executing the move (default: 500ms) */
   readonly delayMs?: number;
   /** Optional kid-friendly speech or reaction accompanying the move */
@@ -163,7 +164,11 @@ export interface ScenarioProgressStore {
   /** Retrieves progress for a specific scenario */
   getProgress(scenarioId: string): Promise<ScenarioProgress | null>;
   /** Saves or updates progress for a completed scenario */
-  saveProgress(scenarioId: string, stars: StarRating, hintsUsed: number): Promise<ScenarioProgress>;
+  saveProgress(
+    scenarioId: string,
+    stars: StarRating,
+    hintsUsed: number,
+  ): Promise<ScenarioProgress>;
   /** Clears all progress records (reset progress) */
   resetAllProgress(): Promise<void>;
 }

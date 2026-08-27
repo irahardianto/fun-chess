@@ -1,31 +1,31 @@
-import type { Square, PieceColor, PieceType } from './models.js';
+import type { Square, PieceColor, PieceType } from "./models.js";
 
 /**
  * Calibrated AI difficulty levels mapped to distinct animal mascots.
  */
-export type AiDifficultyLevel = 'novice' | 'beginner' | 'intermediate' | 'club';
+export type AiDifficultyLevel = "novice" | "beginner" | "intermediate" | "club";
 
 /**
  * Mascot persona identifiers.
  */
-export type MascotId = 'peanut' | 'sparky' | 'fox' | 'owl';
+export type MascotId = "peanut" | "sparky" | "fox" | "owl";
 
 /**
  * Contextual triggers for dynamic mascot speech dialogue.
  */
 export type MascotDialogueTrigger =
-  | 'game_start'
-  | 'player_move'
-  | 'ai_move'
-  | 'player_check'
-  | 'ai_check'
-  | 'player_blunder'
-  | 'ai_blunder'
-  | 'player_win'
-  | 'ai_win'
-  | 'draw'
-  | 'hint_requested'
-  | 'takeback_used';
+  | "game_start"
+  | "player_move"
+  | "ai_move"
+  | "player_check"
+  | "ai_check"
+  | "player_blunder"
+  | "ai_blunder"
+  | "player_win"
+  | "ai_win"
+  | "draw"
+  | "hint_requested"
+  | "takeback_used";
 
 /**
  * Mascot persona contract defining character traits, calibrated ELO, and kid-friendly dialogues.
@@ -103,7 +103,7 @@ export interface AiMoveEvaluation {
   readonly move: {
     readonly from: Square;
     readonly to: Square;
-    readonly promotion?: 'q' | 'r' | 'b' | 'n';
+    readonly promotion?: "q" | "r" | "b" | "n";
   };
   /** Positional score in centipawns from AI's perspective */
   readonly score: EvaluationScore;
@@ -144,16 +144,16 @@ export interface ChessAiEngine {
  * Tactical concept category identified by the hint engine.
  */
 export type HintTheme =
-  | 'fork'
-  | 'pin'
-  | 'skewer'
-  | 'capture_free_piece'
-  | 'escape_attack'
-  | 'center_control'
-  | 'king_safety'
-  | 'checkmate_threat'
-  | 'pawn_promotion'
-  | 'general_development';
+  | "fork"
+  | "pin"
+  | "skewer"
+  | "capture_free_piece"
+  | "escape_attack"
+  | "center_control"
+  | "king_safety"
+  | "checkmate_threat"
+  | "pawn_promotion"
+  | "general_development";
 
 /**
  * Pedagogical hint returned to the learner when tapping "Ask for a Hint".
@@ -163,7 +163,7 @@ export interface HintRecommendation {
   readonly move: {
     readonly from: Square;
     readonly to: Square;
-    readonly promotion?: 'q' | 'r' | 'b' | 'n';
+    readonly promotion?: "q" | "r" | "b" | "n";
   };
   /** Square of the piece to move */
   readonly sourceSquare: Square;
@@ -188,7 +188,10 @@ export interface HintCalculator {
    * @param playerColor - Color of player requesting hint ('w' | 'b')
    * @returns Hint recommendation or null if no legal moves exist
    */
-  calculateHint(fen: string, playerColor: PieceColor): Promise<HintRecommendation | null>;
+  calculateHint(
+    fen: string,
+    playerColor: PieceColor,
+  ): Promise<HintRecommendation | null>;
 }
 
 /**

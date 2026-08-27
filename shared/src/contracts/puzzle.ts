@@ -1,6 +1,6 @@
-import type { Square, PieceColor } from './models.js';
-import type { StarRating } from './scenario.js';
-import type { PuzzleErrorCode, PuzzleErrorPayload } from './errors.js';
+import type { Square, PieceColor } from "./models.js";
+import type { StarRating } from "./scenario.js";
+import type { PuzzleErrorCode, PuzzleErrorPayload } from "./errors.js";
 
 /**
  * Comprehensive tactical and positional motif themes for curated puzzles.
@@ -8,72 +8,72 @@ import type { PuzzleErrorCode, PuzzleErrorPayload } from './errors.js';
  */
 export type PuzzleTheme =
   // --- Domain 1: Fundamental Tactics ---
-  | 'fork'
-  | 'pin'
-  | 'skewer'
-  | 'discovered_attack'
-  | 'discovered_check'
-  | 'double_check'
-  | 'hanging_piece'
-  | 'trapped_piece'
+  | "fork"
+  | "pin"
+  | "skewer"
+  | "discovered_attack"
+  | "discovered_check"
+  | "double_check"
+  | "hanging_piece"
+  | "trapped_piece"
   // --- Domain 2: Intermediate Tactical Motifs ---
-  | 'captures_checks_threats' // CCT calculation discipline
-  | 'knight_outpost'
-  | 'cross_pin'
-  | 'battery'
-  | 'deflection'
-  | 'decoy'
-  | 'interference'
-  | 'clearance'
-  | 'greek_gift'
-  | 'windmill'
-  | 'zwischenzug'             // In-between move
-  | 'desperado'
-  | 'overloaded_piece'
-  | 'x_ray_attack'
+  | "captures_checks_threats" // CCT calculation discipline
+  | "knight_outpost"
+  | "cross_pin"
+  | "battery"
+  | "deflection"
+  | "decoy"
+  | "interference"
+  | "clearance"
+  | "greek_gift"
+  | "windmill"
+  | "zwischenzug" // In-between move
+  | "desperado"
+  | "overloaded_piece"
+  | "x_ray_attack"
   // --- Domain 3: Checkmate Pattern Families ---
-  | 'mate_in_1'
-  | 'mate_in_2'
-  | 'mate_in_3'
-  | 'back_rank_mate'
-  | 'scholars_mate'
-  | 'smothered_mate'
-  | 'anastasia_mate'
-  | 'arabian_mate'
-  | 'hook_mate'
-  | 'vukovic_mate'
-  | 'boden_mate'
-  | 'balestra_mate'
-  | 'blackburne_mate'
-  | 'lolli_mate'
-  | 'damiano_mate'
-  | 'kill_box_mate'
-  | 'railroad_mate'
-  | 'blind_swine_mate'
-  | 'dovetail_mate'
+  | "mate_in_1"
+  | "mate_in_2"
+  | "mate_in_3"
+  | "back_rank_mate"
+  | "scholars_mate"
+  | "smothered_mate"
+  | "anastasia_mate"
+  | "arabian_mate"
+  | "hook_mate"
+  | "vukovic_mate"
+  | "boden_mate"
+  | "balestra_mate"
+  | "blackburne_mate"
+  | "lolli_mate"
+  | "damiano_mate"
+  | "kill_box_mate"
+  | "railroad_mate"
+  | "blind_swine_mate"
+  | "dovetail_mate"
   // --- Domain 4: Endgame Conversions ---
-  | 'pawn_endgame'
-  | 'rook_endgame'
-  | 'queen_endgame'
-  | 'minor_piece_endgame'
-  | 'lucena_position'
-  | 'philidor_defense'
-  | 'two_bishops_mate'
+  | "pawn_endgame"
+  | "rook_endgame"
+  | "queen_endgame"
+  | "minor_piece_endgame"
+  | "lucena_position"
+  | "philidor_defense"
+  | "two_bishops_mate"
   // --- Domain 5: Opening Traps & Defenses ---
-  | 'legals_trap'
-  | 'fried_liver'
-  | 'noahs_ark_trap'
-  | 'fools_mate';
+  | "legals_trap"
+  | "fried_liver"
+  | "noahs_ark_trap"
+  | "fools_mate";
 
 /**
  * High-level theme category for drill filtering.
  */
 export type PuzzleThemeCategory =
-  | 'basic_tactics'
-  | 'advanced_tactics'
-  | 'checkmate_patterns'
-  | 'endgame_technique'
-  | 'opening_traps';
+  | "basic_tactics"
+  | "advanced_tactics"
+  | "checkmate_patterns"
+  | "endgame_technique"
+  | "opening_traps";
 
 /**
  * Metadata descriptor for rendering theme cards in Themed Drills.
@@ -92,11 +92,11 @@ export interface PuzzleThemeDescriptor {
  * Calibrated puzzle difficulty tier based on target ELO.
  */
 export type PuzzleDifficultyTier =
-  | 'novice'       // 600 - 900  (1-move captures / simple mate in 1)
-  | 'easy'         // 900 - 1200 (2-ply forks, pins, simple mates)
-  | 'medium'       // 1200 - 1500 (3-4 ply intermediate tactics)
-  | 'hard'         // 1500 - 1800 (Complex multi-ply combinations)
-  | 'expert';      // 1800+       (Subtle sacrifices & endgame accuracy)
+  | "novice" // 600 - 900  (1-move captures / simple mate in 1)
+  | "easy" // 900 - 1200 (2-ply forks, pins, simple mates)
+  | "medium" // 1200 - 1500 (3-4 ply intermediate tactics)
+  | "hard" // 1500 - 1800 (Complex multi-ply combinations)
+  | "expert"; // 1800+       (Subtle sacrifices & endgame accuracy)
 
 /**
  * Core immutable puzzle representation derived from curated offline CC0 positions.
@@ -164,7 +164,8 @@ export interface PuzzleBundle {
  */
 export type HintLevel = 0 | 1 | 2 | 3;
 
-export type HintTierName = 'none' | 'piece_nudge' | 'target_glow' | 'full_solution';
+export type HintTierName =
+  "none" | "piece_nudge" | "target_glow" | "full_solution";
 
 /**
  * Structured hint payload returned to the UI when a hint is requested.
@@ -192,20 +193,20 @@ export interface HintData {
  * Game modes available within the Puzzle Hub.
  */
 export type PuzzleMode =
-  | 'themed_drills'     // Untimed targeted practice by motif/theme
-  | 'adaptive_ladder'   // Adaptive Elo rating climb with dynamic difficulty
-  | 'puzzle_rush'       // 3-minute timed rapid-fire challenge
-  | 'streak_survivor';  // 3-strike survival mode (how far can you go?)
+  | "themed_drills" // Untimed targeted practice by motif/theme
+  | "adaptive_ladder" // Adaptive Elo rating climb with dynamic difficulty
+  | "puzzle_rush" // 3-minute timed rapid-fire challenge
+  | "streak_survivor"; // 3-strike survival mode (how far can you go?)
 
 /**
  * Result state for a single puzzle attempt within a session.
  */
 export type PuzzleAttemptResult =
-  | 'unsolved'
-  | 'solved_first_try'
-  | 'solved_with_hints'
-  | 'solved_with_retries'
-  | 'failed';
+  | "unsolved"
+  | "solved_first_try"
+  | "solved_with_hints"
+  | "solved_with_retries"
+  | "failed";
 
 /**
  * Base state for any active puzzle session.
@@ -214,7 +215,7 @@ export interface BasePuzzleSessionState {
   readonly mode: PuzzleMode;
   readonly currentPuzzle: Puzzle | null;
   readonly currentFen: string;
-  readonly currentMoveIndex: number;      // Current ply index in puzzle.moves
+  readonly currentMoveIndex: number; // Current ply index in puzzle.moves
   readonly isPlayerTurn: boolean;
   readonly isCompleted: boolean;
   readonly isSolvedSuccessfully: boolean;
@@ -233,7 +234,7 @@ export interface BasePuzzleSessionState {
  * Themed Drills Session State (Untimed practice).
  */
 export interface ThemedDrillsSessionState extends BasePuzzleSessionState {
-  readonly mode: 'themed_drills';
+  readonly mode: "themed_drills";
   readonly activeTheme: PuzzleTheme;
   readonly puzzlesSolvedInSession: number;
   readonly totalPuzzlesInTheme: number;
@@ -244,11 +245,11 @@ export interface ThemedDrillsSessionState extends BasePuzzleSessionState {
  * Adaptive Ladder Session State.
  */
 export interface AdaptiveLadderSessionState extends BasePuzzleSessionState {
-  readonly mode: 'adaptive_ladder';
+  readonly mode: "adaptive_ladder";
   readonly currentRating: number;
   readonly initialSessionRating: number;
   readonly ratingDelta: number;
-  readonly ratingConfidence: number;      // RD
+  readonly ratingConfidence: number; // RD
   readonly streakCount: number;
   readonly bestStreakSession: number;
   readonly targetPuzzleRating: number;
@@ -258,25 +259,25 @@ export interface AdaptiveLadderSessionState extends BasePuzzleSessionState {
  * Puzzle Rush Session State (3-minute blitz sprint).
  */
 export interface PuzzleRushSessionState extends BasePuzzleSessionState {
-  readonly mode: 'puzzle_rush';
+  readonly mode: "puzzle_rush";
   readonly timeRemainingSeconds: number;
-  readonly initialTimeSeconds: number;    // default: 180s (3 min)
-  readonly score: number;                 // Total puzzles solved correctly
-  readonly strikes: number;               // Strikes accumulated (max: 3)
-  readonly maxStrikes: number;            // default: 3
-  readonly comboMultiplier: number;       // 1x, 2x, 3x on consecutive correct solves
+  readonly initialTimeSeconds: number; // default: 180s (3 min)
+  readonly score: number; // Total puzzles solved correctly
+  readonly strikes: number; // Strikes accumulated (max: 3)
+  readonly maxStrikes: number; // default: 3
+  readonly comboMultiplier: number; // 1x, 2x, 3x on consecutive correct solves
   readonly currentStreak: number;
   readonly isTimerRunning: boolean;
   readonly isGameOver: boolean;
-  readonly timeBonusEarnedSeconds: number;// +5s bonus on fast streak solves
+  readonly timeBonusEarnedSeconds: number; // +5s bonus on fast streak solves
 }
 
 /**
  * Streak Survivor Session State (Untimed 3-strike survival).
  */
 export interface StreakSurvivorSessionState extends BasePuzzleSessionState {
-  readonly mode: 'streak_survivor';
-  readonly livesRemaining: number;        // default: 3
+  readonly mode: "streak_survivor";
+  readonly livesRemaining: number; // default: 3
   readonly maxLives: number;
   readonly currentStreak: number;
   readonly bestStreakAllTime: number;
@@ -333,7 +334,7 @@ export interface ThemeMasteryProgress {
   readonly attempted: number;
   readonly solved: number;
   readonly starsEarned: number;
-  readonly masteryLevel: 'novice' | 'apprentice' | 'master';
+  readonly masteryLevel: "novice" | "apprentice" | "master";
   readonly lastPracticedAt: number;
 }
 
@@ -387,10 +388,14 @@ export interface PuzzleProgressStore {
     puzzleId: string,
     theme: PuzzleTheme,
     result: PuzzleAttemptResult,
-    stars: StarRating
+    stars: StarRating,
   ): Promise<PuzzleProgress>;
   /** Updates Puzzle Rush or Streak Survivor high scores */
-  saveArcadeResult(mode: 'puzzle_rush' | 'streak_survivor', score: number, streak: number): Promise<PuzzleProgress>;
+  saveArcadeResult(
+    mode: "puzzle_rush" | "streak_survivor",
+    score: number,
+    streak: number,
+  ): Promise<PuzzleProgress>;
   /** Resets all puzzle progress (user data reset) */
   resetAll(): Promise<void>;
 }
@@ -401,7 +406,7 @@ export interface PuzzleProgressStore {
 export interface PlayerMoveAction {
   readonly from: Square;
   readonly to: Square;
-  readonly promotion?: 'q' | 'r' | 'b' | 'n';
+  readonly promotion?: "q" | "r" | "b" | "n";
 }
 
 /**
@@ -418,7 +423,7 @@ export interface MoveValidationOutcome {
   readonly botReplyMove?: {
     readonly from: Square;
     readonly to: Square;
-    readonly promotion?: 'q' | 'r' | 'b' | 'n';
+    readonly promotion?: "q" | "r" | "b" | "n";
     readonly san: string;
     readonly uci: string;
   };
@@ -437,14 +442,14 @@ export interface PuzzleEngineService {
     puzzle: Puzzle,
     currentMoveIndex: number,
     currentFen: string,
-    playerMove: PlayerMoveAction
+    playerMove: PlayerMoveAction,
   ): MoveValidationOutcome;
 
   generateHint(
     puzzle: Puzzle,
     currentMoveIndex: number,
     currentFen: string,
-    requestedLevel: HintLevel
+    requestedLevel: HintLevel,
   ): HintData;
 
   calculatePuzzleStars(hintsUsed: number, mistakesCount: number): StarRating;
@@ -513,9 +518,17 @@ export interface RushStrikeResult {
  * Pure logic interface for managing Puzzle Rush arcade rules.
  */
 export interface PuzzleRushRules {
-  applySolve(currentScore: number, currentStreak: number, highScore: number, solveTimeMs: number): RushSolveResult;
+  applySolve(
+    currentScore: number,
+    currentStreak: number,
+    highScore: number,
+    solveTimeMs: number,
+  ): RushSolveResult;
   applyStrike(currentStrikes: number, maxStrikes?: number): RushStrikeResult;
-  calculateTimeTick(currentSeconds: number, deltaSeconds: number): RushTickResult;
+  calculateTimeTick(
+    currentSeconds: number,
+    deltaSeconds: number,
+  ): RushTickResult;
 }
 
 // Re-export error contracts for convenience

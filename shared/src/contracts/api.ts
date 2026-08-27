@@ -4,10 +4,13 @@ export interface LanInfoResponse {
   localUrl: string;
   joinUrl: string;
   interfaces: string[];
+  relayMode?: "cloud" | "lan";
+  isCloudRelay?: boolean;
+  publicUrl?: string;
 }
 
 export interface HealthCheckResponse {
-  status: 'ok' | 'degraded';
+  status: "ok" | "degraded";
   uptimeSeconds: number;
   timestamp: string;
   activeRooms: number;
@@ -16,5 +19,9 @@ export interface HealthCheckResponse {
     rss: number;
     heapTotal: number;
     heapUsed: number;
+  };
+  relay?: {
+    mode: "cloud" | "lan";
+    publicUrl?: string;
   };
 }

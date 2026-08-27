@@ -1,612 +1,487 @@
-# Fun Chess — Project Conventions & Architectural Standards
+# Project Architecture & Conventions Guide
 
-**Document Version:** `2.0.0`  
-**Status:** `FROZEN CONTRACT`  
-**Target Applications:** `apps/client/src/features/puzzles/`, `apps/client/src/features/scenarios/`, and `@fun-chess/shared`  
-**Author:** `@architect` (System Architecture Authority)  
-
----
-
-## 1. Architectural Mandates & Dependency Inversion
-
-All features in Fun Chess must adhere to the three foundational architecture rules defined in `.agents/rules/architectural-pattern.md`:
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        DEPENDENCY DIRECTION                             │
-│                                                                         │
-│   UI Components (.vue) ──► Composables ──► Pure Engines (Business Logic) │
-│                                  │                                      │
-│                                  ▼                                      │
-│                        Store Interfaces (Contracts)                     │
-│                                  ▲                                      │
-│                                  │                                      │
-│                      ┌───────────┴───────────┐                          │
-│                      │                       │                          │
-│            LocalStorage Store       InMemory Store                      │
-│            (Production Adapter)     (Test Adapter)                      │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-1. **Rule 1 (I/O Isolation):** All side effects (browser `localStorage`, network requests, audio, timers) must be abstracted behind explicit interfaces defined in `@fun-chess/shared`. Every I/O boundary must supply:
-   - A **Production Adapter** (e.g., `LocalStoragePuzzleProgressStore`) with defensive JSON parsing, runtime validation, and fallback mechanisms.
-   - A **Test Adapter** (e.g., `InMemoryPuzzleProgressStore`) for zero-dependency unit tests.
-2. **Rule 2 (Pure Business Logic):** All move validation, rating calculations (Elo/Glicko), puzzle progression rules, star calculations, and hint generations reside in pure, stateless functions located in `engine/`. These functions must NOT import Vue reactivity (`ref`, `computed`), DOM APIs, audio composables, or storage adapters.
-3. **Rule 3 (Dependency Direction):** UI components and composables depend on shared interfaces, never on concrete storage implementations. Dependencies are injected with default fallbacks.
+**Status:** FROZEN ARCHITECTURAL CONTRACT  
+**Version:** 1.0.0  
+**Initiative:** Cloud-Ready Zero-Database PWA, Ephemeral Cloud Relay & Deflate-QR Progress Synchronization  
+**Target Packages:** `@fun-chess/shared`, `@fun-chess/server`, `@fun-chess/client`, `infra`  
+**Date:** 2026-08-27  
 
 ---
 
-## 2. Directory Layout Conventions
+## 1. Project Organization & Modular Directory Layout
 
-The project follows a strict **vertical-slice feature architecture** (`project-structure.md`). Each feature is self-contained under `apps/client/src/features/<feature-name>/`.
-
-### 2.1 Complete Skeleton: `features/puzzles/`
+The Fun Chess codebase follows a strict **Feature-Driven Vertical Slice** architecture across npm workspaces (`shared`, `apps/server`, `apps/client`) and `infra/`.
 
 ```
-apps/client/src/features/puzzles/
-├── index.ts                               # Public feature API export (exports PuzzleArena, usePuzzleProgress, etc.)
-├── PuzzleArena.vue                        # Root container view for Puzzle Hub (switcher between modes)
-├── components/                            # Feature-specific UI components
-│   ├── index.ts                           # Components public barrier
-│   ├── PuzzleBoardWrapper.vue             # Board wrapper integrating interactive feedback & hints
-│   ├── PuzzleCategoryCard.vue             # Theme selection drill card
-│   ├── PuzzleCompletionModal.vue          # Solved celebration & star modal
-│   ├── PuzzleHintOverlay.vue              # 3-tier visual hint renderer (nudges, glow, arrows)
-│   ├── PuzzleModeSelector.vue             # Segmented tab bar (Drills, Ladder, Rush, Survivor)
-│   ├── PuzzleRushHud.vue                  # Rapid-fire timer, combo multiplier, strikes display
-│   ├── PuzzleThemeBrowser.vue             # Grid of tactical motifs with filter tabs
-│   ├── RatingClimbHud.vue                 # Adaptive Elo indicator, streak flames, rank badge
-│   └── __tests__/                         # Component tests (Vitest + Vue Test Utils)
-│       ├── PuzzleCompletionModal.spec.ts
-│       ├── PuzzleHintOverlay.spec.ts
-│       ├── PuzzleModeSelector.spec.ts
-│       ├── PuzzleRushHud.spec.ts
-│       └── RatingClimbHud.spec.ts
-├── composables/                           # Reactive state orchestration & hooks
-│   ├── index.ts                           # Composables public barrier
-│   ├── useAdaptiveLadder.ts               # State & runner for Adaptive Rating Ladder
-│   ├── useProgressiveHint.ts              # 3-tier progressive hint state machine
-│   ├── usePuzzleProgress.ts               # Persistence sync with injected store
-│   ├── usePuzzleRunner.ts                 # Core interactive move runner & validation loop
-│   ├── usePuzzleRush.ts                   # 3-minute blitz sprint & streak survivor timer
-│   ├── useThemedDrills.ts                 # Filtered theme drill playlist runner
-│   └── __tests__/                         # Composable unit tests
-│       ├── useAdaptiveLadder.spec.ts
-│       ├── useProgressiveHint.spec.ts
-│       ├── usePuzzleProgress.spec.ts
-│       ├── usePuzzleRunner.spec.ts
-│       └── usePuzzleRush.spec.ts
-├── data/                                  # Curated offline puzzle library & themes
-│   ├── index.ts                           # Data pack aggregator & search indexes
-│   ├── puzzle_themes.ts                   # Theme descriptors, icons, kid-friendly hints
-│   ├── packs/                             # Curated CC0 puzzle packs by rating band
-│   │   ├── novice_puzzles.ts              # 600 - 900 ELO (mate-in-1, simple free pieces)
-│   │   ├── easy_puzzles.ts                # 900 - 1200 ELO (forks, pins, basic mates)
-│   │   ├── medium_puzzles.ts              # 1200 - 1500 ELO (intermediate tactics, checkmate families)
-│   │   ├── hard_puzzles.ts                # 1500 - 1800 ELO (conversions, multi-step combinations)
-│   │   └── expert_puzzles.ts              # 1800+ ELO (subtle sacrifices, endgame accuracy)
-│   └── __tests__/                         # Pack integrity & validation tests
-│       ├── pack_integrity.spec.ts         # Validates all FENs, UCI moves, and solutions via chess.js
-│       └── puzzle_themes.spec.ts
-├── engine/                                # Pure business logic engines (zero I/O, zero Vue)
-│   ├── index.ts                           # Engine public barrier
-│   ├── adaptive_rating.ts                 # Elo delta, K-factor scaling, floor protection
-│   ├── hint_generator.ts                  # 3-tier hint generation from puzzle solution
-│   ├── puzzle_validator.ts                # Pure move checking & bot auto-reply advance
-│   ├── rush_engine.ts                     # Time ticks, combo multipliers, strike rules
-│   ├── star_calculator.ts                 # Star scoring (1-3) & accuracy calculation
-│   └── __tests__/                         # Pure engine unit tests (100% coverage)
-│       ├── adaptive_rating.spec.ts
-│       ├── hint_generator.spec.ts
-│       ├── puzzle_validator.spec.ts
-│       ├── rush_engine.spec.ts
-│       └── star_calculator.spec.ts
-└── store/                                 # Storage adapters adhering to Rule 1
-    ├── index.ts                           # Store factory & default singleton export
-    ├── in_memory_puzzle_progress.store.ts # Test adapter (in-memory Map)
-    ├── local_storage_puzzle_progress.store.ts # Production adapter (defensive localStorage)
-    ├── puzzle_progress.store.ts           # Re-export of shared store contract
-    └── __tests__/                         # Store adapter unit tests
-        ├── in_memory_puzzle_progress.spec.ts
-        └── local_storage_puzzle_progress.spec.ts
-```
-
----
-
-### 2.2 Complete Skeleton: `features/scenarios/` (Expanded)
-
-```
-apps/client/src/features/scenarios/
-├── index.ts
-├── ScenarioArena.vue
-├── components/
-│   ├── index.ts
-│   ├── ScenarioCard.vue
-│   ├── ScenarioCategoryList.vue
-│   ├── ScenarioCompletionModal.vue
-│   ├── ScenarioGuideOverlay.vue
-│   └── __tests__/
-├── composables/
-│   ├── index.ts
-│   ├── useScenarioProgress.ts
-│   ├── useScenarioRunner.ts
-│   └── __tests__/
-├── data/
-│   ├── index.ts                           # Aggregator of all curriculum sections
-│   ├── checkmates/                        # Basic checkmate patterns
-│   ├── checkmate_families/                # Expanded: Anastasia, Arabian, Hook, Vukovic, Boden, etc.
-│   ├── endgame/                           # Basic endgames (KQ vs K, KR vs K)
-│   ├── endgame_conversions/               # Expanded: Lucena, Philidor, Two Bishops
-│   ├── fundamentals/                      # Piece movements & rules
-│   ├── intermediate_tactics/              # Expanded: CCT, deflection, decoy, windmill, etc.
-│   ├── opening_traps/                     # Expanded: Legal's Trap, Fried Liver
-│   ├── special_moves/                     # Castling, en passant, promotion
-│   ├── tactics/                           # Basic tactics (fork, pin, skewer)
-│   └── __tests__/
-│       └── scenarios_integrity.spec.ts
-├── engine/
-│   ├── index.ts
-│   ├── scenario_validator.ts
-│   ├── star_calculator.ts
-│   └── __tests__/
-└── store/
-    ├── index.ts
-    ├── in_memory_progress.store.ts
-    ├── local_storage_progress.store.ts
-    ├── scenario_progress.store.ts
-    └── __tests__/
+/
+├── .agentwork/                  # Frozen design contracts, brief, findings
+├── shared/                      # Pure TypeScript domain contracts, algorithms, codecs
+│   ├── src/
+│   │   ├── contracts/           # Interfaces, types, DTOs, and protocols
+│   │   │   ├── api.ts           # HTTP & Relay response shapes (LanInfo, Health)
+│   │   │   ├── errors.ts        # Error codes and typed payloads
+│   │   │   ├── events.ts        # Socket.io ClientToServer & ServerToClient maps
+│   │   │   ├── models.ts        # Core chess domain models (Board, Pieces, Moves)
+│   │   │   ├── navigation.ts    # App modes and launch configurations
+│   │   │   ├── puzzle.ts        # Tactical puzzle contracts and progress schemas
+│   │   │   ├── scenario.ts      # Academy lesson curriculum and progress schemas
+│   │   │   ├── sync.ts          # Unified progress sync, DTOs, and envelope types
+│   │   │   └── index.ts         # Public contract barrel export
+│   │   ├── sync/                # Pure progress sync engines & codecs
+│   │   │   ├── checksum_crc32.ts        # Pure CRC-32 calculator
+│   │   │   ├── dictionary_mapper.ts     # Compact QR tuple dictionary mapper
+│   │   │   ├── progress_codec.ts        # Deflate + CRC-32 + Base64URL codec
+│   │   │   ├── progress_merge_engine.ts # Pure mathematical smart merge engine
+│   │   │   ├── schema_validator.ts      # Clamping, sanitization, and verification
+│   │   │   └── index.ts                 # Sync module barrel export
+│   │   ├── puzzle/              # Pure puzzle validation and adaptive rating engines
+│   │   └── index.ts             # Main shared package export
+│   └── vitest.config.ts         # Shared unit test configuration
+│
+├── apps/server/                 # Node.js Ephemeral Cloud & LAN Relay Server
+│   ├── src/
+│   │   ├── features/            # Feature vertical slices
+│   │   │   ├── lan/             # Local LAN discovery & QR generation
+│   │   │   │   ├── lan.service.ts
+│   │   │   │   └── relay_address.service.ts # Cloud Run PUBLIC_URL resolution
+│   │   │   ├── rooms/           # In-memory room state & lifecycle management
+│   │   │   │   ├── room.store.ts            # Abstract I/O boundary
+│   │   │   │   ├── in_memory_room.store.ts  # Production in-memory adapter
+│   │   │   │   ├── in_memory_room.store.mock.ts # Test double
+│   │   │   │   └── room.service.ts
+│   │   │   └── game/            # Multiplayer move coordination & timers
+│   │   ├── platform/            # Infrastructure adapters & cross-cutting concerns
+│   │   │   ├── http/            # Native Node HTTP server & static SPA handler
+│   │   │   │   ├── http_server.ts   # Route handlers (/health, /healthz, /api/lan-info)
+│   │   │   │   └── static_handler.ts
+│   │   │   ├── socket/          # Typed Socket.io server & event routing
+│   │   │   └── logger/          # Structured Pino logger with correlation IDs
+│   │   └── index.ts             # Server entry point & dependency injection wiring
+│   └── tsconfig.json
+│
+├── apps/client/                 # Vue 3 + Vite Progressive Web Application (PWA)
+│   ├── public/                  # Static assets, icons, sound effects, PWA manifest
+│   │   ├── icons/               # PWA icons (192x192, 512x512, maskable)
+│   │   └── manifest.webmanifest # Web App Manifest (standalone, kid-safe)
+│   ├── src/
+│   │   ├── assets/              # Global styles, SVG pieces, CSS tokens
+│   │   ├── composables/         # Global reactive state composables
+│   │   │   ├── useAudio.ts
+│   │   │   ├── useChessGame.ts
+│   │   │   ├── useLanDiscovery.ts
+│   │   │   ├── useOnlineStatus.ts  # Browser online/offline reactive listener
+│   │   │   ├── usePwaInstall.ts    # PWA install prompt handler
+│   │   │   ├── useQrScanner.ts     # Camera viewfinder & jsQR scanning composable
+│   │   │   └── useSocket.ts
+│   │   ├── features/            # Client feature modules
+│   │   │   ├── academy/         # Curriculum cards, lesson arenas, scenario runners
+│   │   │   ├── puzzles/         # Themed drills, adaptive ladder, puzzle rush
+│   │   │   │   └── store/       # LocalStoragePuzzleProgressStore
+│   │   │   ├── scenarios/       # Academy progress store
+│   │   │   │   └── store/       # LocalStorageProgressStore
+│   │   │   ├── progress_sync/   # Progress Portability & Device-to-Device Sync
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── ProgressSyncModal.vue     # 2-Tab Export / Import modal
+│   │   │   │   │   ├── QrExportView.vue          # High-density QR code renderer
+│   │   │   │   │   ├── QrScannerView.vue         # Live camera scanner with reticle
+│   │   │   │   │   └── ProgressConflictModal.vue # Side-by-side stats diff preview
+│   │   │   │   ├── composables/
+│   │   │   │   │   └── useProgressSync.ts        # Sync workflow coordinator
+│   │   │   │   └── services/
+│   │   │   │       └── progress_file.service.ts  # 1-click JSON download/upload
+│   │   │   ├── pwa/             # Offline banner & Install prompt components
+│   │   │   │   ├── OfflineIndicator.vue          # Floating reassuring pill
+│   │   │   │   ├── PwaInstallBanner.vue          # Subtle install CTA banner
+│   │   │   │   └── PwaInstallModal.vue           # iOS / Android instructions
+│   │   │   └── lobby/           # 4-Way game mode selector & multiplayer cards
+│   │   ├── App.vue              # Top navbar, offline pill, and modal triggers
+│   │   └── main.ts              # Client entry point
+│   ├── vite.config.ts           # Vite 6 + vite-plugin-pwa Workbox cache configuration
+│   └── tsconfig.json
+│
+├── infra/                       # Cloud Run & Local Container Infrastructure
+│   ├── docker/                  # Multi-stage Alpine container files
+│   │   └── Dockerfile
+│   └── terraform/               # Google Cloud Run IaC (Scale-to-zero, Session Affinity)
+│       ├── main.tf
+│       ├── cloud_run.tf
+│       ├── variables.tf
+│       └── outputs.tf
+├── docker-compose.yml           # Local multi-container orchestration
+└── package.json                 # Monorepo root scripts & workspaces definition
 ```
 
 ---
 
-## 3. Store Patterns & I/O Isolation Standards
+## 2. Universal Architecture & I/O Isolation Rules
 
-### 3.1 Store Interface Definition
-The storage contract is strictly declared in `@fun-chess/shared`:
+All code in this initiative MUST strictly satisfy the **Testability-First Architecture Rules**:
+
+### Rule 1: I/O Isolation
+- **No Direct I/O in Business Logic**: Database operations, `localStorage` calls, `process.env` access, network HTTP/Socket calls, camera streams, and file downloads must be encapsulated behind abstract interfaces.
+- **Production & Mock Implementations**: Every I/O boundary must have both a production implementation (e.g. `LocalStorageProgressStore`, `RelayAddressService`) and an in-memory test double (e.g. `InMemoryProgressStoreMock`, `MockRelayAddressService`).
+
+### Rule 2: Pure Business Logic
+- **Pure Functions Only**: Calculations, data transformations, compression codecs, rating adjustments, and merge algorithms must be pure functions (`(input) => output` with zero side effects).
+- **The Three-Step Pattern**:
+  ```
+  1. Fetch Dependencies (via Store / I/O Adapter)
+  2. Execute Pure Business Logic (Calculations / Merges / Codecs)
+  3. Persist Result (via Store / I/O Adapter)
+  ```
+
+### Rule 3: Dependency Direction
+- Dependencies point inward toward domain models and pure business logic.
+- Infrastructure and UI frameworks implement contracts defined in `@fun-chess/shared`.
+
+```
+[ Vue Components / Node HTTP Handlers ]
+                   │
+                   ▼ (Calls)
+        [ Feature Services / Composables ]
+                   │
+                   ▼ (Coordinates)
+        [ Storage / Network Interfaces ] ◄─── [ Production / Mock Adapters ]
+                   │
+                   ▼ (Invokes)
+     [ Pure Engines / Codecs / Validators ]
+                   │
+                   ▼ (Imports)
+           [ Domain Models / Types ]
+```
+
+---
+
+## 3. File Naming & Code Conventions
+
+### 3.1 File Suffix Conventions
+
+| Role / Pattern | Suffix Convention | Example |
+|---|---|---|
+| Domain Contract / Interface | `*.contract.ts` or `*.interface.ts` | `sync.contract.ts`, `logger.interface.ts` |
+| Pure Engine / Algorithm | `*.engine.ts` | `progress_merge_engine.ts`, `adaptive_rating.engine.ts` |
+| Codec / Serialization | `*.codec.ts` / `*.mapper.ts` | `progress_codec.ts`, `dictionary_mapper.ts` |
+| Storage Interface / Implementation | `*.store.ts` / `local_storage_*.store.ts` | `room.store.ts`, `local_storage_progress.store.ts` |
+| Test Double / Mock | `*.mock.ts` or `*.store.mock.ts` | `in_memory_room.store.mock.ts` |
+| Feature Service | `*.service.ts` | `relay_address.service.ts`, `progress_file.service.ts` |
+| Vue Composable | `use*.ts` (camelCase) | `useProgressSync.ts`, `usePwaInstall.ts`, `useOnlineStatus.ts` |
+| Vue Component | `*.vue` (PascalCase) | `ProgressSyncModal.vue`, `OfflineIndicator.vue` |
+| Unit / Contract Spec | `*.spec.ts` | `progress_codec.spec.ts`, `http_api.contract.spec.ts` |
+
+---
+
+## 4. Defensive Programming & Validation Standards
+
+In accordance with the **Rugged Software Constitution**:
+
+1. **Every Input is Untrusted**: Incoming QR strings, imported JSON files, and HTTP parameters are treated as malicious/corrupted until validated.
+2. **Defensive Value Clamping**:
+   - `rating` (Elo): `Math.min(3000, Math.max(500, Math.round(val)))`
+   - `ratingDeviation`: `Math.min(500, Math.max(50, Math.round(val)))`
+   - `starsEarned`: `val === 3 ? 3 : val === 2 ? 2 : 1`
+   - `attempts` / `hints` / `highScores`: `Math.max(0, Math.floor(val))`
+   - `timestamps`: `Math.min(Date.now() + 86400000, Math.max(0, val))`
+3. **No Silent Failures**:
+   - Storage read errors must log a warning and fallback gracefully to an in-memory cache without crashing the user interface.
+   - Corrupted QR scan strings must display a clear, kid-friendly error notification in the UI (`"Oops! This QR code couldn't be read. Let's try scanning again! ✨"`).
+4. **CRC-32 Integrity Verification**:
+   - All compressed QR codes and JSON envelope exports contain a 32-bit CRC.
+   - Payloads with mismatched CRC values are rejected immediately prior to JSON parsing or schema deserialization.
+
+---
+
+## 5. Structured Logging & Observability Standards
+
+### 5.1 Universal 3-Point Logging Mandate
+
+Every operational entry point (HTTP handler, Socket event, background cleanup, Sync import/export) MUST log at three distinct points:
+1. **Operation Start**: Log entry with `correlationId`, `operation`, and input identifiers.
+2. **Operation Success**: Log completion with `correlationId`, `operation`, `durationMs`, and output summary.
+3. **Operation Failure**: Log error with `correlationId`, `operation`, `durationMs`, error message, and stack trace.
+
+### 5.2 Mandatory Context Fields
 
 ```typescript
-// @fun-chess/shared -> contracts/puzzle.ts
-export interface PuzzleProgressStore {
-  getProgress(): Promise<PuzzleProgress>;
-  updateRating(newRatingState: AdaptiveRatingState): Promise<void>;
-  recordPuzzleAttempt(
-    puzzleId: string,
-    theme: PuzzleTheme,
-    result: PuzzleAttemptResult,
-    stars: StarRating
-  ): Promise<PuzzleProgress>;
-  saveArcadeResult(
-    mode: 'puzzle_rush' | 'streak_survivor',
-    score: number,
-    streak: number
-  ): Promise<PuzzleProgress>;
-  resetAll(): Promise<void>;
+export interface LogContext {
+  /** Unique UUID v4 for request/operation tracing across layers */
+  correlationId: string;
+  /** Distinct snake_case operation name */
+  operation: string;
+  /** Execution elapsed time in milliseconds */
+  durationMs?: number;
+  /** HTTP method or Socket event name */
+  method?: string;
+  /** Request path or route */
+  path?: string;
+  /** HTTP response status code */
+  statusCode?: number;
+  /** Error details when operation fails */
+  error?: {
+    message: string;
+    code?: string;
+    stack?: string;
+    details?: unknown;
+  };
+  /** Additional non-PII operational metadata */
+  [key: string]: unknown;
 }
 ```
 
-### 3.2 Production Adapter: `LocalStoragePuzzleProgressStore`
-Requirements for the production adapter:
-- **Defensive Parsing:** Must wrap `JSON.parse` in `try/catch` and return valid default structures on malformed data.
-- **Runtime Type Narrowing:** Must sanitize each property (numeric ranges, enum validation) to prevent corruption from old localStorage versions.
-- **Quota Exceeded Fallback:** Must catch quota/private mode errors and automatically mirror all state to an in-memory `Map`.
-- **Storage Key Isolation:** Uses scoped storage key `fun_chess_puzzle_progress_v2`.
+### 5.3 Client-Side Telemetry & Log Formatting
+
+On the client, logs must be formatted with consistent subsystem tags:
+- `[FC_PROGRESS_SYNC]`: Progress export, import, scanning, and merging
+- `[FC_PWA]`: Service worker registration, cache updates, install prompt triggers
+- `[FC_SOCKET]`: Real-time multiplayer connection lifecycle
+
+---
+
+## 6. Complete Reference Pattern: Progress Sync Vertical Slice
+
+Below is a complete, copy-pasteable reference vertical slice demonstrating all architectural rules in practice.
+
+### Step 1: Public Contract (`shared/src/contracts/sync.contract.ts`)
 
 ```typescript
-// apps/client/src/features/puzzles/store/local_storage_puzzle_progress.store.ts
-import type {
-  PuzzleProgress,
-  PuzzleProgressStore,
-  AdaptiveRatingState,
-  PuzzleTheme,
-  PuzzleAttemptResult,
-  StarRating,
-} from '@fun-chess/shared';
+import type { ScenarioProgressMap } from './scenario.js';
+import type { PuzzleProgress } from './puzzle.js';
 
-export const PUZZLE_PROGRESS_STORAGE_KEY = 'fun_chess_puzzle_progress_v2';
+export interface UnifiedProgressPayload {
+  readonly version: number;
+  readonly exportedAt: number;
+  readonly clientVersion?: string;
+  readonly scenarios: ScenarioProgressMap;
+  readonly puzzles: PuzzleProgress;
+}
 
-export const DEFAULT_ADAPTIVE_RATING: AdaptiveRatingState = {
-  rating: 800,
-  ratingDeviation: 350,
-  peakRating: 800,
-  totalAttempted: 0,
-  totalSolved: 0,
-  bestStreak: 0,
-  ratingHistory: [],
-};
+export type SyncMergeStrategy = 'smart_merge' | 'replace_local' | 'keep_local';
 
-export const DEFAULT_PUZZLE_PROGRESS: PuzzleProgress = {
-  ratingProfile: DEFAULT_ADAPTIVE_RATING,
-  themeMastery: {} as any,
-  arcadeStats: {
-    puzzleRushHighScore: 0,
-    puzzleRushBestStreak: 0,
-    streakSurvivorHighScore: 0,
-    totalRushRuns: 0,
-  },
-  solvedPuzzles: {},
-  createdAt: Date.now(),
-  lastActiveAt: Date.now(),
-};
+export interface ProgressStorage {
+  getUnifiedProgress(): Promise<UnifiedProgressPayload>;
+  saveUnifiedProgress(payload: UnifiedProgressPayload): Promise<void>;
+}
+```
 
-export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
-  private memoryCache: PuzzleProgress;
-  private readonly storageKey: string;
+### Step 2: Pure Calculation Engine (`shared/src/sync/progress_merge_engine.ts`)
 
-  constructor(storageKey: string = PUZZLE_PROGRESS_STORAGE_KEY) {
-    this.storageKey = storageKey;
-    this.memoryCache = { ...DEFAULT_PUZZLE_PROGRESS };
+```typescript
+import type { UnifiedProgressPayload, SyncMergeStrategy } from '../contracts/sync.contract.js';
+
+/**
+ * Pure function performing deterministic smart merge of user progress.
+ * Adheres to Rule 2 (Zero side effects, zero I/O).
+ */
+export function mergeUnifiedProgress(
+  local: UnifiedProgressPayload,
+  incoming: UnifiedProgressPayload,
+  strategy: SyncMergeStrategy
+): UnifiedProgressPayload {
+  if (strategy === 'keep_local') {
+    return { ...local };
+  }
+  if (strategy === 'replace_local') {
+    return { ...incoming };
   }
 
-  private isStorageAvailable(): boolean {
-    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-      return false;
-    }
-    try {
-      const testKey = `__fc_puz_test_${Date.now()}__`;
-      window.localStorage.setItem(testKey, '1');
-      window.localStorage.removeItem(testKey);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private sanitizeProgress(raw: unknown): PuzzleProgress {
-    if (!raw || typeof raw !== 'object') return { ...DEFAULT_PUZZLE_PROGRESS };
-    const data = raw as Record<string, any>;
-
-    const ratingProfile: AdaptiveRatingState = {
-      rating: typeof data.ratingProfile?.rating === 'number' ? Math.max(500, data.ratingProfile.rating) : 800,
-      ratingDeviation: typeof data.ratingProfile?.ratingDeviation === 'number' ? data.ratingProfile.ratingDeviation : 350,
-      peakRating: typeof data.ratingProfile?.peakRating === 'number' ? data.ratingProfile.peakRating : 800,
-      totalAttempted: typeof data.ratingProfile?.totalAttempted === 'number' ? data.ratingProfile.totalAttempted : 0,
-      totalSolved: typeof data.ratingProfile?.totalSolved === 'number' ? data.ratingProfile.totalSolved : 0,
-      bestStreak: typeof data.ratingProfile?.bestStreak === 'number' ? data.ratingProfile.bestStreak : 0,
-      ratingHistory: Array.isArray(data.ratingProfile?.ratingHistory) ? data.ratingProfile.ratingHistory : [],
-    };
-
-    return {
-      ratingProfile,
-      themeMastery: typeof data.themeMastery === 'object' && data.themeMastery !== null ? data.themeMastery : {},
-      arcadeStats: {
-        puzzleRushHighScore: Number(data.arcadeStats?.puzzleRushHighScore) || 0,
-        puzzleRushBestStreak: Number(data.arcadeStats?.puzzleRushBestStreak) || 0,
-        streakSurvivorHighScore: Number(data.arcadeStats?.streakSurvivorHighScore) || 0,
-        totalRushRuns: Number(data.arcadeStats?.totalRushRuns) || 0,
-      },
-      solvedPuzzles: typeof data.solvedPuzzles === 'object' && data.solvedPuzzles !== null ? data.solvedPuzzles : {},
-      createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
-      lastActiveAt: Date.now(),
-    };
-  }
-
-  public async getProgress(): Promise<PuzzleProgress> {
-    if (!this.isStorageAvailable()) {
-      return { ...this.memoryCache };
-    }
-
-    try {
-      const raw = window.localStorage.getItem(this.storageKey);
-      if (!raw) return { ...DEFAULT_PUZZLE_PROGRESS };
-      const parsed = JSON.parse(raw);
-      this.memoryCache = this.sanitizeProgress(parsed);
-      return { ...this.memoryCache };
-    } catch {
-      return { ...this.memoryCache };
-    }
-  }
-
-  public async updateRating(newRatingState: AdaptiveRatingState): Promise<void> {
-    const current = await this.getProgress();
-    current.ratingProfile = newRatingState;
-    current.lastActiveAt = Date.now();
-    await this.persist(current);
-  }
-
-  public async recordPuzzleAttempt(
-    puzzleId: string,
-    theme: PuzzleTheme,
-    result: PuzzleAttemptResult,
-    stars: StarRating
-  ): Promise<PuzzleProgress> {
-    const current = await this.getProgress();
-    const isSuccess = result.startsWith('solved');
-
-    // Update solved records
-    if (isSuccess) {
-      const existing = current.solvedPuzzles[puzzleId];
-      current.solvedPuzzles[puzzleId] = {
-        stars: existing ? (Math.max(existing.stars, stars) as StarRating) : stars,
-        solvedAt: Date.now(),
+  // --- 1. Scenarios Union ---
+  const mergedScenarios: UnifiedProgressPayload['scenarios'] = { ...local.scenarios };
+  for (const [id, incomingSc] of Object.entries(incoming.scenarios)) {
+    const existing = mergedScenarios[id];
+    if (!existing) {
+      mergedScenarios[id] = { ...incomingSc };
+    } else {
+      mergedScenarios[id] = {
+        scenarioId: id,
+        starsEarned: Math.max(existing.starsEarned, incomingSc.starsEarned) as 1 | 2 | 3,
+        attemptsCount: existing.attemptsCount + incomingSc.attemptsCount,
+        hintsUsedTotal: existing.hintsUsedTotal + incomingSc.hintsUsedTotal,
+        firstCompletedAt: Math.min(existing.firstCompletedAt, incomingSc.firstCompletedAt),
+        lastCompletedAt: Math.max(existing.lastCompletedAt, incomingSc.lastCompletedAt),
       };
     }
-
-    // Update theme mastery
-    const existingTheme = current.themeMastery[theme] || {
-      theme,
-      attempted: 0,
-      solved: 0,
-      starsEarned: 0,
-      masteryLevel: 'novice',
-      lastPracticedAt: Date.now(),
-    };
-
-    const newSolved = existingTheme.solved + (isSuccess ? 1 : 0);
-    const newAttempted = existingTheme.attempted + 1;
-    const masteryLevel = newSolved >= 20 ? 'master' : newSolved >= 8 ? 'apprentice' : 'novice';
-
-    current.themeMastery[theme] = {
-      theme,
-      attempted: newAttempted,
-      solved: newSolved,
-      starsEarned: existingTheme.starsEarned + (isSuccess ? stars : 0),
-      masteryLevel,
-      lastPracticedAt: Date.now(),
-    };
-
-    current.lastActiveAt = Date.now();
-    await this.persist(current);
-    return { ...current };
   }
 
-  public async saveArcadeResult(
-    mode: 'puzzle_rush' | 'streak_survivor',
-    score: number,
-    streak: number
-  ): Promise<PuzzleProgress> {
-    const current = await this.getProgress();
-    if (mode === 'puzzle_rush') {
-      current.arcadeStats.puzzleRushHighScore = Math.max(current.arcadeStats.puzzleRushHighScore, score);
-      current.arcadeStats.puzzleRushBestStreak = Math.max(current.arcadeStats.puzzleRushBestStreak, streak);
-      current.arcadeStats.totalRushRuns += 1;
+  // --- 2. Puzzle Ratings & Arcade Merge ---
+  const mergedRating = Math.max(local.puzzles.ratingProfile.rating, incoming.puzzles.ratingProfile.rating);
+  const mergedPeak = Math.max(
+    local.puzzles.ratingProfile.peakRating,
+    incoming.puzzles.ratingProfile.peakRating,
+    mergedRating
+  );
+  const mergedRd = Math.min(
+    local.puzzles.ratingProfile.ratingDeviation,
+    incoming.puzzles.ratingProfile.ratingDeviation
+  );
+
+  const mergedSolvedPuzzles = { ...local.puzzles.solvedPuzzles };
+  for (const [id, incSolve] of Object.entries(incoming.puzzles.solvedPuzzles)) {
+    const existing = mergedSolvedPuzzles[id];
+    if (!existing) {
+      mergedSolvedPuzzles[id] = { ...incSolve };
     } else {
-      current.arcadeStats.streakSurvivorHighScore = Math.max(current.arcadeStats.streakSurvivorHighScore, score);
-    }
-    current.lastActiveAt = Date.now();
-    await this.persist(current);
-    return { ...current };
-  }
-
-  public async resetAll(): Promise<void> {
-    this.memoryCache = { ...DEFAULT_PUZZLE_PROGRESS, createdAt: Date.now(), lastActiveAt: Date.now() };
-    if (this.isStorageAvailable()) {
-      try {
-        window.localStorage.removeItem(this.storageKey);
-      } catch {
-        // Safe ignore
-      }
+      mergedSolvedPuzzles[id] = {
+        stars: Math.max(existing.stars, incSolve.stars) as 1 | 2 | 3,
+        solvedAt: Math.min(existing.solvedAt, incSolve.solvedAt),
+      };
     }
   }
-
-  private async persist(data: PuzzleProgress): Promise<void> {
-    this.memoryCache = { ...data };
-    if (this.isStorageAvailable()) {
-      try {
-        window.localStorage.setItem(this.storageKey, JSON.stringify(data));
-      } catch {
-        // Fallback safely preserved in memoryCache
-      }
-    }
-  }
-}
-
-export const defaultLocalStoragePuzzleProgressStore = new LocalStoragePuzzleProgressStore();
-```
-
----
-
-### 3.3 Composable Injection Pattern: `usePuzzleProgress`
-
-```typescript
-// apps/client/src/features/puzzles/composables/usePuzzleProgress.ts
-import { ref, computed, readonly } from 'vue';
-import type { PuzzleProgress, PuzzleProgressStore, PuzzleTheme, StarRating, PuzzleAttemptResult } from '@fun-chess/shared';
-import { defaultLocalStoragePuzzleProgressStore } from '../store/local_storage_puzzle_progress.store';
-
-export function usePuzzleProgress(customStore?: PuzzleProgressStore) {
-  const store = customStore || defaultLocalStoragePuzzleProgressStore;
-
-  const progress = ref<PuzzleProgress | null>(null);
-  const isLoading = ref<boolean>(false);
-
-  async function loadProgress(): Promise<void> {
-    isLoading.value = true;
-    try {
-      progress.value = await store.getProgress();
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  const currentElo = computed<number>(() => progress.value?.ratingProfile.rating ?? 800);
-  const totalSolvedCount = computed<number>(() => Object.keys(progress.value?.solvedPuzzles ?? {}).length);
-  const rushHighScore = computed<number>(() => progress.value?.arcadeStats.puzzleRushHighScore ?? 0);
-
-  function getThemeMastery(theme: PuzzleTheme) {
-    return progress.value?.themeMastery[theme] ?? null;
-  }
-
-  async function recordAttempt(puzzleId: string, theme: PuzzleTheme, result: PuzzleAttemptResult, stars: StarRating) {
-    const updated = await store.recordPuzzleAttempt(puzzleId, theme, result, stars);
-    progress.value = updated;
-    return updated;
-  }
-
-  // Auto-load on setup
-  loadProgress();
 
   return {
-    progress: readonly(progress),
-    isLoading: readonly(isLoading),
-    currentElo,
-    totalSolvedCount,
-    rushHighScore,
-    loadProgress,
-    getThemeMastery,
-    recordAttempt,
-    resetAll: async () => {
-      await store.resetAll();
-      await loadProgress();
+    version: local.version,
+    exportedAt: Date.now(),
+    scenarios: mergedScenarios,
+    puzzles: {
+      ...local.puzzles,
+      ratingProfile: {
+        ...local.puzzles.ratingProfile,
+        rating: mergedRating,
+        peakRating: mergedPeak,
+        ratingDeviation: mergedRd,
+        totalAttempted: local.puzzles.ratingProfile.totalAttempted + incoming.puzzles.ratingProfile.totalAttempted,
+        totalSolved: local.puzzles.ratingProfile.totalSolved + incoming.puzzles.ratingProfile.totalSolved,
+        bestStreak: Math.max(local.puzzles.ratingProfile.bestStreak, incoming.puzzles.ratingProfile.bestStreak),
+      },
+      arcadeStats: {
+        puzzleRushHighScore: Math.max(
+          local.puzzles.arcadeStats.puzzleRushHighScore,
+          incoming.puzzles.arcadeStats.puzzleRushHighScore
+        ),
+        puzzleRushBestStreak: Math.max(
+          local.puzzles.arcadeStats.puzzleRushBestStreak,
+          incoming.puzzles.arcadeStats.puzzleRushBestStreak
+        ),
+        streakSurvivorHighScore: Math.max(
+          local.puzzles.arcadeStats.streakSurvivorHighScore,
+          incoming.puzzles.arcadeStats.streakSurvivorHighScore
+        ),
+        totalRushRuns: local.puzzles.arcadeStats.totalRushRuns + incoming.puzzles.arcadeStats.totalRushRuns,
+      },
+      solvedPuzzles: mergedSolvedPuzzles,
+      lastActiveAt: Math.max(local.puzzles.lastActiveAt, incoming.puzzles.lastActiveAt, Date.now()),
     },
   };
 }
 ```
 
----
-
-## 4. Pure Business Logic Engine Conventions
-
-Engines live in `features/puzzles/engine/` and must strictly follow these invariants:
-1. **Zero External I/O:** No network, no localStorage, no timers inside calculations.
-2. **Immutable Returns:** Functions return new objects, never mutating arguments in place.
-3. **100% Coverage Target:** Every mathematical branch and edge case must be unit-tested.
-
-### 4.1 Adaptive Elo Engine Implementation (`engine/adaptive_rating.ts`)
+### Step 3: Production Storage Adapter (`apps/client/src/features/progress_sync/store/local_storage_unified.store.ts`)
 
 ```typescript
-import type { RatingAdjustmentParams, RatingAdjustmentResult } from '@fun-chess/shared';
+import type { ProgressStorage, UnifiedProgressPayload } from '@fun-chess/shared';
+import { LocalStorageProgressStore } from '../../scenarios/store/local_storage_progress.store.js';
+import { LocalStoragePuzzleProgressStore } from '../../puzzles/store/local_storage_puzzle_store.js';
 
-const MIN_ELO_FLOOR = 500;
-const BASE_K_FACTOR = 32;
+export class LocalStorageUnifiedStore implements ProgressStorage {
+  constructor(
+    private readonly scenarioStore = new LocalStorageProgressStore(),
+    private readonly puzzleStore = new LocalStoragePuzzleProgressStore()
+  ) {}
 
-/**
- * Pure calculation for child-calibrated Elo progression.
- */
-export function calculateAdaptiveRatingAdjustment(params: RatingAdjustmentParams): RatingAdjustmentResult {
-  const { playerRating, puzzleRating, isSuccess, hintsUsed, currentStreak } = params;
+  public async getUnifiedProgress(): Promise<UnifiedProgressPayload> {
+    const [scenarios, puzzles] = await Promise.all([
+      this.scenarioStore.getProgressMap(),
+      this.puzzleStore.getProgress(),
+    ]);
 
-  // Expected win probability (logistic curve)
-  const exponent = (puzzleRating - playerRating) / 400;
-  const expectedOutcome = 1 / (1 + Math.pow(10, exponent));
-  const actualOutcome = isSuccess ? 1 : 0;
-
-  // Raw Elo delta
-  let rawDelta = Math.round(BASE_K_FACTOR * (actualOutcome - expectedOutcome));
-
-  // Non-punitive hint damping for young learners
-  if (isSuccess && hintsUsed > 0) {
-    const hintPenalty = hintsUsed === 1 ? 0.75 : hintsUsed === 2 ? 0.5 : 0.25;
-    rawDelta = Math.max(2, Math.round(rawDelta * hintPenalty));
-  } else if (!isSuccess) {
-    // Reduce loss penalty when child was exploring / learning
-    rawDelta = Math.max(-12, Math.round(rawDelta * 0.6));
+    return {
+      version: 1,
+      exportedAt: Date.now(),
+      scenarios,
+      puzzles,
+    };
   }
 
-  // Streak bonus on consecutive clean solves (0 hints)
-  let streakBonus = 0;
-  if (isSuccess && hintsUsed === 0 && currentStreak >= 3) {
-    streakBonus = Math.min(10, currentStreak * 2);
+  public async saveUnifiedProgress(payload: UnifiedProgressPayload): Promise<void> {
+    // 1. Reset and rewrite scenario records
+    await this.scenarioStore.resetAllProgress();
+    for (const [id, sc] of Object.entries(payload.scenarios)) {
+      await this.scenarioStore.saveProgress(id, sc.starsEarned, sc.hintsUsedTotal);
+    }
+
+    // 2. Persist updated puzzle progress
+    await this.puzzleStore.updateRating(payload.puzzles.ratingProfile);
   }
-
-  const finalDelta = isSuccess ? rawDelta + streakBonus : rawDelta;
-  const targetRating = playerRating + finalDelta;
-
-  const isProtectedByFloor = targetRating < MIN_ELO_FLOOR;
-  const newRating = Math.max(MIN_ELO_FLOOR, targetRating);
-
-  // Volatility decay
-  const newRd = Math.max(80, Math.round(params.playerRd * 0.95));
-
-  return {
-    newRating,
-    newRd,
-    delta: newRating - playerRating,
-    streakBonus,
-    isProtectedByFloor,
-  };
-}
-
-/**
- * Selects optimal puzzle target rating aiming for ~70% win-rate for positive reinforcement.
- */
-export function selectTargetPuzzleRating(currentRating: number, streak: number): number {
-  if (streak >= 4) {
-    // Challenge child when on a hot streak (+50 to +100 ELO)
-    return currentRating + 50 + Math.min(50, (streak - 3) * 15);
-  }
-  if (streak <= -2) {
-    // Confidence builder when struggling (-50 to -100 ELO)
-    return Math.max(MIN_ELO_FLOOR, currentRating - 60);
-  }
-  // Standard comfort zone (-30 to +20 ELO)
-  return Math.max(MIN_ELO_FLOOR, currentRating - 20);
 }
 ```
 
----
-
-## 5. Component Organization & Visual Craft Conventions
-
-All UI components must adhere to the **Playful Gamified Tactile Arcade Aesthetic** validated in `.agentwork/findings-ux-craftsman.md`.
-
-### 5.1 Design Tokens & 3D Tactile Styling
-1. **Buttons:** Must use 3D bevels with spring easing:
-   ```css
-   .btn-tactile {
-     border-bottom: 5px solid var(--color-shadow);
-     border-radius: var(--radius-lg);
-     transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast);
-   }
-   .btn-tactile:active {
-     transform: translateY(3px);
-     border-bottom-width: 2px;
-   }
-   ```
-2. **Color Palette Mapping:**
-   - **Tactical Drills:** Violet / Indigo Theme (`--color-primary`)
-   - **Adaptive Ladder:** Sunshine Gold (`--academy-gold`, `#ffb300`)
-   - **Puzzle Rush:** Flame Coral / Orange (`#ff5722`)
-   - **Streak Survivor:** Emerald Mint (`#22c55e`)
-3. **Touch Targets & Ergonomics:**
-   - Minimum button height: **48px** (touch target compliance).
-   - Board squares: Responsive CSS grid with minimum 40px dimensions on mobile.
-4. **Accessibility (`aria-*`):**
-   - Live announcements for strikes, time warnings, and streak combos using `role="status"` and `aria-live="polite"`.
-   - Modals must support `Escape` key dismissal and focus trapping.
-
----
-
-## 6. Offline Data Pack Standards
-
-The offline library consists of ~300–500 curated CC0 puzzles organized into modular bundles:
+### Step 4: In-Memory Test Double (`apps/client/src/features/progress_sync/store/in_memory_unified.store.mock.ts`)
 
 ```typescript
-// apps/client/src/features/puzzles/data/packs/novice_puzzles.ts
-import type { Puzzle } from '@fun-chess/shared';
+import type { ProgressStorage, UnifiedProgressPayload } from '@fun-chess/shared';
 
-export const NOVICE_PUZZLES: readonly Puzzle[] = [
-  {
-    id: 'nov_mate_001',
-    fen: 'r1bqkb1r/pppp1ppp/2n5/4p3/2B1n3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 4',
-    moves: ['f3f7'],
-    rating: 700,
-    ratingDeviation: 120,
-    themes: ['mate_in_1', 'scholars_mate'],
-    primaryTheme: 'mate_in_1',
-    difficulty: 'novice',
-    title: "Scholar's Mate Finish! 👑",
-    subtitle: 'Deliver checkmate on the weak f7 square',
-    playerColor: 'w',
-    solutionPlies: 1,
-  },
-  // Additional curated positions...
-];
+export class InMemoryUnifiedStoreMock implements ProgressStorage {
+  private data: UnifiedProgressPayload;
+
+  constructor(initialData: UnifiedProgressPayload) {
+    this.data = JSON.parse(JSON.stringify(initialData));
+  }
+
+  public async getUnifiedProgress(): Promise<UnifiedProgressPayload> {
+    return JSON.parse(JSON.stringify(this.data));
+  }
+
+  public async saveUnifiedProgress(payload: UnifiedProgressPayload): Promise<void> {
+    this.data = JSON.parse(JSON.stringify(payload));
+  }
+}
 ```
 
-### Pack Invariant Verification (`data/__tests__/pack_integrity.spec.ts`)
-Every puzzle pack must be verified at test time:
-1. `fen` must successfully load in `chess.js` without throwing.
-2. Every move in `moves` array must be a valid, legal UCI move advancing the position.
-3. Checkmate puzzles must result in `chess.isCheckmate() === true` on the final move.
-4. All `themes` must be valid members of `PuzzleTheme` union.
+### Step 5: Unit Test with AAA Pattern (`shared/src/__tests__/progress_merge_engine.spec.ts`)
 
----
+```typescript
+import { describe, it, expect } from 'vitest';
+import { mergeUnifiedProgress } from '../sync/progress_merge_engine.js';
+import type { UnifiedProgressPayload } from '../contracts/sync.contract.js';
 
-## 7. Public API Barriers (`index.ts`)
+describe('ProgressMergeEngine Unit Tests', () => {
+  const createMockPayload = (elo: number, rushScore: number): UnifiedProgressPayload => ({
+    version: 1,
+    exportedAt: 1000,
+    scenarios: {
+      'lesson-1': {
+        scenarioId: 'lesson-1',
+        starsEarned: 2,
+        attemptsCount: 1,
+        hintsUsedTotal: 0,
+        firstCompletedAt: 1000,
+        lastCompletedAt: 1000,
+      },
+    },
+    puzzles: {
+      ratingProfile: {
+        rating: elo,
+        ratingDeviation: 100,
+        peakRating: elo,
+        totalAttempted: 10,
+        totalSolved: 8,
+        bestStreak: 5,
+        ratingHistory: [],
+      },
+      themeMastery: {},
+      arcadeStats: {
+        puzzleRushHighScore: rushScore,
+        puzzleRushBestStreak: 4,
+        streakSurvivorHighScore: 3,
+        totalRushRuns: 2,
+      },
+      solvedPuzzles: {},
+      createdAt: 1000,
+      lastActiveAt: 1000,
+    },
+  });
 
-To maintain clean module boundaries and avoid circular dependencies (`code-organization-principles.md`):
-- `apps/client/src/features/puzzles/index.ts` exports ONLY:
-  - `PuzzleArena` (Root component)
-  - `usePuzzleProgress`, `usePuzzleRunner`, `useAdaptiveLadder`, `usePuzzleRush`
-  - Selected public types from `@fun-chess/shared`
-- Internal engine files and raw store adapters are NOT imported directly outside `features/puzzles/`.
+  it('should take Math.max for Elo rating and arcade high scores in smart_merge mode', () => {
+    // Arrange
+    const local = createMockPayload(1200, 15);
+    const incoming = createMockPayload(1450, 8);
+
+    // Act
+    const result = mergeUnifiedProgress(local, incoming, 'smart_merge');
+
+    // Assert
+    expect(result.puzzles.ratingProfile.rating).toBe(1450);
+    expect(result.puzzles.arcadeStats.puzzleRushHighScore).toBe(15);
+    expect(result.puzzles.ratingProfile.totalAttempted).toBe(20);
+    expect(result.puzzles.ratingProfile.totalSolved).toBe(16);
+  });
+});
+```

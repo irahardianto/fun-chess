@@ -6,4 +6,4 @@ export type {
   RushSolveResult,
   RushStrikeResult,
   PuzzleRushRules,
-} from './puzzle.js';
+} from "./puzzle.js";

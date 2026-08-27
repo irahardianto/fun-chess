@@ -2,4 +2,4 @@ export type {
   RatingAdjustmentParams,
   RatingAdjustmentResult,
   AdaptiveRatingCalculator,
-} from './puzzle.js';
+} from "./puzzle.js";
