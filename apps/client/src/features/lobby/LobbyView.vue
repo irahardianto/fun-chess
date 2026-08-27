@@ -18,6 +18,7 @@ import { ScenarioCategoryList } from '../scenarios/components';
 import { PuzzleHubView } from '../puzzles/components';
 import { useLanDiscovery } from '../../composables/useLanDiscovery';
 import { useScenarioProgress } from '../scenarios/composables/useScenarioProgress';
+import { useNetworkStatus } from '../pwa/composables/useNetworkStatus';
 import type { PuzzleTheme } from '@fun-chess/shared';
 
 interface Props {
@@ -55,6 +56,8 @@ const emit = defineEmits<{
   'launch-ladder': [];
   launchRush: [subMode?: 'puzzle_rush' | 'streak_survivor'];
   'launch-rush': [subMode?: 'puzzle_rush' | 'streak_survivor'];
+  openSync: [];
+  'open-sync': [];
 }>();
 
 const avatars = ['🦁', '🚀', '🦄', '⚡', '👑', '🐼'] as const;
@@ -74,6 +77,7 @@ watch(
 
 const { serverLanInfo, activeLanIp } = useLanDiscovery();
 const scenarioProgress = useScenarioProgress();
+const { isOffline } = useNetworkStatus();
 
 const activeProgressMap = computed(() => {
   return props.progressMap ?? scenarioProgress.progressMap.value;
@@ -175,6 +179,21 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
       <div class="logo-badge" aria-hidden="true">♟️✨</div>
       <h1 class="lobby-title">Fun Chess!</h1>
       <p class="lobby-subtitle">Play, Learn, and Master Chess with Friends & AI!</p>
+
+      <div class="lobby-header-badges">
+        <span v-if="isOffline" class="offline-badge-pill" data-testid="lobby-offline-badge">
+          ✈️ 100% Offline Mode
+        </span>
+        <button
+          type="button"
+          class="quick-sync-btn"
+          data-testid="lobby-quick-sync-btn"
+          title="Sync & Backup Progress"
+          @click="emit('openSync'); emit('open-sync')"
+        >
+          <span aria-hidden="true">🔄</span> Save & Sync
+        </button>
+      </div>
     </header>
 
     <!-- 4-Way Mode Switcher Tabs -->
@@ -332,6 +351,55 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   font-size: var(--text-lg);
   color: var(--text-muted);
   font-weight: var(--weight-semibold);
+}
+
+.lobby-header-badges {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.offline-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill, 9999px);
+  background-color: var(--status-offline-bg, rgba(245, 158, 11, 0.16));
+  border: 1.5px solid var(--status-offline, #f59e0b);
+  color: var(--status-offline-text, #fef3c7);
+  font-family: var(--font-display);
+  font-size: var(--text-xs, 12px);
+  font-weight: var(--weight-bold, 700);
+}
+
+.quick-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill, 9999px);
+  background-color: var(--bg-surface-raised, #28284e);
+  border: 1.5px solid var(--border-medium, rgba(255, 255, 255, 0.16));
+  color: var(--text-primary, #f8fafc);
+  font-family: var(--font-display);
+  font-size: var(--text-xs, 12px);
+  font-weight: var(--weight-bold, 700);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+}
+
+.quick-sync-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-primary, #7c3aed);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.quick-sync-btn:active {
+  transform: translateY(0);
 }
 
 .mode-panel {

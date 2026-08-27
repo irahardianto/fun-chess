@@ -125,6 +125,46 @@
   --focus-ring:           0 0 0 3px hsl(var(--color-primary-h, 255) 85% 60% / 0.45);
 
   /* --------------------------------------------------------------------------
+     PWA & SYNC SPECIFIC TOKENS (DESIGN-UX-PWA-SYNC-002)
+     -------------------------------------------------------------------------- */
+  /* Status Colors */
+  --status-offline:        #f59e0b; /* Warm Amber Reassurance */
+  --status-offline-bg:     rgba(245, 158, 11, 0.14);
+  --status-offline-border: #f59e0b;
+  --status-offline-text:   #78350f;
+
+  --status-online:         #10b981; /* Emerald Green */
+  --status-online-glow:    rgba(16, 185, 129, 0.40);
+
+  /* QR Scanner Viewport & Laser */
+  --qr-scanner-bg:          #000000;
+  --qr-reticle-color:       #10b981; /* Emerald Laser */
+  --qr-reticle-glow:        0 0 16px rgba(16, 185, 129, 0.85);
+  --qr-laser-line:          linear-gradient(90deg, transparent, #10b981 30%, #34d399 50%, #10b981 70%, transparent);
+  --qr-corner-border:       3px solid #10b981;
+
+  /* Sync Conflict Stats Highlight */
+  --stat-better-bg:         rgba(16, 185, 129, 0.18);
+  --stat-better-border:     #10b981;
+  --stat-better-text:       #34d399;
+  --stat-better-badge:      #059669;
+
+  --stat-neutral-bg:        rgba(148, 163, 184, 0.10);
+  --stat-neutral-border:    rgba(148, 163, 184, 0.25);
+  --stat-neutral-text:      #94a3b8;
+
+  /* Drag & Drop File Zone */
+  --dropzone-bg:            rgba(124, 58, 237, 0.06);
+  --dropzone-bg-active:     rgba(124, 58, 237, 0.16);
+  --dropzone-border:        2px dashed var(--color-primary);
+  --dropzone-border-active: 2px dashed #a78bfa;
+
+  /* QR Version 12 Canvas Frame */
+  --qr-canvas-bg:           #ffffff; /* Must remain pure white for optical barcode contrast */
+  --qr-canvas-border:       4px solid #1e1e38;
+  --qr-canvas-shadow:       0 8px 24px rgba(0, 0, 0, 0.25);
+
+  /* --------------------------------------------------------------------------
      CHESS BOARD & GAME SPECIFIC TOKENS
      -------------------------------------------------------------------------- */
   /* Warm Sand & Rich Caramel Wood (Kid-Friendly Warm Classic) */
@@ -405,6 +445,11 @@
   --mode-rush-border:   hsl(21, 50%, 36%);
   --hint-meter-empty:   hsl(225, 15%, 28%);
   --strike-empty:       hsl(225, 15%, 28%);
+
+  /* Status Offline Dark Overrides */
+  --status-offline-bg:     rgba(245, 158, 11, 0.16);
+  --status-offline-border: #f59e0b;
+  --status-offline-text:   #fef3c7;
 }
 
 /* --------------------------------------------------------------------------
@@ -545,6 +590,7 @@
   --duration-pulse:   1400ms;
 
   /* Layer Z-Index Hierarchy (Zero-CLS Architecture) */
+  --z-base:                1;
   --z-board-base:          1;
   --z-board-piece:         5;
   --z-board-indicator:     8;
@@ -552,6 +598,8 @@
   --z-overlay-guide:       15;
   --z-overlay-dialogue:    20;
   --z-overlay-alert:       30;
+  --z-floating-indicator:  40;  /* OfflineIndicator pill */
+  --z-pwa-banner:          45;  /* PwaInstallBanner */
   --z-modal-backdrop:      50;
   --z-modal-card:          60;
   --z-global-notification: 100;
@@ -833,6 +881,62 @@
   100% {
     stroke-dashoffset: 0;
     opacity: 1;
+  }
+}
+
+/* 1. Laser Reticle Scanline Sweep */
+@keyframes laser-sweep {
+  0% {
+    top: 15%;
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1.0;
+    filter: drop-shadow(0 0 8px #10b981);
+  }
+  100% {
+    top: 85%;
+    opacity: 0.85;
+  }
+}
+
+/* 2. Floating Pill Entry Animation */
+@keyframes float-pill-in {
+  0% {
+    transform: translateY(-24px) scale(0.92);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 3. Sync Success Beacon & Pulse */
+@keyframes sync-success-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 16px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+/* 4. Dropzone Active Drag Pulse */
+@keyframes dropzone-glow {
+  0%, 100% {
+    border-color: var(--color-primary);
+    background-color: rgba(124, 58, 237, 0.08);
+  }
+  50% {
+    border-color: #a78bfa;
+    background-color: rgba(124, 58, 237, 0.20);
   }
 }
 

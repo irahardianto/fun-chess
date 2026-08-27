@@ -1,0 +1,28 @@
+{
+  "name": "Fun Chess! ♟️✨",
+  "short_name": "FunChess",
+  "description": "Kid-friendly, offline-first chess academy and tactical puzzles with smart progress sync!",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#1e1e38",
+  "background_color": "#0f0f1b",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

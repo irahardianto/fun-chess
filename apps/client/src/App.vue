@@ -15,6 +15,18 @@ import { SoloAiArena } from '@/features/ai';
 import { ScenarioArena } from '@/features/scenarios';
 import { PuzzleArena, PuzzleRushArena } from '@/features/puzzles';
 import { PromotionModal, GameOverModal, RematchModal } from '@/features/modals';
+import {
+  OfflineIndicator,
+  PwaInstallBanner,
+  PwaInstallModal,
+  usePwaInstall,
+  useNetworkStatus,
+} from '@/features/pwa';
+import {
+  ProgressSyncModal,
+  ProgressConflictModal,
+  useProgressSync,
+} from '@/features/portability';
 import { useSocket, useChessGame, useAudio, useConfetti } from '@/composables';
 import type { PuzzleTheme } from '@fun-chess/shared';
 
@@ -100,6 +112,29 @@ const { celebrate } = useConfetti();
 
 // --- LAN Info State ---
 const lanInfo = ref<LanInfoResponse | null>(null);
+
+// --- PWA & Offline Experience ---
+useNetworkStatus();
+const {
+  canInstall,
+  isStandalone,
+  promptInstall,
+  snoozePrompt,
+  isInstallModalOpen,
+  showInstallBanner,
+} = usePwaInstall();
+
+// --- Progress Portability & Sync ---
+const {
+  isSyncModalOpen,
+  isConflictModalOpen,
+  diffPreview,
+  currentProgress,
+  incomingPayload,
+  openSyncModal,
+  closeConflictModal,
+  executeMerge,
+} = useProgressSync();
 
 // --- App Shell Routing State ---
 const currentAppMode = ref<AppGameMode>('lobby');
@@ -497,6 +532,9 @@ function handleLeaveRoom() {
 
 <template>
   <div class="app-shell" data-testid="app-shell">
+    <!-- Reassuring Offline Status Pill -->
+    <OfflineIndicator />
+
     <!-- Top Global App Bar -->
     <header class="app-navbar">
       <button
@@ -535,6 +573,33 @@ function handleLeaveRoom() {
 
       <!-- Quick Action Controls -->
       <div class="navbar-actions">
+        <!-- PWA Install Pill (Mobile/Desktop) -->
+        <BaseButton
+          v-if="canInstall && !isStandalone"
+          variant="primary"
+          size="sm"
+          data-testid="pwa-install-btn"
+          class="nav-install-btn"
+          aria-label="Install App"
+          @click="promptInstall"
+        >
+          <template #icon-left>📲</template>
+          Install App
+        </BaseButton>
+
+        <!-- Save & Progress Sync Button -->
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          data-testid="save-sync-btn"
+          class="nav-icon-btn"
+          aria-label="Save & Sync Progress"
+          title="Save & Sync Progress"
+          @click="openSyncModal"
+        >
+          <template #icon>⚙️</template>
+        </BaseButton>
+
         <BaseButton
           variant="ghost"
           size="sm"
@@ -848,6 +913,8 @@ function handleLeaveRoom() {
         @launch-drills="handleLaunchDrills"
         @launch-ladder="handleLaunchLadder"
         @launch-rush="handleLaunchRush"
+        @open-sync="openSyncModal"
+        @openSync="openSyncModal"
       />
     </main>
 
@@ -885,6 +952,31 @@ function handleLeaveRoom() {
       :requester-name="rematchRequestedBy?.requesterName || 'Opponent'"
       @accept="handleAcceptRematch"
       @decline="handleDeclineRematch"
+    />
+
+    <!-- 5. Progress Portability Sync Modal -->
+    <ProgressSyncModal v-model="isSyncModalOpen" />
+
+    <!-- 6. Progress Conflict Resolution Modal -->
+    <ProgressConflictModal
+      v-model="isConflictModalOpen"
+      :current-progress="currentProgress"
+      :incoming-progress="incomingPayload"
+      :diff-preview="diffPreview"
+      @resolve="executeMerge"
+      @merge="executeMerge('smart_merge')"
+      @replace="executeMerge('replace_local')"
+      @cancel="closeConflictModal"
+    />
+
+    <!-- 7. PWA Install Modal (iOS / Manual Guide) -->
+    <PwaInstallModal v-model="isInstallModalOpen" />
+
+    <!-- 8. Floating PWA Install CTA Banner -->
+    <PwaInstallBanner
+      v-if="showInstallBanner"
+      @install="promptInstall"
+      @dismiss="snoozePrompt"
     />
   </div>
 </template>
@@ -1035,8 +1127,20 @@ function handleLeaveRoom() {
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
+}
+
+.nav-install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  animation: float-bounce 3s infinite ease-in-out;
 }
 
 .nav-icon-btn {

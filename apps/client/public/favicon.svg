@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#28284e" />
+      <stop offset="100%" stop-color="#0f0f1b" />
+    </linearGradient>
+    <linearGradient id="knightGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#7c3aed" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  <!-- Background Rounded Shield -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#bgGrad)" stroke="#7c3aed" stroke-width="2.5" />
+  <!-- Fun Chess Knight (Playful SVG) -->
+  <g filter="url(#glow)" transform="translate(6, 6) scale(0.8125)">
+    <!-- Base -->
+    <path d="M14 54h36c0-3-4-5-8-6H22c-4 1-8 3-8 6z" fill="#f59e0b" />
+    <!-- Body & Mane -->
+    <path d="M20 48c0-8 4-14 8-18-6-2-12-8-12-16 0-1 1-2 2-2h4c2 0 4 2 6 5 2-4 6-7 12-8 3 0 5 2 5 5 0 2-1 4-2 6 4 2 8 6 9 12 1 6-2 11-6 16H20z" fill="url(#knightGrad)" stroke="#1e1e38" stroke-width="1.5"/>
+    <!-- Eye -->
+    <circle cx="28" cy="22" r="2.5" fill="#1e1e38" />
+    <circle cx="27" cy="21" r="0.8" fill="#ffffff" />
+    <!-- Playful Star ✨ -->
+    <path d="M48 10l1.8 3.8 4.2.6-3 3 .7 4.2-3.7-2-3.7 2 .7-4.2-3-3 4.2-.6z" fill="#f59e0b" stroke="#ffffff" stroke-width="0.8"/>
+  </g>
+</svg>
