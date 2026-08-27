@@ -6,8 +6,9 @@ defineProps<{
 
 <template>
   <div
+    class="move-indicator-ring"
     :class="[
-      isCapture ? 'capture-target-ring' : 'valid-move-dot',
+      isCapture ? 'capture-target-ring' : 'valid-move-ring',
     ]"
     data-testid="move-indicator"
     :data-type="isCapture ? 'capture' : 'valid'"
@@ -15,20 +16,9 @@ defineProps<{
 </template>
 
 <style scoped>
-.valid-move-dot {
-  width: 32%;
-  height: 32%;
-  border-radius: var(--radius-pill);
-  background-color: var(--highlight-valid-dot);
-  box-shadow: var(--glow-valid-move);
-  animation: pulse-valid-dot var(--duration-pulse) infinite ease-in-out;
-  pointer-events: none;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
+.move-indicator-ring,
+.valid-move-ring,
+.valid-move-dot,
 .capture-target-ring {
   position: absolute;
   inset: 6%;
@@ -37,5 +27,6 @@ defineProps<{
   animation: pulse-capture-ring 1.1s infinite ease-in-out;
   border: 4px solid var(--highlight-capture-ring);
   box-shadow: 0 0 10px var(--highlight-capture-ring);
+  box-sizing: border-box;
 }
 </style>

@@ -63,7 +63,8 @@ describe('ChessSquare.vue', () => {
       },
     });
     expect(wrapperValid.find('[data-testid="move-indicator"]').exists()).toBe(true);
-    expect(wrapperValid.find('.valid-move-dot').exists()).toBe(true);
+    expect(wrapperValid.find('.move-indicator-ring').exists()).toBe(true);
+    expect(wrapperValid.find('.valid-move-ring').exists()).toBe(true);
 
     const wrapperCapture = mount(ChessSquare, {
       props: {
@@ -72,6 +73,7 @@ describe('ChessSquare.vue', () => {
         isCaptureTarget: true,
       },
     });
+    expect(wrapperCapture.find('.move-indicator-ring').exists()).toBe(true);
     expect(wrapperCapture.find('.capture-target-ring').exists()).toBe(true);
   });
 

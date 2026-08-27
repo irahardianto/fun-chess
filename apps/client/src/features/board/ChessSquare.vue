@@ -148,7 +148,7 @@ function handleDragOver(event: DragEvent) {
 
     <!-- Move Indicator -->
     <MoveIndicator
-      v-if="(props.isValidMove && !props.hasPiece && !capturableState) || capturableState"
+      v-if="props.isValidMove || capturableState"
       :is-capture="capturableState"
     />
 
@@ -224,23 +224,18 @@ function handleDragOver(event: DragEvent) {
   pointer-events: none;
 }
 
-.valid-move-dot {
-  position: absolute;
-  width: 32%;
-  height: 32%;
-  border-radius: var(--radius-pill);
-  background-color: var(--highlight-valid-dot);
-  box-shadow: var(--glow-valid-move);
-  animation: pulse-valid-dot var(--duration-pulse) infinite ease-in-out;
-  pointer-events: none;
-}
-
+.move-indicator-ring,
+.valid-move-ring,
+.valid-move-dot,
 .capture-target-ring {
   position: absolute;
   inset: 6%;
   border-radius: var(--radius-md);
   pointer-events: none;
   animation: pulse-capture-ring 1.1s infinite ease-in-out;
+  border: 4px solid var(--highlight-capture-ring);
+  box-shadow: 0 0 10px var(--highlight-capture-ring);
+  box-sizing: border-box;
 }
 
 .square-coord {

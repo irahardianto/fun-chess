@@ -160,14 +160,6 @@ function isLegalMove(sq: Square): boolean {
 function isCapturableSquare(sq: Square, piece: { type: PieceType; color: PieceColor } | null): boolean {
   if (!isLegalMove(sq)) return false;
   if (piece && piece.color !== props.turn) return true;
-
-  if (props.selectedSquare) {
-    const selectedFile = props.selectedSquare.charAt(0);
-    const sqFile = sq.charAt(0);
-    if (selectedFile !== sqFile && !piece) {
-      return true;
-    }
-  }
   return false;
 }
 
