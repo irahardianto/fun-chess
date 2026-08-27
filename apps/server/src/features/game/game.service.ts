@@ -379,8 +379,12 @@ export class GameService {
     const whitePlayer = room.whitePlayer;
     const blackPlayer = room.blackPlayer;
 
-    if (whitePlayer) whitePlayer.color = "b";
-    if (blackPlayer) blackPlayer.color = "w";
+    if (!whitePlayer || !blackPlayer || !whitePlayer.isConnected || !blackPlayer.isConnected) {
+      throw new GameNotActiveError("Both players must be connected to start a rematch");
+    }
+
+    whitePlayer.color = "b";
+    blackPlayer.color = "w";
 
     room.whitePlayer = blackPlayer;
     room.blackPlayer = whitePlayer;
