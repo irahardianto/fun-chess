@@ -2,8 +2,7 @@
 
 A modern, playful, and responsive web-based chess application designed for kids, parents, and friends. Featuring local LAN multiplayer, kid-friendly AI mascots, interactive tactic puzzles, progressive drills, step-by-step curriculum scenarios, and seamless offline PWA support.
 
-Zero mandatory cloud accounts, zero database tracking — 100% private, accessible, and fast.
-
+Zero database, zero accounts, zero public internet required — 100% private, accessible, and fast!
 ---
 
 ## ✨ Features & Game Modes
@@ -38,32 +37,6 @@ Zero mandatory cloud accounts, zero database tracking — 100% private, accessib
 - **Standardized Visual Hints:** High-visibility red rounded square indicators for all valid moves and capture targets.
 - **Zero-Asset Web Audio Synthesizer:** Procedural Web Audio API sound effects (move thuds, capture pops, check chimes, victory fanfare) with 0ms latency and zero asset downloads.
 - **Celebrations:** Responsive canvas confetti cannons on victory and milestones!
-
----
-
-## 🏗️ Architecture
-
-Fun Chess is organized as a modular TypeScript monorepo with strict vertical slices and contract-driven architecture:
-
-```mermaid
-graph TD
-    Client["apps/client (Vue 3 + Vite + Pinia)"]
-    Server["apps/server (Node.js + Socket.io)"]
-    Shared["shared (@fun-chess/shared)"]
-
-    Client --> Shared
-    Server --> Shared
-
-    subgraph Client Features
-        Board["features/board (ChessBoard, Squares, Indicators)"]
-        AI["features/ai (Minimax, Mascots, Solo Arena)"]
-        Puzzles["features/puzzles (Rush, Drills, Adaptive, Hints)"]
-        Scenarios["features/scenarios (Curriculum & Guide Overlays)"]
-        Lobby["features/lobby (Multiplayer LAN, Room Codes, QR)"]
-        Portability["features/portability (QR Sync & Progress Store)"]
-        PWA["features/pwa (Service Worker, Network Status)"]
-    end
-```
 
 ---
 
