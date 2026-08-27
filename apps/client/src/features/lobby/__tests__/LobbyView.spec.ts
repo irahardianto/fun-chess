@@ -160,5 +160,40 @@ describe('LobbyView.vue', () => {
       },
     ]);
   });
+
+  it('implements ARIA APG roving tabindex and arrow key navigation for avatar picker', async () => {
+    const wrapper = mount(LobbyView);
+
+    const lionBtn = wrapper.find('[data-testid="lobby-avatar-option-🦁"]');
+    const rocketBtn = wrapper.find('[data-testid="lobby-avatar-option-🚀"]');
+    const unicornBtn = wrapper.find('[data-testid="lobby-avatar-option-🦄"]');
+    const pandaBtn = wrapper.find('[data-testid="lobby-avatar-option-🐼"]');
+
+    // Initially 🦁 is selected (tabindex 0), others have -1
+    expect(lionBtn.attributes('tabindex')).toBe('0');
+    expect(rocketBtn.attributes('tabindex')).toBe('-1');
+
+    // ArrowRight -> selects 🚀
+    await lionBtn.trigger('keydown', { key: 'ArrowRight' });
+    expect(rocketBtn.classes()).toContain('is-selected');
+    expect(rocketBtn.attributes('tabindex')).toBe('0');
+    expect(lionBtn.attributes('tabindex')).toBe('-1');
+
+    // ArrowRight -> selects 🦄
+    await rocketBtn.trigger('keydown', { key: 'ArrowRight' });
+    expect(unicornBtn.classes()).toContain('is-selected');
+
+    // ArrowLeft -> back to 🚀
+    await unicornBtn.trigger('keydown', { key: 'ArrowLeft' });
+    expect(rocketBtn.classes()).toContain('is-selected');
+
+    // End -> selects 🐼 (last avatar)
+    await rocketBtn.trigger('keydown', { key: 'End' });
+    expect(pandaBtn.classes()).toContain('is-selected');
+
+    // Home -> selects 🦁 (first avatar)
+    await pandaBtn.trigger('keydown', { key: 'Home' });
+    expect(lionBtn.classes()).toContain('is-selected');
+  });
 });
 

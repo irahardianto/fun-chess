@@ -90,6 +90,35 @@ function selectAvatar(avatar: string) {
   }
 }
 
+function handleAvatarKeyDown(event: KeyboardEvent, currentEmoji: string) {
+  const avatars = PLAYER_AVATARS as readonly string[];
+  const currentIndex = avatars.indexOf(currentEmoji);
+  let nextIndex = currentIndex;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    nextIndex = (currentIndex + 1) % avatars.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    nextIndex = (currentIndex - 1 + avatars.length) % avatars.length;
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    nextIndex = avatars.length - 1;
+  } else {
+    return;
+  }
+
+  const nextEmoji = avatars[nextIndex];
+  if (nextEmoji) {
+    selectAvatar(nextEmoji);
+    const el = document.querySelector<HTMLButtonElement>(`[data-testid="lobby-avatar-option-${nextEmoji}"]`);
+    el?.focus();
+  }
+}
+
 const activeMode = ref<AppGameMode>(
   props.initialMode === 'lobby' ? 'multiplayer_lan' : props.initialMode || 'multiplayer_lan'
 );
@@ -286,10 +315,12 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
             class="avatar-option-btn"
             :class="{ 'is-selected': selectedAvatar === emoji }"
             :aria-checked="selectedAvatar === emoji"
+            :tabindex="selectedAvatar === emoji ? 0 : -1"
             :aria-label="`Select ${emoji} avatar`"
             :data-testid="`lobby-avatar-option-${emoji}`"
             role="radio"
             @click="selectAvatar(emoji)"
+            @keydown="handleAvatarKeyDown($event, emoji)"
           >
             {{ emoji }}
           </button>
@@ -478,7 +509,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
 }
 
 .quick-install-btn:active {
-  transform: translateY(0);
+  transform: scale(0.96);
 }
 
 .quick-sync-btn {
@@ -514,7 +545,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
 }
 
 .quick-sync-btn:active {
-  transform: translateY(0);
+  transform: scale(0.96);
 }
 
 .mode-panel {
@@ -596,11 +627,19 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
 }
 
+.avatar-option-btn:active {
+  transform: scale(0.96);
+}
+
 .avatar-option-btn.is-selected {
   border-color: var(--color-accent);
   background-color: var(--color-accent-subtle);
   transform: translateY(-2px) scale(1.12);
   box-shadow: 0 0 0 2px var(--color-accent), var(--shadow-btn-accent, 0 3px 0 rgba(245, 130, 32, 0.45));
+}
+
+.avatar-option-btn.is-selected:active {
+  transform: scale(0.96);
 }
 
 .lobby-actions-grid {

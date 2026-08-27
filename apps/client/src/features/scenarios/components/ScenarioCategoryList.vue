@@ -301,9 +301,14 @@ function getSectionStats(section: CurriculumSection) {
   font-family: var(--font-display);
   font-weight: var(--weight-bold);
   font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
   padding: 4px 14px;
   border-radius: var(--radius-pill);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.star-counter-text {
+  font-variant-numeric: tabular-nums;
 }
 
 .star-gold-glyph {
@@ -341,6 +346,7 @@ function getSectionStats(section: CurriculumSection) {
   font-family: var(--font-body);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
   color: rgba(255, 255, 255, 0.85);
 }
 
@@ -474,6 +480,7 @@ function getSectionStats(section: CurriculumSection) {
   font-family: var(--font-display);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
   background: var(--bg-surface-raised);

@@ -305,7 +305,7 @@ function handleThemeSelected(theme: PuzzleTheme) {
 .stat-meta {
   display: flex;
   flex-direction: column;
-  text-align: left;
+  text-align: start;
 }
 
 .stat-value {

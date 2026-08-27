@@ -174,7 +174,7 @@ function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  text-align: left;
+  text-align: start;
   line-height: 1.15;
 }
 

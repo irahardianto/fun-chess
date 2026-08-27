@@ -31,28 +31,28 @@ describe('ThemeDrillSelector.vue', () => {
     expect(wrapper.find('[data-testid="theme-card-fork"]').exists()).toBe(false);
   });
 
-  it('emits selectTheme on clicking a theme card', async () => {
+  it('emits selectTheme on clicking the practice drill button', async () => {
     const wrapper = mount(ThemeDrillSelector);
-    const forkCard = wrapper.find('[data-testid="theme-card-fork"]');
-    await forkCard.trigger('click');
+    const drillBtn = wrapper.find('[data-testid="practice-drill-btn-fork"]');
+    expect(drillBtn.exists()).toBe(true);
+    await drillBtn.trigger('click');
 
     expect(wrapper.emitted('selectTheme')).toBeTruthy();
     expect(wrapper.emitted('selectTheme')![0]).toEqual(['fork']);
   });
 
-  it('supports keyboard selection with role="button", tabindex="0", Enter, and Space keys', async () => {
+  it('renders theme card as accessible region and supports decoupled practice drill button', async () => {
     const wrapper = mount(ThemeDrillSelector);
     const forkCard = wrapper.find('[data-testid="theme-card-fork"]');
+    const drillBtn = wrapper.find('[data-testid="practice-drill-btn-fork"]');
 
-    expect(forkCard.attributes('role')).toBe('button');
-    expect(forkCard.attributes('tabindex')).toBe('0');
-    expect(forkCard.attributes('aria-label')).toBe('Select Royal Forks 🍴 tactical drill');
+    expect(forkCard.attributes('role')).toBe('region');
+    expect(forkCard.attributes('aria-label')).toBe('Royal Forks 🍴 tactical drill');
+    expect(drillBtn.exists()).toBe(true);
+    expect(drillBtn.text()).toContain('Practice Drill');
 
-    await forkCard.trigger('keydown.enter');
+    await drillBtn.trigger('click');
     expect(wrapper.emitted('selectTheme')?.[0]).toEqual(['fork']);
-
-    await forkCard.trigger('keydown.space');
-    expect(wrapper.emitted('selectTheme')?.[1]).toEqual(['fork']);
   });
 
   describe('Theme Concept Primer Modal Flow', () => {

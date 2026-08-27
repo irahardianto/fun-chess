@@ -70,6 +70,63 @@ const colorOptions: Array<{ id: PieceColor | 'random'; label: string; icon: stri
   { id: 'b', label: 'Play Black', icon: '⚫' },
 ];
 
+function handleAvatarKeyDown(event: KeyboardEvent, currentEmoji: string) {
+  const avatars = PLAYER_AVATARS as readonly string[];
+  const currentIndex = avatars.indexOf(currentEmoji);
+  let nextIndex = currentIndex;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    nextIndex = (currentIndex + 1) % avatars.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    nextIndex = (currentIndex - 1 + avatars.length) % avatars.length;
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    nextIndex = avatars.length - 1;
+  } else {
+    return;
+  }
+
+  const nextEmoji = avatars[nextIndex];
+  if (nextEmoji) {
+    selectAvatar(nextEmoji);
+    const el = document.querySelector<HTMLButtonElement>(`[data-testid="avatar-option-${nextEmoji}"]`);
+    el?.focus();
+  }
+}
+
+function handleColorKeyDown(event: KeyboardEvent, currentColorId: PieceColor | 'random') {
+  const currentIndex = colorOptions.findIndex((opt) => opt.id === currentColorId);
+  let nextIndex = currentIndex;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    nextIndex = (currentIndex + 1) % colorOptions.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    nextIndex = (currentIndex - 1 + colorOptions.length) % colorOptions.length;
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    nextIndex = colorOptions.length - 1;
+  } else {
+    return;
+  }
+
+  const nextOpt = colorOptions[nextIndex];
+  if (nextOpt) {
+    chosenColor.value = nextOpt.id;
+    const el = document.querySelector<HTMLButtonElement>(`[data-testid="color-option-${nextOpt.id}"]`);
+    el?.focus();
+  }
+}
+
 function handleSelectMascot(mascot: MascotPersona) {
   emit('select', mascot.id);
   emit('start', {
@@ -105,10 +162,12 @@ function getMascotColorClass(id: MascotId): string {
             class="avatar-option-btn"
             :class="{ 'is-selected': selectedAvatar === emoji }"
             :aria-checked="selectedAvatar === emoji"
+            :tabindex="selectedAvatar === emoji ? 0 : -1"
             :aria-label="`Select ${emoji} avatar`"
             :data-testid="`avatar-option-${emoji}`"
             role="radio"
             @click="selectAvatar(emoji)"
+            @keydown="handleAvatarKeyDown($event, emoji)"
           >
             {{ emoji }}
           </button>
@@ -116,15 +175,20 @@ function getMascotColorClass(id: MascotId): string {
       </div>
 
       <!-- Player Color Preference Segmented Control -->
-      <div class="color-picker-control" role="group" aria-label="Select Piece Color">
+      <div class="color-picker-control" role="radiogroup" aria-label="Select Piece Color">
         <button
           v-for="opt in colorOptions"
           :key="opt.id"
           type="button"
           class="color-option-btn"
           :class="{ 'is-selected': chosenColor === opt.id }"
-          :aria-pressed="chosenColor === opt.id"
+          :aria-checked="chosenColor === opt.id"
+          :tabindex="chosenColor === opt.id ? 0 : -1"
+          :aria-label="opt.label"
+          :data-testid="`color-option-${opt.id}`"
+          role="radio"
           @click="chosenColor = opt.id"
+          @keydown="handleColorKeyDown($event, opt.id)"
         >
           <span class="color-option-icon" aria-hidden="true">{{ opt.icon }}</span>
           <span class="color-option-label">{{ opt.label }}</span>
@@ -294,11 +358,19 @@ function getMascotColorClass(id: MascotId): string {
   box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
 }
 
+.avatar-option-btn:active {
+  transform: scale(0.96);
+}
+
 .avatar-option-btn.is-selected {
   border-color: var(--color-accent);
   background-color: var(--color-accent-subtle);
   transform: translateY(-2px) scale(1.12);
   box-shadow: 0 0 0 2px var(--color-accent), var(--shadow-btn-accent, 0 3px 0 rgba(245, 130, 32, 0.45));
+}
+
+.avatar-option-btn.is-selected:active {
+  transform: scale(0.96);
 }
 
 /* Color Picker Control */
@@ -350,11 +422,19 @@ function getMascotColorClass(id: MascotId): string {
   box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
 }
 
+.color-option-btn:active {
+  transform: scale(0.96);
+}
+
 .color-option-btn.is-selected {
   background-color: var(--color-primary);
   color: var(--text-on-primary, #ffffff);
   box-shadow: 0 3px 0 var(--color-primary-bevel, hsl(255, 70%, 45%)), var(--shadow-sm);
   transform: scale(1.02);
+}
+
+.color-option-btn.is-selected:active {
+  transform: scale(0.96);
 }
 
 .color-option-icon {

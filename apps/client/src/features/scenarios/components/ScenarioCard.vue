@@ -174,7 +174,7 @@ function handlePlay() {
 
 .diff-pill--beginner {
   background-color: var(--cat-fundamentals-bg);
-  color: var(--cat-fundamentals);
+  color: var(--cat-fundamentals-text, var(--cat-fundamentals));
 }
 
 .diff-pill--intermediate {
@@ -189,7 +189,7 @@ function handlePlay() {
 
 [data-theme='dark'] .diff-pill--beginner {
   background-color: var(--cat-fundamentals-bg);
-  color: var(--color-success-text);
+  color: var(--cat-fundamentals-text, var(--color-success-text, #34d399));
 }
 
 [data-theme='dark'] .diff-pill--intermediate {

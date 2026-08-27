@@ -38,7 +38,7 @@ describe('AiOpponentSelect.vue', () => {
     expect(cards.length).toBe(4);
   });
 
-  it('renders color option buttons (White, Random, Black) with White selected by default', () => {
+  it('renders color option buttons (White, Random, Black) with White selected by default and roving tabindex', () => {
     const wrapper = mount(AiOpponentSelect);
 
     const colorButtons = wrapper.findAll('.color-option-btn');
@@ -50,22 +50,94 @@ describe('AiOpponentSelect.vue', () => {
 
     // Default selected is White
     expect(colorButtons[0]?.classes()).toContain('is-selected');
-    expect(colorButtons[0]?.attributes('aria-pressed')).toBe('true');
+    expect(colorButtons[0]?.attributes('aria-checked')).toBe('true');
+    expect(colorButtons[0]?.attributes('tabindex')).toBe('0');
+    expect(colorButtons[1]?.attributes('tabindex')).toBe('-1');
+    expect(colorButtons[2]?.attributes('tabindex')).toBe('-1');
   });
 
-  it('allows player to toggle color preference', async () => {
+  it('allows player to toggle color preference and updates aria-checked and tabindex', async () => {
     const wrapper = mount(AiOpponentSelect);
     const colorButtons = wrapper.findAll('.color-option-btn');
 
     // Click "Random Side"
     await colorButtons[1]?.trigger('click');
     expect(colorButtons[1]?.classes()).toContain('is-selected');
+    expect(colorButtons[1]?.attributes('aria-checked')).toBe('true');
+    expect(colorButtons[1]?.attributes('tabindex')).toBe('0');
     expect(colorButtons[0]?.classes()).not.toContain('is-selected');
+    expect(colorButtons[0]?.attributes('tabindex')).toBe('-1');
 
     // Click "Play Black"
     await colorButtons[2]?.trigger('click');
     expect(colorButtons[2]?.classes()).toContain('is-selected');
+    expect(colorButtons[2]?.attributes('aria-checked')).toBe('true');
+    expect(colorButtons[2]?.attributes('tabindex')).toBe('0');
     expect(colorButtons[1]?.classes()).not.toContain('is-selected');
+    expect(colorButtons[1]?.attributes('tabindex')).toBe('-1');
+  });
+
+  it('supports roving tabindex keyboard navigation on color options', async () => {
+    const wrapper = mount(AiOpponentSelect);
+
+    const whiteBtn = wrapper.find('[data-testid="color-option-w"]');
+    const randomBtn = wrapper.find('[data-testid="color-option-random"]');
+    const blackBtn = wrapper.find('[data-testid="color-option-b"]');
+
+    expect(whiteBtn.attributes('aria-checked')).toBe('true');
+
+    // ArrowRight -> selects random
+    await whiteBtn.trigger('keydown', { key: 'ArrowRight' });
+    expect(randomBtn.attributes('aria-checked')).toBe('true');
+    expect(randomBtn.attributes('tabindex')).toBe('0');
+
+    // ArrowRight -> selects black
+    await randomBtn.trigger('keydown', { key: 'ArrowRight' });
+    expect(blackBtn.attributes('aria-checked')).toBe('true');
+    expect(blackBtn.attributes('tabindex')).toBe('0');
+
+    // ArrowRight -> wraps to white
+    await blackBtn.trigger('keydown', { key: 'ArrowRight' });
+    expect(whiteBtn.attributes('aria-checked')).toBe('true');
+
+    // ArrowLeft -> wraps to black
+    await whiteBtn.trigger('keydown', { key: 'ArrowLeft' });
+    expect(blackBtn.attributes('aria-checked')).toBe('true');
+
+    // Home -> white
+    await blackBtn.trigger('keydown', { key: 'Home' });
+    expect(whiteBtn.attributes('aria-checked')).toBe('true');
+
+    // End -> black
+    await whiteBtn.trigger('keydown', { key: 'End' });
+    expect(blackBtn.attributes('aria-checked')).toBe('true');
+  });
+
+  it('supports roving tabindex keyboard navigation on avatar options', async () => {
+    const wrapper = mount(AiOpponentSelect);
+
+    const lionOption = wrapper.find('[data-testid="avatar-option-🦁"]');
+    const rocketOption = wrapper.find('[data-testid="avatar-option-🚀"]');
+    const pandaOption = wrapper.find('[data-testid="avatar-option-🐼"]');
+
+    expect(lionOption.attributes('tabindex')).toBe('0');
+    expect(rocketOption.attributes('tabindex')).toBe('-1');
+
+    // ArrowRight -> selects rocket
+    await lionOption.trigger('keydown', { key: 'ArrowRight' });
+    expect(rocketOption.classes()).toContain('is-selected');
+    expect(rocketOption.attributes('tabindex')).toBe('0');
+    expect(lionOption.attributes('tabindex')).toBe('-1');
+
+    // End -> selects panda
+    await rocketOption.trigger('keydown', { key: 'End' });
+    expect(pandaOption.classes()).toContain('is-selected');
+    expect(pandaOption.attributes('tabindex')).toBe('0');
+
+    // Home -> selects lion
+    await pandaOption.trigger('keydown', { key: 'Home' });
+    expect(lionOption.classes()).toContain('is-selected');
+    expect(lionOption.attributes('tabindex')).toBe('0');
   });
 
   it('renders all 6 avatar emoji options with 🦁 selected by default', () => {

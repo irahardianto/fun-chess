@@ -177,17 +177,13 @@ function handleCategoryKeyDown(
       <BaseCard
         v-for="desc in filteredThemes"
         :key="desc.id"
-        variant="interactive"
+        variant="default"
         padding="md"
         class="theme-drill-card"
         :class="{ 'is-selected': props.selectedTheme === desc.id }"
         :data-testid="`theme-card-${desc.id}`"
-        role="button"
-        tabindex="0"
-        :aria-label="`Select ${desc.name} tactical drill`"
-        @click="handleSelect(desc.id)"
-        @keydown.enter.prevent="handleSelect(desc.id)"
-        @keydown.space.prevent="handleSelect(desc.id)"
+        role="region"
+        :aria-label="`${desc.name} tactical drill`"
       >
         <div class="card-top-row">
           <span class="theme-icon-badge">{{ desc.icon }}</span>
@@ -197,7 +193,7 @@ function handleCategoryKeyDown(
               class="primer-info-btn"
               :data-testid="`theme-primer-btn-${desc.id}`"
               aria-label="View Concept Primer"
-              @click.stop="openPrimer(desc)"
+              @click="openPrimer(desc)"
             >
               📖 Primer
             </button>
@@ -230,6 +226,20 @@ function handleCategoryKeyDown(
             }}
             Solved)
           </span>
+        </div>
+
+        <div class="card-actions">
+          <BaseButton
+            variant="primary"
+            size="sm"
+            full-width
+            class="practice-drill-btn"
+            :data-testid="`practice-drill-btn-${desc.id}`"
+            @click="handleSelect(desc.id)"
+          >
+            <template #icon-left>🎯</template>
+            Practice Drill
+          </BaseButton>
         </div>
       </BaseCard>
     </div>
@@ -376,7 +386,6 @@ function handleCategoryKeyDown(
 }
 
 .theme-drill-card {
-  cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -425,7 +434,9 @@ function handleCategoryKeyDown(
   color: var(--color-primary);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all var(--duration-fast) ease;
+  transition: transform var(--duration-fast) ease,
+              background-color var(--duration-fast) ease,
+              color var(--duration-fast) ease;
 }
 
 .primer-info-btn:hover {
@@ -482,6 +493,10 @@ function handleCategoryKeyDown(
   border-top: 1px solid var(--border-subtle);
 }
 
+.card-actions {
+  margin-top: var(--space-2);
+}
+
 .mastery-level-tag {
   font-family: var(--font-display);
   font-size: var(--text-xs);
@@ -504,7 +519,7 @@ function handleCategoryKeyDown(
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  text-align: left;
+  text-align: start;
 }
 
 .primer-header-row {

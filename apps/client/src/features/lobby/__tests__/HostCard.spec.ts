@@ -23,7 +23,7 @@ describe('HostCard.vue (Accessibility & Interactions)', () => {
     expect(hostBtn.text()).toContain('Host Game');
   });
 
-  it('selects preferred piece color using radio options and updates aria-checked', async () => {
+  it('selects preferred piece color using radio options and updates aria-checked and tabindex', async () => {
     const wrapper = mount(HostCard);
 
     const whiteBtn = wrapper.find('[data-testid="color-white-btn"]');
@@ -31,15 +31,55 @@ describe('HostCard.vue (Accessibility & Interactions)', () => {
     const blackBtn = wrapper.find('[data-testid="color-black-btn"]');
 
     expect(randomBtn.attributes('aria-checked')).toBe('true');
+    expect(randomBtn.attributes('tabindex')).toBe('0');
     expect(whiteBtn.attributes('aria-checked')).toBe('false');
+    expect(whiteBtn.attributes('tabindex')).toBe('-1');
+    expect(blackBtn.attributes('tabindex')).toBe('-1');
 
     await whiteBtn.trigger('click');
     expect(whiteBtn.attributes('aria-checked')).toBe('true');
+    expect(whiteBtn.attributes('tabindex')).toBe('0');
     expect(randomBtn.attributes('aria-checked')).toBe('false');
+    expect(randomBtn.attributes('tabindex')).toBe('-1');
 
     await blackBtn.trigger('click');
     expect(blackBtn.attributes('aria-checked')).toBe('true');
+    expect(blackBtn.attributes('tabindex')).toBe('0');
     expect(whiteBtn.attributes('aria-checked')).toBe('false');
+    expect(whiteBtn.attributes('tabindex')).toBe('-1');
+  });
+
+  it('supports roving tabindex keyboard navigation with Arrow keys, Home, and End', async () => {
+    const wrapper = mount(HostCard);
+
+    const randomBtn = wrapper.find('[data-testid="color-random-btn"]');
+    const whiteBtn = wrapper.find('[data-testid="color-white-btn"]');
+    const blackBtn = wrapper.find('[data-testid="color-black-btn"]');
+
+    // Initially random (index 1) is selected
+    expect(randomBtn.attributes('aria-checked')).toBe('true');
+
+    // Press ArrowRight -> moves to black (index 2)
+    await randomBtn.trigger('keydown', { key: 'ArrowRight' });
+    expect(blackBtn.attributes('aria-checked')).toBe('true');
+    expect(blackBtn.attributes('tabindex')).toBe('0');
+
+    // Press ArrowRight -> wraps to white (index 0)
+    await blackBtn.trigger('keydown', { key: 'ArrowRight' });
+    expect(whiteBtn.attributes('aria-checked')).toBe('true');
+    expect(whiteBtn.attributes('tabindex')).toBe('0');
+
+    // Press ArrowLeft -> wraps to black (index 2)
+    await whiteBtn.trigger('keydown', { key: 'ArrowLeft' });
+    expect(blackBtn.attributes('aria-checked')).toBe('true');
+
+    // Press Home -> moves to white (index 0)
+    await blackBtn.trigger('keydown', { key: 'Home' });
+    expect(whiteBtn.attributes('aria-checked')).toBe('true');
+
+    // Press End -> moves to black (index 2)
+    await whiteBtn.trigger('keydown', { key: 'End' });
+    expect(blackBtn.attributes('aria-checked')).toBe('true');
   });
 
   it('validates empty nickname and shows error with aria-invalid on input', async () => {

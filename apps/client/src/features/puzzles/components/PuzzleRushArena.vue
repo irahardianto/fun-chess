@@ -554,7 +554,7 @@ defineExpose({
   border: 1.5px solid var(--border-subtle, #e2e8f0);
   border-radius: var(--radius-md, 12px);
   padding: var(--space-2, 8px) var(--space-3, 12px);
-  text-align: left;
+  text-align: start;
 }
 
 .stat-pill-icon {

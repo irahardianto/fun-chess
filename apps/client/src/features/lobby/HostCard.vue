@@ -14,6 +14,41 @@ const hostNickname = ref('');
 const preferredColor = ref<'w' | 'b' | 'random'>('random');
 const errorMsg = ref('');
 
+const colorOptions: readonly ('w' | 'random' | 'b')[] = ['w', 'random', 'b'];
+
+function onColorKeyDown(event: KeyboardEvent, currentColor: 'w' | 'random' | 'b') {
+  const currentIndex = colorOptions.indexOf(currentColor);
+  let nextIndex = currentIndex;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    nextIndex = (currentIndex + 1) % colorOptions.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    nextIndex = (currentIndex - 1 + colorOptions.length) % colorOptions.length;
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    nextIndex = colorOptions.length - 1;
+  } else {
+    return;
+  }
+
+  const nextColor = colorOptions[nextIndex];
+  if (nextColor) {
+    preferredColor.value = nextColor;
+    const btnMap: Record<'w' | 'random' | 'b', string> = {
+      w: 'color-white-btn',
+      random: 'color-random-btn',
+      b: 'color-black-btn',
+    };
+    const el = document.querySelector<HTMLButtonElement>(`[data-testid="${btnMap[nextColor]}"]`);
+    el?.focus();
+  }
+}
+
 function onHostSubmit() {
   const name = hostNickname.value.trim();
   if (!name) {
@@ -55,9 +90,11 @@ function onHostSubmit() {
             :class="{ 'is-selected': preferredColor === 'w' }"
             role="radio"
             :aria-checked="preferredColor === 'w'"
+            :tabindex="preferredColor === 'w' ? 0 : -1"
             aria-label="Play as white (first move)"
             data-testid="color-white-btn"
             @click="preferredColor = 'w'"
+            @keydown="onColorKeyDown($event, 'w')"
           >
             <span class="color-option-icon" aria-hidden="true">⚪</span>
             <span class="color-option-label">White</span>
@@ -69,9 +106,11 @@ function onHostSubmit() {
             :class="{ 'is-selected': preferredColor === 'random' }"
             role="radio"
             :aria-checked="preferredColor === 'random'"
+            :tabindex="preferredColor === 'random' ? 0 : -1"
             aria-label="Play as random color (surprise me)"
             data-testid="color-random-btn"
             @click="preferredColor = 'random'"
+            @keydown="onColorKeyDown($event, 'random')"
           >
             <span class="color-option-icon" aria-hidden="true">🎲</span>
             <span class="color-option-label">Random</span>
@@ -83,9 +122,11 @@ function onHostSubmit() {
             :class="{ 'is-selected': preferredColor === 'b' }"
             role="radio"
             :aria-checked="preferredColor === 'b'"
+            :tabindex="preferredColor === 'b' ? 0 : -1"
             aria-label="Play as black (defend)"
             data-testid="color-black-btn"
             @click="preferredColor = 'b'"
+            @keydown="onColorKeyDown($event, 'b')"
           >
             <span class="color-option-icon" aria-hidden="true">⚫</span>
             <span class="color-option-label">Black</span>
@@ -212,6 +253,10 @@ function onHostSubmit() {
   box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
 }
 
+.color-option-btn:active {
+  transform: scale(0.96);
+}
+
 .color-option-btn.is-selected {
   background-color: var(--color-primary);
   color: var(--text-on-primary, #ffffff);
@@ -220,7 +265,7 @@ function onHostSubmit() {
 }
 
 .color-option-btn.is-selected:active {
-  transform: translateY(2px) scale(0.98);
+  transform: scale(0.96);
 }
 
 .color-option-icon {

@@ -733,7 +733,9 @@ onUnmounted(() => {
   opacity: 0.25;
   filter: grayscale(1);
   transform: scale(0.9);
-  transition: all var(--duration-normal, 240ms) var(--ease-spring);
+  transition: transform var(--duration-normal, 240ms) var(--ease-spring),
+              opacity var(--duration-normal, 240ms) ease,
+              filter var(--duration-normal, 240ms) ease;
 }
 
 .star-item.is-earned,
@@ -909,7 +911,7 @@ onUnmounted(() => {
   border-radius: var(--radius-xl, 22px);
   padding: var(--space-4, 16px);
   width: 100%;
-  text-align: left;
+  text-align: start;
   box-sizing: border-box;
 }
 
@@ -1044,7 +1046,10 @@ onUnmounted(() => {
   color: var(--text-main, #0f172a);
   cursor: pointer;
   font-size: 0.9rem;
-  transition: all var(--duration-fast, 140ms) ease;
+  transition: transform var(--duration-fast, 140ms) ease,
+              background-color var(--duration-fast, 140ms) ease,
+              border-color var(--duration-fast, 140ms) ease,
+              color var(--duration-fast, 140ms) ease;
 }
 
 .replay-control-btn:hover:not(:disabled) {
@@ -1069,7 +1074,7 @@ onUnmounted(() => {
   border-radius: var(--radius-lg, 16px);
   padding: var(--space-2, 8px) var(--space-3, 12px);
   box-sizing: border-box;
-  text-align: left;
+  text-align: start;
 }
 
 .explanation-icon {
@@ -1108,7 +1113,7 @@ onUnmounted(() => {
   border: 1px solid var(--border-subtle, #e2e8f0);
   border-radius: var(--radius-md, 12px);
   padding: var(--space-2, 8px);
-  text-align: left;
+  text-align: start;
 }
 
 .metric-icon {
@@ -1150,8 +1155,8 @@ onUnmounted(() => {
 /* Docked Bottom Inspection Bar (When Modal is Minimized) */
 .docked-inspect-bar {
   position: fixed;
-  bottom: 20px;
-  left: 50%;
+  bottom: max(20px, calc(16px + env(safe-area-inset-bottom, 0px)));
+  inset-inline-start: 50%;
   transform: translateX(-50%);
   z-index: var(--z-minimized-dock, 35);
   display: flex;
