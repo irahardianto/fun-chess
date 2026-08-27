@@ -80,6 +80,99 @@ When started, Fun Chess automatically binds to `0.0.0.0` and prints your local W
 ============================================================
 ```
 
+### 4. Run with Docker Compose (Optional)
+```bash
+# Build and run containerized server locally
+docker compose up --build
+```
+
+---
+
+## ☁️ Optional Cloud Deployment (Google Cloud Run)
+
+While Fun Chess is designed primarily for zero-config local LAN play, you can optionally deploy it to **Google Cloud Run** for serverless, publicly accessible multiplayer games with friends over the internet without needing port forwarding or VPNs.
+
+### Why Google Cloud Run?
+- **Serverless & Cost-Effective:** Scales to zero (`min-instances = 0`) when idle — costs $0 when no games are active.
+- **WebSocket Native:** Fully supports Socket.io WebSockets with long-lived connection timeouts (`3600s`).
+- **Zero Database Required:** The authoritative in-memory room store runs entirely inside the container with sub-millisecond move latency.
+
+---
+
+### Deployment Method A: `gcloud` CLI (Quick Deploy)
+
+1. **Build and push container image:**
+   ```bash
+   export GCP_PROJECT_ID="your-gcp-project-id"
+   export REGION="asia-southeast1" # or us-central1, europe-west1, etc.
+   export IMAGE_NAME="gcr.io/${GCP_PROJECT_ID}/fun-chess:latest"
+
+   # Submit build to Google Cloud Build
+   gcloud builds submit --tag ${IMAGE_NAME}
+   ```
+
+2. **Deploy to Cloud Run with Session Affinity & WebSocket Tuning:**
+   ```bash
+   gcloud run deploy fun-chess \
+     --image ${IMAGE_NAME} \
+     --platform managed \
+     --region ${REGION} \
+     --allow-unauthenticated \
+     --port 3000 \
+     --timeout 3600 \
+     --concurrency 100 \
+     --session-affinity \
+     --min-instances 0 \
+     --max-instances 1 \
+     --memory 512Mi \
+     --cpu 1 \
+     --set-env-vars NODE_ENV=production
+   ```
+
+> [!TIP]
+> **Key Deployment Flags:**
+> - `--session-affinity`: Routes WebSocket connections and HTTP requests stickily to ensure multiplayer pairs connect to the same in-memory room.
+> - `--max-instances 1`: Recommended for the zero-database in-memory storage model.
+> - `--timeout 3600`: Keeps WebSocket connections active during extended chess matches without proxy disconnects.
+
+---
+
+### Deployment Method B: Terraform (Infrastructure as Code)
+
+Production-ready Terraform configurations are provided in [`infra/terraform/`](file:///home/irahardianto/works/projects/fun-chess/infra/terraform).
+
+1. **Navigate to Terraform directory:**
+   ```bash
+   cd infra/terraform
+   ```
+
+2. **Configure your variables:**
+   ```bash
+   # Copy sample variable file (never commit terraform.tfvars!)
+   cp terraform.tfvars.example terraform.tfvars
+   ```
+   Edit `terraform.tfvars` with your GCP project ID and container image URI:
+   ```hcl
+   gcp_project_id  = "your-gcp-project-id"
+   container_image = "asia-southeast1-docker.pkg.dev/your-gcp-project-id/fun-chess-repo/fun-chess:latest"
+   gcp_region      = "asia-southeast1"
+   service_name    = "fun-chess"
+   min_instances   = 0
+   max_instances   = 1
+   ```
+
+3. **Initialize and Apply:**
+   ```bash
+   terraform init
+   terraform apply
+   ```
+
+4. **Access your Service:**
+   Terraform will output your public Cloud Run URL (`service_url`). Opening this URL will launch Fun Chess in Cloud Relay mode, automatically generating public invite and QR links for remote friends.
+
+> [!NOTE]
+> For in-depth architecture specifications, Redis scale-out blueprints, health probe contracts, and connection lifecycle details, see [docs/cloud-run-architecture.md](file:///home/irahardianto/works/projects/fun-chess/docs/cloud-run-architecture.md).
+
 ---
 
 ## 🧪 Testing & Verification
