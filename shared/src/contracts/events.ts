@@ -12,11 +12,13 @@ import { SocketErrorPayload } from "./errors.js";
 export interface CreateRoomRequest {
   playerName: string; // 1-20 characters, sanitized
   preferredColor?: "w" | "b" | "random"; // Default: 'random'
+  avatar?: string; // Selected avatar emoji
 }
 
 export interface JoinRoomRequest {
   roomCode: string; // 4-character uppercase alphanumeric
   playerName: string; // 1-20 characters, sanitized
+  avatar?: string; // Selected avatar emoji
 }
 
 export interface ReconnectRequest {

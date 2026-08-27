@@ -89,6 +89,7 @@ export interface Player {
   id: string; // UUID
   socketId: string; // Socket.io connection ID
   name: string; // Nickname
+  avatar?: string; // Selected emoji avatar (e.g. 🦁, 🚀, 🦄, ⚡, 👑, 🐼)
   color: PieceColor; // 'w' or 'b'
   isHost: boolean; // True if created the room
   isConnected: boolean; // Connection status

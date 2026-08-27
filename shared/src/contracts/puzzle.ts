@@ -417,6 +417,8 @@ export interface MoveValidationOutcome {
   readonly isCorrect: boolean;
   /** Whether the complete puzzle solution is now finished */
   readonly isPuzzleComplete: boolean;
+  /** Intermediate FEN string immediately after player's move (before opponent reply) */
+  readonly intermediateFen?: string;
   /** Next FEN string after applying player move and optional bot response */
   readonly nextFen: string;
   /** Automated bot counter-move if puzzle continues */
