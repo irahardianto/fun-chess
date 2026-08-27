@@ -41,7 +41,7 @@ const emit = defineEmits<{
           @click="emit('accept')"
         >
           <template #icon-left>⚔️</template>
-          Accept Rematch
+          Accept rematch
         </BaseButton>
 
         <BaseButton
@@ -51,7 +51,7 @@ const emit = defineEmits<{
           data-testid="decline-rematch-btn"
           @click="emit('decline')"
         >
-          Decline
+          Decline rematch
         </BaseButton>
       </div>
     </div>

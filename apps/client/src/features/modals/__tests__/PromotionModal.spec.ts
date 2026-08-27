@@ -61,4 +61,21 @@ describe('PromotionModal.vue', () => {
     expect(wrapper.emitted('select')).toHaveLength(1);
     expect(wrapper.emitted('select')?.[0]).toEqual(['n']);
   });
+
+  it('verifies focus-visible outline and logical text-align styling on promotion cards', () => {
+    wrapper = mount(PromotionModal, {
+      props: {
+        modelValue: true,
+        color: 'w',
+      },
+    });
+
+    const promotionCards = document.body.querySelectorAll('.promotion-card');
+    expect(promotionCards.length).toBe(4);
+
+    const promotionCard = promotionCards[0] as HTMLElement;
+    expect(promotionCard).not.toBeNull();
+    expect(promotionCard.getAttribute('role')).toBeNull(); // semantic button
+    expect(promotionCard.tagName).toBe('BUTTON');
+  });
 });

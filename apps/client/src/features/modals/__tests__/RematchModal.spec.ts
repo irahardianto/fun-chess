@@ -32,6 +32,7 @@ describe('RematchModal.vue', () => {
 
     const acceptBtn = document.body.querySelector('[data-testid="accept-rematch-btn"]') as HTMLButtonElement;
     expect(acceptBtn).not.toBeNull();
+    expect(acceptBtn.textContent).toContain('Accept rematch');
     acceptBtn.click();
 
     expect(wrapper.emitted('accept')).toHaveLength(1);
@@ -47,6 +48,7 @@ describe('RematchModal.vue', () => {
 
     const declineBtn = document.body.querySelector('[data-testid="decline-rematch-btn"]') as HTMLButtonElement;
     expect(declineBtn).not.toBeNull();
+    expect(declineBtn.textContent).toContain('Decline rematch');
     declineBtn.click();
 
     expect(wrapper.emitted('decline')).toHaveLength(1);

@@ -127,7 +127,7 @@ function handleClose() {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   color-scheme: only light !important;
   forced-color-adjust: none !important;
   transition: transform var(--duration-fast) var(--ease-spring),
@@ -145,6 +145,12 @@ function handleClose() {
 
 .promotion-card:active {
   transform: translateY(4px) scale(0.96);
+}
+
+.promotion-card:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 
 .piece-icon-wrapper {

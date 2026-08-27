@@ -813,8 +813,8 @@ function handleLeaveRoom() {
         >
           <span>🤝 <strong>{{ drawOfferedBy.fromPlayerName }}</strong> offered a peaceful draw!</span>
           <div class="banner-buttons">
-            <BaseButton variant="success" size="sm" @click="handleAcceptDraw">Accept Draw</BaseButton>
-            <BaseButton variant="ghost" size="sm" @click="handleDeclineDraw">Decline</BaseButton>
+            <BaseButton variant="success" size="sm" @click="handleAcceptDraw">Accept draw</BaseButton>
+            <BaseButton variant="ghost" size="sm" @click="handleDeclineDraw">Decline draw</BaseButton>
           </div>
         </div>
 
@@ -1038,6 +1038,7 @@ function handleLeaveRoom() {
   position: absolute;
   top: -120px;
   left: 50%;
+  inset-inline-start: 50%;
   transform: translateX(-50%);
   background-color: var(--color-primary);
   color: var(--text-on-primary, #ffffff);
@@ -1115,7 +1116,7 @@ function handleLeaveRoom() {
 }
 
 .navbar-brand:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
 }
 
 .navbar-brand:focus-visible {
@@ -1167,6 +1168,10 @@ function handleLeaveRoom() {
 
 .room-code-chip:hover {
   transform: scale(1.05);
+}
+
+.room-code-chip:active {
+  transform: scale(0.96);
 }
 
 .room-code-chip:focus-visible {
@@ -1234,6 +1239,11 @@ function handleLeaveRoom() {
   padding: 4px 12px;
   box-sizing: border-box;
   animation: float-bounce 3s infinite ease-in-out;
+  transition: transform var(--duration-fast) var(--ease-spring);
+}
+
+.nav-install-btn:active {
+  transform: scale(0.96);
 }
 
 .nav-icon-btn {
@@ -1244,6 +1254,11 @@ function handleLeaveRoom() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: transform var(--duration-fast, 150ms) var(--ease-spring);
+}
+
+.nav-icon-btn:active {
+  transform: scale(0.96);
 }
 
 .nav-exit-btn {
@@ -1367,11 +1382,15 @@ function handleLeaveRoom() {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  transition: opacity var(--duration-fast, 150ms);
+  transition: opacity var(--duration-fast, 150ms), transform var(--duration-fast, 150ms) var(--ease-spring);
 }
 
 .notification-dismiss-btn:hover {
   opacity: 1;
+}
+
+.notification-dismiss-btn:active {
+  transform: scale(0.96);
 }
 
 .notification-dismiss-btn:focus-visible {

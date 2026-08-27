@@ -201,7 +201,7 @@ describe('ProgressConflictModal.vue', () => {
     expect(wrapper.emitted('resolve')?.[0]).toEqual(['replace_local']);
   });
 
-  it('emits resolve with keep_local on Cancel button click', async () => {
+  it('emits resolve with keep_local on Keep current progress button click', async () => {
     const wrapper = mount(ProgressConflictModal, {
       props: {
         modelValue: true,
@@ -216,10 +216,10 @@ describe('ProgressConflictModal.vue', () => {
       },
     });
 
-    const cancelBtn = wrapper.findAll('button').find((b) => b.text().includes('Cancel'));
-    expect(cancelBtn).toBeDefined();
+    const keepBtn = wrapper.findAll('button').find((b) => b.text().includes('Keep current progress'));
+    expect(keepBtn).toBeDefined();
 
-    await cancelBtn?.trigger('click');
+    await keepBtn?.trigger('click');
     expect(wrapper.emitted('resolve')?.[0]).toEqual(['keep_local']);
   });
 });

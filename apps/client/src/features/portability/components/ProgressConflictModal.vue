@@ -236,7 +236,7 @@ function handleClose() {
             size="sm"
             @click="handleAction('keep_local')"
           >
-            Cancel / Keep Current
+            Keep current progress
           </BaseButton>
         </div>
       </div>

@@ -296,19 +296,19 @@ describe('App.vue Shell & Navigation Integration', () => {
 
     // Test accept draw
     const buttons = drawBanner.findAllComponents({ name: 'BaseButton' });
-    const acceptBtn = buttons.find((b: any) => b.text().includes('Accept Draw'));
+    const acceptBtn = buttons.find((b: any) => b.text().includes('Accept draw'));
     expect(acceptBtn?.exists()).toBe(true);
     await acceptBtn!.trigger('click');
     expect(mockRespondDraw).toHaveBeenCalledWith('ROOM12', true);
 
     // Test decline draw
-    const declineBtn = buttons.find((b: any) => b.text().includes('Decline'));
+    const declineBtn = buttons.find((b: any) => b.text().includes('Decline draw'));
     expect(declineBtn?.exists()).toBe(true);
     await declineBtn!.trigger('click');
     expect(mockRespondDraw).toHaveBeenCalledWith('ROOM12', false);
   });
 
-  it('verifies Zero-CLS CSS rules for banners in App.vue', () => {
+  it('verifies Zero-CLS CSS rules, logical properties, and tactile press feedback in App.vue', () => {
     const appVueContent = fs.readFileSync(path.resolve(__dirname, '../App.vue'), 'utf-8');
 
     // app-notification-banner fixed overlay
@@ -328,6 +328,16 @@ describe('App.vue Shell & Navigation Integration', () => {
     expect(appVueContent).toMatch(/\.draw-offer-banner\s*\{[^}]*position:\s*absolute;/);
     expect(appVueContent).toMatch(/\.draw-offer-banner\s*\{[^}]*top:\s*8px;/);
     expect(appVueContent).toMatch(/\.draw-offer-banner\s*\{[^}]*z-index:\s*var\(--z-overlay-alert,\s*30\);/);
+
+    // Logical CSS inset property on skip-link
+    expect(appVueContent).toContain('inset-inline-start: 50%;');
+
+    // Tactile press feedback on chips and buttons
+    expect(appVueContent).toMatch(/\.room-code-chip:active\s*\{[^}]*transform:\s*scale\(0\.96\);/);
+    expect(appVueContent).toMatch(/\.navbar-brand:active\s*\{[^}]*transform:\s*scale\(0\.96\);/);
+    expect(appVueContent).toMatch(/\.nav-install-btn:active\s*\{[^}]*transform:\s*scale\(0\.96\);/);
+    expect(appVueContent).toMatch(/\.nav-icon-btn:active\s*\{[^}]*transform:\s*scale\(0\.96\);/);
+    expect(appVueContent).toMatch(/\.notification-dismiss-btn:active\s*\{[^}]*transform:\s*scale\(0\.96\);/);
   });
 
   it('renders navbar Install App button and keeps it visible even after snoozing floating banner', async () => {
