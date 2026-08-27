@@ -1,602 +1,2322 @@
 [
   {
-    "id": "puz_smothered_001",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "id": "puz_sm_001",
+    "fen": "5r1k/5ppp/8/6N1/2Q5/8/8/6K1 w - - 0 1",
     "moves": [
-      "e4d6"
-    ],
-    "rating": 750,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "novice",
-    "title": "Smothered Knight Checkmate #1 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_002",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
+      "g5f7",
+      "h8g8",
       "f7h6",
       "g8h8",
-      "e1f2"
+      "c4g8",
+      "f8g8",
+      "h6f7"
     ],
-    "rating": 778,
-    "ratingDeviation": 100,
+    "rating": 1300,
+    "ratingDeviation": 80,
     "themes": [
       "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "novice",
-    "title": "Double Check Corner Lure #2 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_003",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 806,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "novice",
-    "title": "Smothered Knight Checkmate #3 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_004",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
-    ],
-    "rating": 834,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "novice",
-    "title": "Double Check Corner Lure #4 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_005",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 862,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "novice",
-    "title": "Smothered Knight Checkmate #5 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_006",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
-    ],
-    "rating": 890,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "novice",
-    "title": "Double Check Corner Lure #6 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_007",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 918,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Smothered Knight Checkmate #7 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_008",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
-    ],
-    "rating": 946,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Double Check Corner Lure #8 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_009",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 974,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Smothered Knight Checkmate #9 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_010",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
-    ],
-    "rating": 1002,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Double Check Corner Lure #10 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_011",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 1030,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Smothered Knight Checkmate #11 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_012",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
-    ],
-    "rating": 1058,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Double Check Corner Lure #12 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_013",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 1086,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Smothered Knight Checkmate #13 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_014",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
-    ],
-    "rating": 1114,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Double Check Corner Lure #14 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_015",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 1142,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Smothered Knight Checkmate #15 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_016",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
-    ],
-    "rating": 1170,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Double Check Corner Lure #16 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_017",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 1198,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "easy",
-    "title": "Smothered Knight Checkmate #17 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_018",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
-    ],
-    "rating": 1226,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
+      "captures_checks_threats"
     ],
     "primaryTheme": "smothered_mate",
     "difficulty": "medium",
-    "title": "Double Check Corner Lure #18 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
+    "title": "Philidor's Legacy with Qc4 & Ng5 #1 👑",
+    "subtitle": "1. Nf7+ Kg8 2. Nh6+ Kh8 3. Qg8+ Rxg8 4. Nf7# executes classic smothered mate.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Nf7+ Kg8 2. Nh6+ Kh8 3. Qg8+ Rxg8 4. Nf7# executes classic smothered mate. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf7+",
+        "moveUci": "g5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg8+",
+        "moveUci": "c4g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "g5",
+      "f7"
+    ]
   },
   {
-    "id": "puz_smothered_019",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "id": "puz_sm_002",
+    "fen": "5r1k/5ppp/8/6N1/8/1Q6/8/6K1 w - - 0 1",
     "moves": [
-      "e4d6"
-    ],
-    "rating": 1254,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "medium",
-    "title": "Smothered Knight Checkmate #19 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_020",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
+      "g5f7",
+      "h8g8",
       "f7h6",
       "g8h8",
-      "e1f2"
+      "b3g8",
+      "f8g8",
+      "h6f7"
     ],
-    "rating": 1282,
-    "ratingDeviation": 100,
+    "rating": 1350,
+    "ratingDeviation": 80,
     "themes": [
       "smothered_mate",
-      "discovered_check"
+      "captures_checks_threats"
     ],
     "primaryTheme": "smothered_mate",
     "difficulty": "medium",
-    "title": "Double Check Corner Lure #20 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
+    "title": "Philidor's Legacy with Qb3 #2 👑",
+    "subtitle": "White uses the b3 diagonal to deliver the smothered mate.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "White uses the b3 diagonal to deliver the smothered mate. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf7+",
+        "moveUci": "g5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg8+",
+        "moveUci": "b3g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "g5",
+      "f7"
+    ]
   },
   {
-    "id": "puz_smothered_021",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "id": "puz_sm_003",
+    "fen": "5r1k/5ppp/8/6N1/8/8/Q7/6K1 w - - 0 1",
     "moves": [
-      "e4d6"
-    ],
-    "rating": 1310,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "medium",
-    "title": "Smothered Knight Checkmate #21 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_022",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
+      "g5f7",
+      "h8g8",
       "f7h6",
       "g8h8",
-      "e1f2"
+      "a2g8",
+      "f8g8",
+      "h6f7"
     ],
-    "rating": 1338,
-    "ratingDeviation": 100,
+    "rating": 1400,
+    "ratingDeviation": 80,
     "themes": [
       "smothered_mate",
-      "discovered_check"
+      "captures_checks_threats"
     ],
     "primaryTheme": "smothered_mate",
     "difficulty": "medium",
-    "title": "Double Check Corner Lure #22 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
+    "title": "Long-Diagonal Philidor with Qa2 #3 👑",
+    "subtitle": "Queen penetrates from a2 to set up 4. Nf7#.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Queen penetrates from a2 to set up 4. Nf7#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf7+",
+        "moveUci": "g5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg8+",
+        "moveUci": "a2g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "g5",
+      "f7"
+    ]
   },
   {
-    "id": "puz_smothered_023",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "id": "puz_sm_004",
+    "fen": "5r1k/5ppp/8/3Q2N1/8/8/8/6K1 w - - 0 1",
     "moves": [
-      "e4d6"
-    ],
-    "rating": 1366,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "medium",
-    "title": "Smothered Knight Checkmate #23 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_024",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
+      "g5f7",
+      "h8g8",
       "f7h6",
       "g8h8",
-      "e1f2"
-    ],
-    "rating": 1394,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "discovered_check"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "medium",
-    "title": "Double Check Corner Lure #24 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_smothered_025",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
-    "moves": [
-      "e4d6"
-    ],
-    "rating": 1422,
-    "ratingDeviation": 100,
-    "themes": [
-      "smothered_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "smothered_mate",
-    "difficulty": "medium",
-    "title": "Smothered Knight Checkmate #25 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_smothered_026",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
-    "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
+      "d5g8",
+      "f8g8",
+      "h6f7"
     ],
     "rating": 1450,
-    "ratingDeviation": 100,
+    "ratingDeviation": 80,
     "themes": [
       "smothered_mate",
-      "discovered_check"
+      "captures_checks_threats"
     ],
     "primaryTheme": "smothered_mate",
     "difficulty": "medium",
-    "title": "Double Check Corner Lure #26 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
+    "title": "Central Queen Philidor with Qd5 #4 👑",
+    "subtitle": "Centralized queen and knight dismantle Black's kingside.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Centralized queen and knight dismantle Black's kingside. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf7+",
+        "moveUci": "g5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg8+",
+        "moveUci": "d5g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "g5",
+      "f7"
+    ]
   },
   {
-    "id": "puz_smothered_027",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "id": "puz_sm_005",
+    "fen": "5r1k/5ppp/8/4N3/2Q5/8/8/6K1 w - - 0 1",
     "moves": [
-      "e4d6"
+      "e5f7",
+      "h8g8",
+      "f7h6",
+      "g8h8",
+      "c4g8",
+      "f8g8",
+      "h6f7"
     ],
-    "rating": 1478,
-    "ratingDeviation": 100,
+    "rating": 1500,
+    "ratingDeviation": 80,
     "themes": [
       "smothered_mate",
-      "mate_in_1"
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Philidor with Ne5 Jumper #5 👑",
+    "subtitle": "Knight launches from e5 into f7 to begin the combination.",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Knight launches from e5 into f7 to begin the combination. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf7+",
+        "moveUci": "e5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg8+",
+        "moveUci": "c4g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "e5",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_006",
+    "fen": "5r1k/5ppp/8/4N3/8/1Q6/8/6K1 w - - 0 1",
+    "moves": [
+      "e5f7",
+      "h8g8",
+      "f7h6",
+      "g8h8",
+      "b3g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Philidor Double Check Cadence #6 👑",
+    "subtitle": "Knight and Queen double check leaves Black with only 2...Kh8.",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Knight and Queen double check leaves Black with only 2...Kh8. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf7+",
+        "moveUci": "e5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg8+",
+        "moveUci": "b3g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "e5",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_007",
+    "fen": "5r1k/5ppp/8/4N3/8/8/Q7/6K1 w - - 0 1",
+    "moves": [
+      "e5f7",
+      "h8g8",
+      "f7h6",
+      "g8h8",
+      "a2g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1600,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Philidor with Qa2 Battery #7 👑",
+    "subtitle": "Long-range Queen sacrifice on g8 forces rook capture.",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Long-range Queen sacrifice on g8 forces rook capture. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf7+",
+        "moveUci": "e5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg8+",
+        "moveUci": "a2g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "e5",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_008",
+    "fen": "5r1k/5ppp/8/3QN3/8/8/8/6K1 w - - 0 1",
+    "moves": [
+      "e5f7",
+      "h8g8",
+      "f7h6",
+      "g8h8",
+      "d5g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Dominant Center Smothered Mate #8 👑",
+    "subtitle": "Queen and knight dominate the board to deliver 4. Nf7#.",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Queen and knight dominate the board to deliver 4. Nf7#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf7+",
+        "moveUci": "e5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg8+",
+        "moveUci": "d5g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "e5",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_009",
+    "fen": "5rk1/5Npp/8/8/2Q5/8/8/6K1 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "c4g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Double Check Flash with Nh6+ #9 👑",
+    "subtitle": "1. Nh6+ Kh8 2. Qg8+ Rxg8 3. Nf7# finishes Black in 5 plies.",
+    "playerColor": "w",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Nh6+ Kh8 2. Qg8+ Rxg8 3. Nf7# finishes Black in 5 plies. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qg8+",
+        "moveUci": "c4g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "f7",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_010",
+    "fen": "5rk1/5Npp/8/8/8/1Q6/8/6K1 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "b3g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Double Check from b3 #10 👑",
+    "subtitle": "White delivers double check and Queen sacrifice on g8.",
+    "playerColor": "w",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "White delivers double check and Queen sacrifice on g8. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qg8+",
+        "moveUci": "b3g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "f7",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_011",
+    "fen": "5rk1/5Npp/8/8/8/8/Q7/6K1 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "a2g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1800,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Double Check along a2-g8 Diagonal #11 👑",
+    "subtitle": "Double check forces the king to the corner before Qg8+.",
+    "playerColor": "w",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Double check forces the king to the corner before Qg8+. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qg8+",
+        "moveUci": "a2g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "f7",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_012",
+    "fen": "5rk1/5Npp/8/3Q4/8/8/8/6K1 w - - 0 1",
+    "moves": [
+      "f7h6",
+      "g8h8",
+      "d5g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1850,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "5-Ply Central Smothered Sequence #12 👑",
+    "subtitle": "1. Nh6+ Kh8 2. Qg8+ Rxg8 3. Nf7# concludes the attack.",
+    "playerColor": "w",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Nh6+ Kh8 2. Qg8+ Rxg8 3. Nf7# concludes the attack. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nh6+",
+        "moveUci": "f7h6",
+        "actor": "w",
+        "explanation": "White checks the King with Nh6+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qg8+",
+        "moveUci": "d5g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "f7",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_013",
+    "fen": "5r1k/6pp/7N/8/2Q5/8/8/6K1 w - - 0 1",
+    "moves": [
+      "c4g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1900,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Direct Queen Sacrifice on g8 #13 👑",
+    "subtitle": "1. Qg8+ Rxg8 2. Nf7# executes the 3-ply finish.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Qg8+ Rxg8 2. Nf7# executes the 3-ply finish. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qg8+",
+        "moveUci": "c4g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "c4",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_014",
+    "fen": "5r1k/6pp/7N/8/8/1Q6/8/6K1 w - - 0 1",
+    "moves": [
+      "b3g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 1950,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Queen Decoy on g8 #14 👑",
+    "subtitle": "1. Qg8+ forces the rook into the corner before Nf7#.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Qg8+ forces the rook into the corner before Nf7#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qg8+",
+        "moveUci": "b3g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "b3",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_015",
+    "fen": "5r1k/6pp/7N/8/8/8/Q7/6K1 w - - 0 1",
+    "moves": [
+      "a2g8",
+      "f8g8",
+      "h6f7"
+    ],
+    "rating": 2000,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Lightning Queen Sac on g8 #15 👑",
+    "subtitle": "1. Qg8+ Rxg8 2. Nf7# ends the game on the spot.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Qg8+ Rxg8 2. Nf7# ends the game on the spot. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qg8+",
+        "moveUci": "a2g8",
+        "actor": "w",
+        "explanation": "White checks the King with Qg8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Rxg8, capturing the enemy Q on g8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nf7#",
+        "moveUci": "h6f7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Nf7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f7"
+    ],
+    "keySquares": [
+      "a2",
+      "f7"
+    ]
+  },
+  {
+    "id": "puz_sm_016",
+    "fen": "6k1/8/8/2q5/6n1/8/5PPP/5R1K b - - 0 1",
+    "moves": [
+      "g4f2",
+      "h1g1",
+      "f2h3",
+      "g1h1",
+      "c5g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1300,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
     ],
     "primaryTheme": "smothered_mate",
     "difficulty": "medium",
-    "title": "Smothered Knight Checkmate #27 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Philidor's Legacy #16 👑",
+    "subtitle": "1...Nf2+ 2. Kg1 3...Nh3+ 4. Kh1 5...Qg1+ 6. Rxg1 7...Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Nf2+ 2. Kg1 3...Nh3+ 4. Kh1 5...Qg1+ 6. Rxg1 7...Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf2+",
+        "moveUci": "g4f2",
+        "actor": "b",
+        "explanation": "Black plays Nxf2+, capturing the enemy P on f2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg1+",
+        "moveUci": "c5g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "g4",
+      "f2"
+    ]
   },
   {
-    "id": "puz_smothered_028",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "id": "puz_sm_017",
+    "fen": "6k1/8/1q6/8/6n1/8/5PPP/5R1K b - - 0 1",
     "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
+      "g4f2",
+      "h1g1",
+      "f2h3",
+      "g1h1",
+      "b6g1",
+      "f1g1",
+      "h3f2"
     ],
-    "rating": 1506,
-    "ratingDeviation": 100,
+    "rating": 1350,
+    "ratingDeviation": 80,
     "themes": [
       "smothered_mate",
-      "discovered_check"
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Black Philidor with Qb6 #17 👑",
+    "subtitle": "Black uses the b6 diagonal to deliver smothered mate.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Black uses the b6 diagonal to deliver smothered mate. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf2+",
+        "moveUci": "g4f2",
+        "actor": "b",
+        "explanation": "Black plays Nxf2+, capturing the enemy P on f2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg1+",
+        "moveUci": "b6g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "g4",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_018",
+    "fen": "6k1/q7/8/8/6n1/8/5PPP/5R1K b - - 0 1",
+    "moves": [
+      "g4f2",
+      "h1g1",
+      "f2h3",
+      "g1h1",
+      "a7g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1400,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Black Philidor with Qa7 Battery #18 👑",
+    "subtitle": "Long-range Queen sacrifice on g1 forces rook capture.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Long-range Queen sacrifice on g1 forces rook capture. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf2+",
+        "moveUci": "g4f2",
+        "actor": "b",
+        "explanation": "Black plays Nxf2+, capturing the enemy P on f2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg1+",
+        "moveUci": "a7g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "g4",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_019",
+    "fen": "6k1/8/8/8/3q2n1/8/5PPP/5R1K b - - 0 1",
+    "moves": [
+      "g4f2",
+      "h1g1",
+      "f2h3",
+      "g1h1",
+      "d4g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1450,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "medium",
+    "title": "Black Central Queen Philidor #19 👑",
+    "subtitle": "Black dominates the center to deliver 4...Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Black dominates the center to deliver 4...Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf2+",
+        "moveUci": "g4f2",
+        "actor": "b",
+        "explanation": "Black plays Nxf2+, capturing the enemy P on f2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg1+",
+        "moveUci": "d4g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "g4",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_020",
+    "fen": "6k1/8/8/2q5/4n3/8/5PPP/5R1K b - - 0 1",
+    "moves": [
+      "e4f2",
+      "h1g1",
+      "f2h3",
+      "g1h1",
+      "c5g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1500,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
     ],
     "primaryTheme": "smothered_mate",
     "difficulty": "hard",
-    "title": "Double Check Corner Lure #28 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Philidor with Ne4 Jumper #20 👑",
+    "subtitle": "Knight launches from e4 into f2 to begin the combination.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Knight launches from e4 into f2 to begin the combination. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf2+",
+        "moveUci": "e4f2",
+        "actor": "b",
+        "explanation": "Black plays Nxf2+, capturing the enemy P on f2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg1+",
+        "moveUci": "c5g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "e4",
+      "f2"
+    ]
   },
   {
-    "id": "puz_smothered_029",
-    "fen": "r1bqkb1r/pp1npppp/2p2n2/8/3PN3/8/PPP1QPPP/R1B1KBNR w KQkq - 1 6",
+    "id": "puz_sm_021",
+    "fen": "6k1/8/1q6/8/4n3/8/5PPP/5R1K b - - 0 1",
     "moves": [
-      "e4d6"
+      "e4f2",
+      "h1g1",
+      "f2h3",
+      "g1h1",
+      "b6g1",
+      "f1g1",
+      "h3f2"
     ],
-    "rating": 1534,
-    "ratingDeviation": 100,
+    "rating": 1550,
+    "ratingDeviation": 80,
     "themes": [
       "smothered_mate",
-      "mate_in_1"
+      "captures_checks_threats"
     ],
     "primaryTheme": "smothered_mate",
     "difficulty": "hard",
-    "title": "Smothered Knight Checkmate #29 💨",
-    "subtitle": "Nd6# delivers smothered checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Double Check Cadence #21 👑",
+    "subtitle": "Knight and Queen double check leaves White with only 2. Kh1.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Knight and Queen double check leaves White with only 2. Kh1. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf2+",
+        "moveUci": "e4f2",
+        "actor": "b",
+        "explanation": "Black plays Nxf2+, capturing the enemy P on f2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg1+",
+        "moveUci": "b6g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "e4",
+      "f2"
+    ]
   },
   {
-    "id": "puz_smothered_030",
-    "fen": "6k1/5Npp/8/8/8/8/8/4K3 w - - 0 1",
+    "id": "puz_sm_022",
+    "fen": "6k1/q7/8/8/4n3/8/5PPP/5R1K b - - 0 1",
     "moves": [
-      "f7h6",
-      "g8h8",
-      "e1f2"
+      "e4f2",
+      "h1g1",
+      "f2h3",
+      "g1h1",
+      "a7g1",
+      "f1g1",
+      "h3f2"
     ],
-    "rating": 1562,
-    "ratingDeviation": 100,
+    "rating": 1600,
+    "ratingDeviation": 80,
     "themes": [
       "smothered_mate",
-      "discovered_check"
+      "captures_checks_threats"
     ],
     "primaryTheme": "smothered_mate",
     "difficulty": "hard",
-    "title": "Double Check Corner Lure #30 💨",
-    "subtitle": "Nh6+ forces king to h8 corner!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Philidor with Long Diagonal #22 👑",
+    "subtitle": "Black sacrifices the Queen on g1 before delivering Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Black sacrifices the Queen on g1 before delivering Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf2+",
+        "moveUci": "e4f2",
+        "actor": "b",
+        "explanation": "Black plays Nxf2+, capturing the enemy P on f2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg1+",
+        "moveUci": "a7g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "e4",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_023",
+    "fen": "6k1/8/8/8/3qn3/8/5PPP/5R1K b - - 0 1",
+    "moves": [
+      "e4f2",
+      "h1g1",
+      "f2h3",
+      "g1h1",
+      "d4g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Black Dominant Center Smothered Mate #23 👑",
+    "subtitle": "Black concludes the 7-ply sequence with 4...Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Black concludes the 7-ply sequence with 4...Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nxf2+",
+        "moveUci": "e4f2",
+        "actor": "b",
+        "explanation": "Black plays Nxf2+, capturing the enemy P on f2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg1+",
+        "moveUci": "d4g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "e4",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_024",
+    "fen": "6k1/8/8/2q5/8/8/5nPP/5RK1 b - - 0 1",
+    "moves": [
+      "f2h3",
+      "g1h1",
+      "c5g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Black Double Check Flash with Nh3+ #24 👑",
+    "subtitle": "1...Nh3+ 2. Kh1 3...Qg1+ 4. Rxg1 5...Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Nh3+ 2. Kh1 3...Qg1+ 4. Rxg1 5...Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qg1+",
+        "moveUci": "c5g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "f2",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_025",
+    "fen": "6k1/8/1q6/8/8/8/5nPP/5RK1 b - - 0 1",
+    "moves": [
+      "f2h3",
+      "g1h1",
+      "b6g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "hard",
+    "title": "Black Double Check from b6 #25 👑",
+    "subtitle": "Double check forces White into 2. Kh1 before Qg1+.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Double check forces White into 2. Kh1 before Qg1+. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qg1+",
+        "moveUci": "b6g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "f2",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_026",
+    "fen": "6k1/q7/8/8/8/8/5nPP/5RK1 b - - 0 1",
+    "moves": [
+      "f2h3",
+      "g1h1",
+      "a7g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1800,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Black 5-Ply Queen Sac from a7 #26 👑",
+    "subtitle": "Black deflects White's rook to deliver 3...Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Black deflects White's rook to deliver 3...Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qg1+",
+        "moveUci": "a7g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "f2",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_027",
+    "fen": "6k1/8/8/8/3q4/8/5nPP/5RK1 b - - 0 1",
+    "moves": [
+      "f2h3",
+      "g1h1",
+      "d4g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1850,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Black Central 5-Ply Smothered Finish #27 👑",
+    "subtitle": "1...Nh3+ 2. Kh1 3...Qg1+ 4. Rxg1 5...Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Nh3+ 2. Kh1 3...Qg1+ 4. Rxg1 5...Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Nh3+",
+        "moveUci": "f2h3",
+        "actor": "b",
+        "explanation": "Black checks the King with Nh3+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qg1+",
+        "moveUci": "d4g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "f2",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_028",
+    "fen": "6k1/8/8/2q5/8/7n/6PP/5R1K b - - 0 1",
+    "moves": [
+      "c5g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1900,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Black Direct Queen Sacrifice on g1 #28 👑",
+    "subtitle": "1...Qg1+ 2. Rxg1 3...Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Qg1+ 2. Rxg1 3...Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qg1+",
+        "moveUci": "c5g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "c5",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_029",
+    "fen": "6k1/8/1q6/8/8/7n/6PP/5R1K b - - 0 1",
+    "moves": [
+      "b6g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 1950,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Black Queen Decoy on g1 #29 👑",
+    "subtitle": "1...Qg1+ forces White's rook into g1 before Nf2#.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Qg1+ forces White's rook into g1 before Nf2#. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qg1+",
+        "moveUci": "b6g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "b6",
+      "f2"
+    ]
+  },
+  {
+    "id": "puz_sm_030",
+    "fen": "6k1/q7/8/8/8/7n/6PP/5R1K b - - 0 1",
+    "moves": [
+      "a7g1",
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 2000,
+    "ratingDeviation": 80,
+    "themes": [
+      "smothered_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "smothered_mate",
+    "difficulty": "expert",
+    "title": "Black Lightning Queen Sac on g1 #30 👑",
+    "subtitle": "1...Qg1+ 2. Rxg1 3...Nf2# ends the game immediately.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Sacrifice the Queen and execute the smothered checkmate with the Knight.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Qg1+ 2. Rxg1 3...Nf2# ends the game immediately. executing the classic Philidor smothered mate sequence.",
+    "keyTakeaway": "The smothered mate traps the king behind its own pieces using double check and a forcing queen sacrifice.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qg1+",
+        "moveUci": "a7g1",
+        "actor": "b",
+        "explanation": "Black checks the King with Qg1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxg1",
+        "moveUci": "f1g1",
+        "actor": "w",
+        "explanation": "White plays Rxg1, capturing the enemy Q on g1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Nf2#",
+        "moveUci": "h3f2",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Nf2#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "f2"
+    ],
+    "keySquares": [
+      "a7",
+      "f2"
+    ]
   }
 ]

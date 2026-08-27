@@ -20,6 +20,11 @@ describe('Puzzle Validator Engine', () => {
     primaryTheme: 'back_rank_mate',
     difficulty: 'novice',
     title: 'Back Rank Mate in 1',
+    tacticalGoal: 'Deliver checkmate to the back-rank King',
+    tacticalReward: 'checkmate',
+    outcomeAdvantage: 'Checkmate 👑',
+    learningSummary: 'Ra8 delivered back rank checkmate!',
+    keyTakeaway: 'Watch for trapped back-rank Kings!',
     playerColor: 'w',
     solutionPlies: 1,
   };
@@ -34,6 +39,11 @@ describe('Puzzle Validator Engine', () => {
     primaryTheme: 'fork',
     difficulty: 'novice',
     title: 'Knight Fork Adventure',
+    tacticalGoal: 'Fork King and Rook on c7',
+    tacticalReward: 'win_rook',
+    outcomeAdvantage: '+5 Rook ♜',
+    learningSummary: 'Knight jumped to b5 and c7 to fork the King and Rook.',
+    keyTakeaway: 'Knights jump over obstacles to fork pieces!',
     playerColor: 'w',
     solutionPlies: 4,
   };
@@ -48,12 +58,17 @@ describe('Puzzle Validator Engine', () => {
     primaryTheme: 'pawn_endgame',
     difficulty: 'novice',
     title: 'Promote to Queen',
+    tacticalGoal: 'Promote your pawn to a Queen to win the endgame',
+    tacticalReward: 'pawn_promotion',
+    outcomeAdvantage: '+9 Queen ♛',
+    learningSummary: 'Promoting the pawn creates a decisive queen advantage.',
+    keyTakeaway: 'Passed pawns must be pushed!',
     playerColor: 'w',
     solutionPlies: 3,
   };
 
   describe('validatePuzzleMove', () => {
-    it('validates a correct single-ply player move and marks puzzle complete', () => {
+    it('validates a correct single-ply player move and marks puzzle complete with analysis and step explanation', () => {
       const outcome = validatePuzzleMove(
         singlePlyPuzzle,
         0,
@@ -66,9 +81,14 @@ describe('Puzzle Validator Engine', () => {
       expect(outcome.nextFen).toContain('R5k1/5ppp/8/8/8/8/8/4K3 b - - 1 1');
       expect(outcome.botReplyMove).toBeUndefined();
       expect(outcome.feedback).toContain('solved the puzzle');
+      expect(outcome.stepExplanation).toBeDefined();
+      expect(outcome.stepExplanation?.moveSan).toBe('Ra8#');
+      expect(outcome.analysis).toBeDefined();
+      expect(outcome.analysis?.isCheckmate).toBe(true);
+      expect(outcome.analysis?.advantageSummary.formattedAdvantage).toBe('Checkmate 👑');
     });
 
-    it('rejects an incorrect move with non-punitive feedback', () => {
+    it('rejects an incorrect move with refutation analysis', () => {
       const outcome = validatePuzzleMove(
         singlePlyPuzzle,
         0,
@@ -80,10 +100,11 @@ describe('Puzzle Validator Engine', () => {
       expect(outcome.isPuzzleComplete).toBe(false);
       expect(outcome.nextFen).toBe(singlePlyPuzzle.fen);
       expect(outcome.nextMoveIndex).toBe(0);
-      expect(outcome.feedback).toContain('Not quite');
+      expect(outcome.refutation).toBeDefined();
+      expect(outcome.feedback).toBeDefined();
     });
 
-    it('handles multi-ply moves and returns the automated bot counter-move', () => {
+    it('handles multi-ply moves and returns the automated bot counter-move and stepExplanation', () => {
       // Ply 0: Player plays c3b5
       const ply0 = validatePuzzleMove(
         multiPlyPuzzle,
@@ -98,6 +119,7 @@ describe('Puzzle Validator Engine', () => {
       expect(ply0.botReplyMove?.from).toBe('e8');
       expect(ply0.botReplyMove?.to).toBe('d8');
       expect(ply0.nextMoveIndex).toBe(2); // Ready for player's next move (ply 2)
+      expect(ply0.stepExplanation?.moveSan).toBe('Nb5');
 
       // Ply 2: Player plays b5c7
       const ply2 = validatePuzzleMove(
@@ -111,6 +133,7 @@ describe('Puzzle Validator Engine', () => {
       expect(ply2.isPuzzleComplete).toBe(true); // Final bot response finishes line
       expect(ply2.botReplyMove?.from).toBe('d8');
       expect(ply2.botReplyMove?.to).toBe('c7');
+      expect(ply2.analysis).toBeDefined();
     });
 
     it('validates pawn promotion moves', () => {
@@ -124,6 +147,7 @@ describe('Puzzle Validator Engine', () => {
       expect(outcome.isCorrect).toBe(true);
       expect(outcome.botReplyMove?.from).toBe('e3');
       expect(outcome.botReplyMove?.to).toBe('d3');
+      expect(outcome.stepExplanation?.moveSan).toContain('e8=Q');
     });
 
     it('handles edge cases gracefully (invalid index, empty puzzle)', () => {
@@ -175,3 +199,4 @@ describe('Puzzle Validator Engine', () => {
     });
   });
 });
+

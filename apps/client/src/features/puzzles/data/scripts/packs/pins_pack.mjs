@@ -1,0 +1,1090 @@
+export const PIN_DATA = [
+  {
+    "id": "puz_pin_001",
+    "fen": "r1bqk2r/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1",
+    "moves": [
+      "b5c6",
+      "d7c6",
+      "f3e5"
+    ],
+    "rating": 650,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Ruy Lopez Classical Pin on c6 #1 \ud83d\udccc",
+    "subtitle": "Pin the c6 Knight and win the e5 pawn!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Pin and capture on c6, then win the e5 pawn.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1. Bxc6 pinned and captured the Knight on c6. After 1...dxc6, White snatched 2. Nxe5 with an extra center pawn.",
+    "keyTakeaway": "Pinning the defender of a central pawn allows you to capture the pawn once the defender is removed.",
+    "targetSquares": [
+      "c6",
+      "e5"
+    ],
+    "keySquares": [
+      "b5",
+      "c6"
+    ]
+  },
+  {
+    "id": "puz_pin_002",
+    "fen": "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1",
+    "moves": [
+      "b5c6",
+      "b7c6",
+      "f3e5"
+    ],
+    "rating": 680,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Absolute Knight Pin on c6 #2 \ud83d\udccc",
+    "subtitle": "Eliminate the pinned defender on c6!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Remove the pinned c6 Knight to win the e5 pawn.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1. Bxc6 removed the pinned defender. After 1...bxc6, White captured the unguarded 2. Nxe5 pawn.",
+    "keyTakeaway": "A pinned piece cannot effectively defend other friendly pieces.",
+    "targetSquares": [
+      "c6",
+      "e5"
+    ],
+    "keySquares": [
+      "b5",
+      "c6"
+    ]
+  },
+  {
+    "id": "puz_pin_003",
+    "fen": "r1bqk2r/ppp2ppp/2n1pn2/3p4/1bPP4/2N1PN2/PP1B1PPP/R2QKB1R w KQkq - 0 1",
+    "moves": [
+      "c3d5",
+      "e6d5",
+      "d2b4"
+    ],
+    "rating": 710,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Unpinning into Bishop Capture #3 \ud83d\udccc",
+    "subtitle": "Unpin the Knight on c3 to win the b4 Bishop!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Resolve the pin on c3 and win Black's b4 Bishop.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Bishop \u2694\ufe0f",
+    "learningSummary": "1. Nxd5 resolved the pin on c3 by jumping into the center. After 1...exd5, White captured 2. Bxb4 cleanly!",
+    "keyTakeaway": "When an opponent pins your piece, look for tactical counter-strikes that unpin with threats.",
+    "targetSquares": [
+      "d5",
+      "b4"
+    ],
+    "keySquares": [
+      "c3",
+      "d2"
+    ]
+  },
+  {
+    "id": "puz_pin_004",
+    "fen": "r1bqk2r/ppp2ppp/2n1pn2/8/1b1P4/2N2N2/PPP1BPPP/R1BQK2R w KQkq - 0 1",
+    "moves": [
+      "c1g5",
+      "h7h6",
+      "g5f6"
+    ],
+    "rating": 740,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Relative Bishop Pin on f6 #4 \ud83d\udccc",
+    "subtitle": "Pin the f6 Knight to the Queen and capture!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Pin the f6 Knight to Black's Queen with Bg5 and exchange.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1. Bg5 pinned Black's f6 Knight against the d8 Queen. After 1...h6, White captured 2. Bxf6 winning the knight.",
+    "keyTakeaway": "A relative pin against the Queen severely restricts the pinned piece's mobility.",
+    "targetSquares": [
+      "g5",
+      "f6"
+    ],
+    "keySquares": [
+      "c1",
+      "g5"
+    ]
+  },
+  {
+    "id": "puz_pin_005",
+    "fen": "r1bqk2r/ppp2ppp/2n2n2/3pp3/1b1P4/2N1PN2/PPP1BPPP/R1BQK2R b KQkq - 0 1",
+    "moves": [
+      "c8g4",
+      "d4e5",
+      "g4f3"
+    ],
+    "rating": 770,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Black Bishop Pin on g4 #5 \ud83d\udccc",
+    "subtitle": "Pin White's f3 Knight and eliminate it!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Pin the f3 Knight with ...Bg4 and capture it after central pawn moves.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1...Bg4 pinned the f3 Knight to White's Queen. After 2. dxe5, Black captured 2...Bxf3 removing the defender.",
+    "keyTakeaway": "Pinning f3 or f6 paralyzes the key guardian of the center.",
+    "targetSquares": [
+      "g4",
+      "f3"
+    ],
+    "keySquares": [
+      "c8",
+      "g4"
+    ]
+  },
+  {
+    "id": "puz_pin_006",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/1B2p3/3PP3/5N2/PPP2PPP/RNBQK2R w KQkq - 0 1",
+    "moves": [
+      "d4d5",
+      "c6e7",
+      "f3e5"
+    ],
+    "rating": 800,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Pawn Advance Against Pinned Knight #6 \u265f",
+    "subtitle": "Push d5 to exploit the pinned c6 Knight!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Advance d5 to drive the pinned Knight and win e5.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1. d5 attacked the pinned c6 Knight. When it was forced to retreat 1...Ne7, White won 2. Nxe5.",
+    "keyTakeaway": "Always attack pinned pieces with pawns to gain space and force concessions.",
+    "targetSquares": [
+      "d5",
+      "e5"
+    ],
+    "keySquares": [
+      "d4",
+      "d5"
+    ]
+  },
+  {
+    "id": "puz_pin_007",
+    "fen": "r1bqk2r/ppp2ppp/2n2n2/3p4/1b1PP3/2N2N2/PPP1BPPP/R1BQK2R b KQkq - 0 1",
+    "moves": [
+      "f6e4",
+      "c1d2",
+      "e4d2"
+    ],
+    "rating": 830,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Black Central Knight Strike on e4 #7 \u265e",
+    "subtitle": "Nxe4 exploits the pinned c3 Knight!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on e4 and exchange on d2 with Black.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Bishop \u2694\ufe0f",
+    "learningSummary": "1...Nxe4 won a central pawn exploiting the pinned c3 Knight. After 2. Bd2, Black traded 2...Nxd2.",
+    "keyTakeaway": "Take advantage of pinned pieces by capturing their protected squares.",
+    "targetSquares": [
+      "e4",
+      "d2"
+    ],
+    "keySquares": [
+      "f6",
+      "b4"
+    ]
+  },
+  {
+    "id": "puz_pin_008",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3p4/3Pn3/2N2N2/PPP1BPPP/R1BQK2R w KQkq - 0 1",
+    "moves": [
+      "e1g1",
+      "e8g8",
+      "c3e4"
+    ],
+    "rating": 860,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Castling Out of Pin into Central Capture #8 \ud83c\udff0",
+    "subtitle": "Castle to safety and capture the e4 Knight!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Castle safely and capture Black's advanced e4 Knight.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1. O-O unpinned the King, and after 1...O-O, White captured the knight 2. Nxe4.",
+    "keyTakeaway": "Castling breaks vertical pins on the e-file and prepares active counterplay.",
+    "targetSquares": [
+      "g1",
+      "e4"
+    ],
+    "keySquares": [
+      "e1",
+      "g1"
+    ]
+  },
+  {
+    "id": "puz_pin_009",
+    "fen": "r1bqk2r/ppp1bppp/2n5/1B1p4/3P4/2N2N2/PPP2PPP/R1BQK2R w KQkq - 0 1",
+    "moves": [
+      "f3e5",
+      "c8d7",
+      "e5d7"
+    ],
+    "rating": 890,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "novice",
+    "title": "Piling On the Pinned Knight #9 \u265e",
+    "subtitle": "Ne5 increases pressure on the pinned c6 Knight!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Play Ne5 to overload the pinned c6 Knight.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Bishop \u2694\ufe0f",
+    "learningSummary": "1. Ne5 added a second attacker to the pinned c6 Knight. After 1...Bd7, White captured 2. Nxd7 winning the Bishop pair.",
+    "keyTakeaway": "Add attackers to a pinned piece until the defense collapses.",
+    "targetSquares": [
+      "e5",
+      "d7"
+    ],
+    "keySquares": [
+      "f3",
+      "e5"
+    ]
+  },
+  {
+    "id": "puz_pin_010",
+    "fen": "3qkb1r/pppr1ppp/8/1B6/8/8/PPP2PPP/R3K2R w KQk - 0 1",
+    "moves": [
+      "b5d7",
+      "d8d7",
+      "e1g1"
+    ],
+    "rating": 920,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Absolute Pin Win on d7 #10 \ud83d\udccc",
+    "subtitle": "Bxd7+ wins the pinned Rook on d7!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the pinned Rook on d7 and castle.",
+    "tacticalReward": "win_exchange",
+    "outcomeAdvantage": "+2 Exchange \u2696\ufe0f",
+    "learningSummary": "1. Bxd7+ won Black's pinned Rook on d7. After 1...Qxd7, White castled 2. O-O up the exchange.",
+    "keyTakeaway": "An absolute pin against the King completely immobilizes the pinned piece.",
+    "targetSquares": [
+      "d7",
+      "g1"
+    ],
+    "keySquares": [
+      "b5",
+      "d7"
+    ]
+  },
+  {
+    "id": "puz_pin_011",
+    "fen": "r1b1k2r/pppqbppp/2n1pn2/1B1p4/3P4/2N1PN2/PPP2PPP/R1BQK2R w KQkq - 0 1",
+    "moves": [
+      "f3e5",
+      "d7d6",
+      "b5c6"
+    ],
+    "rating": 950,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Piling on Pinned Queen with Ne5 #11 \ud83d\udccc",
+    "subtitle": "Ne5 attacks Black's Queen and Bxc6 wins a piece!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Play Ne5 to pile up on the pinned c6 Knight and capture on c6.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Minor Piece \u2694\ufe0f",
+    "learningSummary": "1. Ne5 attacked Black's Queen on d7 while exploiting the pin on c6. After 1...Qd6, White snapped 2. Bxc6+.",
+    "keyTakeaway": "Pile up on pinned pieces by adding new attackers to break through.",
+    "targetSquares": [
+      "e5",
+      "c6"
+    ],
+    "keySquares": [
+      "f3",
+      "b5"
+    ]
+  },
+  {
+    "id": "puz_pin_012",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/1B2p3/1b2P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 0 1",
+    "moves": [
+      "c2c3",
+      "b4e7",
+      "b5c6"
+    ],
+    "rating": 980,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Challenging the Pin & Capturing c6 #12 \ud83d\udccc",
+    "subtitle": "c3 repels the Bishop and Bxc6 wins the Knight!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Play c3 to drive back the Bishop and capture the pinned Knight on c6.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Minor Piece \u2694\ufe0f",
+    "learningSummary": "1. c3 kicked Black's b4 Bishop to e7, then White captured 2. Bxc6 winning the pinned Knight.",
+    "keyTakeaway": "Disrupting the opponent's counter-pin allows you to execute your own pin capture.",
+    "targetSquares": [
+      "c3",
+      "c6"
+    ],
+    "keySquares": [
+      "c2",
+      "b5"
+    ]
+  },
+  {
+    "id": "puz_pin_013",
+    "fen": "r1bqk2r/pppn1ppp/3b4/1B1pN3/8/8/PPPP1PPP/RNBQK2R w KQkq - 0 1",
+    "moves": [
+      "b5d7",
+      "c8d7",
+      "e5d7"
+    ],
+    "rating": 1020,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Pinned Knight Takedown on d7 #13 \ud83d\udccc",
+    "subtitle": "Bxd7+ eliminates the pinned knight!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the pinned Knight on d7 and follow with Nxd7.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Minor Piece \u2694\ufe0f",
+    "learningSummary": "1. Bxd7+ captured Black's pinned Knight. After 1...Bxd7, White followed with 2. Nxd7 winning a piece cleanly.",
+    "keyTakeaway": "Pile up on pinned pieces and capture them when they cannot retreat.",
+    "targetSquares": [
+      "d7",
+      "d7"
+    ],
+    "keySquares": [
+      "b5",
+      "e5"
+    ]
+  },
+  {
+    "id": "puz_pin_014",
+    "fen": "r1bqk2r/pppp1ppp/2n1pn2/1B6/3PP3/5N2/PPP2PPP/RNBQK2R w KQkq - 0 1",
+    "moves": [
+      "d4d5",
+      "a7a6",
+      "d5c6"
+    ],
+    "rating": 1060,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Pawn Break Winning Pinned Piece #14 \u265f",
+    "subtitle": "d5 crashes into the pinned c6 Knight!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Advance d5 against the pinned Knight and capture on c6.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Minor Piece \u2694\ufe0f",
+    "learningSummary": "1. d5 struck the pinned c6 Knight. When Black played 1...a6, White captured 2. dxc6 winning the Knight cleanly.",
+    "keyTakeaway": "Central pawn advances exert maximum pressure against pinned defenders.",
+    "targetSquares": [
+      "d5",
+      "c6"
+    ],
+    "keySquares": [
+      "d4",
+      "d5"
+    ]
+  },
+  {
+    "id": "puz_pin_015",
+    "fen": "r1bqk2r/ppp2ppp/2n2n2/3pp3/1bPP4/2N1P3/PP1B1PPP/R2QKBNR b KQkq - 0 1",
+    "moves": [
+      "e5d4",
+      "c3d5",
+      "b4d2"
+    ],
+    "rating": 1100,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Black Counter-Pin Strike on d2 #15 \u265d",
+    "subtitle": "exd4 and Bxd2+ captures White's defending Bishop!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Liquidate on d4 and capture the d2 Bishop with check.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Bishop \u2694\ufe0f",
+    "learningSummary": "1...exd4 cleared central lines. After 2. Nxd5, Black captured 2...Bxd2+ winning a minor piece.",
+    "keyTakeaway": "Liquidate central tension to exploit pinned pieces on the diagonal.",
+    "targetSquares": [
+      "d4",
+      "d2"
+    ],
+    "keySquares": [
+      "e5",
+      "b4"
+    ]
+  },
+  {
+    "id": "puz_pin_016",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3p4/3Pn3/2NB1N2/PPP2PPP/R1BQK2R w KQkq - 0 1",
+    "moves": [
+      "d3e4",
+      "d5e4",
+      "c3e4"
+    ],
+    "rating": 1140,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Piling on Pinned e4 Knight #16 \ud83d\udccc",
+    "subtitle": "Bd3 adds an attacker and captures on e4!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Attack the pinned e4 Knight with Bd3 and win the piece.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1. Bd3 pinned the e4 Knight to Black's King on e8. After 1...Bf5, White captured 2. Bxe4 cleanly.",
+    "keyTakeaway": "Concentrate multiple pieces against the pinned target until it falls.",
+    "targetSquares": [
+      "d3",
+      "e4"
+    ],
+    "keySquares": [
+      "e2",
+      "d3"
+    ]
+  },
+  {
+    "id": "puz_pin_017",
+    "fen": "r1bqk2r/pppn1ppp/4p3/1B1pN3/8/8/PPPP1PPP/RNBQK2R w KQkq - 0 1",
+    "moves": [
+      "b5d7",
+      "c8d7",
+      "e5d7"
+    ],
+    "rating": 1180,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Pin Overload on d7 #17 \ud83d\udccc",
+    "subtitle": "Bxd7+ captures the pinned Knight!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the pinned Knight on d7 and win the Bishop with Nxd7.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Minor Piece \u2694\ufe0f",
+    "learningSummary": "1. Bxd7+ captured Black's pinned Knight on d7. After 1...Bxd7, White followed with 2. Nxd7 winning a clean piece.",
+    "keyTakeaway": "Attacking pinned pieces with multiple pieces guarantees a winning capture.",
+    "targetSquares": [
+      "d7",
+      "d7"
+    ],
+    "keySquares": [
+      "b5",
+      "e5"
+    ]
+  },
+  {
+    "id": "puz_pin_018",
+    "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p3/1b2P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 0 1",
+    "moves": [
+      "b4c3",
+      "d2c3",
+      "f6e4"
+    ],
+    "rating": 1220,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "easy",
+    "title": "Black Center Pawn Snatch on e4 #18 \u265f",
+    "subtitle": "Bxc3+ eliminates defender and Nxe4 grabs pawn!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Eliminate the c3 Knight and capture the e4 pawn.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1...Bxc3+ removed the defender of e4. After 2. dxc3, Black captured 2...Nxe4.",
+    "keyTakeaway": "Removing the guardian of a key central square wins free pawns.",
+    "targetSquares": [
+      "c3",
+      "e4"
+    ],
+    "keySquares": [
+      "b4",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_pin_019",
+    "fen": "r2qk2r/pbppbppp/1pn1pn2/1B6/3PP3/2N2N2/PPP2PPP/R1BQR1K1 w kq - 0 1",
+    "moves": [
+      "e4e5",
+      "f6d5",
+      "c3d5"
+    ],
+    "rating": 1260,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "medium",
+    "title": "Pin Advance with e5 #19 \u265f",
+    "subtitle": "e5 pushes Black's defender away and Nxd5 captures!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Advance e5 to dislodge the defender and capture on d5.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Minor Piece \u2694\ufe0f",
+    "learningSummary": "1. e5 attacked Black's f6 Knight while c6 remained pinned. After 1...Nd5, White captured 2. Nxd5 winning a piece.",
+    "keyTakeaway": "Pushing pawns into pinned pieces forces concessions and wins material.",
+    "targetSquares": [
+      "e5",
+      "d5"
+    ],
+    "keySquares": [
+      "e4",
+      "c3"
+    ]
+  },
+  {
+    "id": "puz_pin_020",
+    "fen": "r1bqk2r/pppp1ppp/2n5/4p3/1b1Pn3/2N2N2/PPP1BPPP/R1BQK2R b KQkq - 0 1",
+    "moves": [
+      "e4c3",
+      "b2c3",
+      "b4c3"
+    ],
+    "rating": 1300,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "medium",
+    "title": "Black Piece Snatch on c3 #20 \u265e",
+    "subtitle": "Nxc3 exploits the pin on the c3 Knight!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on c3 with the Knight and follow up with ...Bxc3+.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1...Nxc3 exploited the pinned c3 Knight. After 2. bxc3, Black followed with 2...Bxc3+ winning material.",
+    "keyTakeaway": "Attacking pinned pieces with tactical captures overwhelms the defense.",
+    "targetSquares": [
+      "c3",
+      "c3"
+    ],
+    "keySquares": [
+      "e4",
+      "b4"
+    ]
+  },
+  {
+    "id": "puz_pin_021",
+    "fen": "r2qk2r/pp1b1ppp/2n1pn2/3P4/3P4/2N1PN2/PP2BPPP/R1BQK2R w KQkq - 0 1",
+    "moves": [
+      "d5c6",
+      "b7c6",
+      "e1g1"
+    ],
+    "rating": 1340,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "medium",
+    "title": "Pawn Capture on c6 #21 \u265f",
+    "subtitle": "dxc6 wins Black's Knight on c6!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on c6 with the pawn and castle to safety.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1. dxc6 won Black's Knight on c6. After 1...bxc6, White castled 2. O-O with an extra piece.",
+    "keyTakeaway": "Pawn captures on pinned pieces establish winning material leads.",
+    "targetSquares": [
+      "c6",
+      "g1"
+    ],
+    "keySquares": [
+      "d5",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_pin_022",
+    "fen": "r2qk2r/pppb1ppp/2n1pn2/3p4/2PP4/1QN1PN2/PP2BPPP/R1B1K2R w KQkq - 0 1",
+    "moves": [
+      "b3b7",
+      "a8b8",
+      "b7a6"
+    ],
+    "rating": 1380,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "medium",
+    "title": "Queen Infiltration on b7 #22 \u265b",
+    "subtitle": "Qxb7 snatches the queenside pawn with tempo!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the b7 pawn and retreat the Queen safely.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Queenside Pawn \u265f",
+    "learningSummary": "1. Qxb7 won Black's b7 pawn. When Black replied 1...Rab8, White retreated 2. Qa6 cleanly.",
+    "keyTakeaway": "Active queens can snatch pawns on the 7th rank when defenders are tied down.",
+    "targetSquares": [
+      "b7",
+      "a6"
+    ],
+    "keySquares": [
+      "b3",
+      "b7"
+    ]
+  },
+  {
+    "id": "puz_pin_023",
+    "fen": "r1bqk2r/pp1p1ppp/2n1pn2/8/1b1NP3/2N5/PPP1BPPP/R1BQK2R b KQkq - 0 1",
+    "moves": [
+      "f6e4",
+      "d4c6",
+      "b7c6"
+    ],
+    "rating": 1420,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "medium",
+    "title": "Black Central Pawn Snatch on e4 #23 \u265f",
+    "subtitle": "Nxe4 exploits the absolute pin on the c3 Knight!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on e4 using the pin on c3.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1...Nxe4 won the e4 pawn because White's c3 Knight was pinned to the King by the b4 Bishop!",
+    "keyTakeaway": "Pieces pinned to the King cannot capture attackers.",
+    "targetSquares": [
+      "e4",
+      "c6"
+    ],
+    "keySquares": [
+      "f6",
+      "b7"
+    ]
+  },
+  {
+    "id": "puz_pin_024",
+    "fen": "r3k2r/p1p2ppp/1pn1pn2/1B1p4/2PP4/P1N1PN2/1P3PPP/R1BQK2R w KQkq - 0 1",
+    "moves": [
+      "b5c6",
+      "e8e7",
+      "c6a8"
+    ],
+    "rating": 1460,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "medium",
+    "title": "Pin and Corner Rook Capture on a8 #24 \u265d",
+    "subtitle": "Bxc6+ pins and wins the corner a8 Rook!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Play Bxc6+ and capture the corner a8 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook \u265c",
+    "learningSummary": "1. Bxc6+ attacked the King and corner Rook. After 1...Ke7, White captured 2. Bxa8 winning a full Rook!",
+    "keyTakeaway": "Pins along the diagonal often fork corner rooks when uncastled.",
+    "targetSquares": [
+      "c6",
+      "a8"
+    ],
+    "keySquares": [
+      "b5",
+      "c6"
+    ]
+  },
+  {
+    "id": "puz_pin_025",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/4p3/3PP3/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 1",
+    "moves": [
+      "d4e5",
+      "f6g4",
+      "c1f4"
+    ],
+    "rating": 1500,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "hard",
+    "title": "Center Pawn Win and Consolidation #25 \u265f",
+    "subtitle": "dxe5 wins the e5 pawn and defends with Bf4!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Win the e5 pawn and defend the center with Bf4.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1. dxe5 won Black's e5 pawn. When Black attacked with 1...Ng4, White reinforced 2. Bf4 cleanly.",
+    "keyTakeaway": "Central pawn advantages translate into winning endgames with proper defense.",
+    "targetSquares": [
+      "e5",
+      "f4"
+    ],
+    "keySquares": [
+      "d4",
+      "c1"
+    ]
+  },
+  {
+    "id": "puz_pin_026",
+    "fen": "r1bqk2r/pp2bppp/2n5/1Bpp4/3Pn3/2N2N2/PPP2PPP/R1BQR1K1 w kq - 0 1",
+    "moves": [
+      "c3e4",
+      "d5e4",
+      "e1e4"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "hard",
+    "title": "Rook Pin Recapture on e4 #26 \u265c",
+    "subtitle": "Rxe4 captures the loose pawn with file domination!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Trade on e4 and capture the e4 pawn with the Rook.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1. Nxe4 eliminated Black's active Knight. After 1...dxe4, White captured 2. Rxe4 dominating the open e-file.",
+    "keyTakeaway": "Liquidating minor pieces leaves enemy overextended pawns vulnerable to Rook captures.",
+    "targetSquares": [
+      "e4",
+      "e4"
+    ],
+    "keySquares": [
+      "c3",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_pin_027",
+    "fen": "r1bqk2r/ppp2ppp/2n1pn2/3p4/1b1P4/2N1PN2/PPP1BPPP/R1BQK2R b KQkq - 0 1",
+    "moves": [
+      "f6e4",
+      "c1d2",
+      "b4c3"
+    ],
+    "rating": 1600,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "hard",
+    "title": "Black Pressure on Pinned c3 Knight #27 \ud83d\udccc",
+    "subtitle": "Ne4 piles pressure on the pinned Knight!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Overload the pinned c3 Knight and trade pieces.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1...Ne4 increased pressure on the c3 Knight, and after 2. Bd2, Black captured 2...Bxc3.",
+    "keyTakeaway": "Add attackers to pinned pieces to force favorable trades.",
+    "targetSquares": [
+      "e4",
+      "c3"
+    ],
+    "keySquares": [
+      "f6",
+      "b4"
+    ]
+  },
+  {
+    "id": "puz_pin_028",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3pP3/1b1P4/P1N2N2/1PP1BPPP/R1BQK2R w KQkq - 0 1",
+    "moves": [
+      "a3b4",
+      "c6b4",
+      "e1g1"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "hard",
+    "title": "Bishop Capture on b4 #28 \u265f",
+    "subtitle": "axb4 captures Black's exposed Bishop!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the Bishop on b4 and castle safely.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Bishop \u2694\ufe0f",
+    "learningSummary": "1. axb4 won Black's loose Bishop on b4. After 1...Nxb4, White castled 2. O-O up a full piece.",
+    "keyTakeaway": "Tactical pawn strikes win pinned pieces when they run out of retreat squares.",
+    "targetSquares": [
+      "b4",
+      "g1"
+    ],
+    "keySquares": [
+      "a3",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_pin_029",
+    "fen": "r1bqk2r/pppp1ppp/2n5/4P3/1b1N4/2N5/PPP2PPP/R1BQKB1R b KQkq - 0 1",
+    "moves": [
+      "c6e5",
+      "c1d2",
+      "e8g8"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "hard",
+    "title": "Black Central Pawn Snatch on e5 #29 \u265f",
+    "subtitle": "Nxe5 wins the e5 pawn while c3 is pinned!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the loose e5 pawn and castle to safety.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Center Pawn \u265f",
+    "learningSummary": "1...Nxe5 won the undefended e5 pawn. When White played 2. Bd2, Black castled 2...O-O.",
+    "keyTakeaway": "Look for undefended pawns when the opponent's knight is pinned.",
+    "targetSquares": [
+      "e5",
+      "g8"
+    ],
+    "keySquares": [
+      "c6",
+      "b4"
+    ]
+  },
+  {
+    "id": "puz_pin_030",
+    "fen": "r2qk2r/ppp1bppp/2n1pn2/3P4/3P4/2N1PN2/PP3PPP/R1BQKB1R w KQkq - 0 1",
+    "moves": [
+      "d5c6",
+      "b7c6",
+      "f1d3"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "hard",
+    "title": "Center Pawn Breakthrough on c6 #30 \u265f",
+    "subtitle": "dxc6 wins Black's Knight on c6!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on c6 with the pawn and develop the Bishop to d3.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1. dxc6 won Black's Knight on c6. After 1...bxc6, White developed 2. Bd3 with full control.",
+    "keyTakeaway": "Passed and capturing pawns dismantle defensive structures.",
+    "targetSquares": [
+      "c6",
+      "d3"
+    ],
+    "keySquares": [
+      "d5",
+      "f1"
+    ]
+  },
+  {
+    "id": "puz_pin_031",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/3Pp3/1b2P3/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 1",
+    "moves": [
+      "d5c6",
+      "b7c6",
+      "c1d2"
+    ],
+    "rating": 1820,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "expert",
+    "title": "Counter-Strike Against the Pinned Knight #31 \u265f",
+    "subtitle": "dxc6 captures the Knight while White is pinned!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on c6 with the pawn and neutralize the pin with Bd2.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1. dxc6 won Black's Knight. After 1...bxc6, White played 2. Bd2 neutralizing the pin completely.",
+    "keyTakeaway": "An attack by a pawn on a pinned piece cannot be stopped by counter-pins.",
+    "targetSquares": [
+      "c6",
+      "d2"
+    ],
+    "keySquares": [
+      "d5",
+      "c1"
+    ]
+  },
+  {
+    "id": "puz_pin_032",
+    "fen": "r1b1k2r/pppp1ppp/8/8/4n3/2P5/PP3PPP/R1B1KB1R w KQkq - 0 1",
+    "moves": [
+      "f1d3",
+      "d7d5",
+      "d3e4"
+    ],
+    "rating": 1900,
+    "ratingDeviation": 80,
+    "themes": [
+      "pin",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "pin",
+    "difficulty": "expert",
+    "title": "Endgame Knight Removal with Bd3 #32 \u265d",
+    "subtitle": "Bxe4 removes Black's centralized knight!",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Attack the e4 Knight with Bd3 and capture it cleanly.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight \u2694\ufe0f",
+    "learningSummary": "1. Bd3 attacked the centralized e4 Knight, and after 1...d5, White captured 2. Bxe4 heading into a won endgame.",
+    "keyTakeaway": "Eliminating the enemy's most advanced piece transitions into a favorable endgame.",
+    "targetSquares": [
+      "d3",
+      "e4"
+    ],
+    "keySquares": [
+      "f1",
+      "d3"
+    ]
+  }
+];

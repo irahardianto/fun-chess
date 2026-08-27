@@ -6,6 +6,11 @@ import type {
   PlayerMoveAction,
   MoveValidationOutcome,
 } from '@fun-chess/shared';
+import {
+  generateMistakeRefutation,
+  analyzePuzzleSolution,
+  generateStepBreakdowns,
+} from './puzzle_analysis_engine';
 
 /**
  * Normalizes a PlayerMoveAction into a standard 4-5 character UCI string.
@@ -117,18 +122,20 @@ export function validatePuzzleMove(
   }
 
   const playerUci = formatPlayerMoveToUci(playerMove);
-
-  // Check if player's UCI move matches expected UCI move
-  // If expected requires promotion and player didn't specify promotion, consider if from/to match
   const matchesExpected = playerUci === expectedUci;
 
   if (!matchesExpected) {
+    const refutation = generateMistakeRefutation(currentFen, playerMove);
+    const feedback = refutation
+      ? `Not quite! ${refutation.kidFriendlyExplanation}`
+      : 'Not quite! Look closer for the best tactical move.';
     return {
       isCorrect: false,
       isPuzzleComplete: false,
       nextFen: currentFen,
       nextMoveIndex: currentMoveIndex,
-      feedback: 'Not quite! Look closer for the best tactical move.',
+      feedback,
+      refutation: refutation ?? undefined,
     };
   }
 
@@ -171,8 +178,19 @@ export function validatePuzzleMove(
   const intermediateFen = chess.fen();
   const nextMoveIdx = currentMoveIndex + 1;
 
+  // Step explanation for this ply
+  const stepNarratives = puzzle.stepExplanations ?? generateStepBreakdowns(puzzle);
+  const stepExplanation = stepNarratives[currentMoveIndex] ?? {
+    plyIndex: currentMoveIndex,
+    moveSan: playerResult.san,
+    moveUci: expectedUci,
+    actor: puzzle.playerColor,
+    explanation: `Plays ${playerResult.san} accurately!`,
+  };
+
   // Case 1: Player executed the final ply of the puzzle
   if (nextMoveIdx >= puzzle.moves.length) {
+    const analysis = analyzePuzzleSolution(puzzle);
     return {
       isCorrect: true,
       isPuzzleComplete: true,
@@ -180,12 +198,15 @@ export function validatePuzzleMove(
       nextFen: intermediateFen,
       nextMoveIndex: nextMoveIdx,
       feedback: 'Brilliant! You solved the puzzle! 🎉',
+      stepExplanation,
+      analysis,
     };
   }
 
   // Case 2: Multi-ply puzzle! Automated opponent response needed
   const opponentUci = puzzle.moves[nextMoveIdx];
   if (!opponentUci) {
+    const analysis = analyzePuzzleSolution(puzzle);
     return {
       isCorrect: true,
       isPuzzleComplete: true,
@@ -193,6 +214,8 @@ export function validatePuzzleMove(
       nextFen: intermediateFen,
       nextMoveIndex: nextMoveIdx,
       feedback: 'Brilliant! You solved the puzzle! 🎉',
+      stepExplanation,
+      analysis,
     };
   }
 
@@ -220,6 +243,7 @@ export function validatePuzzleMove(
 
   const playerNextIdx = nextMoveIdx + 1;
   const isCompleteAfterBot = playerNextIdx >= puzzle.moves.length;
+  const analysis = isCompleteAfterBot ? analyzePuzzleSolution(puzzle) : undefined;
 
   return {
     isCorrect: true,
@@ -231,5 +255,7 @@ export function validatePuzzleMove(
     feedback: isCompleteAfterBot
       ? 'Brilliant! You solved the puzzle! 🎉'
       : 'Great move! Keep going...',
+    stepExplanation,
+    analysis,
   };
 }

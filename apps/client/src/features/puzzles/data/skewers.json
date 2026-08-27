@@ -1,625 +1,1712 @@
 [
   {
     "id": "puz_skewer_001",
-    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "fen": "r3k3/7R/8/8/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
-      "a1a4",
-      "a5b5",
-      "a4a8"
+      "h7h8",
+      "e8e7",
+      "h8a8"
     ],
-    "rating": 800,
-    "ratingDeviation": 100,
+    "rating": 650,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "novice",
-    "title": "Rook Rank Skewer #1 ⚡",
-    "subtitle": "Check on a4 and win the Queen on a8!",
+    "title": "8th Rank Rook Skewer on h8 #1 ♜",
+    "subtitle": "Rh8+ skewers the King to win the a8 Rook!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Deliver Rh8+ to skewer the King and win the a8 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Rh8+ checked Black's King on e8 and skewered right through to the undefended a8 Rook. After 1...Ke7, 2. Rxa8 won the Rook.",
+    "keyTakeaway": "A skewer attacks a more valuable piece in front, forcing it to move and exposing the piece behind.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rh8+",
+        "moveUci": "h7h8",
+        "actor": "w",
+        "explanation": "White checks the King with Rh8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "e8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxa8",
+        "moveUci": "h8a8",
+        "actor": "w",
+        "explanation": "White plays Rxa8, capturing the enemy R on a8!"
+      }
+    ],
+    "targetSquares": [
+      "h8",
+      "a8"
+    ],
+    "keySquares": [
+      "h7",
+      "h8"
+    ]
   },
   {
     "id": "puz_skewer_002",
-    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "fen": "4k2r/R7/8/8/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
-      "e1e4",
-      "e5d5",
-      "e4e8"
+      "a7a8",
+      "e8e7",
+      "a8h8"
     ],
-    "rating": 828,
-    "ratingDeviation": 100,
+    "rating": 680,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "novice",
-    "title": "Center File Skewer #2 ⚡",
-    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "title": "8th Rank Rook Skewer on a8 #2 ♜",
+    "subtitle": "Ra8+ skewers King to win the h8 Rook!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Play Ra8+ to skewer the King and win the corner h8 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Ra8+ checked the King on e8. When the King stepped aside to e7, White collected the h8 Rook with 2. Rxh8.",
+    "keyTakeaway": "Look for open 8th rank files when the enemy King and Rook share the back rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra8+",
+        "moveUci": "a7a8",
+        "actor": "w",
+        "explanation": "White checks the King with Ra8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "e8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh8",
+        "moveUci": "a8h8",
+        "actor": "w",
+        "explanation": "White plays Rxh8, capturing the enemy R on h8!"
+      }
+    ],
+    "targetSquares": [
+      "a8",
+      "h8"
+    ],
+    "keySquares": [
+      "a7",
+      "a8"
+    ]
   },
   {
     "id": "puz_skewer_003",
-    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "fen": "4k3/ppp2ppp/8/8/8/8/7r/R3K3 b - - 0 1",
     "moves": [
-      "h1h4",
-      "h5g6",
-      "h4h8"
+      "h2h1",
+      "e1e2",
+      "h1a1"
     ],
-    "rating": 856,
-    "ratingDeviation": 100,
+    "rating": 710,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "queen_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "novice",
-    "title": "Queen File Skewer #3 ⚡",
-    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black 1st Rank Rook Skewer on h1 #3 ♜",
+    "subtitle": "Rh1+ skewers White's King to win the a1 Rook!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Deliver ...Rh1+ to skewer White's King and capture the a1 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1...Rh1+ checked White's King on e1. After 2. Ke2, Black grabbed 2...Rxa1 cleanly.",
+    "keyTakeaway": "Black's Rook on the 1st rank is just as deadly as White's on the 8th rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rh1+",
+        "moveUci": "h2h1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rh1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "e1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxa1",
+        "moveUci": "h1a1",
+        "actor": "b",
+        "explanation": "Black plays Rxa1, capturing the enemy R on a1!"
+      }
+    ],
+    "targetSquares": [
+      "h1",
+      "a1"
+    ],
+    "keySquares": [
+      "h2",
+      "h1"
+    ]
   },
   {
     "id": "puz_skewer_004",
-    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "fen": "4k3/ppp2ppp/8/8/8/8/r7/4K2R b - - 0 1",
     "moves": [
-      "c1b2",
-      "d4e4",
-      "b2g7"
+      "a2a1",
+      "e1e2",
+      "a1h1"
     ],
-    "rating": 884,
-    "ratingDeviation": 100,
+    "rating": 740,
+    "ratingDeviation": 80,
     "themes": [
-      "skewer"
+      "skewer",
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "novice",
-    "title": "Diagonal Bishop Skewer #4 ⚡",
-    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black 1st Rank Rook Skewer on a1 #4 ♜",
+    "subtitle": "Ra1+ skewers King to win the h1 Rook!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Deliver ...Ra1+ to skewer the King and win the h1 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1...Ra1+ drove White's King away from e1, allowing Black to win 2...Rxh1.",
+    "keyTakeaway": "When Kings are caught in the center, rook checks on the edges win opposite corner pieces.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra1+",
+        "moveUci": "a2a1",
+        "actor": "b",
+        "explanation": "Black checks the King with Ra1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "e1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh1",
+        "moveUci": "a1h1",
+        "actor": "b",
+        "explanation": "Black plays Rxh1, capturing the enemy R on h1!"
+      }
+    ],
+    "targetSquares": [
+      "a1",
+      "h1"
+    ],
+    "keySquares": [
+      "a2",
+      "a1"
+    ]
   },
   {
     "id": "puz_skewer_005",
-    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/2q5/8/8/5B2/PPP2PPP/R3K2R w KQkq - 0 1",
     "moves": [
-      "a1a4",
-      "a5b5",
-      "a4a8"
+      "f3c6",
+      "b7c6",
+      "e1g1"
     ],
-    "rating": 912,
-    "ratingDeviation": 100,
+    "rating": 780,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
-    "difficulty": "easy",
-    "title": "Rook Rank Skewer #5 ⚡",
-    "subtitle": "Check on a4 and win the Queen on a8!",
+    "difficulty": "novice",
+    "title": "Bishop Long Diagonal Queen Skewer #5 ♝",
+    "subtitle": "Bxc6+ skewers Queen and wrecks structure!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the Queen on c6 with Bxc6+ and castle safely.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "1. Bxc6+ captured Black's Queen on c6. After 1...bxc6, White castled 2. O-O with a decisive advantage.",
+    "keyTakeaway": "Bishops on long diagonals strike heavy enemy pieces with devastating impact.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxc6+",
+        "moveUci": "f3c6",
+        "actor": "w",
+        "explanation": "White plays Bxc6+, capturing the enemy Q on c6!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "bxc6",
+        "moveUci": "b7c6",
+        "actor": "b",
+        "explanation": "Black plays bxc6, capturing the enemy B on c6!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "O-O",
+        "moveUci": "e1g1",
+        "actor": "w",
+        "explanation": "White plays O-O."
+      }
+    ],
+    "targetSquares": [
+      "c6",
+      "g1"
+    ],
+    "keySquares": [
+      "f3",
+      "e1"
+    ]
   },
   {
     "id": "puz_skewer_006",
-    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "fen": "4k2r/ppp2ppp/8/8/8/2B5/PPP2PPP/4K2R w Kk - 0 1",
     "moves": [
-      "e1e4",
-      "e5d5",
-      "e4e8"
+      "c3g7",
+      "h8g8",
+      "g7f6"
     ],
-    "rating": 940,
-    "ratingDeviation": 100,
+    "rating": 820,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
-    "difficulty": "easy",
-    "title": "Center File Skewer #6 ⚡",
-    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "difficulty": "novice",
+    "title": "Bishop Skewer on g7 #6 ♝",
+    "subtitle": "Bxg7 attacks the corner h8 Rook!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the g7 pawn and retreat to f6 with decisive control.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1. Bxg7 attacked Black's h8 Rook. After 1...Rg8, White repositioned 2. Bf6 with strong diagonal pressure.",
+    "keyTakeaway": "Bishops slicing across the board create continuous threats on enemy rooks.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxg7",
+        "moveUci": "c3g7",
+        "actor": "w",
+        "explanation": "White plays Bxg7, capturing the enemy P on g7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Rg8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Bf6",
+        "moveUci": "g7f6",
+        "actor": "w",
+        "explanation": "White plays Bf6."
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "f6"
+    ],
+    "keySquares": [
+      "c3",
+      "g7"
+    ]
   },
   {
     "id": "puz_skewer_007",
-    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/2b5/8/8/8/PPP2PPP/4K2R b Kkq - 0 1",
     "moves": [
-      "h1h4",
-      "h5g6",
-      "h4h8"
+      "c6g2",
+      "h1g1",
+      "g2f3"
     ],
-    "rating": 968,
-    "ratingDeviation": 100,
+    "rating": 860,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "queen_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
-    "difficulty": "easy",
-    "title": "Queen File Skewer #7 ⚡",
-    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "difficulty": "novice",
+    "title": "Black Bishop Skewer on g2 #7 ♝",
+    "subtitle": "...Bxg2 attacks White's h1 Rook!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture g2 with ...Bxg2 and retreat safely to f3.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1...Bxg2 attacked White's h1 Rook, forcing 2. Rg1, after which Black preserved the Bishop on 2...Bf3.",
+    "keyTakeaway": "Flank pawn snatches by bishops force rooks onto passive squares.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxg2",
+        "moveUci": "c6g2",
+        "actor": "b",
+        "explanation": "Black plays Bxg2, capturing the enemy P on g2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Rg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Bf3",
+        "moveUci": "g2f3",
+        "actor": "b",
+        "explanation": "Black plays Bf3."
+      }
+    ],
+    "targetSquares": [
+      "g2",
+      "f3"
+    ],
+    "keySquares": [
+      "c6",
+      "g2"
+    ]
   },
   {
     "id": "puz_skewer_008",
-    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "fen": "r4k1r/R7/8/8/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
-      "c1b2",
-      "d4e4",
-      "b2g7"
+      "a7a8",
+      "f8e7",
+      "a8h8"
     ],
-    "rating": 996,
-    "ratingDeviation": 100,
+    "rating": 900,
+    "ratingDeviation": 80,
     "themes": [
-      "skewer"
+      "skewer",
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "easy",
-    "title": "Diagonal Bishop Skewer #8 ⚡",
-    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "title": "7th Rank Double Rook Skewer on a8 #8 ♜",
+    "subtitle": "Rxa8+ captures a8 and sweeps the h8 Rook!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the a8 Rook with check and take the h8 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Rxa8+ won Black's a8 Rook with check. When the King stepped to e7, White collected 2. Rxh8.",
+    "keyTakeaway": "Catching the enemy King on the back rank allows rooks to sweep both corners.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxa8+",
+        "moveUci": "a7a8",
+        "actor": "w",
+        "explanation": "White plays Rxa8+, capturing the enemy R on a8!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh8",
+        "moveUci": "a8h8",
+        "actor": "w",
+        "explanation": "White plays Rxh8, capturing the enemy R on h8!"
+      }
+    ],
+    "targetSquares": [
+      "a8",
+      "h8"
+    ],
+    "keySquares": [
+      "a7",
+      "a8"
+    ]
   },
   {
     "id": "puz_skewer_009",
-    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "fen": "r1k5/R7/8/8/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
-      "a1a4",
-      "a5b5",
-      "a4a8"
+      "a7a8",
+      "c8b7",
+      "e1e2"
     ],
-    "rating": 1024,
-    "ratingDeviation": 100,
+    "rating": 940,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "easy",
-    "title": "Rook Rank Skewer #9 ⚡",
-    "subtitle": "Check on a4 and win the Queen on a8!",
+    "title": "7th Rank Rook Snatch on a8 #9 ♜",
+    "subtitle": "Rxa8+ captures the a8 Rook with check!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the a8 Rook and centralize the King.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Rxa8+ won Black's corner Rook on a8. After 1...Kb7, White centralized 2. Ke2.",
+    "keyTakeaway": "Rook captures on the back rank come with decisive tempo.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxa8+",
+        "moveUci": "a7a8",
+        "actor": "w",
+        "explanation": "White plays Rxa8+, capturing the enemy R on a8!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kb7",
+        "moveUci": "c8b7",
+        "actor": "b",
+        "explanation": "Black plays Kb7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ke2",
+        "moveUci": "e1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      }
+    ],
+    "targetSquares": [
+      "a8",
+      "e2"
+    ],
+    "keySquares": [
+      "a7",
+      "e1"
+    ]
   },
   {
     "id": "puz_skewer_010",
-    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "fen": "4k2r/ppp2ppp/8/8/4q3/8/PPP2PPP/R1B1K2R b KQk - 0 1",
     "moves": [
-      "e1e4",
-      "e5d5",
-      "e4e8"
+      "e4g2",
+      "h1f1",
+      "e8g8"
     ],
-    "rating": 1052,
-    "ratingDeviation": 100,
+    "rating": 980,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "easy",
-    "title": "Center File Skewer #10 ⚡",
-    "subtitle": "Fire down the e-file to skewer King and Queen!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Queen Skewer on g2 #10 ♛",
+    "subtitle": "...Qxg2 attacks the corner h1 Rook!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture g2 with the Queen and castle safely.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1...Qxg2 attacked White's h1 Rook, forcing 2. Rf1, and Black secured the King 2...O-O.",
+    "keyTakeaway": "Invading queens on the second rank create simultaneous pawn and piece threats.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qxg2",
+        "moveUci": "e4g2",
+        "actor": "b",
+        "explanation": "Black plays Qxg2, capturing the enemy P on g2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rf1",
+        "moveUci": "h1f1",
+        "actor": "w",
+        "explanation": "White plays Rf1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "O-O",
+        "moveUci": "e8g8",
+        "actor": "b",
+        "explanation": "Black plays O-O."
+      }
+    ],
+    "targetSquares": [
+      "g2",
+      "g8"
+    ],
+    "keySquares": [
+      "e4",
+      "e8"
+    ]
   },
   {
     "id": "puz_skewer_011",
-    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/4Q3/8/8/PPP2PPP/R1B1K2R w KQkq - 0 1",
     "moves": [
-      "h1h4",
-      "h5g6",
-      "h4h8"
+      "e5g7",
+      "e8e7",
+      "g7h8"
     ],
-    "rating": 1080,
-    "ratingDeviation": 100,
+    "rating": 1020,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "queen_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "easy",
-    "title": "Queen File Skewer #11 ⚡",
-    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
+    "title": "Queen Skewer-Raid on g7 #11 ♛",
+    "subtitle": "Qxg7 skewers the h8 Rook and wins heavy material!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture g7 with Qxg7 and take the corner h8 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Qxg7 attacked Black's h8 Rook. After 1...Ke7, White captured 2. Qxh8 winning a full Rook!",
+    "keyTakeaway": "Queens on the 7th rank strike across all files simultaneously.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qxg7",
+        "moveUci": "e5g7",
+        "actor": "w",
+        "explanation": "White plays Qxg7, capturing the enemy P on g7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "e8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh8",
+        "moveUci": "g7h8",
+        "actor": "w",
+        "explanation": "White plays Qxh8, capturing the enemy R on h8!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "h8"
+    ],
+    "keySquares": [
+      "e5",
+      "g7"
+    ]
   },
   {
     "id": "puz_skewer_012",
-    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/q6Q/8/8/PPP2PPP/R3K2R w KQkq - 0 1",
     "moves": [
-      "c1b2",
-      "d4e4",
-      "b2g7"
+      "h5a5",
+      "e8g8",
+      "e1g1"
     ],
-    "rating": 1108,
-    "ratingDeviation": 100,
+    "rating": 1060,
+    "ratingDeviation": 80,
     "themes": [
-      "skewer"
+      "skewer",
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "easy",
-    "title": "Diagonal Bishop Skewer #12 ⚡",
-    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "title": "Cross-Board Queen Snatch on a5 #12 ♛",
+    "subtitle": "Qxa5 captures the exposed Queen with check!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the Queen on a5 and castle to safety.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "1. Qxa5 captured Black's defenseless Queen. After 1...O-O, White castled 2. O-O up a full Queen.",
+    "keyTakeaway": "Loose pieces on the edges of the board are prime targets for cross-board queen tactics.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qxa5",
+        "moveUci": "h5a5",
+        "actor": "w",
+        "explanation": "White plays Qxa5, capturing the enemy Q on a5!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "O-O",
+        "moveUci": "e8g8",
+        "actor": "b",
+        "explanation": "Black plays O-O."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "O-O",
+        "moveUci": "e1g1",
+        "actor": "w",
+        "explanation": "White plays O-O."
+      }
+    ],
+    "targetSquares": [
+      "a5",
+      "g1"
+    ],
+    "keySquares": [
+      "h5",
+      "e1"
+    ]
   },
   {
     "id": "puz_skewer_013",
-    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/Q6q/8/8/PPP2PPP/R3K2R b KQkq - 0 1",
     "moves": [
-      "a1a4",
-      "a5b5",
-      "a4a8"
+      "h5a5",
+      "c2c3",
+      "e8g8"
     ],
-    "rating": 1136,
-    "ratingDeviation": 100,
+    "rating": 1100,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "easy",
-    "title": "Rook Rank Skewer #13 ⚡",
-    "subtitle": "Check on a4 and win the Queen on a8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Cross-Board Queen Snatch on a5 #13 ♛",
+    "subtitle": "...Qxa5+ captures White's Queen!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the Queen on a5 with check and castle to safety.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "1...Qxa5+ won White's Queen on a5 with check. After 2. c3, Black castled 2...O-O with an insurmountable lead.",
+    "keyTakeaway": "Always calculate long-range queen captures along open ranks.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qxa5+",
+        "moveUci": "h5a5",
+        "actor": "b",
+        "explanation": "Black plays Qxa5+, capturing the enemy Q on a5!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "c3",
+        "moveUci": "c2c3",
+        "actor": "w",
+        "explanation": "White plays c3."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "O-O",
+        "moveUci": "e8g8",
+        "actor": "b",
+        "explanation": "Black plays O-O."
+      }
+    ],
+    "targetSquares": [
+      "a5",
+      "g8"
+    ],
+    "keySquares": [
+      "h5",
+      "e8"
+    ]
   },
   {
     "id": "puz_skewer_014",
-    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "fen": "4k3/1R4p1/8/8/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
-      "e1e4",
-      "e5d5",
-      "e4e8"
+      "b7g7",
+      "e8f8",
+      "g7a7"
     ],
-    "rating": 1164,
-    "ratingDeviation": 100,
+    "rating": 1140,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "easy",
-    "title": "Center File Skewer #14 ⚡",
-    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "title": "7th Rank Rook Pawn Skewer #14 ♜",
+    "subtitle": "Rxg7 wins pawn and attacks f8 King!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the g7 pawn and reposition the Rook safely.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1. Rxg7 won Black's g7 pawn with tempo. When Black played 1...Kf8, White retreated 2. Ra7.",
+    "keyTakeaway": "Rooks on the 7th rank create relentless pawn-snatching skewers.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxg7",
+        "moveUci": "b7g7",
+        "actor": "w",
+        "explanation": "White plays Rxg7, capturing the enemy P on g7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf8",
+        "moveUci": "e8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ra7",
+        "moveUci": "g7a7",
+        "actor": "w",
+        "explanation": "White plays Ra7."
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "a7"
+    ],
+    "keySquares": [
+      "b7",
+      "g7"
+    ]
   },
   {
     "id": "puz_skewer_015",
-    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "fen": "4k3/ppp2ppp/8/8/8/8/1r4P1/4K3 b - - 0 1",
     "moves": [
-      "h1h4",
-      "h5g6",
-      "h4h8"
+      "b2g2",
+      "e1f1",
+      "g2a2"
     ],
-    "rating": 1192,
-    "ratingDeviation": 100,
+    "rating": 1180,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "queen_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "easy",
-    "title": "Queen File Skewer #15 ⚡",
-    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black 2nd Rank Rook Pawn Skewer #15 ♜",
+    "subtitle": "...Rxg2 captures the g2 pawn with tempo!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture g2 and retreat the Rook safely to a2.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1...Rxg2 won White's g2 pawn. After 2. Kf1, Black retreated 2...Ra2 maintaining an extra pawn.",
+    "keyTakeaway": "Active rooks on the second rank convert endgames by picking off flank pawns.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxg2",
+        "moveUci": "b2g2",
+        "actor": "b",
+        "explanation": "Black plays Rxg2, capturing the enemy P on g2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf1",
+        "moveUci": "e1f1",
+        "actor": "w",
+        "explanation": "White plays Kf1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ra2",
+        "moveUci": "g2a2",
+        "actor": "b",
+        "explanation": "Black plays Ra2."
+      }
+    ],
+    "targetSquares": [
+      "g2",
+      "a2"
+    ],
+    "keySquares": [
+      "b2",
+      "g2"
+    ]
   },
   {
     "id": "puz_skewer_016",
-    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "fen": "r3k3/p1p2ppp/8/3B4/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
-      "c1b2",
-      "d4e4",
-      "b2g7"
+      "d5c6",
+      "e8e7",
+      "c6a8"
     ],
     "rating": 1220,
-    "ratingDeviation": 100,
+    "ratingDeviation": 80,
     "themes": [
-      "skewer"
+      "skewer",
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "medium",
-    "title": "Diagonal Bishop Skewer #16 ⚡",
-    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "title": "Bishop Skewer-Fork on c6 #16 ♝",
+    "subtitle": "Bc6+ checks King and takes the a8 Rook!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Deliver Bc6+ and capture the a8 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Bc6+ drove Black's King to e7, allowing White to capture 2. Bxa8 cleanly.",
+    "keyTakeaway": "Bishops on central diagonals strike both King and corner rooks simultaneously.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bc6+",
+        "moveUci": "d5c6",
+        "actor": "w",
+        "explanation": "White checks the King with Bc6+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "e8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Bxa8",
+        "moveUci": "c6a8",
+        "actor": "w",
+        "explanation": "White plays Bxa8, capturing the enemy R on a8!"
+      }
+    ],
+    "targetSquares": [
+      "c6",
+      "a8"
+    ],
+    "keySquares": [
+      "d5",
+      "c6"
+    ]
   },
   {
     "id": "puz_skewer_017",
-    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "fen": "4k3/ppp2ppp/8/8/3b4/8/P1P2PPP/R3K3 b - - 0 1",
     "moves": [
-      "a1a4",
-      "a5b5",
-      "a4a8"
+      "d4c3",
+      "e1e2",
+      "c3a1"
     ],
-    "rating": 1248,
-    "ratingDeviation": 100,
+    "rating": 1260,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "medium",
-    "title": "Rook Rank Skewer #17 ⚡",
-    "subtitle": "Check on a4 and win the Queen on a8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Bishop Skewer on c3 #17 ♝",
+    "subtitle": "...Bc3+ checks King and captures the a1 Rook!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Deliver ...Bc3+ and win the corner a1 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1...Bc3+ drove White's King to e2, and Black won the corner Rook with 2...Bxa1.",
+    "keyTakeaway": "Diagonal skewers against centralized kings win corner pieces.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bc3+",
+        "moveUci": "d4c3",
+        "actor": "b",
+        "explanation": "Black checks the King with Bc3+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "e1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Bxa1",
+        "moveUci": "c3a1",
+        "actor": "b",
+        "explanation": "Black plays Bxa1, capturing the enemy R on a1!"
+      }
+    ],
+    "targetSquares": [
+      "c3",
+      "a1"
+    ],
+    "keySquares": [
+      "d4",
+      "c3"
+    ]
   },
   {
     "id": "puz_skewer_018",
-    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/4Q3/8/8/PPP2PPP/4K2R w Kkq - 0 1",
     "moves": [
-      "e1e4",
-      "e5d5",
-      "e4e8"
+      "e5g7",
+      "e8d7",
+      "g7h8"
     ],
-    "rating": 1276,
-    "ratingDeviation": 100,
+    "rating": 1300,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "medium",
-    "title": "Center File Skewer #18 ⚡",
-    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "title": "Queen Infiltration on g7 #18 ♛",
+    "subtitle": "Qxg7 attacks King and takes h8 Rook!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture g7 with the Queen and win the h8 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Qxg7 attacked Black's King and the h8 Rook. After 1...Kd7, White captured 2. Qxh8.",
+    "keyTakeaway": "Major pieces on the 7th rank leave defenders with no good squares.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qxg7",
+        "moveUci": "e5g7",
+        "actor": "w",
+        "explanation": "White plays Qxg7, capturing the enemy P on g7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kd7",
+        "moveUci": "e8d7",
+        "actor": "b",
+        "explanation": "Black plays Kd7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh8",
+        "moveUci": "g7h8",
+        "actor": "w",
+        "explanation": "White plays Qxh8, capturing the enemy R on h8!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "h8"
+    ],
+    "keySquares": [
+      "e5",
+      "g7"
+    ]
   },
   {
     "id": "puz_skewer_019",
-    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/8/4q3/8/PPP2PPP/4K2R b Kkq - 0 1",
     "moves": [
-      "h1h4",
-      "h5g6",
-      "h4h8"
+      "e4g2",
+      "e1d2",
+      "g2h1"
     ],
-    "rating": 1304,
-    "ratingDeviation": 100,
+    "rating": 1340,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "queen_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "medium",
-    "title": "Queen File Skewer #19 ⚡",
-    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Queen Infiltration on g2 #19 ♛",
+    "subtitle": "...Qxg2 skewers the corner h1 Rook!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture g2 with the Queen and take the h1 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1...Qxg2 attacked White's King and corner h1 Rook. After 2. Kd2, Black captured 2...Qxh1.",
+    "keyTakeaway": "Queen invasions on the second rank decimate enemy rook positions.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qxg2",
+        "moveUci": "e4g2",
+        "actor": "b",
+        "explanation": "Black plays Qxg2, capturing the enemy P on g2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kd2",
+        "moveUci": "e1d2",
+        "actor": "w",
+        "explanation": "White plays Kd2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh1",
+        "moveUci": "g2h1",
+        "actor": "b",
+        "explanation": "Black plays Qxh1, capturing the enemy R on h1!"
+      }
+    ],
+    "targetSquares": [
+      "g2",
+      "h1"
+    ],
+    "keySquares": [
+      "e4",
+      "g2"
+    ]
   },
   {
     "id": "puz_skewer_020",
-    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/B7/8/8/8/PPP2PPP/R3K2R w KQkq - 0 1",
     "moves": [
-      "c1b2",
-      "d4e4",
-      "b2g7"
+      "a6b7",
+      "a8b8",
+      "b7c6"
     ],
-    "rating": 1332,
-    "ratingDeviation": 100,
+    "rating": 1380,
+    "ratingDeviation": 80,
     "themes": [
-      "skewer"
+      "skewer",
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "medium",
-    "title": "Diagonal Bishop Skewer #20 ⚡",
-    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "title": "Bishop Infiltration on b7 #20 ♝",
+    "subtitle": "Bxb7 attacks the a8 Rook with tempo!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on b7 and reposition to c6 with check.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1. Bxb7 won Black's b7 pawn and attacked the a8 Rook, consolidating with 2. Bc6+.",
+    "keyTakeaway": "Flank bishops slicing through enemy pawn chains create winning passed pawns.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxb7",
+        "moveUci": "a6b7",
+        "actor": "w",
+        "explanation": "White plays Bxb7, capturing the enemy P on b7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rb8",
+        "moveUci": "a8b8",
+        "actor": "b",
+        "explanation": "Black plays Rb8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Bc6+",
+        "moveUci": "b7c6",
+        "actor": "w",
+        "explanation": "White checks the King with Bc6+!"
+      }
+    ],
+    "targetSquares": [
+      "b7",
+      "c6"
+    ],
+    "keySquares": [
+      "a6",
+      "b7"
+    ]
   },
   {
     "id": "puz_skewer_021",
-    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/8/8/b7/PPP2PPP/R3K2R b KQkq - 0 1",
     "moves": [
-      "a1a4",
-      "a5b5",
-      "a4a8"
+      "a3b2",
+      "a1b1",
+      "b2c3"
     ],
-    "rating": 1360,
-    "ratingDeviation": 100,
+    "rating": 1420,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "medium",
-    "title": "Rook Rank Skewer #21 ⚡",
-    "subtitle": "Check on a4 and win the Queen on a8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Bishop Infiltration on b2 #21 ♝",
+    "subtitle": "...Bxb2 snatches the b2 pawn!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on b2 and check the King with ...Bc3+.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1...Bxb2 won White's b2 pawn. When White played 2. Rb1, Black replied 2...Bc3+ winning with check.",
+    "keyTakeaway": "Checking intermediate moves secure piece safety after snatching pawns.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxb2",
+        "moveUci": "a3b2",
+        "actor": "b",
+        "explanation": "Black plays Bxb2, capturing the enemy P on b2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rb1",
+        "moveUci": "a1b1",
+        "actor": "w",
+        "explanation": "White plays Rb1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Bc3+",
+        "moveUci": "b2c3",
+        "actor": "b",
+        "explanation": "Black checks the King with Bc3+!"
+      }
+    ],
+    "targetSquares": [
+      "b2",
+      "c3"
+    ],
+    "keySquares": [
+      "a3",
+      "b2"
+    ]
   },
   {
     "id": "puz_skewer_022",
-    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "fen": "4k3/3R2p1/8/8/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
-      "e1e4",
-      "e5d5",
-      "e4e8"
+      "d7g7",
+      "e8f8",
+      "g7a7"
     ],
-    "rating": 1388,
-    "ratingDeviation": 100,
+    "rating": 1460,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "medium",
-    "title": "Center File Skewer #22 ⚡",
-    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "title": "Rook 7th Rank Pawn Sweep #22 ♜",
+    "subtitle": "Rxg7 wins pawn with check threat!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture g7 and retreat safely.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1. Rxg7 won Black's g7 pawn. After 1...Kf8, White retreated 2. Ra7 holding a decisive endgame lead.",
+    "keyTakeaway": "Pawn sweeps along the 7th rank clear the way for your own passed pawns.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxg7",
+        "moveUci": "d7g7",
+        "actor": "w",
+        "explanation": "White plays Rxg7, capturing the enemy P on g7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf8",
+        "moveUci": "e8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ra7",
+        "moveUci": "g7a7",
+        "actor": "w",
+        "explanation": "White plays Ra7."
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "a7"
+    ],
+    "keySquares": [
+      "d7",
+      "g7"
+    ]
   },
   {
     "id": "puz_skewer_023",
-    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "fen": "4k3/ppp2ppp/8/8/8/8/3r2P1/4K3 b - - 0 1",
     "moves": [
-      "h1h4",
-      "h5g6",
-      "h4h8"
+      "d2g2",
+      "e1f1",
+      "g2a2"
     ],
-    "rating": 1416,
-    "ratingDeviation": 100,
+    "rating": 1500,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "queen_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
-    "difficulty": "medium",
-    "title": "Queen File Skewer #23 ⚡",
-    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "difficulty": "hard",
+    "title": "Black 2nd Rank Pawn Sweep #23 ♜",
+    "subtitle": "...Rxg2 captures the g2 pawn cleanly!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture g2 with the Rook and retreat to a2.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1...Rxg2 won White's g2 pawn. After 2. Kf1, Black retreated 2...Ra2 securing the win.",
+    "keyTakeaway": "Converting endgames requires picking off every loose enemy pawn with active rooks.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxg2",
+        "moveUci": "d2g2",
+        "actor": "b",
+        "explanation": "Black plays Rxg2, capturing the enemy P on g2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf1",
+        "moveUci": "e1f1",
+        "actor": "w",
+        "explanation": "White plays Kf1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ra2",
+        "moveUci": "g2a2",
+        "actor": "b",
+        "explanation": "Black plays Ra2."
+      }
+    ],
+    "targetSquares": [
+      "g2",
+      "a2"
+    ],
+    "keySquares": [
+      "d2",
+      "g2"
+    ]
   },
   {
     "id": "puz_skewer_024",
-    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/8/8/5Q2/PPP2PPP/4K2R w Kkq - 0 1",
     "moves": [
-      "c1b2",
-      "d4e4",
-      "b2g7"
+      "f3b7",
+      "e8g8",
+      "b7a8"
     ],
-    "rating": 1444,
-    "ratingDeviation": 100,
+    "rating": 1550,
+    "ratingDeviation": 80,
     "themes": [
-      "skewer"
+      "skewer",
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
-    "difficulty": "medium",
-    "title": "Diagonal Bishop Skewer #24 ⚡",
-    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "difficulty": "hard",
+    "title": "Queen Diagonal Infiltration on b7 #24 ♛",
+    "subtitle": "Qxb7 invades and captures the a8 Rook!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on b7 and take the corner a8 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Qxb7 attacked Black's corner Rook. When Black castled 1...O-O, White captured 2. Qxa8.",
+    "keyTakeaway": "Invading along the diagonal skewers corner pieces even if the king castles.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qxb7",
+        "moveUci": "f3b7",
+        "actor": "w",
+        "explanation": "White plays Qxb7, capturing the enemy P on b7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "O-O",
+        "moveUci": "e8g8",
+        "actor": "b",
+        "explanation": "Black plays O-O."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxa8",
+        "moveUci": "b7a8",
+        "actor": "w",
+        "explanation": "White plays Qxa8, capturing the enemy R on a8!"
+      }
+    ],
+    "targetSquares": [
+      "b7",
+      "a8"
+    ],
+    "keySquares": [
+      "f3",
+      "b7"
+    ]
   },
   {
     "id": "puz_skewer_025",
-    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/5q2/8/8/8/PPP2PPP/4K2R b Kkq - 0 1",
     "moves": [
-      "a1a4",
-      "a5b5",
-      "a4a8"
+      "f6b2",
+      "e1g1",
+      "b2a1"
     ],
-    "rating": 1472,
-    "ratingDeviation": 100,
+    "rating": 1600,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
-    "difficulty": "medium",
-    "title": "Rook Rank Skewer #25 ⚡",
-    "subtitle": "Check on a4 and win the Queen on a8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "difficulty": "hard",
+    "title": "Black Queen Diagonal Infiltration on b2 #25 ♛",
+    "subtitle": "...Qxb2 invades and wins the a1 Rook!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture on b2 and win the corner a1 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1...Qxb2 attacked White's a1 Rook. After 2. O-O, Black captured 2...Qxa1 cleanly.",
+    "keyTakeaway": "Black's Queen on b2 delivers the same deadly diagonal skewer as White's on b7.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qxb2",
+        "moveUci": "f6b2",
+        "actor": "b",
+        "explanation": "Black plays Qxb2, capturing the enemy P on b2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "O-O",
+        "moveUci": "e1g1",
+        "actor": "w",
+        "explanation": "White plays O-O."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qa1",
+        "moveUci": "b2a1",
+        "actor": "b",
+        "explanation": "Black plays Qa1."
+      }
+    ],
+    "targetSquares": [
+      "b2",
+      "a1"
+    ],
+    "keySquares": [
+      "f6",
+      "b2"
+    ]
   },
   {
     "id": "puz_skewer_026",
-    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/8/2Q5/8/PPP2PPP/R3K2R w KQkq - 0 1",
     "moves": [
-      "e1e4",
-      "e5d5",
-      "e4e8"
+      "c4e4",
+      "e8f8",
+      "e4b7"
     ],
-    "rating": 1500,
-    "ratingDeviation": 100,
+    "rating": 1650,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "hard",
-    "title": "Center File Skewer #26 ⚡",
-    "subtitle": "Fire down the e-file to skewer King and Queen!",
+    "title": "Queen Double-Rank Skewer on e4 #26 ♛",
+    "subtitle": "Qe4+ checks King and invades b7!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Deliver Qe4+ and capture the b7 pawn.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1. Qe4+ forced Black's King to f8, and White snatched 2. Qxb7 attacking the a8 Rook.",
+    "keyTakeaway": "Double-rank skewers drive the king to the side and demolish the queenside.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qe4+",
+        "moveUci": "c4e4",
+        "actor": "w",
+        "explanation": "White checks the King with Qe4+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf8",
+        "moveUci": "e8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxb7",
+        "moveUci": "e4b7",
+        "actor": "w",
+        "explanation": "White plays Qxb7, capturing the enemy P on b7!"
+      }
+    ],
+    "targetSquares": [
+      "e4",
+      "b7"
+    ],
+    "keySquares": [
+      "c4",
+      "e4"
+    ]
   },
   {
     "id": "puz_skewer_027",
-    "fen": "7r/8/8/7k/8/8/8/6KQ w - - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/8/2q5/8/PPP2PPP/R3K2R b KQkq - 0 1",
     "moves": [
-      "h1h4",
-      "h5g6",
-      "h4h8"
+      "c4e4",
+      "e1d2",
+      "e4g2"
     ],
-    "rating": 1528,
-    "ratingDeviation": 100,
+    "rating": 1700,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "queen_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "hard",
-    "title": "Queen File Skewer #27 ⚡",
-    "subtitle": "Skewer the King on h5 to win the Rook on h8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Queen Skewer on e4 #27 ♛",
+    "subtitle": "...Qe4+ drives King and captures g2!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Deliver ...Qe4+ and capture the g2 pawn.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+1 Pawn ♟",
+    "learningSummary": "1...Qe4+ drove White's King to d2, and Black captured 2...Qxg2 with an overwhelming attack.",
+    "keyTakeaway": "Invading the 2nd rank with the Queen leads directly to checkmating nets.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qe4+",
+        "moveUci": "c4e4",
+        "actor": "b",
+        "explanation": "Black checks the King with Qe4+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kd2",
+        "moveUci": "e1d2",
+        "actor": "w",
+        "explanation": "White plays Kd2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxg2",
+        "moveUci": "e4g2",
+        "actor": "b",
+        "explanation": "Black plays Qxg2, capturing the enemy P on g2!"
+      }
+    ],
+    "targetSquares": [
+      "e4",
+      "g2"
+    ],
+    "keySquares": [
+      "c4",
+      "e4"
+    ]
   },
   {
     "id": "puz_skewer_028",
-    "fen": "8/6r1/8/8/3k4/8/8/2B1K3 w - - 0 1",
+    "fen": "r3k2r/p1p2ppp/8/3B4/8/8/PPP2PPP/4K2R w Kkq - 0 1",
     "moves": [
-      "c1b2",
-      "d4e4",
-      "b2g7"
+      "d5a8",
+      "e8e7",
+      "a8e4"
     ],
-    "rating": 1556,
-    "ratingDeviation": 100,
+    "rating": 1750,
+    "ratingDeviation": 80,
     "themes": [
-      "skewer"
+      "skewer",
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
     "difficulty": "hard",
-    "title": "Diagonal Bishop Skewer #28 ⚡",
-    "subtitle": "Bb2+ skewers King and Rook on the long diagonal!",
+    "title": "Long Diagonal Corner Snatch on a8 #28 ♝",
+    "subtitle": "Bxa8 wins Black's trapped corner Rook!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the corner a8 Rook and reposition the Bishop safely to e4.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Bxa8 won Black's corner Rook cleanly. After 1...Ke7, White repositioned 2. Be4 controlling key central squares.",
+    "keyTakeaway": "Diagonals that pierce the enemy back rank directly trap corner rooks.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxa8",
+        "moveUci": "d5a8",
+        "actor": "w",
+        "explanation": "White plays Bxa8, capturing the enemy R on a8!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "e8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Be4",
+        "moveUci": "a8e4",
+        "actor": "w",
+        "explanation": "White plays Be4."
+      }
+    ],
+    "targetSquares": [
+      "a8",
+      "e4"
+    ],
+    "keySquares": [
+      "d5",
+      "a8"
+    ]
   },
   {
     "id": "puz_skewer_029",
-    "fen": "q7/8/8/k7/8/8/8/R3K3 w - - 0 1",
+    "fen": "r6k/R7/8/8/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
-      "a1a4",
-      "a5b5",
-      "a4a8"
+      "a7a8",
+      "h8g7",
+      "e1e2"
     ],
-    "rating": 1584,
-    "ratingDeviation": 100,
+    "rating": 1850,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
-    "difficulty": "hard",
-    "title": "Rook Rank Skewer #29 ⚡",
-    "subtitle": "Check on a4 and win the Queen on a8!",
+    "difficulty": "expert",
+    "title": "Master Corner Decapitation on a8 #29 ♜",
+    "subtitle": "Rxa8+ captures the a8 Rook with check!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the a8 Rook and centralize the King.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Rxa8+ captured Black's corner Rook with check. After 1...Kg7, White mobilized 2. Ke2.",
+    "keyTakeaway": "When corner pieces are trapped, systematic rook captures clear the board.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxa8+",
+        "moveUci": "a7a8",
+        "actor": "w",
+        "explanation": "White plays Rxa8+, capturing the enemy R on a8!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg7",
+        "moveUci": "h8g7",
+        "actor": "b",
+        "explanation": "Black plays Kg7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ke2",
+        "moveUci": "e1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      }
+    ],
+    "targetSquares": [
+      "a8",
+      "e2"
+    ],
+    "keySquares": [
+      "a7",
+      "e1"
+    ]
   },
   {
     "id": "puz_skewer_030",
-    "fen": "4q3/8/8/4k3/8/8/8/4R1K1 w - - 0 1",
+    "fen": "4k2r/8/8/8/8/8/r7/R3K3 b - - 0 1",
     "moves": [
-      "e1e4",
-      "e5d5",
-      "e4e8"
+      "a2a1",
+      "e1e2",
+      "a1h1"
     ],
-    "rating": 1612,
-    "ratingDeviation": 100,
+    "rating": 1950,
+    "ratingDeviation": 80,
     "themes": [
       "skewer",
-      "rook_endgame"
+      "captures_checks_threats"
     ],
     "primaryTheme": "skewer",
-    "difficulty": "hard",
-    "title": "Center File Skewer #30 ⚡",
-    "subtitle": "Fire down the e-file to skewer King and Queen!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "difficulty": "expert",
+    "title": "Master Black Corner Decapitation on a1 #30 ♜",
+    "subtitle": "...Rxa1+ skewers King and wins h1 Rook!",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Capture the a1 Rook and win the h1 Rook.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1...Rxa1+ captured White's a1 Rook with check. After 2. Ke2, Black won 2...Rxh1 for a master victory.",
+    "keyTakeaway": "Back-rank dominance decides high-level master games instantly.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxa1+",
+        "moveUci": "a2a1",
+        "actor": "b",
+        "explanation": "Black plays Rxa1+, capturing the enemy R on a1!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "e1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rah1",
+        "moveUci": "a1h1",
+        "actor": "b",
+        "explanation": "Black plays Rah1."
+      }
+    ],
+    "targetSquares": [
+      "a1",
+      "h1"
+    ],
+    "keySquares": [
+      "a2",
+      "a1"
+    ]
   }
 ]

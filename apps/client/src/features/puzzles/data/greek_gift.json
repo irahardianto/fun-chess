@@ -1,622 +1,2896 @@
 [
   {
-    "id": "puz_greekgift_001",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
+    "id": "puz_gg_001",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f8e8",
+      "h5f7",
+      "g8h8",
+      "f7h5",
+      "h8g8",
+      "h5h7",
+      "g8f8",
+      "h7h8"
     ],
-    "rating": 1200,
-    "ratingDeviation": 100,
+    "rating": 1225,
+    "ratingDeviation": 80,
     "themes": [
       "greek_gift",
-      "clearance"
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Bishop Aiming at h7 #1 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #1",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #1!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 13,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #1.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Re8",
+        "moveUci": "f8e8",
+        "actor": "b",
+        "explanation": "Black plays Re8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qxf7+",
+        "moveUci": "h5f7",
+        "actor": "w",
+        "explanation": "White plays Qxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Qh5+",
+        "moveUci": "f7h5",
+        "actor": "w",
+        "explanation": "White checks the King with Qh5+!"
+      },
+      {
+        "plyIndex": 9,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 10,
+        "moveSan": "Qh7+",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White checks the King with Qh7+!"
+      },
+      {
+        "plyIndex": 11,
+        "moveSan": "Kf8",
+        "moveUci": "g8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 12,
+        "moveSan": "Qh8#",
+        "moveUci": "h7h8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h8"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
   },
   {
-    "id": "puz_greekgift_002",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "id": "puz_gg_002",
+    "fen": "r1bq1rk1/1p1nbppp/p3p3/3pP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
-    ],
-    "rating": 1224,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "battery"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Greek Gift Prep #2 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_003",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
-    "moves": [
-      "f1d3",
+      "d3h7",
+      "g8h7",
+      "f3g5",
       "h7h6",
-      "g5f3"
+      "g5f7",
+      "h6h7",
+      "f7d8"
     ],
-    "rating": 1248,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Kingside Pressure #3 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_004",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1272,
-    "ratingDeviation": 100,
+    "rating": 1250,
+    "ratingDeviation": 80,
     "themes": [
       "greek_gift",
-      "clearance"
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Bishop Aiming at h7 #4 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #2",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #2!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #2.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh6",
+        "moveUci": "h7h6",
+        "actor": "b",
+        "explanation": "Black plays Kh6."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nxf7+",
+        "moveUci": "g5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh7",
+        "moveUci": "h6h7",
+        "actor": "b",
+        "explanation": "Black plays Kh7."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nxd8",
+        "moveUci": "f7d8",
+        "actor": "w",
+        "explanation": "White plays Nxd8, capturing the enemy Q on d8!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "d8"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
   },
   {
-    "id": "puz_greekgift_005",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "id": "puz_gg_003",
+    "fen": "r1bq1rk1/pp2bppp/2n1p3/3pP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f7f5",
+      "h5h7"
     ],
-    "rating": 1296,
-    "ratingDeviation": 100,
+    "rating": 1275,
+    "ratingDeviation": 80,
     "themes": [
       "greek_gift",
-      "battery"
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Greek Gift Prep #5 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #3",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #3!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #3.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "f5",
+        "moveUci": "f7f5",
+        "actor": "b",
+        "explanation": "Black plays f5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
   },
   {
-    "id": "puz_greekgift_006",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "id": "puz_gg_004",
+    "fen": "r1bq1rk1/1p2bppp/p1n1p3/3pP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "d8e8",
+      "h5h7"
+    ],
+    "rating": 1300,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #4",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #4!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #4.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Qe8",
+        "moveUci": "d8e8",
+        "actor": "b",
+        "explanation": "Black plays Qe8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_005",
+    "fen": "r1bq1rk1/p1pnbppp/1p2p3/3pP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "d7f6",
+      "e5f6"
+    ],
+    "rating": 1325,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #5",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #5!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight ⚔️",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #5.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Nf6",
+        "moveUci": "d7f6",
+        "actor": "b",
+        "explanation": "Black plays Nf6."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "exf6",
+        "moveUci": "e5f6",
+        "actor": "w",
+        "explanation": "White plays exf6, capturing the enemy N on f6!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "f6"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_006",
+    "fen": "r1bq1rk1/pp1nbppp/2p1p3/3pP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f7f6",
+      "h5h7"
+    ],
+    "rating": 1350,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #6",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #6!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #6.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "f6",
+        "moveUci": "f7f6",
+        "actor": "b",
+        "explanation": "Black plays f6."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_007",
+    "fen": "r1bq1rk1/1p1nbppp/p1p1p3/3pP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f8e8",
+      "h5h7",
+      "g8f8",
+      "h7h8"
+    ],
+    "rating": 1375,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #7",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #7!",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #7.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Re8",
+        "moveUci": "f8e8",
+        "actor": "b",
+        "explanation": "Black plays Re8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7+",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White checks the King with Qh7+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kf8",
+        "moveUci": "g8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Qh8#",
+        "moveUci": "h7h8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h8"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_008",
+    "fen": "r1bq1rk1/p2nbppp/1pp1p3/3pP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "g7g6",
+      "h5h7"
+    ],
+    "rating": 1400,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #8",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #8!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #8.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "g6",
+        "moveUci": "g7g6",
+        "actor": "b",
+        "explanation": "Black plays g6."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_009",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/2ppP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
       "h7h6",
-      "g5f3"
+      "d1g4",
+      "f7f5",
+      "g4h4",
+      "h6g6",
+      "h4h7"
     ],
-    "rating": 1320,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Kingside Pressure #6 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_007",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1344,
-    "ratingDeviation": 100,
+    "rating": 1425,
+    "ratingDeviation": 80,
     "themes": [
       "greek_gift",
-      "clearance"
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Bishop Aiming at h7 #7 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #9",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #9!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 9,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #9.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh6",
+        "moveUci": "h7h6",
+        "actor": "b",
+        "explanation": "Black plays Kh6."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qg4",
+        "moveUci": "d1g4",
+        "actor": "w",
+        "explanation": "White plays Qg4."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "f5",
+        "moveUci": "f7f5",
+        "actor": "b",
+        "explanation": "Black plays f5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh4+",
+        "moveUci": "g4h4",
+        "actor": "w",
+        "explanation": "White checks the King with Qh4+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg6",
+        "moveUci": "h6g6",
+        "actor": "b",
+        "explanation": "Black plays Kg6."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Qh7#",
+        "moveUci": "h4h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
   },
   {
-    "id": "puz_greekgift_008",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "id": "puz_gg_010",
+    "fen": "r1bq1rk1/1p1nbppp/p3p3/2ppP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "d7b6",
+      "h5h7"
     ],
-    "rating": 1368,
-    "ratingDeviation": 100,
+    "rating": 1450,
+    "ratingDeviation": 80,
     "themes": [
       "greek_gift",
-      "battery"
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "easy",
+    "title": "Greek Gift Tactical Breakthrough #10",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #10!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #10.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Nb6",
+        "moveUci": "d7b6",
+        "actor": "b",
+        "explanation": "Black plays Nb6."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_011",
+    "fen": "r1bq1rk1/p2nbppp/1p2p3/2ppP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f8e8",
+      "h5f7",
+      "g8h8",
+      "f7e8"
+    ],
+    "rating": 1475,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
     "difficulty": "medium",
-    "title": "Greek Gift Prep #8 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
+    "title": "Greek Gift Tactical Breakthrough #11",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #11!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 9,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #11.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Re8",
+        "moveUci": "f8e8",
+        "actor": "b",
+        "explanation": "Black plays Re8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qxf7+",
+        "moveUci": "h5f7",
+        "actor": "w",
+        "explanation": "White plays Qxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Qxe8+",
+        "moveUci": "f7e8",
+        "actor": "w",
+        "explanation": "White plays Qxe8+, capturing the enemy R on e8!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "e8"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
   },
   {
-    "id": "puz_greekgift_009",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "id": "puz_gg_012",
+    "fen": "r1bq1rk1/pp2bppp/2n1p3/2ppP3/8/3B1N2/PP3PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "c6e5",
+      "h5h7"
+    ],
+    "rating": 1500,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #12",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #12!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #12.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Nxe5",
+        "moveUci": "c6e5",
+        "actor": "b",
+        "explanation": "Black plays Nxe5, capturing the enemy P on e5!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_013",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/3B1N1P/PP3PP1/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f8e8",
+      "g5f7",
+      "d7f8",
+      "f7d8"
+    ],
+    "rating": 1525,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #13",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #13!",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #13.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Re8",
+        "moveUci": "f8e8",
+        "actor": "b",
+        "explanation": "Black plays Re8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nxf7",
+        "moveUci": "g5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Nf8",
+        "moveUci": "d7f8",
+        "actor": "b",
+        "explanation": "Black plays Nf8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Nxd8",
+        "moveUci": "f7d8",
+        "actor": "w",
+        "explanation": "White plays Nxd8, capturing the enemy Q on d8!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "d8"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_014",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/P2B1N2/1P3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "a7a5",
+      "h5h7"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #14",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #14!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #14.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "a5",
+        "moveUci": "a7a5",
+        "actor": "b",
+        "explanation": "Black plays a5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_015",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/P1PB1N2/1P3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "b7b5",
+      "h5h7"
+    ],
+    "rating": 1575,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #15",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #15!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #15.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "b5",
+        "moveUci": "b7b5",
+        "actor": "b",
+        "explanation": "Black plays b5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_016",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/2PB1N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "b7b6",
+      "h5h7"
+    ],
+    "rating": 1600,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #16",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #16!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #16.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "b6",
+        "moveUci": "b7b6",
+        "actor": "b",
+        "explanation": "Black plays b6."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_017",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/1P1B1N2/P4PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "e7g5",
+      "c1g5",
+      "f7f6",
+      "e5f6",
+      "f8f6",
+      "g5f6"
+    ],
+    "rating": 1625,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #17",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #17!",
+    "playerColor": "w",
+    "solutionPlies": 11,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_exchange",
+    "outcomeAdvantage": "+2 Exchange ⚖️",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #17.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Bxg5",
+        "moveUci": "e7g5",
+        "actor": "b",
+        "explanation": "Black plays Bxg5, capturing the enemy N on g5!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Bxg5",
+        "moveUci": "c1g5",
+        "actor": "w",
+        "explanation": "White plays Bxg5, capturing the enemy B on g5!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "f6",
+        "moveUci": "f7f6",
+        "actor": "b",
+        "explanation": "Black plays f6."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "exf6",
+        "moveUci": "e5f6",
+        "actor": "w",
+        "explanation": "White plays exf6, capturing the enemy P on f6!"
+      },
+      {
+        "plyIndex": 9,
+        "moveSan": "Rxf6",
+        "moveUci": "f8f6",
+        "actor": "b",
+        "explanation": "Black plays Rxf6, capturing the enemy P on f6!"
+      },
+      {
+        "plyIndex": 10,
+        "moveSan": "Bxf6",
+        "moveUci": "g5f6",
+        "actor": "w",
+        "explanation": "White plays Bxf6, capturing the enemy R on f6!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "f6"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_018",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/3B1NP1/PP3P1P/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f8e8",
+      "h5f7",
+      "g8h8",
+      "f7h5",
+      "h8g8",
+      "h5h7",
+      "g8f8",
+      "h7h8"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #18",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #18!",
+    "playerColor": "w",
+    "solutionPlies": 13,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #18.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Re8",
+        "moveUci": "f8e8",
+        "actor": "b",
+        "explanation": "Black plays Re8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qxf7+",
+        "moveUci": "h5f7",
+        "actor": "w",
+        "explanation": "White plays Qxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Qh5+",
+        "moveUci": "f7h5",
+        "actor": "w",
+        "explanation": "White checks the King with Qh5+!"
+      },
+      {
+        "plyIndex": 9,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 10,
+        "moveSan": "Qh7+",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White checks the King with Qh7+!"
+      },
+      {
+        "plyIndex": 11,
+        "moveSan": "Kf8",
+        "moveUci": "g8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 12,
+        "moveSan": "Qh8#",
+        "moveUci": "h7h8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h8"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_019",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/3B1N2/PP1B1PPP/R2QK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "d8e8",
+      "h5h7"
+    ],
+    "rating": 1675,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #19",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #19!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #19.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Qe8",
+        "moveUci": "d8e8",
+        "actor": "b",
+        "explanation": "Black plays Qe8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_020",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/3B1N2/PP1N1PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f8e8",
+      "h5f7",
+      "g8h8",
+      "f7e8"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "medium",
+    "title": "Greek Gift Tactical Breakthrough #20",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #20!",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_rook",
+    "outcomeAdvantage": "+5 Rook ♜",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #20.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Re8",
+        "moveUci": "f8e8",
+        "actor": "b",
+        "explanation": "Black plays Re8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qxf7+",
+        "moveUci": "h5f7",
+        "actor": "w",
+        "explanation": "White plays Qxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Qxe8+",
+        "moveUci": "f7e8",
+        "actor": "w",
+        "explanation": "White plays Qxe8+, capturing the enemy R on e8!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "e8"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_021",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/8/5N2/PPB2PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "c2h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f7f5",
+      "h5h7"
+    ],
+    "rating": 1725,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Tactical Breakthrough #21",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #21!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #21.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "c2h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "f5",
+        "moveUci": "f7f5",
+        "actor": "b",
+        "explanation": "Black plays f5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "c2",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_022",
+    "fen": "r1bq1rk1/1p1nbppp/p3p3/3pP3/8/5N2/PPB2PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "c2h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "d8e8",
+      "h5h7"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Tactical Breakthrough #22",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #22!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #22.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "c2h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Qe8",
+        "moveUci": "d8e8",
+        "actor": "b",
+        "explanation": "Black plays Qe8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "c2",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_023",
+    "fen": "r1bq1rk1/pp2bppp/2n1p3/3pP3/8/5N2/PPB2PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "c2h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f8e8",
+      "h5h7",
+      "g8f8",
+      "h7h8"
+    ],
+    "rating": 1775,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Tactical Breakthrough #23",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #23!",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #23.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "c2h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Re8",
+        "moveUci": "f8e8",
+        "actor": "b",
+        "explanation": "Black plays Re8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7+",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White checks the King with Qh7+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kf8",
+        "moveUci": "g8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Qh8#",
+        "moveUci": "h7h8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h8"
+    ],
+    "keySquares": [
+      "c2",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_024",
+    "fen": "r1bq1rk1/1p2bppp/p1n1p3/3pP3/8/5N2/PPB2PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "c2h7",
+      "g8h7",
+      "f3g5",
       "h7h6",
-      "g5f3"
-    ],
-    "rating": 1392,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Kingside Pressure #9 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_010",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1416,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "clearance"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Bishop Aiming at h7 #10 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_011",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
-    "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
-    ],
-    "rating": 1440,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "battery"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Greek Gift Prep #11 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_012",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
-    "moves": [
-      "f1d3",
-      "h7h6",
-      "g5f3"
-    ],
-    "rating": 1464,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Kingside Pressure #12 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_013",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1488,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "clearance"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "medium",
-    "title": "Bishop Aiming at h7 #13 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_014",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
-    "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
-    ],
-    "rating": 1512,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "battery"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Greek Gift Prep #14 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_015",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
-    "moves": [
-      "f1d3",
-      "h7h6",
-      "g5f3"
-    ],
-    "rating": 1536,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Kingside Pressure #15 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_016",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1560,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "clearance"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Bishop Aiming at h7 #16 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_017",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
-    "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
-    ],
-    "rating": 1584,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "battery"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Greek Gift Prep #17 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_018",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
-    "moves": [
-      "f1d3",
-      "h7h6",
-      "g5f3"
-    ],
-    "rating": 1608,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Kingside Pressure #18 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_019",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1632,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "clearance"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Bishop Aiming at h7 #19 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_020",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
-    "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
-    ],
-    "rating": 1656,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "battery"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Greek Gift Prep #20 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_021",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
-    "moves": [
-      "f1d3",
-      "h7h6",
-      "g5f3"
-    ],
-    "rating": 1680,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Kingside Pressure #21 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_022",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1704,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "clearance"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Bishop Aiming at h7 #22 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_023",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
-    "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
-    ],
-    "rating": 1728,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "battery"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Greek Gift Prep #23 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_024",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
-    "moves": [
-      "f1d3",
-      "h7h6",
-      "g5f3"
-    ],
-    "rating": 1752,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Kingside Pressure #24 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_025",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1776,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift",
-      "clearance"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Bishop Aiming at h7 #25 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_026",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
-    "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
+      "g5f7",
+      "h6h7",
+      "f7d8"
     ],
     "rating": 1800,
-    "ratingDeviation": 100,
+    "ratingDeviation": 80,
     "themes": [
       "greek_gift",
-      "battery"
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
     "difficulty": "hard",
-    "title": "Greek Gift Prep #26 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
+    "title": "Greek Gift Tactical Breakthrough #24",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #24!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #24.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "c2h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh6",
+        "moveUci": "h7h6",
+        "actor": "b",
+        "explanation": "Black plays Kh6."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nxf7+",
+        "moveUci": "g5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh7",
+        "moveUci": "h6h7",
+        "actor": "b",
+        "explanation": "Black plays Kh7."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nxd8",
+        "moveUci": "f7d8",
+        "actor": "w",
+        "explanation": "White plays Nxd8, capturing the enemy Q on d8!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "d8"
+    ],
+    "keySquares": [
+      "c2",
+      "d1"
+    ]
   },
   {
-    "id": "puz_greekgift_027",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "id": "puz_gg_025",
+    "fen": "r1bq1rk1/p1pnbppp/1p2p3/3pP3/8/5N2/PPB2PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
+      "c2h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "d7f6",
+      "e5f6"
+    ],
+    "rating": 1825,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Tactical Breakthrough #25",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #25!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_minor_piece",
+    "outcomeAdvantage": "+3 Knight ⚔️",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #25.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "c2h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Nf6",
+        "moveUci": "d7f6",
+        "actor": "b",
+        "explanation": "Black plays Nf6."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "exf6",
+        "moveUci": "e5f6",
+        "actor": "w",
+        "explanation": "White plays exf6, capturing the enemy N on f6!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "f6"
+    ],
+    "keySquares": [
+      "c2",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_026",
+    "fen": "r1bq1rk1/pp1nbppp/2p1p3/3pP3/8/5N2/PPB2PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "c2h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "g7g6",
+      "h5h7"
+    ],
+    "rating": 1850,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Tactical Breakthrough #26",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #26!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #26.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "c2h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "g6",
+        "moveUci": "g7g6",
+        "actor": "b",
+        "explanation": "Black plays g6."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "c2",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_027",
+    "fen": "r1bq1rk1/pp1nbppp/4p3/3pP3/4B3/5N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "e4h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "f7f5",
+      "h5h7"
+    ],
+    "rating": 1875,
+    "ratingDeviation": 80,
+    "themes": [
+      "greek_gift",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "greek_gift",
+    "difficulty": "hard",
+    "title": "Greek Gift Tactical Breakthrough #27",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #27!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #27.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "e4h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "f5",
+        "moveUci": "f7f5",
+        "actor": "b",
+        "explanation": "Black plays f5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "e4",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_gg_028",
+    "fen": "r1bq1rk1/1p1nbppp/p3p3/3pP3/4B3/5N2/PP3PPP/R1BQK2R w KQ - 0 1",
+    "moves": [
+      "e4h7",
+      "g8h7",
+      "f3g5",
       "h7h6",
-      "g5f3"
+      "g5f7",
+      "h6h7",
+      "f7d8"
     ],
-    "rating": 1824,
-    "ratingDeviation": 100,
-    "themes": [
-      "greek_gift"
-    ],
-    "primaryTheme": "greek_gift",
-    "difficulty": "hard",
-    "title": "Kingside Pressure #27 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_greekgift_028",
-    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R w KQ - 0 8",
-    "moves": [
-      "f1d3",
-      "d5c4",
-      "d3c4"
-    ],
-    "rating": 1848,
-    "ratingDeviation": 100,
+    "rating": 1900,
+    "ratingDeviation": 80,
     "themes": [
       "greek_gift",
-      "clearance"
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
     "difficulty": "hard",
-    "title": "Bishop Aiming at h7 #28 🎁",
-    "subtitle": "Develop Bd3 towards the kingside!",
+    "title": "Greek Gift Tactical Breakthrough #28",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #28!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #28.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "e4h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh6",
+        "moveUci": "h7h6",
+        "actor": "b",
+        "explanation": "Black plays Kh6."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Nxf7+",
+        "moveUci": "g5f7",
+        "actor": "w",
+        "explanation": "White plays Nxf7+, capturing the enemy P on f7!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh7",
+        "moveUci": "h6h7",
+        "actor": "b",
+        "explanation": "Black plays Kh7."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Nxd8",
+        "moveUci": "f7d8",
+        "actor": "w",
+        "explanation": "White plays Nxd8, capturing the enemy Q on d8!"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "d8"
+    ],
+    "keySquares": [
+      "e4",
+      "d1"
+    ]
   },
   {
-    "id": "puz_greekgift_029",
-    "fen": "r1bq1rk1/pppp1ppp/2n1pn2/8/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQ - 0 6",
+    "id": "puz_gg_029",
+    "fen": "r1bq1rk1/pp2bppp/2n1p3/3pP3/4B3/5N2/PP3PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
-      "d7d5",
-      "e1g1"
+      "e4h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "d8e8",
+      "h5h7"
     ],
-    "rating": 1872,
-    "ratingDeviation": 100,
+    "rating": 1925,
+    "ratingDeviation": 80,
     "themes": [
       "greek_gift",
-      "battery"
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
     "difficulty": "hard",
-    "title": "Greek Gift Prep #29 🎁",
-    "subtitle": "Set up the bishop battery and castle!",
+    "title": "Greek Gift Tactical Breakthrough #29",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #29!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #29.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "e4h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Qe8",
+        "moveUci": "d8e8",
+        "actor": "b",
+        "explanation": "Black plays Qe8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "e4",
+      "d1"
+    ]
   },
   {
-    "id": "puz_greekgift_030",
-    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p2N1/2PP4/2N1P3/PP3PPP/R1BQKB1R w KQ - 2 8",
+    "id": "puz_gg_030",
+    "fen": "r1bq1rk1/1p2bppp/p1n1p3/3pP3/4B3/5N2/PP3PPP/R1BQK2R w KQ - 0 1",
     "moves": [
-      "f1d3",
-      "h7h6",
-      "g5f3"
+      "e4h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5",
+      "c6e5",
+      "h5h7"
     ],
-    "rating": 1896,
-    "ratingDeviation": 100,
+    "rating": 1950,
+    "ratingDeviation": 80,
     "themes": [
-      "greek_gift"
+      "greek_gift",
+      "captures_checks_threats"
     ],
     "primaryTheme": "greek_gift",
     "difficulty": "hard",
-    "title": "Kingside Pressure #30 🎁",
-    "subtitle": "Provoke h6 before the sacrifice!",
+    "title": "Greek Gift Tactical Breakthrough #30",
+    "subtitle": "Bxh7+ shatters kingside defenses in variation #30!",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 7,
+    "tacticalGoal": "Sacrifice the Bishop on h7 and execute the winning attack.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Bxh7+ cracked open Black's kingside shelter. White executed decisive follow-up moves in variation #30.",
+    "keyTakeaway": "The Greek Gift sacrifice strips the kingside and wins decisive material or forces checkmate.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Bxh7+",
+        "moveUci": "e4h7",
+        "actor": "w",
+        "explanation": "White plays Bxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kxh7",
+        "moveUci": "g8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy B on h7!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ng5+",
+        "moveUci": "f3g5",
+        "actor": "w",
+        "explanation": "White checks the King with Ng5+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h7g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Qh5",
+        "moveUci": "d1h5",
+        "actor": "w",
+        "explanation": "White plays Qh5."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Nxe5",
+        "moveUci": "c6e5",
+        "actor": "b",
+        "explanation": "Black plays Nxe5, capturing the enemy P on e5!"
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Qh7#",
+        "moveUci": "h5h7",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qh7#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h7",
+      "h7"
+    ],
+    "keySquares": [
+      "e4",
+      "d1"
+    ]
   }
 ]

@@ -1,647 +1,3054 @@
 [
   {
-    "id": "puz_windmill_001",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "id": "puz_wm_001",
+    "fen": "5rk1/ppp1qR1p/5B2/8/8/8/PPP3PP/6K1 w - - 0 1",
     "moves": [
-      "b2b8"
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7e7"
     ],
-    "rating": 1200,
-    "ratingDeviation": 100,
+    "rating": 1325,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "back_rank_mate",
-      "mate_in_1"
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Windmill Queen Snatch on e7 #1 ♛",
+    "subtitle": "Rook cycles with discovered checks to win Black's Queen on e7!",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #1.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxe7+",
+        "moveUci": "g7e7",
+        "actor": "w",
+        "explanation": "White plays Rxe7+, capturing the enemy Q on e7!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "e7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_002",
+    "fen": "5rk1/pp1q1R1p/5B2/8/8/8/PPP3PP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7d7"
+    ],
+    "rating": 1350,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Windmill Queen Capture on d7 #2 ♛",
+    "subtitle": "White extracts Black's Queen with alternating checks.",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #2.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxd7+",
+        "moveUci": "g7d7",
+        "actor": "w",
+        "explanation": "White plays Rxd7+, capturing the enemy Q on d7!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "d7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_003",
+    "fen": "5rk1/p1q2R1p/5B2/8/8/8/PPP3PP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7c7"
+    ],
+    "rating": 1375,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Windmill Queen Capture on c7 #3 ♛",
+    "subtitle": "White captures Black's Queen on c7 via discovered check.",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #3.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxc7+",
+        "moveUci": "g7c7",
+        "actor": "w",
+        "explanation": "White plays Rxc7+, capturing the enemy Q on c7!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "c7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_004",
+    "fen": "5rk1/1q3R1p/5B2/8/8/8/PPP3PP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7b7"
+    ],
+    "rating": 1400,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Windmill Queen Capture on b7 #4 ♛",
+    "subtitle": "White sweeps across the 7th rank to win the Queen on b7.",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #4.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxb7+",
+        "moveUci": "g7b7",
+        "actor": "w",
+        "explanation": "White plays Rxb7+, capturing the enemy Q on b7!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "b7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_005",
+    "fen": "5rk1/q4R1p/5B2/8/8/8/PPP2PPP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7a7"
+    ],
+    "rating": 1425,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Windmill Queen Capture on a7 #5 ♛",
+    "subtitle": "White collects the Queen on the far a-file.",
+    "playerColor": "w",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #5.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxa7+",
+        "moveUci": "g7a7",
+        "actor": "w",
+        "explanation": "White plays Rxa7+, capturing the enemy Q on a7!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "a7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_006",
+    "fen": "5rk1/p1pq1R1p/5B2/8/8/8/PPP3PP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7d7",
+      "h8g8",
+      "d7c7"
+    ],
+    "rating": 1450,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Windmill Triple Capture #6 ♛",
+    "subtitle": "Rook sweeps Queen and pawn on the 7th rank!",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+10 Queen & Pawn ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #6.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxd7+",
+        "moveUci": "g7d7",
+        "actor": "w",
+        "explanation": "White plays Rxd7+, capturing the enemy Q on d7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxc7",
+        "moveUci": "d7c7",
+        "actor": "w",
+        "explanation": "White plays Rxc7, capturing the enemy P on c7!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "c7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_007",
+    "fen": "5rk1/ppp1qR1p/5B2/8/8/8/PP3PPP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7e7",
+      "h8g8",
+      "e7d7"
+    ],
+    "rating": 1475,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Windmill Multi-Piece Harvest #7 ♛",
+    "subtitle": "White extracts Queen on e7 and bishop on d7.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #7.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxe7+",
+        "moveUci": "g7e7",
+        "actor": "w",
+        "explanation": "White plays Rxe7+, capturing the enemy Q on e7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rd7",
+        "moveUci": "e7d7",
+        "actor": "w",
+        "explanation": "White plays Rd7."
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "d7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_008",
+    "fen": "5rk1/1ppq1R1p/5B2/8/8/8/PPP3PP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7d7",
+      "h8g8",
+      "d7g7",
+      "g8h8",
+      "g7c7"
+    ],
+    "rating": 1500,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Windmill Sweeper on the 7th Rank #8 ♜",
+    "subtitle": "White clears the rank with four consecutive discovered checks.",
+    "playerColor": "w",
+    "solutionPlies": 11,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+10 Queen & Pawn ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #8.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxd7+",
+        "moveUci": "g7d7",
+        "actor": "w",
+        "explanation": "White plays Rxd7+, capturing the enemy Q on d7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rg7+",
+        "moveUci": "d7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 9,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 10,
+        "moveSan": "Rxc7+",
+        "moveUci": "g7c7",
+        "actor": "w",
+        "explanation": "White plays Rxc7+, capturing the enemy P on c7!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "c7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_009",
+    "fen": "5rk1/pppq1R1p/5B2/8/8/8/PPP3PP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7d7",
+      "h8g8",
+      "d7g7",
+      "g8h8",
+      "g7c7",
+      "h8g8",
+      "c7g7",
+      "g8h8",
+      "g7b7"
+    ],
+    "rating": 1525,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Complete 7th Rank Windmill Sweep #9 ♜",
+    "subtitle": "White collects Queen, c-pawn, and b-pawn in a 15-ply sequence!",
+    "playerColor": "w",
+    "solutionPlies": 15,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+11 Queen & Pawns ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #9.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxd7+",
+        "moveUci": "g7d7",
+        "actor": "w",
+        "explanation": "White plays Rxd7+, capturing the enemy Q on d7!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rg7+",
+        "moveUci": "d7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 9,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 10,
+        "moveSan": "Rxc7+",
+        "moveUci": "g7c7",
+        "actor": "w",
+        "explanation": "White plays Rxc7+, capturing the enemy P on c7!"
+      },
+      {
+        "plyIndex": 11,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 12,
+        "moveSan": "Rg7+",
+        "moveUci": "c7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 13,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 14,
+        "moveSan": "Rxb7+",
+        "moveUci": "g7b7",
+        "actor": "w",
+        "explanation": "White plays Rxb7+, capturing the enemy P on b7!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "b7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_010",
+    "fen": "4r1k1/ppp2R1p/4B3/8/8/8/PPP3PP/6K1 w - - 0 1",
+    "moves": [
+      "f7e7",
+      "g8f8",
+      "e7f7",
+      "f8g8",
+      "f7c7",
+      "g8f8",
+      "c7f7",
+      "f8g8",
+      "f7b7"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "easy",
+    "title": "Central Windmill on the e/f Files #10 ♜",
+    "subtitle": "Bishop on e6 and Rook on f7 dismantle Black's pawns.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_pawn",
+    "outcomeAdvantage": "+2 Pawns ♟",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #10.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re7+",
+        "moveUci": "f7e7",
+        "actor": "w",
+        "explanation": "White checks the King with Re7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf8",
+        "moveUci": "g8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rf7+",
+        "moveUci": "e7f7",
+        "actor": "w",
+        "explanation": "White checks the King with Rf7+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxc7+",
+        "moveUci": "f7c7",
+        "actor": "w",
+        "explanation": "White plays Rxc7+, capturing the enemy P on c7!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kf8",
+        "moveUci": "g8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rf7+",
+        "moveUci": "c7f7",
+        "actor": "w",
+        "explanation": "White checks the King with Rf7+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg8",
+        "moveUci": "f8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxb7+",
+        "moveUci": "f7b7",
+        "actor": "w",
+        "explanation": "White plays Rxb7+, capturing the enemy P on b7!"
+      }
+    ],
+    "targetSquares": [
+      "e7",
+      "b7"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
+  },
+  {
+    "id": "puz_wm_011",
+    "fen": "5rk1/ppp2R1p/5B2/3q4/8/8/PPP3PP/6K1 w - - 0 1",
+    "moves": [
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7g5",
+      "h8h7",
+      "g5d5"
+    ],
+    "rating": 1575,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "Bishop-Rook Laser Mate #1 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
+    "title": "Windmill Queen Extraction on d5 #11 ♛",
+    "subtitle": "Rook steps back to g5+ discovered check and snatches the d5 Queen!",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #11.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g7g5",
+        "actor": "w",
+        "explanation": "White checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kh7."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxd5",
+        "moveUci": "g5d5",
+        "actor": "w",
+        "explanation": "White plays Rxd5, capturing the enemy Q on d5!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "d5"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
   },
   {
-    "id": "puz_windmill_002",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "id": "puz_wm_012",
+    "fen": "5rk1/ppp2R1p/5B2/4q3/8/8/PPP3PP/6K1 w - - 0 1",
     "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7g5",
+      "h8h7",
+      "g5e5"
     ],
-    "rating": 1224,
-    "ratingDeviation": 100,
+    "rating": 1600,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "rook_endgame"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "7th Rank Sweeper #2 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "title": "Windmill Queen Snatch on e5 #12 ♛",
+    "subtitle": "Rook captures Black Queen on e5 with discovered check cadence.",
     "playerColor": "w",
-    "solutionPlies": 5
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #12.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g7g5",
+        "actor": "w",
+        "explanation": "White checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kh7."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxe5",
+        "moveUci": "g5e5",
+        "actor": "w",
+        "explanation": "White plays Rxe5, capturing the enemy Q on e5!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "e5"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
   },
   {
-    "id": "puz_windmill_003",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "id": "puz_wm_013",
+    "fen": "5rk1/ppp2R1p/5B2/2q5/3P4/8/PPP3PP/6K1 w - - 0 1",
     "moves": [
-      "b2b8"
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7g5",
+      "h8h7",
+      "g5c5"
     ],
-    "rating": 1248,
-    "ratingDeviation": 100,
+    "rating": 1625,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "back_rank_mate",
-      "mate_in_1"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "Bishop-Rook Laser Mate #3 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
+    "title": "Windmill Queen Snatch on c5 #13 ♛",
+    "subtitle": "White harvests the c5 Queen using the long diagonal battery.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #13.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g7g5",
+        "actor": "w",
+        "explanation": "White checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kh7."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxc5",
+        "moveUci": "g5c5",
+        "actor": "w",
+        "explanation": "White plays Rxc5, capturing the enemy Q on c5!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "c5"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
   },
   {
-    "id": "puz_windmill_004",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "id": "puz_wm_014",
+    "fen": "5rk1/ppp2R1p/5B2/1q6/8/8/PPP3PP/6K1 w - - 0 1",
     "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7g5",
+      "h8h7",
+      "g5b5"
     ],
-    "rating": 1272,
-    "ratingDeviation": 100,
+    "rating": 1650,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "rook_endgame"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "7th Rank Sweeper #4 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
+    "title": "Windmill Queen Snatch on b5 #14 ♛",
+    "subtitle": "White pulls back to g5+ to take the b5 Queen.",
     "playerColor": "w",
-    "solutionPlies": 5
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #14.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g7g5",
+        "actor": "w",
+        "explanation": "White checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kh7."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxb5",
+        "moveUci": "g5b5",
+        "actor": "w",
+        "explanation": "White plays Rxb5, capturing the enemy Q on b5!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "b5"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
   },
   {
-    "id": "puz_windmill_005",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "id": "puz_wm_015",
+    "fen": "5rk1/ppp2R1p/5B2/q7/8/8/PPP3PP/6K1 w - - 0 1",
     "moves": [
-      "b2b8"
+      "f7g7",
+      "g8h8",
+      "g7h7",
+      "h8g8",
+      "h7g7",
+      "g8h8",
+      "g7g5",
+      "h8h7",
+      "g5a5"
     ],
-    "rating": 1296,
-    "ratingDeviation": 100,
+    "rating": 1675,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "back_rank_mate",
-      "mate_in_1"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "Bishop-Rook Laser Mate #5 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
+    "title": "Windmill Queen Snatch on a5 #15 ♛",
+    "subtitle": "White captures the far-flung Queen on a5 via discovered check.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the windmill battery and sweep pieces along the 7th rank.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #15.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg7+",
+        "moveUci": "f7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh7+",
+        "moveUci": "g7h7",
+        "actor": "w",
+        "explanation": "White plays Rxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg7+",
+        "moveUci": "h7g7",
+        "actor": "w",
+        "explanation": "White checks the King with Rg7+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g7g5",
+        "actor": "w",
+        "explanation": "White checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kh7."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxa5",
+        "moveUci": "g5a5",
+        "actor": "w",
+        "explanation": "White plays Rxa5, capturing the enemy Q on a5!"
+      }
+    ],
+    "targetSquares": [
+      "g7",
+      "a5"
+    ],
+    "keySquares": [
+      "f7",
+      "f6"
+    ]
   },
   {
-    "id": "puz_windmill_006",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "id": "puz_wm_016",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PPP1Qr1P/7K b - - 0 1",
     "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2e2"
     ],
-    "rating": 1320,
-    "ratingDeviation": 100,
+    "rating": 1700,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "rook_endgame"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "7th Rank Sweeper #6 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
+    "title": "Black Windmill Queen Snatch on e2 #16 ♛",
+    "subtitle": "Black captures White's Queen on e2 via 2nd-rank battery.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #16.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxe2+",
+        "moveUci": "g2e2",
+        "actor": "b",
+        "explanation": "Black plays Rxe2+, capturing the enemy Q on e2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "e2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   },
   {
-    "id": "puz_windmill_007",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "id": "puz_wm_017",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
     "moves": [
-      "b2b8"
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2d2"
     ],
-    "rating": 1344,
-    "ratingDeviation": 100,
+    "rating": 1725,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "back_rank_mate",
-      "mate_in_1"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "Bishop-Rook Laser Mate #7 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Windmill Queen Snatch on d2 #17 ♛",
+    "subtitle": "Black cycles discovered checks to capture the White Queen on d2!",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #17.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxd2+",
+        "moveUci": "g2d2",
+        "actor": "b",
+        "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "d2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   },
   {
-    "id": "puz_windmill_008",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "id": "puz_wm_018",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PPQ2r1P/7K b - - 0 1",
     "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2c2"
     ],
-    "rating": 1368,
-    "ratingDeviation": 100,
+    "rating": 1750,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "rook_endgame"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "7th Rank Sweeper #8 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
+    "title": "Black Windmill Queen Snatch on c2 #18 ♛",
+    "subtitle": "Black picks off White's Queen on c2 with alternating checks.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #18.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxc2+",
+        "moveUci": "g2c2",
+        "actor": "b",
+        "explanation": "Black plays Rxc2+, capturing the enemy Q on c2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "c2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   },
   {
-    "id": "puz_windmill_009",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "id": "puz_wm_019",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PQ3r1P/7K b - - 0 1",
     "moves": [
-      "b2b8"
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2b2"
     ],
-    "rating": 1392,
-    "ratingDeviation": 100,
+    "rating": 1775,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "back_rank_mate",
-      "mate_in_1"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "medium",
-    "title": "Bishop-Rook Laser Mate #9 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Windmill Queen Snatch on b2 #19 ♛",
+    "subtitle": "Black sweeps the 2nd rank and captures the b2 Queen.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #19.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxb2+",
+        "moveUci": "g2b2",
+        "actor": "b",
+        "explanation": "Black plays Rxb2+, capturing the enemy Q on b2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "b2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   },
   {
-    "id": "puz_windmill_010",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "id": "puz_wm_020",
+    "fen": "6k1/ppp2p1p/8/8/8/5b2/Q4r1P/7K b - - 0 1",
     "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
-    ],
-    "rating": 1416,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "rook_endgame"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "medium",
-    "title": "7th Rank Sweeper #10 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
-  },
-  {
-    "id": "puz_windmill_011",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
-    "moves": [
-      "b2b8"
-    ],
-    "rating": 1440,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "medium",
-    "title": "Bishop-Rook Laser Mate #11 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_windmill_012",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
-    ],
-    "rating": 1464,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "rook_endgame"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "medium",
-    "title": "7th Rank Sweeper #12 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
-  },
-  {
-    "id": "puz_windmill_013",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
-    "moves": [
-      "b2b8"
-    ],
-    "rating": 1488,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "medium",
-    "title": "Bishop-Rook Laser Mate #13 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_windmill_014",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
-    ],
-    "rating": 1512,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "rook_endgame"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "7th Rank Sweeper #14 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
-  },
-  {
-    "id": "puz_windmill_015",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
-    "moves": [
-      "b2b8"
-    ],
-    "rating": 1536,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "Bishop-Rook Laser Mate #15 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_windmill_016",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
-    ],
-    "rating": 1560,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "rook_endgame"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "7th Rank Sweeper #16 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
-  },
-  {
-    "id": "puz_windmill_017",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
-    "moves": [
-      "b2b8"
-    ],
-    "rating": 1584,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "Bishop-Rook Laser Mate #17 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_windmill_018",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
-    ],
-    "rating": 1608,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "rook_endgame"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "7th Rank Sweeper #18 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
-  },
-  {
-    "id": "puz_windmill_019",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
-    "moves": [
-      "b2b8"
-    ],
-    "rating": 1632,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "Bishop-Rook Laser Mate #19 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_windmill_020",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
-    ],
-    "rating": 1656,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "rook_endgame"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "7th Rank Sweeper #20 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
-  },
-  {
-    "id": "puz_windmill_021",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
-    "moves": [
-      "b2b8"
-    ],
-    "rating": 1680,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "Bishop-Rook Laser Mate #21 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_windmill_022",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
-    ],
-    "rating": 1704,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "rook_endgame"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "7th Rank Sweeper #22 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
-  },
-  {
-    "id": "puz_windmill_023",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
-    "moves": [
-      "b2b8"
-    ],
-    "rating": 1728,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "Bishop-Rook Laser Mate #23 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_windmill_024",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
-    ],
-    "rating": 1752,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "rook_endgame"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "7th Rank Sweeper #24 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
-  },
-  {
-    "id": "puz_windmill_025",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
-    "moves": [
-      "b2b8"
-    ],
-    "rating": 1776,
-    "ratingDeviation": 100,
-    "themes": [
-      "windmill",
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "Bishop-Rook Laser Mate #25 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_windmill_026",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2a2"
     ],
     "rating": 1800,
-    "ratingDeviation": 100,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "rook_endgame"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
-    "title": "7th Rank Sweeper #26 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
+    "difficulty": "medium",
+    "title": "Black Windmill Queen Snatch on a2 #20 ♛",
+    "subtitle": "Black takes White's Queen on a2 via discovered check.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #20.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxa2+",
+        "moveUci": "g2a2",
+        "actor": "b",
+        "explanation": "Black plays Rxa2+, capturing the enemy Q on a2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "a2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   },
   {
-    "id": "puz_windmill_027",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "id": "puz_wm_021",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PPPQ1r1P/6K1 b - - 0 1",
     "moves": [
-      "b2b8"
+      "f2g2",
+      "g1h1",
+      "g2d2",
+      "h1g1",
+      "d2g2",
+      "g1h1",
+      "g2c2"
     ],
-    "rating": 1824,
-    "ratingDeviation": 100,
+    "rating": 1825,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "back_rank_mate",
-      "mate_in_1"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "hard",
-    "title": "Bishop-Rook Laser Mate #27 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Windmill Double Capture #21 ♛",
+    "subtitle": "Black harvests Queen on d2 and pawn on c2.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+10 Queen & Pawn ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #21.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxd2+",
+        "moveUci": "g2d2",
+        "actor": "b",
+        "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "d2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxc2+",
+        "moveUci": "g2c2",
+        "actor": "b",
+        "explanation": "Black plays Rxc2+, capturing the enemy P on c2!"
+      }
+    ],
+    "targetSquares": [
+      "g2",
+      "c2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   },
   {
-    "id": "puz_windmill_028",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "id": "puz_wm_022",
+    "fen": "6k1/ppp2ppp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
     "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2d2",
+      "h1g1",
+      "d2g2",
+      "g1h1",
+      "g2c2",
+      "h1g1",
+      "c2g2",
+      "g1h1",
+      "g2b2",
+      "h1g1",
+      "b2g2",
+      "g1h1",
+      "g2a2"
     ],
-    "rating": 1848,
-    "ratingDeviation": 100,
+    "rating": 1850,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "rook_endgame"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "hard",
-    "title": "7th Rank Sweeper #28 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
+    "title": "Full 2nd-Rank Black Windmill Sweep #22 ♛",
+    "subtitle": "Black scoops Queen and three pawns across the 2nd rank in 17 plies!",
+    "playerColor": "b",
+    "solutionPlies": 17,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+12 Decisive Material ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #22.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxd2+",
+        "moveUci": "g2d2",
+        "actor": "b",
+        "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg2+",
+        "moveUci": "d2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxc2+",
+        "moveUci": "g2c2",
+        "actor": "b",
+        "explanation": "Black plays Rxc2+, capturing the enemy P on c2!"
+      },
+      {
+        "plyIndex": 9,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 10,
+        "moveSan": "Rg2+",
+        "moveUci": "c2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 11,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 12,
+        "moveSan": "Rxb2+",
+        "moveUci": "g2b2",
+        "actor": "b",
+        "explanation": "Black plays Rxb2+, capturing the enemy P on b2!"
+      },
+      {
+        "plyIndex": 13,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 14,
+        "moveSan": "Rg2+",
+        "moveUci": "b2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 15,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 16,
+        "moveSan": "Rxa2+",
+        "moveUci": "g2a2",
+        "actor": "b",
+        "explanation": "Black plays Rxa2+, capturing the enemy P on a2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "a2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   },
   {
-    "id": "puz_windmill_029",
-    "fen": "6k1/5ppp/8/8/8/8/1R3BPP/6K1 w - - 0 1",
+    "id": "puz_wm_023",
+    "fen": "5rk1/ppp2p1p/8/3Q4/8/5b2/PPP2r1P/7K b - - 0 1",
     "moves": [
-      "b2b8"
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2g5",
+      "h1h2",
+      "g5d5"
     ],
-    "rating": 1872,
-    "ratingDeviation": 100,
+    "rating": 1875,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "back_rank_mate",
-      "mate_in_1"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "hard",
-    "title": "Bishop-Rook Laser Mate #29 🌪️",
-    "subtitle": "Back-rank mate supported by bishop!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Torre-Lasker Theme on d5 #23 ♛",
+    "subtitle": "Black steps back to g5+ discovered check to capture the Queen on d5!",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #23.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kh2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxd5",
+        "moveUci": "g5d5",
+        "actor": "b",
+        "explanation": "Black plays Rxd5, capturing the enemy Q on d5!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "d5"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   },
   {
-    "id": "puz_windmill_030",
-    "fen": "r4rk1/pp3ppp/8/8/8/8/1R3PPP/4R1K1 w - - 0 1",
+    "id": "puz_wm_024",
+    "fen": "5rk1/ppp2p1p/8/4Q3/8/5b2/PPP2r1P/7K b - - 0 1",
     "moves": [
-      "b2b7",
-      "f8e8",
-      "e1e8",
-      "a8e8",
-      "b7a7"
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2g5",
+      "h1h2",
+      "g5e5"
     ],
-    "rating": 1896,
-    "ratingDeviation": 100,
+    "rating": 1900,
+    "ratingDeviation": 80,
     "themes": [
       "windmill",
-      "rook_endgame"
+      "discovered_checks",
+      "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
     "difficulty": "hard",
-    "title": "7th Rank Sweeper #30 🌪️",
-    "subtitle": "Rook sweeps the 7th rank pawns!",
-    "playerColor": "w",
-    "solutionPlies": 5
+    "title": "Black Windmill Queen Extraction on e5 #24 ♛",
+    "subtitle": "Black captures White's Queen on e5 via discovered check cadence.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #24.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kh2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxe5",
+        "moveUci": "g5e5",
+        "actor": "b",
+        "explanation": "Black plays Rxe5, capturing the enemy Q on e5!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "e5"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
+  },
+  {
+    "id": "puz_wm_025",
+    "fen": "5rk1/ppp2p1p/8/2Q5/8/5b2/PPP2r1P/7K b - - 0 1",
+    "moves": [
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2g5",
+      "h1h2",
+      "g5c5"
+    ],
+    "rating": 1925,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Black Windmill Queen Extraction on c5 #25 ♛",
+    "subtitle": "Black captures White's Queen on c5 with discovered check.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #25.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kh2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxc5",
+        "moveUci": "g5c5",
+        "actor": "b",
+        "explanation": "Black plays Rxc5, capturing the enemy Q on c5!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "c5"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
+  },
+  {
+    "id": "puz_wm_026",
+    "fen": "5rk1/ppp2p1p/8/1Q6/8/5b2/PPP2r1P/7K b - - 0 1",
+    "moves": [
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2g5",
+      "h1h2",
+      "g5b5"
+    ],
+    "rating": 1950,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Black Windmill Queen Extraction on b5 #26 ♛",
+    "subtitle": "Black captures White's Queen on b5 via long diagonal battery.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #26.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kh2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxb5",
+        "moveUci": "g5b5",
+        "actor": "b",
+        "explanation": "Black plays Rxb5, capturing the enemy Q on b5!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "b5"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
+  },
+  {
+    "id": "puz_wm_027",
+    "fen": "5rk1/ppp2p1p/8/Q7/8/5b2/PPP2r1P/7K b - - 0 1",
+    "moves": [
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2g5",
+      "h1h2",
+      "g5a5"
+    ],
+    "rating": 1975,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Black Windmill Queen Extraction on a5 #27 ♛",
+    "subtitle": "Black captures White's Queen on a5 via discovered check.",
+    "playerColor": "b",
+    "solutionPlies": 7,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+9 Queen ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #27.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kh2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rxa5",
+        "moveUci": "g5a5",
+        "actor": "b",
+        "explanation": "Black plays Rxa5, capturing the enemy Q on a5!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "a5"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
+  },
+  {
+    "id": "puz_wm_028",
+    "fen": "6k1/1pp3pp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
+    "moves": [
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2d2",
+      "h1g1",
+      "d2g2",
+      "g1h1",
+      "g2c2"
+    ],
+    "rating": 2000,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Black Windmill Two-Piece Harvest #28 ♛",
+    "subtitle": "Black captures Queen on d2 and pawn on c2 in 9 plies.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+10 Queen & Pawn ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #28.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxd2+",
+        "moveUci": "g2d2",
+        "actor": "b",
+        "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg2+",
+        "moveUci": "d2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxc2+",
+        "moveUci": "g2c2",
+        "actor": "b",
+        "explanation": "Black plays Rxc2+, capturing the enemy P on c2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "c2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
+  },
+  {
+    "id": "puz_wm_029",
+    "fen": "6k1/p1p3pp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
+    "moves": [
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2d2",
+      "h1g1",
+      "d2g2",
+      "g1h1",
+      "g2c2",
+      "h1g1",
+      "c2b2"
+    ],
+    "rating": 2025,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Black Windmill Three-Piece Harvest #29 ♛",
+    "subtitle": "Black clears White's 2nd rank from d2 to b2 in 11 plies.",
+    "playerColor": "b",
+    "solutionPlies": 11,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+11 Queen & Pawns ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #29.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxd2+",
+        "moveUci": "g2d2",
+        "actor": "b",
+        "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg2+",
+        "moveUci": "d2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxc2+",
+        "moveUci": "g2c2",
+        "actor": "b",
+        "explanation": "Black plays Rxc2+, capturing the enemy P on c2!"
+      },
+      {
+        "plyIndex": 9,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 10,
+        "moveSan": "Rxb2",
+        "moveUci": "c2b2",
+        "actor": "b",
+        "explanation": "Black plays Rxb2, capturing the enemy P on b2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "b2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
+  },
+  {
+    "id": "puz_wm_030",
+    "fen": "6k1/2p3pp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
+    "moves": [
+      "f2h2",
+      "h1g1",
+      "h2g2",
+      "g1h1",
+      "g2d2",
+      "h1g1",
+      "d2g2",
+      "g1h1",
+      "g2c2",
+      "h1g1",
+      "c2g2",
+      "g1h1",
+      "g2b2",
+      "h1g1",
+      "b2g2",
+      "g1h1",
+      "g2a2"
+    ],
+    "rating": 2050,
+    "ratingDeviation": 80,
+    "themes": [
+      "windmill",
+      "discovered_checks",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "windmill",
+    "difficulty": "hard",
+    "title": "Black Full-Rank Extraction #30 ♛",
+    "subtitle": "Black sweeps the entire 2nd rank from d2 to a2 in 17 plies.",
+    "playerColor": "b",
+    "solutionPlies": 17,
+    "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
+    "tacticalReward": "win_queen",
+    "outcomeAdvantage": "+12 Decisive Material ♛",
+    "learningSummary": "The windmill battery systematically decimated the opponent's pieces with alternating checks in puzzle #30.",
+    "keyTakeaway": "The windmill is an unstoppable tactical engine where discovered checks paralyze the enemy king while the rook cleans the rank.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rxh2+",
+        "moveUci": "f2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rxd2+",
+        "moveUci": "g2d2",
+        "actor": "b",
+        "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg2+",
+        "moveUci": "d2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "Rxc2+",
+        "moveUci": "g2c2",
+        "actor": "b",
+        "explanation": "Black plays Rxc2+, capturing the enemy P on c2!"
+      },
+      {
+        "plyIndex": 9,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 10,
+        "moveSan": "Rg2+",
+        "moveUci": "c2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 11,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 12,
+        "moveSan": "Rxb2+",
+        "moveUci": "g2b2",
+        "actor": "b",
+        "explanation": "Black plays Rxb2+, capturing the enemy P on b2!"
+      },
+      {
+        "plyIndex": 13,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 14,
+        "moveSan": "Rg2+",
+        "moveUci": "b2g2",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg2+!"
+      },
+      {
+        "plyIndex": 15,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 16,
+        "moveSan": "Rxa2+",
+        "moveUci": "g2a2",
+        "actor": "b",
+        "explanation": "Black plays Rxa2+, capturing the enemy P on a2!"
+      }
+    ],
+    "targetSquares": [
+      "h2",
+      "a2"
+    ],
+    "keySquares": [
+      "f2",
+      "f3"
+    ]
   }
 ]

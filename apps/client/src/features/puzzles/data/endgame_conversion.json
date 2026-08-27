@@ -1,737 +1,2674 @@
 [
   {
-    "id": "puz_endgame_001",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_001",
+    "fen": "4K3/4P1k1/8/8/R7/8/4r3/8 w - - 0 1",
     "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
+      "a4g4",
+      "g7f6",
+      "e8f8",
+      "e2h2",
+      "e7e8q"
     ],
-    "rating": 700,
-    "ratingDeviation": 100,
+    "rating": 1200,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "novice",
-    "title": "Promote to Queen #1 👑",
-    "subtitle": "Advance your e-pawn to e8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_002",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
-    ],
-    "rating": 726,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "novice",
-    "title": "Flank Pawn Promotion #2 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_003",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
-    ],
-    "rating": 752,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "novice",
-    "title": "g-Pawn Touchdown #3 👑",
-    "subtitle": "Crown your g-pawn on g8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_004",
-    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "c7c8q",
-      "e3d3",
-      "c8c3"
-    ],
-    "rating": 778,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "novice",
-    "title": "Queenside Coronation #4 👑",
-    "subtitle": "Promote c8=Q and win!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_005",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
-    ],
-    "rating": 804,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "novice",
-    "title": "Promote to Queen #5 👑",
-    "subtitle": "Advance your e-pawn to e8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_006",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
-    ],
-    "rating": 830,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "novice",
-    "title": "Flank Pawn Promotion #6 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_007",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
-    ],
-    "rating": 856,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "novice",
-    "title": "g-Pawn Touchdown #7 👑",
-    "subtitle": "Crown your g-pawn on g8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_008",
-    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "c7c8q",
-      "e3d3",
-      "c8c3"
-    ],
-    "rating": 882,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "novice",
-    "title": "Queenside Coronation #8 👑",
-    "subtitle": "Promote c8=Q and win!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_009",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
-    ],
-    "rating": 908,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Promote to Queen #9 👑",
-    "subtitle": "Advance your e-pawn to e8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_010",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
-    ],
-    "rating": 934,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Flank Pawn Promotion #10 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_011",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
-    ],
-    "rating": 960,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "g-Pawn Touchdown #11 👑",
-    "subtitle": "Crown your g-pawn on g8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_012",
-    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "c7c8q",
-      "e3d3",
-      "c8c3"
-    ],
-    "rating": 986,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Queenside Coronation #12 👑",
-    "subtitle": "Promote c8=Q and win!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_013",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
-    ],
-    "rating": 1012,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Promote to Queen #13 👑",
-    "subtitle": "Advance your e-pawn to e8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_014",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
-    ],
-    "rating": 1038,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Flank Pawn Promotion #14 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_015",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
-    ],
-    "rating": 1064,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "g-Pawn Touchdown #15 👑",
-    "subtitle": "Crown your g-pawn on g8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_016",
-    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "c7c8q",
-      "e3d3",
-      "c8c3"
-    ],
-    "rating": 1090,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Queenside Coronation #16 👑",
-    "subtitle": "Promote c8=Q and win!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_017",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
-    ],
-    "rating": 1116,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Promote to Queen #17 👑",
-    "subtitle": "Advance your e-pawn to e8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_018",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
-    ],
-    "rating": 1142,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Flank Pawn Promotion #18 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_019",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
-    ],
-    "rating": 1168,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "g-Pawn Touchdown #19 👑",
-    "subtitle": "Crown your g-pawn on g8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_020",
-    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "c7c8q",
-      "e3d3",
-      "c8c3"
-    ],
-    "rating": 1194,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "easy",
-    "title": "Queenside Coronation #20 👑",
-    "subtitle": "Promote c8=Q and win!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_021",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
-    ],
-    "rating": 1220,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "medium",
-    "title": "Promote to Queen #21 👑",
-    "subtitle": "Advance your e-pawn to e8!",
+    "title": "Lucena Position — e-File Bridge #1 👑",
+    "subtitle": "1. Rg4+ Kf6 2. Kf8 Rh2 3. e8=Q! completes the Lucena conversion.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1. Rg4+ Kf6 2. Kf8 Rh2 3. e8=Q! completes the Lucena conversion. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg4+",
+        "moveUci": "a4g4",
+        "actor": "w",
+        "explanation": "White checks the King with Rg4+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf6",
+        "moveUci": "g7f6",
+        "actor": "b",
+        "explanation": "Black plays Kf6."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Kf8",
+        "moveUci": "e8f8",
+        "actor": "w",
+        "explanation": "White plays Kf8."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh2",
+        "moveUci": "e2h2",
+        "actor": "b",
+        "explanation": "Black plays Rh2."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "e8=Q",
+        "moveUci": "e7e8q",
+        "actor": "w",
+        "explanation": "White plays e8=Q."
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "a4",
+      "e8"
+    ]
   },
   {
-    "id": "puz_endgame_022",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_002",
+    "fen": "3K4/3P1k2/8/8/R7/8/3r4/8 w - - 0 1",
     "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
+      "a4f4",
+      "f7e6",
+      "d8e8",
+      "d2h2",
+      "d7d8q"
     ],
-    "rating": 1246,
-    "ratingDeviation": 100,
+    "rating": 1250,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "medium",
-    "title": "Flank Pawn Promotion #22 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
+    "title": "Lucena Position — d-File Bridge #2 👑",
+    "subtitle": "White forces the enemy king away before promoting on d8.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "White forces the enemy king away before promoting on d8. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rf4+",
+        "moveUci": "a4f4",
+        "actor": "w",
+        "explanation": "White checks the King with Rf4+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke6",
+        "moveUci": "f7e6",
+        "actor": "b",
+        "explanation": "Black plays Ke6."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ke8",
+        "moveUci": "d8e8",
+        "actor": "w",
+        "explanation": "White plays Ke8."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh2",
+        "moveUci": "d2h2",
+        "actor": "b",
+        "explanation": "Black plays Rh2."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "d8=Q",
+        "moveUci": "d7d8q",
+        "actor": "w",
+        "explanation": "White plays d8=Q."
+      }
+    ],
+    "targetSquares": [
+      "d8"
+    ],
+    "keySquares": [
+      "a4",
+      "d8"
+    ]
   },
   {
-    "id": "puz_endgame_023",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_003",
+    "fen": "2K5/2P1k3/8/8/R7/8/2r5/8 w - - 0 1",
     "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
+      "a4e4",
+      "e7f6",
+      "c8d7",
+      "c2h2",
+      "c7c8q"
     ],
-    "rating": 1272,
-    "ratingDeviation": 100,
+    "rating": 1300,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "medium",
-    "title": "g-Pawn Touchdown #23 👑",
-    "subtitle": "Crown your g-pawn on g8!",
+    "title": "Lucena Position — c-File Escort #3 👑",
+    "subtitle": "White steps the King to d7 and promotes on c8.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "White steps the King to d7 and promotes on c8. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re4+",
+        "moveUci": "a4e4",
+        "actor": "w",
+        "explanation": "White checks the King with Re4+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf6",
+        "moveUci": "e7f6",
+        "actor": "b",
+        "explanation": "Black plays Kf6."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Kd7",
+        "moveUci": "c8d7",
+        "actor": "w",
+        "explanation": "White plays Kd7."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh2",
+        "moveUci": "c2h2",
+        "actor": "b",
+        "explanation": "Black plays Rh2."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "c8=Q",
+        "moveUci": "c7c8q",
+        "actor": "w",
+        "explanation": "White plays c8=Q."
+      }
+    ],
+    "targetSquares": [
+      "c8"
+    ],
+    "keySquares": [
+      "a4",
+      "c8"
+    ]
   },
   {
-    "id": "puz_endgame_024",
-    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_004",
+    "fen": "5K2/5P1k/8/8/R7/8/5r2/8 w - - 0 1",
     "moves": [
-      "c7c8q",
-      "e3d3",
-      "c8c3"
-    ],
-    "rating": 1298,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "medium",
-    "title": "Queenside Coronation #24 👑",
-    "subtitle": "Promote c8=Q and win!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_025",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
-    ],
-    "rating": 1324,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "medium",
-    "title": "Promote to Queen #25 👑",
-    "subtitle": "Advance your e-pawn to e8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_026",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
+      "a4h4",
+      "h7g6",
+      "f8g8",
+      "f2f1",
+      "f7f8q"
     ],
     "rating": 1350,
-    "ratingDeviation": 100,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "medium",
-    "title": "Flank Pawn Promotion #26 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
+    "title": "Lucena Position — f-File Shelter #4 👑",
+    "subtitle": "White drives Black's king to g6 and queens the f-pawn.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "White drives Black's king to g6 and queens the f-pawn. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rh4+",
+        "moveUci": "a4h4",
+        "actor": "w",
+        "explanation": "White checks the King with Rh4+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg6",
+        "moveUci": "h7g6",
+        "actor": "b",
+        "explanation": "Black plays Kg6."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Kg8",
+        "moveUci": "f8g8",
+        "actor": "w",
+        "explanation": "White plays Kg8."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rf1",
+        "moveUci": "f2f1",
+        "actor": "b",
+        "explanation": "Black plays Rf1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "f8=Q",
+        "moveUci": "f7f8q",
+        "actor": "w",
+        "explanation": "White plays f8=Q."
+      }
+    ],
+    "targetSquares": [
+      "f8"
+    ],
+    "keySquares": [
+      "a4",
+      "f8"
+    ]
   },
   {
-    "id": "puz_endgame_027",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_005",
+    "fen": "1K6/1P1k4/8/8/R7/8/1r6/8 w - - 0 1",
     "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
+      "a4d4",
+      "d7e6",
+      "b8c7",
+      "b2h2",
+      "b7b8q"
     ],
-    "rating": 1376,
-    "ratingDeviation": 100,
+    "rating": 1400,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "medium",
-    "title": "g-Pawn Touchdown #27 👑",
-    "subtitle": "Crown your g-pawn on g8!",
+    "title": "Lucena Position — b-File Conversion #5 👑",
+    "subtitle": "White crowns the b-pawn with 3. b8=Q.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "White crowns the b-pawn with 3. b8=Q. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd4+",
+        "moveUci": "a4d4",
+        "actor": "w",
+        "explanation": "White checks the King with Rd4+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke6",
+        "moveUci": "d7e6",
+        "actor": "b",
+        "explanation": "Black plays Ke6."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Kc7",
+        "moveUci": "b8c7",
+        "actor": "w",
+        "explanation": "White plays Kc7."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh2",
+        "moveUci": "b2h2",
+        "actor": "b",
+        "explanation": "Black plays Rh2."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "b8=Q",
+        "moveUci": "b7b8q",
+        "actor": "w",
+        "explanation": "White plays b8=Q."
+      }
+    ],
+    "targetSquares": [
+      "b8"
+    ],
+    "keySquares": [
+      "a4",
+      "b8"
+    ]
   },
   {
-    "id": "puz_endgame_028",
-    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_006",
+    "fen": "8/4R3/8/r7/8/8/4p1K1/4k3 b - - 0 1",
     "moves": [
-      "c7c8q",
-      "e3d3",
-      "c8c3"
+      "a5g5",
+      "g2f3",
+      "e1f1",
+      "e7h7",
+      "e2e1q"
     ],
-    "rating": 1402,
-    "ratingDeviation": 100,
+    "rating": 1450,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "medium",
-    "title": "Queenside Coronation #28 👑",
-    "subtitle": "Promote c8=Q and win!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Lucena — e-File Bridge #6 👑",
+    "subtitle": "1...Rg5+ 2. Kf3 Kf1 3...e1=Q! secures the win for Black.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1...Rg5+ 2. Kf3 Kf1 3...e1=Q! secures the win for Black. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rg5+",
+        "moveUci": "a5g5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rg5+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf3",
+        "moveUci": "g2f3",
+        "actor": "w",
+        "explanation": "White plays Kf3."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Kf1",
+        "moveUci": "e1f1",
+        "actor": "b",
+        "explanation": "Black plays Kf1."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh7",
+        "moveUci": "e7h7",
+        "actor": "w",
+        "explanation": "White plays Rh7."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "e1=Q",
+        "moveUci": "e2e1q",
+        "actor": "b",
+        "explanation": "Black plays e1=Q."
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "a5",
+      "e1"
+    ]
   },
   {
-    "id": "puz_endgame_029",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_007",
+    "fen": "8/3R4/8/r7/8/8/3p1K2/3k4 b - - 0 1",
     "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
+      "a5f5",
+      "f2e3",
+      "d1e1",
+      "d7h7",
+      "d2d1q"
     ],
-    "rating": 1428,
-    "ratingDeviation": 100,
+    "rating": 1500,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "medium",
-    "title": "Promote to Queen #29 👑",
-    "subtitle": "Advance your e-pawn to e8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_030",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
-    ],
-    "rating": 1454,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "medium",
-    "title": "Flank Pawn Promotion #30 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_031",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
-    ],
-    "rating": 1480,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
-    "difficulty": "medium",
-    "title": "g-Pawn Touchdown #31 👑",
-    "subtitle": "Crown your g-pawn on g8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_endgame_032",
-    "fen": "8/2P5/8/8/8/4k3/8/6K1 w - - 0 1",
-    "moves": [
-      "c7c8q",
-      "e3d3",
-      "c8c3"
-    ],
-    "rating": 1506,
-    "ratingDeviation": 100,
-    "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
-    ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "hard",
-    "title": "Queenside Coronation #32 👑",
-    "subtitle": "Promote c8=Q and win!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Lucena — d-File Breakthrough #7 👑",
+    "subtitle": "Black escorts the d-pawn to promotion on d1.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black escorts the d-pawn to promotion on d1. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rf5+",
+        "moveUci": "a5f5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rf5+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke3",
+        "moveUci": "f2e3",
+        "actor": "w",
+        "explanation": "White plays Ke3."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ke1",
+        "moveUci": "d1e1",
+        "actor": "b",
+        "explanation": "Black plays Ke1."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh7",
+        "moveUci": "d7h7",
+        "actor": "w",
+        "explanation": "White plays Rh7."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "d1=Q",
+        "moveUci": "d2d1q",
+        "actor": "b",
+        "explanation": "Black plays d1=Q."
+      }
+    ],
+    "targetSquares": [
+      "d1"
+    ],
+    "keySquares": [
+      "a5",
+      "d1"
+    ]
   },
   {
-    "id": "puz_endgame_033",
-    "fen": "8/4P3/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_008",
+    "fen": "8/2R5/8/r7/8/8/2p1K3/2k5 b - - 0 1",
     "moves": [
-      "e7e8q",
-      "e3d3",
-      "e8e3"
+      "a5e5",
+      "e2f3",
+      "c1d2",
+      "c7h7",
+      "c2c1q"
     ],
-    "rating": 1532,
-    "ratingDeviation": 100,
+    "rating": 1550,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "hard",
-    "title": "Promote to Queen #33 👑",
-    "subtitle": "Advance your e-pawn to e8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Lucena — c-File Escort #8 👑",
+    "subtitle": "Black kings steps to d2 to clear c1 for the new queen.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black kings steps to d2 to clear c1 for the new queen. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re5+",
+        "moveUci": "a5e5",
+        "actor": "b",
+        "explanation": "Black checks the King with Re5+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kf3",
+        "moveUci": "e2f3",
+        "actor": "w",
+        "explanation": "White plays Kf3."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Kd2",
+        "moveUci": "c1d2",
+        "actor": "b",
+        "explanation": "Black plays Kd2."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh7",
+        "moveUci": "c7h7",
+        "actor": "w",
+        "explanation": "White plays Rh7."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "c1=Q",
+        "moveUci": "c2c1q",
+        "actor": "b",
+        "explanation": "Black plays c1=Q."
+      }
+    ],
+    "targetSquares": [
+      "c1"
+    ],
+    "keySquares": [
+      "a5",
+      "c1"
+    ]
   },
   {
-    "id": "puz_endgame_034",
-    "fen": "8/1P6/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_009",
+    "fen": "8/5R2/8/r7/8/8/5p1K/5k2 b - - 0 1",
     "moves": [
-      "b7b8q",
-      "e3d3",
-      "b8b3"
+      "a5h5",
+      "h2g3",
+      "f1e2",
+      "f7h7",
+      "f2f1q"
     ],
-    "rating": 1558,
-    "ratingDeviation": 100,
+    "rating": 1600,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "hard",
-    "title": "Flank Pawn Promotion #34 👑",
-    "subtitle": "Push the b-pawn to the 8th rank!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Lucena — f-File Queen Promotion #9 👑",
+    "subtitle": "Black secures 3...f1=Q with decisive advantage.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black secures 3...f1=Q with decisive advantage. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rh5+",
+        "moveUci": "a5h5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rh5+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg3",
+        "moveUci": "h2g3",
+        "actor": "w",
+        "explanation": "White plays Kg3."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Ke2",
+        "moveUci": "f1e2",
+        "actor": "b",
+        "explanation": "Black plays Ke2."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh7",
+        "moveUci": "f7h7",
+        "actor": "w",
+        "explanation": "White plays Rh7."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "f1=Q",
+        "moveUci": "f2f1q",
+        "actor": "b",
+        "explanation": "Black plays f1=Q."
+      }
+    ],
+    "targetSquares": [
+      "f1"
+    ],
+    "keySquares": [
+      "a5",
+      "f1"
+    ]
   },
   {
-    "id": "puz_endgame_035",
-    "fen": "8/6P1/8/8/8/4k3/8/6K1 w - - 0 1",
+    "id": "puz_eg_010",
+    "fen": "8/1R6/8/r7/8/8/1p1K4/1k6 b - - 0 1",
     "moves": [
-      "g7g8q",
-      "e3d3",
-      "g8g3"
+      "a5d5",
+      "d2e3",
+      "b1c2",
+      "b7h7",
+      "b2b1q"
     ],
-    "rating": 1584,
-    "ratingDeviation": 100,
+    "rating": 1650,
+    "ratingDeviation": 80,
     "themes": [
-      "endgame_conversions",
-      "pawn_endgame"
+      "lucena_position",
+      "endgame_conversion"
     ],
-    "primaryTheme": "pawn_endgame",
+    "primaryTheme": "lucena_position",
     "difficulty": "hard",
-    "title": "g-Pawn Touchdown #35 👑",
-    "subtitle": "Crown your g-pawn on g8!",
+    "title": "Black Lucena — b-File Conversion #10 👑",
+    "subtitle": "Black slides the King to c2 and promotes on b1.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Apply the Lucena bridge technique to escort the passed pawn to promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black slides the King to c2 and promotes on b1. demonstrating precise endgame technique.",
+    "keyTakeaway": "The Lucena technique cuts off the enemy king and builds a bridge to promote the passed pawn.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd5+",
+        "moveUci": "a5d5",
+        "actor": "b",
+        "explanation": "Black checks the King with Rd5+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke3",
+        "moveUci": "d2e3",
+        "actor": "w",
+        "explanation": "White plays Ke3."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Kc2",
+        "moveUci": "b1c2",
+        "actor": "b",
+        "explanation": "Black plays Kc2."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Rh7",
+        "moveUci": "b7h7",
+        "actor": "w",
+        "explanation": "White plays Rh7."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "b1=Q",
+        "moveUci": "b2b1q",
+        "actor": "b",
+        "explanation": "Black plays b1=Q."
+      }
+    ],
+    "targetSquares": [
+      "b1"
+    ],
+    "keySquares": [
+      "a5",
+      "b1"
+    ]
+  },
+  {
+    "id": "puz_eg_011",
+    "fen": "8/ppp5/8/PPP5/8/8/8/4K2k w - - 0 1",
+    "moves": [
+      "b5b6",
+      "a7b6",
+      "c5c6",
+      "b7c6",
+      "a5a6",
+      "b6b5",
+      "a6a7",
+      "b5b4",
+      "a7a8q"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "pawn_breakthrough",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "pawn_breakthrough",
+    "difficulty": "hard",
+    "title": "Queenside 3-Pawn Breakthrough (1. b6!) #11 👑",
+    "subtitle": "1. b6! creates an unstoppable passed a-pawn promoting to Queen on a8.",
     "playerColor": "w",
-    "solutionPlies": 3
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the multi-pawn sacrifice breakthrough to create an unstoppable passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1. b6! creates an unstoppable passed a-pawn promoting to Queen on a8. demonstrating precise endgame technique.",
+    "keyTakeaway": "Pawn breakthroughs sacrifice secondary pawns to create a winning passed runner.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "b6",
+        "moveUci": "b5b6",
+        "actor": "w",
+        "explanation": "White plays b6."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "axb6",
+        "moveUci": "a7b6",
+        "actor": "b",
+        "explanation": "Black plays axb6, capturing the enemy P on b6!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "c6",
+        "moveUci": "c5c6",
+        "actor": "w",
+        "explanation": "White plays c6."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "bxc6",
+        "moveUci": "b7c6",
+        "actor": "b",
+        "explanation": "Black plays bxc6, capturing the enemy P on c6!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "a6",
+        "moveUci": "a5a6",
+        "actor": "w",
+        "explanation": "White plays a6."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "b5",
+        "moveUci": "b6b5",
+        "actor": "b",
+        "explanation": "Black plays b5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "a7",
+        "moveUci": "a6a7",
+        "actor": "w",
+        "explanation": "White plays a7."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "b4",
+        "moveUci": "b5b4",
+        "actor": "b",
+        "explanation": "Black plays b4."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "a8=Q",
+        "moveUci": "a7a8q",
+        "actor": "w",
+        "explanation": "White plays a8=Q."
+      }
+    ],
+    "targetSquares": [
+      "a8"
+    ],
+    "keySquares": [
+      "b5",
+      "a8"
+    ]
+  },
+  {
+    "id": "puz_eg_012",
+    "fen": "8/5ppp/8/5PPP/8/8/8/4K2k w - - 0 1",
+    "moves": [
+      "g5g6",
+      "f7g6",
+      "h5h6",
+      "g7h6",
+      "f5f6",
+      "g6g5",
+      "f6f7",
+      "g5g4",
+      "f7f8q"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 80,
+    "themes": [
+      "pawn_breakthrough",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "pawn_breakthrough",
+    "difficulty": "hard",
+    "title": "Kingside 3-Pawn Breakthrough (1. g6!) #12 👑",
+    "subtitle": "1. g6! forces an unstoppable passed f-pawn promoting on f8.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the multi-pawn sacrifice breakthrough to create an unstoppable passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1. g6! forces an unstoppable passed f-pawn promoting on f8. demonstrating precise endgame technique.",
+    "keyTakeaway": "Pawn breakthroughs sacrifice secondary pawns to create a winning passed runner.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "g6",
+        "moveUci": "g5g6",
+        "actor": "w",
+        "explanation": "White plays g6."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "fxg6",
+        "moveUci": "f7g6",
+        "actor": "b",
+        "explanation": "Black plays fxg6, capturing the enemy P on g6!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "h6",
+        "moveUci": "h5h6",
+        "actor": "w",
+        "explanation": "White plays h6."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "gxh6",
+        "moveUci": "g7h6",
+        "actor": "b",
+        "explanation": "Black plays gxh6, capturing the enemy P on h6!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "f6",
+        "moveUci": "f5f6",
+        "actor": "w",
+        "explanation": "White plays f6."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "g5",
+        "moveUci": "g6g5",
+        "actor": "b",
+        "explanation": "Black plays g5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "f7",
+        "moveUci": "f6f7",
+        "actor": "w",
+        "explanation": "White plays f7."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "g4",
+        "moveUci": "g5g4",
+        "actor": "b",
+        "explanation": "Black plays g4."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "f8=Q",
+        "moveUci": "f7f8q",
+        "actor": "w",
+        "explanation": "White plays f8=Q."
+      }
+    ],
+    "targetSquares": [
+      "f8"
+    ],
+    "keySquares": [
+      "g5",
+      "f8"
+    ]
+  },
+  {
+    "id": "puz_eg_013",
+    "fen": "4K2k/8/8/8/ppp5/8/PPP5/8 b - - 0 1",
+    "moves": [
+      "b4b3",
+      "a2b3",
+      "c4c3",
+      "b2c3",
+      "a4a3",
+      "b3b4",
+      "a3a2",
+      "b4b5",
+      "a2a1q"
+    ],
+    "rating": 1800,
+    "ratingDeviation": 80,
+    "themes": [
+      "pawn_breakthrough",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "pawn_breakthrough",
+    "difficulty": "expert",
+    "title": "Black Queenside Pawn Breakthrough #13 👑",
+    "subtitle": "1...b3! creates an outside passed pawn that queens on a1.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the multi-pawn sacrifice breakthrough to create an unstoppable passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1...b3! creates an outside passed pawn that queens on a1. demonstrating precise endgame technique.",
+    "keyTakeaway": "Pawn breakthroughs sacrifice secondary pawns to create a winning passed runner.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "b3",
+        "moveUci": "b4b3",
+        "actor": "b",
+        "explanation": "Black plays b3."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "axb3",
+        "moveUci": "a2b3",
+        "actor": "w",
+        "explanation": "White plays axb3, capturing the enemy P on b3!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "c3",
+        "moveUci": "c4c3",
+        "actor": "b",
+        "explanation": "Black plays c3."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "bxc3",
+        "moveUci": "b2c3",
+        "actor": "w",
+        "explanation": "White plays bxc3, capturing the enemy P on c3!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "a3",
+        "moveUci": "a4a3",
+        "actor": "b",
+        "explanation": "Black plays a3."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "b4",
+        "moveUci": "b3b4",
+        "actor": "w",
+        "explanation": "White plays b4."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "a2",
+        "moveUci": "a3a2",
+        "actor": "b",
+        "explanation": "Black plays a2."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "b5",
+        "moveUci": "b4b5",
+        "actor": "w",
+        "explanation": "White plays b5."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "a1=Q",
+        "moveUci": "a2a1q",
+        "actor": "b",
+        "explanation": "Black plays a1=Q."
+      }
+    ],
+    "targetSquares": [
+      "a1"
+    ],
+    "keySquares": [
+      "b4",
+      "a1"
+    ]
+  },
+  {
+    "id": "puz_eg_014",
+    "fen": "4K2k/8/8/8/5ppp/8/5PPP/8 b - - 0 1",
+    "moves": [
+      "g4g3",
+      "f2g3",
+      "h4h3",
+      "g2h3",
+      "f4f3",
+      "g3g4",
+      "f3f2",
+      "g4g5",
+      "f2f1q"
+    ],
+    "rating": 1850,
+    "ratingDeviation": 80,
+    "themes": [
+      "pawn_breakthrough",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "pawn_breakthrough",
+    "difficulty": "expert",
+    "title": "Black Kingside Pawn Breakthrough #14 👑",
+    "subtitle": "1...g3! creates the winning f-pawn promoting on f1.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the multi-pawn sacrifice breakthrough to create an unstoppable passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1...g3! creates the winning f-pawn promoting on f1. demonstrating precise endgame technique.",
+    "keyTakeaway": "Pawn breakthroughs sacrifice secondary pawns to create a winning passed runner.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "g3",
+        "moveUci": "g4g3",
+        "actor": "b",
+        "explanation": "Black plays g3."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "fxg3",
+        "moveUci": "f2g3",
+        "actor": "w",
+        "explanation": "White plays fxg3, capturing the enemy P on g3!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "h3",
+        "moveUci": "h4h3",
+        "actor": "b",
+        "explanation": "Black plays h3."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "gxh3",
+        "moveUci": "g2h3",
+        "actor": "w",
+        "explanation": "White plays gxh3, capturing the enemy P on h3!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "f3",
+        "moveUci": "f4f3",
+        "actor": "b",
+        "explanation": "Black plays f3."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "g4",
+        "moveUci": "g3g4",
+        "actor": "w",
+        "explanation": "White plays g4."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "f2",
+        "moveUci": "f3f2",
+        "actor": "b",
+        "explanation": "Black plays f2."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "g5",
+        "moveUci": "g4g5",
+        "actor": "w",
+        "explanation": "White plays g5."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "f1=Q",
+        "moveUci": "f2f1q",
+        "actor": "b",
+        "explanation": "Black plays f1=Q."
+      }
+    ],
+    "targetSquares": [
+      "f1"
+    ],
+    "keySquares": [
+      "g4",
+      "f1"
+    ]
+  },
+  {
+    "id": "puz_eg_015",
+    "fen": "8/ppp5/8/PPP5/8/8/8/4K1k1 w - - 0 1",
+    "moves": [
+      "b5b6",
+      "c7b6",
+      "a5a6",
+      "b7a6",
+      "c5c6",
+      "b6b5",
+      "c6c7",
+      "b5b4",
+      "c7c8q"
+    ],
+    "rating": 1900,
+    "ratingDeviation": 80,
+    "themes": [
+      "pawn_breakthrough",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "pawn_breakthrough",
+    "difficulty": "expert",
+    "title": "Pawn Breakthrough Variation (1...cxb6) #15 👑",
+    "subtitle": "1. b6 creates a winning passed c-pawn promoting on c8.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the multi-pawn sacrifice breakthrough to create an unstoppable passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1. b6 creates a winning passed c-pawn promoting on c8. demonstrating precise endgame technique.",
+    "keyTakeaway": "Pawn breakthroughs sacrifice secondary pawns to create a winning passed runner.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "b6",
+        "moveUci": "b5b6",
+        "actor": "w",
+        "explanation": "White plays b6."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "cxb6",
+        "moveUci": "c7b6",
+        "actor": "b",
+        "explanation": "Black plays cxb6, capturing the enemy P on b6!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "a6",
+        "moveUci": "a5a6",
+        "actor": "w",
+        "explanation": "White plays a6."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "bxa6",
+        "moveUci": "b7a6",
+        "actor": "b",
+        "explanation": "Black plays bxa6, capturing the enemy P on a6!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "c6",
+        "moveUci": "c5c6",
+        "actor": "w",
+        "explanation": "White plays c6."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "b5",
+        "moveUci": "b6b5",
+        "actor": "b",
+        "explanation": "Black plays b5."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "c7",
+        "moveUci": "c6c7",
+        "actor": "w",
+        "explanation": "White plays c7."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "b4",
+        "moveUci": "b5b4",
+        "actor": "b",
+        "explanation": "Black plays b4."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "c8=Q",
+        "moveUci": "c7c8q",
+        "actor": "w",
+        "explanation": "White plays c8=Q."
+      }
+    ],
+    "targetSquares": [
+      "c8"
+    ],
+    "keySquares": [
+      "b5",
+      "c8"
+    ]
+  },
+  {
+    "id": "puz_eg_016",
+    "fen": "4K1k1/8/8/8/ppp5/8/PPP5/8 b - - 0 1",
+    "moves": [
+      "b4b3",
+      "c2b3",
+      "a4a3",
+      "b2a3",
+      "c4c3",
+      "b3b4",
+      "c3c2",
+      "b4b5",
+      "c2c1q"
+    ],
+    "rating": 1950,
+    "ratingDeviation": 80,
+    "themes": [
+      "pawn_breakthrough",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "pawn_breakthrough",
+    "difficulty": "expert",
+    "title": "Black Pawn Breakthrough Variation #16 👑",
+    "subtitle": "1...b3! escorts the passed c-pawn to promotion on c1.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Execute the multi-pawn sacrifice breakthrough to create an unstoppable passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1...b3! escorts the passed c-pawn to promotion on c1. demonstrating precise endgame technique.",
+    "keyTakeaway": "Pawn breakthroughs sacrifice secondary pawns to create a winning passed runner.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "b3",
+        "moveUci": "b4b3",
+        "actor": "b",
+        "explanation": "Black plays b3."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "cxb3",
+        "moveUci": "c2b3",
+        "actor": "w",
+        "explanation": "White plays cxb3, capturing the enemy P on b3!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "a3",
+        "moveUci": "a4a3",
+        "actor": "b",
+        "explanation": "Black plays a3."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "bxa3",
+        "moveUci": "b2a3",
+        "actor": "w",
+        "explanation": "White plays bxa3, capturing the enemy P on a3!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "c3",
+        "moveUci": "c4c3",
+        "actor": "b",
+        "explanation": "Black plays c3."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "b4",
+        "moveUci": "b3b4",
+        "actor": "w",
+        "explanation": "White plays b4."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "c2",
+        "moveUci": "c3c2",
+        "actor": "b",
+        "explanation": "Black plays c2."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "b5",
+        "moveUci": "b4b5",
+        "actor": "w",
+        "explanation": "White plays b5."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "c1=Q",
+        "moveUci": "c2c1q",
+        "actor": "b",
+        "explanation": "Black plays c1=Q."
+      }
+    ],
+    "targetSquares": [
+      "c1"
+    ],
+    "keySquares": [
+      "b4",
+      "c1"
+    ]
+  },
+  {
+    "id": "puz_eg_017",
+    "fen": "4k3/8/4K3/4P3/8/8/8/8 w - - 0 1",
+    "moves": [
+      "e6d6",
+      "e8d8",
+      "e5e6",
+      "d8e8",
+      "e6e7",
+      "e8f7",
+      "d6d7",
+      "f7g7",
+      "e7e8q"
+    ],
+    "rating": 1500,
+    "ratingDeviation": 80,
+    "themes": [
+      "king_opposition",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "king_opposition",
+    "difficulty": "hard",
+    "title": "Direct Opposition & Pawn Escort (e-Pawn) #17 👑",
+    "subtitle": "White takes opposition and shoulders the Black king to queen.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Use opposition and king shouldering to escort the passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "White takes opposition and shoulders the Black king to queen. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Kd6",
+        "moveUci": "e6d6",
+        "actor": "w",
+        "explanation": "White plays Kd6."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kd8",
+        "moveUci": "e8d8",
+        "actor": "b",
+        "explanation": "Black plays Kd8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "e6",
+        "moveUci": "e5e6",
+        "actor": "w",
+        "explanation": "White plays e6."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Ke8",
+        "moveUci": "d8e8",
+        "actor": "b",
+        "explanation": "Black plays Ke8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "e7",
+        "moveUci": "e6e7",
+        "actor": "w",
+        "explanation": "White plays e7."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kf7",
+        "moveUci": "e8f7",
+        "actor": "b",
+        "explanation": "Black plays Kf7."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Kd7",
+        "moveUci": "d6d7",
+        "actor": "w",
+        "explanation": "White plays Kd7."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg7",
+        "moveUci": "f7g7",
+        "actor": "b",
+        "explanation": "Black plays Kg7."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "e8=Q",
+        "moveUci": "e7e8q",
+        "actor": "w",
+        "explanation": "White plays e8=Q."
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "e6",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_eg_018",
+    "fen": "3k4/8/3K4/3P4/8/8/8/8 w - - 0 1",
+    "moves": [
+      "d6e6",
+      "d8e8",
+      "d5d6",
+      "e8d8",
+      "d6d7",
+      "d8c7",
+      "e6e7",
+      "c7b7",
+      "d7d8q"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 80,
+    "themes": [
+      "king_opposition",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "king_opposition",
+    "difficulty": "hard",
+    "title": "d-Pawn King Shouldering Technique #18 👑",
+    "subtitle": "White controls the key squares in front of the passed pawn.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Use opposition and king shouldering to escort the passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "White controls the key squares in front of the passed pawn. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ke6",
+        "moveUci": "d6e6",
+        "actor": "w",
+        "explanation": "White plays Ke6."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke8",
+        "moveUci": "d8e8",
+        "actor": "b",
+        "explanation": "Black plays Ke8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "d6",
+        "moveUci": "d5d6",
+        "actor": "w",
+        "explanation": "White plays d6."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kd8",
+        "moveUci": "e8d8",
+        "actor": "b",
+        "explanation": "Black plays Kd8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "d7",
+        "moveUci": "d6d7",
+        "actor": "w",
+        "explanation": "White plays d7."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kc7",
+        "moveUci": "d8c7",
+        "actor": "b",
+        "explanation": "Black plays Kc7."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Ke7",
+        "moveUci": "e6e7",
+        "actor": "w",
+        "explanation": "White plays Ke7."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kb7",
+        "moveUci": "c7b7",
+        "actor": "b",
+        "explanation": "Black plays Kb7."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "d8=Q",
+        "moveUci": "d7d8q",
+        "actor": "w",
+        "explanation": "White plays d8=Q."
+      }
+    ],
+    "targetSquares": [
+      "d8"
+    ],
+    "keySquares": [
+      "d6",
+      "d8"
+    ]
+  },
+  {
+    "id": "puz_eg_019",
+    "fen": "2k5/8/2K5/2P5/8/8/8/8 w - - 0 1",
+    "moves": [
+      "c6d6",
+      "c8d8",
+      "c5c6",
+      "d8c8",
+      "c6c7",
+      "c8b7",
+      "d6d7",
+      "b7b6",
+      "c7c8q"
+    ],
+    "rating": 1600,
+    "ratingDeviation": 80,
+    "themes": [
+      "king_opposition",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "king_opposition",
+    "difficulty": "hard",
+    "title": "c-Pawn King Opposition Mastery #19 👑",
+    "subtitle": "Systematic king escort forces promotion on c8.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Use opposition and king shouldering to escort the passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Systematic king escort forces promotion on c8. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Kd6",
+        "moveUci": "c6d6",
+        "actor": "w",
+        "explanation": "White plays Kd6."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kd8",
+        "moveUci": "c8d8",
+        "actor": "b",
+        "explanation": "Black plays Kd8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "c6",
+        "moveUci": "c5c6",
+        "actor": "w",
+        "explanation": "White plays c6."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kc8",
+        "moveUci": "d8c8",
+        "actor": "b",
+        "explanation": "Black plays Kc8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "c7",
+        "moveUci": "c6c7",
+        "actor": "w",
+        "explanation": "White plays c7."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kb7",
+        "moveUci": "c8b7",
+        "actor": "b",
+        "explanation": "Black plays Kb7."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Kd7",
+        "moveUci": "d6d7",
+        "actor": "w",
+        "explanation": "White plays Kd7."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kb6",
+        "moveUci": "b7b6",
+        "actor": "b",
+        "explanation": "Black plays Kb6."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "c8=Q",
+        "moveUci": "c7c8q",
+        "actor": "w",
+        "explanation": "White plays c8=Q."
+      }
+    ],
+    "targetSquares": [
+      "c8"
+    ],
+    "keySquares": [
+      "c6",
+      "c8"
+    ]
+  },
+  {
+    "id": "puz_eg_020",
+    "fen": "5k2/8/5K2/5P2/8/8/8/8 w - - 0 1",
+    "moves": [
+      "f6e6",
+      "f8e8",
+      "f5f6",
+      "e8f8",
+      "f6f7",
+      "f8g7",
+      "e6e7",
+      "g7g6",
+      "f7f8q"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 80,
+    "themes": [
+      "king_opposition",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "king_opposition",
+    "difficulty": "hard",
+    "title": "f-Pawn Flank Conversion #20 👑",
+    "subtitle": "White establishes control of the 7th rank to queen on f8.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Use opposition and king shouldering to escort the passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "White establishes control of the 7th rank to queen on f8. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ke6",
+        "moveUci": "f6e6",
+        "actor": "w",
+        "explanation": "White plays Ke6."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke8",
+        "moveUci": "f8e8",
+        "actor": "b",
+        "explanation": "Black plays Ke8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "f6",
+        "moveUci": "f5f6",
+        "actor": "w",
+        "explanation": "White plays f6."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kf8",
+        "moveUci": "e8f8",
+        "actor": "b",
+        "explanation": "Black plays Kf8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "f7",
+        "moveUci": "f6f7",
+        "actor": "w",
+        "explanation": "White plays f7."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kg7",
+        "moveUci": "f8g7",
+        "actor": "b",
+        "explanation": "Black plays Kg7."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Ke7",
+        "moveUci": "e6e7",
+        "actor": "w",
+        "explanation": "White plays Ke7."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg6",
+        "moveUci": "g7g6",
+        "actor": "b",
+        "explanation": "Black plays Kg6."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "f8=Q",
+        "moveUci": "f7f8q",
+        "actor": "w",
+        "explanation": "White plays f8=Q."
+      }
+    ],
+    "targetSquares": [
+      "f8"
+    ],
+    "keySquares": [
+      "f6",
+      "f8"
+    ]
+  },
+  {
+    "id": "puz_eg_021",
+    "fen": "8/8/8/8/4p3/4k3/8/4K3 b - - 0 1",
+    "moves": [
+      "e3d3",
+      "e1d1",
+      "e4e3",
+      "d1e1",
+      "e3e2",
+      "e1f2",
+      "d3d2",
+      "f2g3",
+      "e2e1q"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "king_opposition",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "king_opposition",
+    "difficulty": "hard",
+    "title": "Black King Opposition (e-Pawn) #21 👑",
+    "subtitle": "Black shoulders White's king and queens on e1.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Use opposition and king shouldering to escort the passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black shoulders White's king and queens on e1. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Kd3",
+        "moveUci": "e3d3",
+        "actor": "b",
+        "explanation": "Black plays Kd3."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kd1",
+        "moveUci": "e1d1",
+        "actor": "w",
+        "explanation": "White plays Kd1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "e3",
+        "moveUci": "e4e3",
+        "actor": "b",
+        "explanation": "Black plays e3."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Ke1",
+        "moveUci": "d1e1",
+        "actor": "w",
+        "explanation": "White plays Ke1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "e2",
+        "moveUci": "e3e2",
+        "actor": "b",
+        "explanation": "Black plays e2."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kf2",
+        "moveUci": "e1f2",
+        "actor": "w",
+        "explanation": "White plays Kf2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Kd2",
+        "moveUci": "d3d2",
+        "actor": "b",
+        "explanation": "Black plays Kd2."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg3",
+        "moveUci": "f2g3",
+        "actor": "w",
+        "explanation": "White plays Kg3."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "e1=Q+",
+        "moveUci": "e2e1q",
+        "actor": "b",
+        "explanation": "Black checks the King with e1=Q+!"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "e3",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_eg_022",
+    "fen": "8/8/8/8/3p4/3k4/8/3K4 b - - 0 1",
+    "moves": [
+      "d3e3",
+      "d1e1",
+      "d4d3",
+      "e1d1",
+      "d3d2",
+      "d1c2",
+      "e3e2",
+      "c2b3",
+      "d2d1q"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 80,
+    "themes": [
+      "king_opposition",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "king_opposition",
+    "difficulty": "hard",
+    "title": "Black d-Pawn King Escort #22 👑",
+    "subtitle": "Black seizes key squares to ensure d1 promotion.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Use opposition and king shouldering to escort the passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black seizes key squares to ensure d1 promotion. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ke3",
+        "moveUci": "d3e3",
+        "actor": "b",
+        "explanation": "Black plays Ke3."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke1",
+        "moveUci": "d1e1",
+        "actor": "w",
+        "explanation": "White plays Ke1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "d3",
+        "moveUci": "d4d3",
+        "actor": "b",
+        "explanation": "Black plays d3."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kd1",
+        "moveUci": "e1d1",
+        "actor": "w",
+        "explanation": "White plays Kd1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "d2",
+        "moveUci": "d3d2",
+        "actor": "b",
+        "explanation": "Black plays d2."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kc2",
+        "moveUci": "d1c2",
+        "actor": "w",
+        "explanation": "White plays Kc2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Ke2",
+        "moveUci": "e3e2",
+        "actor": "b",
+        "explanation": "Black plays Ke2."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kb3",
+        "moveUci": "c2b3",
+        "actor": "w",
+        "explanation": "White plays Kb3."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "d1=Q+",
+        "moveUci": "d2d1q",
+        "actor": "b",
+        "explanation": "Black checks the King with d1=Q+!"
+      }
+    ],
+    "targetSquares": [
+      "d1"
+    ],
+    "keySquares": [
+      "d3",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_eg_023",
+    "fen": "8/8/8/8/2p5/2k5/8/2K5 b - - 0 1",
+    "moves": [
+      "c3d3",
+      "c1d1",
+      "c4c3",
+      "d1c1",
+      "c3c2",
+      "c1b2",
+      "d3d2",
+      "b2b3",
+      "c2c1q"
+    ],
+    "rating": 1800,
+    "ratingDeviation": 80,
+    "themes": [
+      "king_opposition",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "king_opposition",
+    "difficulty": "expert",
+    "title": "Black c-Pawn King Shouldering #23 👑",
+    "subtitle": "Black guides the c-pawn safely to c1.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Use opposition and king shouldering to escort the passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black guides the c-pawn safely to c1. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Kd3",
+        "moveUci": "c3d3",
+        "actor": "b",
+        "explanation": "Black plays Kd3."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kd1",
+        "moveUci": "c1d1",
+        "actor": "w",
+        "explanation": "White plays Kd1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "c3",
+        "moveUci": "c4c3",
+        "actor": "b",
+        "explanation": "Black plays c3."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kc1",
+        "moveUci": "d1c1",
+        "actor": "w",
+        "explanation": "White plays Kc1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "c2",
+        "moveUci": "c3c2",
+        "actor": "b",
+        "explanation": "Black plays c2."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kb2",
+        "moveUci": "c1b2",
+        "actor": "w",
+        "explanation": "White plays Kb2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Kd2",
+        "moveUci": "d3d2",
+        "actor": "b",
+        "explanation": "Black plays Kd2."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kb3",
+        "moveUci": "b2b3",
+        "actor": "w",
+        "explanation": "White plays Kb3."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "c1=Q",
+        "moveUci": "c2c1q",
+        "actor": "b",
+        "explanation": "Black plays c1=Q."
+      }
+    ],
+    "targetSquares": [
+      "c1"
+    ],
+    "keySquares": [
+      "c3",
+      "c1"
+    ]
+  },
+  {
+    "id": "puz_eg_024",
+    "fen": "8/8/8/8/5p2/5k2/8/5K2 b - - 0 1",
+    "moves": [
+      "f3e3",
+      "f1e1",
+      "f4f3",
+      "e1f1",
+      "f3f2",
+      "f1g2",
+      "e3e2",
+      "g2g3",
+      "f2f1q"
+    ],
+    "rating": 1850,
+    "ratingDeviation": 80,
+    "themes": [
+      "king_opposition",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "king_opposition",
+    "difficulty": "expert",
+    "title": "Black f-Pawn Conversion #24 👑",
+    "subtitle": "Black takes distant opposition and promotes on f1.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Use opposition and king shouldering to escort the passed pawn.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black takes distant opposition and promotes on f1. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ke3",
+        "moveUci": "f3e3",
+        "actor": "b",
+        "explanation": "Black plays Ke3."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke1",
+        "moveUci": "f1e1",
+        "actor": "w",
+        "explanation": "White plays Ke1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "f3",
+        "moveUci": "f4f3",
+        "actor": "b",
+        "explanation": "Black plays f3."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kf1",
+        "moveUci": "e1f1",
+        "actor": "w",
+        "explanation": "White plays Kf1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "f2",
+        "moveUci": "f3f2",
+        "actor": "b",
+        "explanation": "Black plays f2."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kg2",
+        "moveUci": "f1g2",
+        "actor": "w",
+        "explanation": "White plays Kg2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Ke2",
+        "moveUci": "e3e2",
+        "actor": "b",
+        "explanation": "Black plays Ke2."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Kg3",
+        "moveUci": "g2g3",
+        "actor": "w",
+        "explanation": "White plays Kg3."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "f1=Q",
+        "moveUci": "f2f1q",
+        "actor": "b",
+        "explanation": "Black plays f1=Q."
+      }
+    ],
+    "targetSquares": [
+      "f1"
+    ],
+    "keySquares": [
+      "f3",
+      "f1"
+    ]
+  },
+  {
+    "id": "puz_eg_025",
+    "fen": "8/P7/8/r7/8/k7/3K4/1R6 w - - 0 1",
+    "moves": [
+      "b1a1",
+      "a3b4",
+      "a1a5",
+      "b4a5",
+      "a7a8q"
+    ],
+    "rating": 1900,
+    "ratingDeviation": 80,
+    "themes": [
+      "rook_endgame",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "rook_endgame",
+    "difficulty": "expert",
+    "title": "Rook Skewer into a8 Promotion #25 👑",
+    "subtitle": "1. Ra1+ Kb4 2. Rxa5 Kxa5 3. a8=Q+ converts the rook ending.",
+    "playerColor": "w",
+    "solutionPlies": 5,
+    "tacticalGoal": "Liquidate into a winning queen promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1. Ra1+ Kb4 2. Rxa5 Kxa5 3. a8=Q+ converts the rook ending. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra1+",
+        "moveUci": "b1a1",
+        "actor": "w",
+        "explanation": "White checks the King with Ra1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kb4",
+        "moveUci": "a3b4",
+        "actor": "b",
+        "explanation": "Black plays Kb4."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxa5",
+        "moveUci": "a1a5",
+        "actor": "w",
+        "explanation": "White plays Rxa5, capturing the enemy R on a5!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxa5",
+        "moveUci": "b4a5",
+        "actor": "b",
+        "explanation": "Black plays Kxa5, capturing the enemy R on a5!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "a8=Q+",
+        "moveUci": "a7a8q",
+        "actor": "w",
+        "explanation": "White checks the King with a8=Q+!"
+      }
+    ],
+    "targetSquares": [
+      "a8"
+    ],
+    "keySquares": [
+      "b1",
+      "a8"
+    ]
+  },
+  {
+    "id": "puz_eg_026",
+    "fen": "8/7P/8/7r/8/7k/4K3/6R1 w - - 0 1",
+    "moves": [
+      "g1h1",
+      "h3g4",
+      "h1h5",
+      "g4h5",
+      "h7h8q"
+    ],
+    "rating": 1950,
+    "ratingDeviation": 80,
+    "themes": [
+      "rook_endgame",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "rook_endgame",
+    "difficulty": "expert",
+    "title": "Rook Skewer into h8 Promotion #26 👑",
+    "subtitle": "1. Rh1+ Kg4 2. Rxa5 Rxh5 3. h8=Q+ wins.",
+    "playerColor": "w",
+    "solutionPlies": 5,
+    "tacticalGoal": "Liquidate into a winning queen promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1. Rh1+ Kg4 2. Rxa5 Rxh5 3. h8=Q+ wins. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rh1+",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White checks the King with Rh1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kg4",
+        "moveUci": "h3g4",
+        "actor": "b",
+        "explanation": "Black plays Kg4."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxh5",
+        "moveUci": "h1h5",
+        "actor": "w",
+        "explanation": "White plays Rxh5, capturing the enemy R on h5!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh5",
+        "moveUci": "g4h5",
+        "actor": "b",
+        "explanation": "Black plays Kxh5, capturing the enemy R on h5!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "h8=Q+",
+        "moveUci": "h7h8q",
+        "actor": "w",
+        "explanation": "White checks the King with h8=Q+!"
+      }
+    ],
+    "targetSquares": [
+      "h8"
+    ],
+    "keySquares": [
+      "g1",
+      "h8"
+    ]
+  },
+  {
+    "id": "puz_eg_027",
+    "fen": "1r4k1/8/K7/8/R7/8/p7/8 b - - 0 1",
+    "moves": [
+      "b8a8",
+      "a6b5",
+      "a8a4",
+      "b5a4",
+      "a2a1q"
+    ],
+    "rating": 2000,
+    "ratingDeviation": 80,
+    "themes": [
+      "rook_endgame",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "rook_endgame",
+    "difficulty": "expert",
+    "title": "Black Rook Skewer into a1 Promotion #27 👑",
+    "subtitle": "1...Ra8+ 2. Kb5 Rxa4 3. Kxa4 a1=Q+ wins the game.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Liquidate into a winning queen promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1...Ra8+ 2. Kb5 Rxa4 3. Kxa4 a1=Q+ wins the game. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra8+",
+        "moveUci": "b8a8",
+        "actor": "b",
+        "explanation": "Black checks the King with Ra8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kb5",
+        "moveUci": "a6b5",
+        "actor": "w",
+        "explanation": "White plays Kb5."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxa4",
+        "moveUci": "a8a4",
+        "actor": "b",
+        "explanation": "Black plays Rxa4, capturing the enemy R on a4!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxa4",
+        "moveUci": "b5a4",
+        "actor": "w",
+        "explanation": "White plays Kxa4, capturing the enemy R on a4!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "a1=Q+",
+        "moveUci": "a2a1q",
+        "actor": "b",
+        "explanation": "Black checks the King with a1=Q+!"
+      }
+    ],
+    "targetSquares": [
+      "a1"
+    ],
+    "keySquares": [
+      "b8",
+      "a1"
+    ]
+  },
+  {
+    "id": "puz_eg_028",
+    "fen": "6r1/6k1/K7/8/7R/8/7p/8 b - - 0 1",
+    "moves": [
+      "g8h8",
+      "h4h8",
+      "g7h8",
+      "a6b5",
+      "h2h1q"
+    ],
+    "rating": 2050,
+    "ratingDeviation": 80,
+    "themes": [
+      "rook_endgame",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "rook_endgame",
+    "difficulty": "expert",
+    "title": "Black Rook Deflection into h1 Promotion #28 👑",
+    "subtitle": "1...Rh8 2. Rxh8 Kxh8 3. Kb5 h1=Q! secures the win.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Liquidate into a winning queen promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "1...Rh8 2. Rxh8 Kxh8 3. Kb5 h1=Q! secures the win. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Rh8."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxh8",
+        "moveUci": "h4h8",
+        "actor": "w",
+        "explanation": "White plays Rxh8, capturing the enemy R on h8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Kxh8",
+        "moveUci": "g7h8",
+        "actor": "b",
+        "explanation": "Black plays Kxh8, capturing the enemy R on h8!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kb5",
+        "moveUci": "a6b5",
+        "actor": "w",
+        "explanation": "White plays Kb5."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "h1=Q",
+        "moveUci": "h2h1q",
+        "actor": "b",
+        "explanation": "Black plays h1=Q."
+      }
+    ],
+    "targetSquares": [
+      "h1"
+    ],
+    "keySquares": [
+      "g8",
+      "h1"
+    ]
+  },
+  {
+    "id": "puz_eg_029",
+    "fen": "6k1/8/6K1/6P1/8/8/8/8 w - - 0 1",
+    "moves": [
+      "g6h6",
+      "g8h8",
+      "g5g6",
+      "h8g8",
+      "g6g7",
+      "g8f7",
+      "h6h7",
+      "f7e7",
+      "g7g8q"
+    ],
+    "rating": 2100,
+    "ratingDeviation": 80,
+    "themes": [
+      "rook_endgame",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "rook_endgame",
+    "difficulty": "expert",
+    "title": "Flank Opposition & 7th-Rank Domination (g-Pawn) #29 👑",
+    "subtitle": "White out-triangulates the defender to seal the g8 promotion square.",
+    "playerColor": "w",
+    "solutionPlies": 9,
+    "tacticalGoal": "Liquidate into a winning queen promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "White out-triangulates the defender to seal the g8 promotion square. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Kh6",
+        "moveUci": "g6h6",
+        "actor": "w",
+        "explanation": "White plays Kh6."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "g6",
+        "moveUci": "g5g6",
+        "actor": "w",
+        "explanation": "White plays g6."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg8",
+        "moveUci": "h8g8",
+        "actor": "b",
+        "explanation": "Black plays Kg8."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "g7",
+        "moveUci": "g6g7",
+        "actor": "w",
+        "explanation": "White plays g7."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kf7",
+        "moveUci": "g8f7",
+        "actor": "b",
+        "explanation": "Black plays Kf7."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Kh7",
+        "moveUci": "h6h7",
+        "actor": "w",
+        "explanation": "White plays Kh7."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Ke7",
+        "moveUci": "f7e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "g8=Q",
+        "moveUci": "g7g8q",
+        "actor": "w",
+        "explanation": "White plays g8=Q."
+      }
+    ],
+    "targetSquares": [
+      "g8"
+    ],
+    "keySquares": [
+      "g6",
+      "g8"
+    ]
+  },
+  {
+    "id": "puz_eg_030",
+    "fen": "8/8/8/8/6p1/6k1/8/6K1 b - - 0 1",
+    "moves": [
+      "g3h3",
+      "g1h1",
+      "g4g3",
+      "h1g1",
+      "g3g2",
+      "g1f2",
+      "h3h2",
+      "f2e2",
+      "g2g1q"
+    ],
+    "rating": 2150,
+    "ratingDeviation": 80,
+    "themes": [
+      "rook_endgame",
+      "endgame_conversion"
+    ],
+    "primaryTheme": "rook_endgame",
+    "difficulty": "expert",
+    "title": "Black Flank Opposition & 2nd-Rank Outflanking #30 👑",
+    "subtitle": "Black outflanks White's king with 4...Kh2 securing g1 promotion.",
+    "playerColor": "b",
+    "solutionPlies": 9,
+    "tacticalGoal": "Liquidate into a winning queen promotion.",
+    "tacticalReward": "pawn_promotion",
+    "outcomeAdvantage": "Queen Promotion ♛",
+    "learningSummary": "Black outflanks White's king with 4...Kh2 securing g1 promotion. demonstrating precise endgame technique.",
+    "keyTakeaway": "King opposition and shouldering are fundamental to escorting passed pawns to promotion.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Kh3",
+        "moveUci": "g3h3",
+        "actor": "b",
+        "explanation": "Black plays Kh3."
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "g3",
+        "moveUci": "g4g3",
+        "actor": "b",
+        "explanation": "Black plays g3."
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "g2",
+        "moveUci": "g3g2",
+        "actor": "b",
+        "explanation": "Black plays g2."
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kf2",
+        "moveUci": "g1f2",
+        "actor": "w",
+        "explanation": "White plays Kf2."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Kh2",
+        "moveUci": "h3h2",
+        "actor": "b",
+        "explanation": "Black plays Kh2."
+      },
+      {
+        "plyIndex": 7,
+        "moveSan": "Ke2",
+        "moveUci": "f2e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 8,
+        "moveSan": "g1=Q",
+        "moveUci": "g2g1q",
+        "actor": "b",
+        "explanation": "Black plays g1=Q."
+      }
+    ],
+    "targetSquares": [
+      "g1"
+    ],
+    "keySquares": [
+      "g3",
+      "g1"
+    ]
   }
 ]

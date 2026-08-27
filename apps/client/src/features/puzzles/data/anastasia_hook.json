@@ -1,592 +1,1922 @@
 [
   {
-    "id": "puz_anastasia_001",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
+    "id": "puz_ah_001",
+    "fen": "5rk1/5ppp/8/3N4/5R2/3Q4/8/6K1 w - - 0 1",
     "moves": [
-      "a1a8"
+      "d5e7",
+      "g8h8",
+      "d3h7",
+      "h8h7",
+      "f4h4"
     ],
-    "rating": 800,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "novice",
-    "title": "Hook Mate Net #1 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_002",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 828,
-    "ratingDeviation": 100,
+    "rating": 1200,
+    "ratingDeviation": 80,
     "themes": [
       "anastasia_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "anastasia_mate",
-    "difficulty": "novice",
-    "title": "Anastasia's Trap #2 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_003",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
-    ],
-    "rating": 856,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "novice",
-    "title": "Knight Takes Defender #3 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_004",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 884,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "novice",
-    "title": "Hook Mate Net #4 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_005",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 912,
-    "ratingDeviation": 100,
-    "themes": [
-      "anastasia_mate",
-      "mate_in_1"
+      "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
     "difficulty": "easy",
-    "title": "Anastasia's Trap #5 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "title": "Anastasia's Mate with f4 Rook #1 👑",
+    "subtitle": "1. Ne7+ Kh8 2. Qxh7+ Kxh7 3. Rh4# seals Black along the h-file.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Ne7+ Kh8 2. Qxh7+ Kxh7 3. Rh4# seals Black along the h-file. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne7+",
+        "moveUci": "d5e7",
+        "actor": "w",
+        "explanation": "White checks the King with Ne7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Qxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy Q on h7!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh4#",
+        "moveUci": "f4h4",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rh4#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h4"
+    ],
+    "keySquares": [
+      "d5",
+      "h4"
+    ]
   },
   {
-    "id": "puz_anastasia_006",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "id": "puz_ah_002",
+    "fen": "5rk1/5ppp/8/3N4/8/3QR3/8/6K1 w - - 0 1",
     "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
+      "d5e7",
+      "g8h8",
+      "d3h7",
+      "h8h7",
+      "e3h3"
     ],
-    "rating": 940,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "easy",
-    "title": "Knight Takes Defender #6 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_007",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 968,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "easy",
-    "title": "Hook Mate Net #7 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_008",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 996,
-    "ratingDeviation": 100,
+    "rating": 1250,
+    "ratingDeviation": 80,
     "themes": [
       "anastasia_mate",
-      "mate_in_1"
+      "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
     "difficulty": "easy",
-    "title": "Anastasia's Trap #8 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "title": "Anastasia's Mate from e3 #2 👑",
+    "subtitle": "White executes the classic queen sacrifice and rook mate on h3.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "White executes the classic queen sacrifice and rook mate on h3. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne7+",
+        "moveUci": "d5e7",
+        "actor": "w",
+        "explanation": "White checks the King with Ne7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Qxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy Q on h7!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh3#",
+        "moveUci": "e3h3",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rh3#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h3"
+    ],
+    "keySquares": [
+      "d5",
+      "h3"
+    ]
   },
   {
-    "id": "puz_anastasia_009",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "id": "puz_ah_003",
+    "fen": "5rk1/5ppp/8/3N4/3R4/3Q4/8/6K1 w - - 0 1",
     "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
+      "d5e7",
+      "g8h8",
+      "d3h7",
+      "h8h7",
+      "d4h4"
     ],
-    "rating": 1024,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "easy",
-    "title": "Knight Takes Defender #9 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_010",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1052,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "easy",
-    "title": "Hook Mate Net #10 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_011",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1080,
-    "ratingDeviation": 100,
+    "rating": 1300,
+    "ratingDeviation": 80,
     "themes": [
       "anastasia_mate",
-      "mate_in_1"
+      "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
     "difficulty": "easy",
-    "title": "Anastasia's Trap #11 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "title": "Anastasia's Mate with d4 Rook #3 👑",
+    "subtitle": "Rook sweeps from d4 to h4 for checkmate.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Rook sweeps from d4 to h4 for checkmate. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne7+",
+        "moveUci": "d5e7",
+        "actor": "w",
+        "explanation": "White checks the King with Ne7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Qxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy Q on h7!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh4#",
+        "moveUci": "d4h4",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rh4#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h4"
+    ],
+    "keySquares": [
+      "d5",
+      "h4"
+    ]
   },
   {
-    "id": "puz_anastasia_012",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "id": "puz_ah_004",
+    "fen": "5rk1/5ppp/8/3N4/2R5/3Q4/8/6K1 w - - 0 1",
     "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
+      "d5e7",
+      "g8h8",
+      "d3h7",
+      "h8h7",
+      "c4h4"
     ],
-    "rating": 1108,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "easy",
-    "title": "Knight Takes Defender #12 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_013",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1136,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "easy",
-    "title": "Hook Mate Net #13 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_014",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1164,
-    "ratingDeviation": 100,
+    "rating": 1350,
+    "ratingDeviation": 80,
     "themes": [
       "anastasia_mate",
-      "mate_in_1"
+      "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
     "difficulty": "easy",
-    "title": "Anastasia's Trap #14 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "title": "Anastasia's Mate from c4 #4 👑",
+    "subtitle": "Queen sacrifice on h7 opens the h-file for the c4 rook.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Queen sacrifice on h7 opens the h-file for the c4 rook. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne7+",
+        "moveUci": "d5e7",
+        "actor": "w",
+        "explanation": "White checks the King with Ne7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Qxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy Q on h7!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh4#",
+        "moveUci": "c4h4",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rh4#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h4"
+    ],
+    "keySquares": [
+      "d5",
+      "h4"
+    ]
   },
   {
-    "id": "puz_anastasia_015",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "id": "puz_ah_005",
+    "fen": "5rk1/5ppp/8/3N4/1R6/3Q4/8/6K1 w - - 0 1",
     "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
+      "d5e7",
+      "g8h8",
+      "d3h7",
+      "h8h7",
+      "b4h4"
     ],
-    "rating": 1192,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "easy",
-    "title": "Knight Takes Defender #15 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_016",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1220,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "medium",
-    "title": "Hook Mate Net #16 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_017",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1248,
-    "ratingDeviation": 100,
+    "rating": 1400,
+    "ratingDeviation": 80,
     "themes": [
       "anastasia_mate",
-      "mate_in_1"
+      "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
     "difficulty": "medium",
-    "title": "Anastasia's Trap #17 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "title": "Anastasia's Mate from b4 #5 👑",
+    "subtitle": "Long-range rook slide to h4 concludes the Anastasia combination.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Long-range rook slide to h4 concludes the Anastasia combination. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne7+",
+        "moveUci": "d5e7",
+        "actor": "w",
+        "explanation": "White checks the King with Ne7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Qxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy Q on h7!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh4#",
+        "moveUci": "b4h4",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rh4#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h4"
+    ],
+    "keySquares": [
+      "d5",
+      "h4"
+    ]
   },
   {
-    "id": "puz_anastasia_018",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "id": "puz_ah_006",
+    "fen": "5rk1/5ppp/8/3N4/R7/3Q4/8/6K1 w - - 0 1",
     "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
+      "d5e7",
+      "g8h8",
+      "d3h7",
+      "h8h7",
+      "a4h4"
     ],
-    "rating": 1276,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "medium",
-    "title": "Knight Takes Defender #18 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_019",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1304,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "medium",
-    "title": "Hook Mate Net #19 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_020",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1332,
-    "ratingDeviation": 100,
+    "rating": 1450,
+    "ratingDeviation": 80,
     "themes": [
       "anastasia_mate",
-      "mate_in_1"
+      "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
     "difficulty": "medium",
-    "title": "Anastasia's Trap #20 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
+    "title": "Anastasia's Full-Rank Sweep #6 👑",
+    "subtitle": "Rook on a4 travels all the way to h4 for mate.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Rook on a4 travels all the way to h4 for mate. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne7+",
+        "moveUci": "d5e7",
+        "actor": "w",
+        "explanation": "White checks the King with Ne7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Qxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy Q on h7!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh4#",
+        "moveUci": "a4h4",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rh4#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h4"
+    ],
+    "keySquares": [
+      "d5",
+      "h4"
+    ]
   },
   {
-    "id": "puz_anastasia_021",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "id": "puz_ah_007",
+    "fen": "5rk1/5ppp/8/5N2/5R2/3Q4/8/6K1 w - - 0 1",
     "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
-    ],
-    "rating": 1360,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "medium",
-    "title": "Knight Takes Defender #21 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_022",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1388,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "medium",
-    "title": "Hook Mate Net #22 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_023",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1416,
-    "ratingDeviation": 100,
-    "themes": [
-      "anastasia_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "anastasia_mate",
-    "difficulty": "medium",
-    "title": "Anastasia's Trap #23 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_024",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
-    "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
-    ],
-    "rating": 1444,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "medium",
-    "title": "Knight Takes Defender #24 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_025",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1472,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "medium",
-    "title": "Hook Mate Net #25 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_026",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
+      "f5e7",
+      "g8h8",
+      "d3h7",
+      "h8h7",
+      "f4h4"
     ],
     "rating": 1500,
-    "ratingDeviation": 100,
+    "ratingDeviation": 80,
     "themes": [
       "anastasia_mate",
-      "mate_in_1"
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "medium",
+    "title": "Anastasia's Mate from f5 #7 👑",
+    "subtitle": "Knight jumps from f5 to e7 establishing the key cutoff.",
+    "playerColor": "w",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Knight jumps from f5 to e7 establishing the key cutoff. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne7+",
+        "moveUci": "f5e7",
+        "actor": "w",
+        "explanation": "White checks the King with Ne7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Qxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy Q on h7!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh4#",
+        "moveUci": "f4h4",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rh4#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h4"
+    ],
+    "keySquares": [
+      "f5",
+      "h4"
+    ]
+  },
+  {
+    "id": "puz_ah_008",
+    "fen": "5rk1/5ppp/8/5N2/8/3Q1R2/8/6K1 w - - 0 1",
+    "moves": [
+      "f5e7",
+      "g8h8",
+      "d3h7",
+      "h8h7",
+      "f3h3"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 80,
+    "themes": [
+      "anastasia_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "medium",
+    "title": "Anastasia's Mate with f3 Rook #8 👑",
+    "subtitle": "1. Ne7+ followed by Qxh7+ and Rh3#.",
+    "playerColor": "w",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Ne7+ followed by Qxh7+ and Rh3#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne7+",
+        "moveUci": "f5e7",
+        "actor": "w",
+        "explanation": "White checks the King with Ne7+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh8",
+        "moveUci": "g8h8",
+        "actor": "b",
+        "explanation": "Black plays Kh8."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh7+",
+        "moveUci": "d3h7",
+        "actor": "w",
+        "explanation": "White plays Qxh7+, capturing the enemy P on h7!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh7",
+        "moveUci": "h8h7",
+        "actor": "b",
+        "explanation": "Black plays Kxh7, capturing the enemy Q on h7!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh3#",
+        "moveUci": "f3h3",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rh3#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h3"
+    ],
+    "keySquares": [
+      "f5",
+      "h3"
+    ]
+  },
+  {
+    "id": "puz_ah_009",
+    "fen": "6k1/8/3q4/5r2/3n4/8/5PPP/5RK1 b - - 0 1",
+    "moves": [
+      "d4e2",
+      "g1h1",
+      "d6h2",
+      "h1h2",
+      "f5h5"
+    ],
+    "rating": 1600,
+    "ratingDeviation": 80,
+    "themes": [
+      "anastasia_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "medium",
+    "title": "Black Anastasia's Mate #9 👑",
+    "subtitle": "1...Ne2+ 2. Kh1 3...Qxh2+ 4. Kxh2 5...Rh5#.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Ne2+ 2. Kh1 3...Qxh2+ 4. Kxh2 5...Rh5#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne2+",
+        "moveUci": "d4e2",
+        "actor": "b",
+        "explanation": "Black checks the King with Ne2+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh2+",
+        "moveUci": "d6h2",
+        "actor": "b",
+        "explanation": "Black plays Qxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kxh2, capturing the enemy Q on h2!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh5#",
+        "moveUci": "f5h5",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rh5#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h5"
+    ],
+    "keySquares": [
+      "d4",
+      "h5"
+    ]
+  },
+  {
+    "id": "puz_ah_010",
+    "fen": "6k1/8/3q1r2/8/3n4/8/5PPP/5RK1 b - - 0 1",
+    "moves": [
+      "d4e2",
+      "g1h1",
+      "d6h2",
+      "h1h2",
+      "f6h6"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 80,
+    "themes": [
+      "anastasia_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "medium",
+    "title": "Black Anastasia's Mate from f6 #10 👑",
+    "subtitle": "Black rook on f6 delivers the final checkmate on h6.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Black rook on f6 delivers the final checkmate on h6. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne2+",
+        "moveUci": "d4e2",
+        "actor": "b",
+        "explanation": "Black checks the King with Ne2+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh2+",
+        "moveUci": "d6h2",
+        "actor": "b",
+        "explanation": "Black plays Qxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kxh2, capturing the enemy Q on h2!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh6#",
+        "moveUci": "f6h6",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rh6#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h6"
+    ],
+    "keySquares": [
+      "d4",
+      "h6"
+    ]
+  },
+  {
+    "id": "puz_ah_011",
+    "fen": "6k1/8/3q4/3r4/3n4/8/5PPP/5RK1 b - - 0 1",
+    "moves": [
+      "d4e2",
+      "g1h1",
+      "d6h2",
+      "h1h2",
+      "d5h5"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "anastasia_mate",
+      "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
     "difficulty": "hard",
-    "title": "Anastasia's Trap #26 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Anastasia's Mate from d5 #11 👑",
+    "subtitle": "Central d5 rook slides to h5 to deliver mate.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Central d5 rook slides to h5 to deliver mate. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne2+",
+        "moveUci": "d4e2",
+        "actor": "b",
+        "explanation": "Black checks the King with Ne2+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh2+",
+        "moveUci": "d6h2",
+        "actor": "b",
+        "explanation": "Black plays Qxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kxh2, capturing the enemy Q on h2!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh5#",
+        "moveUci": "d5h5",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rh5#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h5"
+    ],
+    "keySquares": [
+      "d4",
+      "h5"
+    ]
   },
   {
-    "id": "puz_anastasia_027",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "id": "puz_ah_012",
+    "fen": "6k1/8/3q4/2r5/3n4/8/5PPP/5RK1 b - - 0 1",
     "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
+      "d4e2",
+      "g1h1",
+      "d6h2",
+      "h1h2",
+      "c5h5"
     ],
-    "rating": 1528,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "hanging_piece"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "hard",
-    "title": "Knight Takes Defender #27 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
-  },
-  {
-    "id": "puz_anastasia_028",
-    "fen": "6k1/5ppp/4N3/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1556,
-    "ratingDeviation": 100,
-    "themes": [
-      "hook_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "hook_mate",
-    "difficulty": "hard",
-    "title": "Hook Mate Net #28 🪝",
-    "subtitle": "Rook delivers checkmate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_anastasia_029",
-    "fen": "6k1/4Nppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1584,
-    "ratingDeviation": 100,
+    "rating": 1750,
+    "ratingDeviation": 80,
     "themes": [
       "anastasia_mate",
-      "mate_in_1"
+      "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
     "difficulty": "hard",
-    "title": "Anastasia's Trap #29 🪝",
-    "subtitle": "Knight walls off escape, Rook checks on a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Anastasia's Mate from c5 #12 👑",
+    "subtitle": "Queen sacrifice breaks White's shelter before 3...Rh5#.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Queen sacrifice breaks White's shelter before 3...Rh5#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne2+",
+        "moveUci": "d4e2",
+        "actor": "b",
+        "explanation": "Black checks the King with Ne2+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh2+",
+        "moveUci": "d6h2",
+        "actor": "b",
+        "explanation": "Black plays Qxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kxh2, capturing the enemy Q on h2!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh5#",
+        "moveUci": "c5h5",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rh5#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h5"
+    ],
+    "keySquares": [
+      "d4",
+      "h5"
+    ]
   },
   {
-    "id": "puz_anastasia_030",
-    "fen": "5rk1/5ppp/4N3/8/8/8/5PPP/4R1K1 w - - 0 1",
+    "id": "puz_ah_013",
+    "fen": "6k1/8/3q4/1r6/3n4/8/5PPP/5RK1 b - - 0 1",
     "moves": [
-      "e6f8",
-      "g8f8",
-      "e1e4"
+      "d4e2",
+      "g1h1",
+      "d6h2",
+      "h1h2",
+      "b5h5"
     ],
-    "rating": 1612,
-    "ratingDeviation": 100,
+    "rating": 1800,
+    "ratingDeviation": 80,
+    "themes": [
+      "anastasia_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "hard",
+    "title": "Black Anastasia's Mate from b5 #13 👑",
+    "subtitle": "Long-range rook slide to h5 finishes the combination.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Long-range rook slide to h5 finishes the combination. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne2+",
+        "moveUci": "d4e2",
+        "actor": "b",
+        "explanation": "Black checks the King with Ne2+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh2+",
+        "moveUci": "d6h2",
+        "actor": "b",
+        "explanation": "Black plays Qxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kxh2, capturing the enemy Q on h2!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh5#",
+        "moveUci": "b5h5",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rh5#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h5"
+    ],
+    "keySquares": [
+      "d4",
+      "h5"
+    ]
+  },
+  {
+    "id": "puz_ah_014",
+    "fen": "6k1/8/3q4/r7/3n4/8/5PPP/5RK1 b - - 0 1",
+    "moves": [
+      "d4e2",
+      "g1h1",
+      "d6h2",
+      "h1h2",
+      "a5h5"
+    ],
+    "rating": 1850,
+    "ratingDeviation": 80,
+    "themes": [
+      "anastasia_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "hard",
+    "title": "Black Anastasia's Full-Rank Sweep #14 👑",
+    "subtitle": "Rook sweeps from a5 to h5.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Rook sweeps from a5 to h5. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne2+",
+        "moveUci": "d4e2",
+        "actor": "b",
+        "explanation": "Black checks the King with Ne2+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh2+",
+        "moveUci": "d6h2",
+        "actor": "b",
+        "explanation": "Black plays Qxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kxh2, capturing the enemy Q on h2!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh5#",
+        "moveUci": "a5h5",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rh5#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h5"
+    ],
+    "keySquares": [
+      "d4",
+      "h5"
+    ]
+  },
+  {
+    "id": "puz_ah_015",
+    "fen": "6k1/8/3q4/5r2/5n2/8/5PPP/5RK1 b - - 0 1",
+    "moves": [
+      "f4e2",
+      "g1h1",
+      "d6h2",
+      "h1h2",
+      "f5h5"
+    ],
+    "rating": 1900,
+    "ratingDeviation": 80,
+    "themes": [
+      "anastasia_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "anastasia_mate",
+    "difficulty": "hard",
+    "title": "Black Anastasia's Mate from f4 #15 👑",
+    "subtitle": "Knight on f4 initiates the 5-ply Anastasia mate.",
+    "playerColor": "b",
+    "solutionPlies": 5,
+    "tacticalGoal": "Sacrifice on the h-file and execute Anastasia's checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Knight on f4 initiates the 5-ply Anastasia mate. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "Anastasia's mate traps the king on the h-file using a Knight to guard g8 and g6.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ne2+",
+        "moveUci": "f4e2",
+        "actor": "b",
+        "explanation": "Black checks the King with Ne2+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Qxh2+",
+        "moveUci": "d6h2",
+        "actor": "b",
+        "explanation": "Black plays Qxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kxh2",
+        "moveUci": "h1h2",
+        "actor": "w",
+        "explanation": "White plays Kxh2, capturing the enemy Q on h2!"
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rh5#",
+        "moveUci": "f5h5",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rh5#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "h5"
+    ],
+    "keySquares": [
+      "f4",
+      "h5"
+    ]
+  },
+  {
+    "id": "puz_ah_016",
+    "fen": "5k2/5p2/4pNp1/4P1P1/8/8/8/3R2K1 w - - 0 1",
+    "moves": [
+      "d1d8",
+      "f8e7",
+      "d8e8"
+    ],
+    "rating": 1200,
+    "ratingDeviation": 80,
     "themes": [
       "hook_mate",
-      "hanging_piece"
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "Classic White Hook Mate on e8 #16 👑",
+    "subtitle": "1. Rd8+ Ke7 2. Re8# supported by the f6 Knight.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rd8+ Ke7 2. Re8# supported by the f6 Knight. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd8+",
+        "moveUci": "d1d8",
+        "actor": "w",
+        "explanation": "White checks the King with Rd8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re8#",
+        "moveUci": "d8e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "d1",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_ah_017",
+    "fen": "5k2/5p2/4pNp1/4P1P1/8/8/8/2R3K1 w - - 0 1",
+    "moves": [
+      "c1c8",
+      "f8e7",
+      "c8e8"
+    ],
+    "rating": 1250,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "White Hook Mate from c1 #17 👑",
+    "subtitle": "Rook checks on c8 before delivering Re8#.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Rook checks on c8 before delivering Re8#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc8+",
+        "moveUci": "c1c8",
+        "actor": "w",
+        "explanation": "White checks the King with Rc8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re8#",
+        "moveUci": "c8e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "c1",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_ah_018",
+    "fen": "5k2/5p2/4pNp1/4P1P1/8/8/8/1R4K1 w - - 0 1",
+    "moves": [
+      "b1b8",
+      "f8e7",
+      "b8e8"
+    ],
+    "rating": 1300,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "White Hook Mate from b1 #18 👑",
+    "subtitle": "White slides the b-file rook into the hook mate.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "White slides the b-file rook into the hook mate. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rb8+",
+        "moveUci": "b1b8",
+        "actor": "w",
+        "explanation": "White checks the King with Rb8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re8#",
+        "moveUci": "b8e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "b1",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_ah_019",
+    "fen": "5k2/5p2/4pNp1/4P1P1/8/8/8/R5K1 w - - 0 1",
+    "moves": [
+      "a1a8",
+      "f8e7",
+      "a8e8"
+    ],
+    "rating": 1350,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "easy",
+    "title": "White Hook Mate from a1 #19 👑",
+    "subtitle": "Long-range rook check forces the king to e7 before Re8#.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Long-range rook check forces the king to e7 before Re8#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra8+",
+        "moveUci": "a1a8",
+        "actor": "w",
+        "explanation": "White checks the King with Ra8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re8#",
+        "moveUci": "a8e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "a1",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_ah_020",
+    "fen": "5k2/5p2/4pNp1/4P1P1/8/8/3R4/6K1 w - - 0 1",
+    "moves": [
+      "d2d8",
+      "f8e7",
+      "d8e8"
+    ],
+    "rating": 1400,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "White Hook Mate from d2 #20 👑",
+    "subtitle": "2nd-rank rook penetrates on d8 to deliver the hook mate.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "2nd-rank rook penetrates on d8 to deliver the hook mate. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd8+",
+        "moveUci": "d2d8",
+        "actor": "w",
+        "explanation": "White checks the King with Rd8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re8#",
+        "moveUci": "d8e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "d2",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_ah_021",
+    "fen": "5k2/5p2/4pNp1/4P1P1/8/8/2R5/6K1 w - - 0 1",
+    "moves": [
+      "c2c8",
+      "f8e7",
+      "c8e8"
+    ],
+    "rating": 1450,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "White Hook Mate from c2 #21 👑",
+    "subtitle": "White rook crashes in on c8 before administering Re8#.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "White rook crashes in on c8 before administering Re8#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc8+",
+        "moveUci": "c2c8",
+        "actor": "w",
+        "explanation": "White checks the King with Rc8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re8#",
+        "moveUci": "c8e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "c2",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_ah_022",
+    "fen": "5k2/5p2/4pNp1/4P1P1/8/8/1R6/6K1 w - - 0 1",
+    "moves": [
+      "b2b8",
+      "f8e7",
+      "b8e8"
+    ],
+    "rating": 1500,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "White Hook Mate from b2 #22 👑",
+    "subtitle": "b2 rook delivers the forcing check on b8.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "b2 rook delivers the forcing check on b8. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rb8+",
+        "moveUci": "b2b8",
+        "actor": "w",
+        "explanation": "White checks the King with Rb8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re8#",
+        "moveUci": "b8e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "b2",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_ah_023",
+    "fen": "5k2/5p2/4pNp1/4P1P1/8/8/R7/6K1 w - - 0 1",
+    "moves": [
+      "a2a8",
+      "f8e7",
+      "a8e8"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "White Hook Mate from a2 #23 👑",
+    "subtitle": "Rook on a2 drives Black's king into the fatal hook.",
+    "playerColor": "w",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Rook on a2 drives Black's king into the fatal hook. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra8+",
+        "moveUci": "a2a8",
+        "actor": "w",
+        "explanation": "White checks the King with Ra8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke7",
+        "moveUci": "f8e7",
+        "actor": "b",
+        "explanation": "Black plays Ke7."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re8#",
+        "moveUci": "a8e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "a2",
+      "e8"
+    ]
+  },
+  {
+    "id": "puz_ah_024",
+    "fen": "k2r4/8/8/8/4p1p1/4PnP1/5P2/5K2 b - - 0 1",
+    "moves": [
+      "d8d1",
+      "f1e2",
+      "d1e1"
+    ],
+    "rating": 1600,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Black Hook Mate on e1 #24 👑",
+    "subtitle": "1...Rd1+ 2. Ke2 3...Re1# supported by the f3 knight.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rd1+ 2. Ke2 3...Re1# supported by the f3 knight. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd1+",
+        "moveUci": "d8d1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rd1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "f1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re1#",
+        "moveUci": "d1e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Re1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "d8",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_ah_025",
+    "fen": "k1r5/8/8/8/4p1p1/4PnP1/5P2/5K2 b - - 0 1",
+    "moves": [
+      "c8c1",
+      "f1e2",
+      "c1e1"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "medium",
+    "title": "Black Hook Mate from c8 #25 👑",
+    "subtitle": "Rook penetrates from c8 into e1.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Rook penetrates from c8 into e1. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc1+",
+        "moveUci": "c8c1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rc1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "f1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re1#",
+        "moveUci": "c1e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Re1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "c8",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_ah_026",
+    "fen": "kr6/8/8/8/4p1p1/4PnP1/5P2/5K2 b - - 0 1",
+    "moves": [
+      "b8b1",
+      "f1e2",
+      "b1e1"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
     "difficulty": "hard",
-    "title": "Knight Takes Defender #30 🪝",
-    "subtitle": "Eliminate the defender on f8!",
-    "playerColor": "w",
-    "solutionPlies": 3
+    "title": "Black Hook Mate from b8 #26 👑",
+    "subtitle": "Black slides b-file rook into the hook mate.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Black slides b-file rook into the hook mate. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rb1+",
+        "moveUci": "b8b1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rb1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "f1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re1#",
+        "moveUci": "b1e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Re1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "b8",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_ah_027",
+    "fen": "r1k5/8/8/8/4p1p1/4PnP1/5P2/5K2 b - - 0 1",
+    "moves": [
+      "a8a1",
+      "f1e2",
+      "a1e1"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "hard",
+    "title": "Black Hook Mate from a8 #27 👑",
+    "subtitle": "Long-range a8 rook check forces Ke2 before Re1#.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Long-range a8 rook check forces Ke2 before Re1#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra1+",
+        "moveUci": "a8a1",
+        "actor": "b",
+        "explanation": "Black checks the King with Ra1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "f1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re1#",
+        "moveUci": "a1e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Re1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "a8",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_ah_028",
+    "fen": "k7/3r4/8/8/4p1p1/4PnP1/5P2/5K2 b - - 0 1",
+    "moves": [
+      "d7d1",
+      "f1e2",
+      "d1e1"
+    ],
+    "rating": 1800,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "hard",
+    "title": "Black Hook Mate from d7 #28 👑",
+    "subtitle": "7th-rank rook crashes in on d1 to deliver Re1#.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "7th-rank rook crashes in on d1 to deliver Re1#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd1+",
+        "moveUci": "d7d1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rd1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "f1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re1#",
+        "moveUci": "d1e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Re1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "d7",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_ah_029",
+    "fen": "k7/2r5/8/8/4p1p1/4PnP1/5P2/5K2 b - - 0 1",
+    "moves": [
+      "c7c1",
+      "f1e2",
+      "c1e1"
+    ],
+    "rating": 1850,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "hard",
+    "title": "Black Hook Mate from c7 #29 👑",
+    "subtitle": "Black forces Ke2 before the decisive Re1#.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Black forces Ke2 before the decisive Re1#. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc1+",
+        "moveUci": "c7c1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rc1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "f1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re1#",
+        "moveUci": "c1e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Re1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "c7",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_ah_030",
+    "fen": "k7/1r6/8/8/4p1p1/4PnP1/5P2/5K2 b - - 0 1",
+    "moves": [
+      "b7b1",
+      "f1e2",
+      "b1e1"
+    ],
+    "rating": 1900,
+    "ratingDeviation": 80,
+    "themes": [
+      "hook_mate",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "hook_mate",
+    "difficulty": "hard",
+    "title": "Black Hook Mate from b7 #30 👑",
+    "subtitle": "Rook on b7 completes the hook mate combination.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Coordinate Rook, Knight, and Pawn to execute the Hook Mate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "Rook on b7 completes the hook mate combination. demonstrating lethal Knight and Rook coordination.",
+    "keyTakeaway": "The Hook Mate pairs a Rook and a pawn-protected Knight to build an inescapable mating net.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rb1+",
+        "moveUci": "b7b1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rb1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Ke2",
+        "moveUci": "f1e2",
+        "actor": "w",
+        "explanation": "White plays Ke2."
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Re1#",
+        "moveUci": "b1e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Re1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "b7",
+      "e1"
+    ]
   }
 ]

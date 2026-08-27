@@ -1,667 +1,1538 @@
 [
   {
-    "id": "puz_backrank_001",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 600,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "Back-Rank Lightning #1 👑",
-    "subtitle": "Slide your rook to a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_002",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
+    "id": "puz_br_001",
+    "fen": "6k1/5ppp/8/8/8/8/8/3R2K1 w - - 0 1",
     "moves": [
       "d1d8"
     ],
-    "rating": 624,
-    "ratingDeviation": 90,
+    "rating": 650,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "Open File Checkmate #2 👑",
-    "subtitle": "Take on d8 for mate!",
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Back-Rank Mate on d8 #1 👑",
+    "subtitle": "1. Rd8# delivers instant back-rank checkmate.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rd8# delivers instant back-rank checkmate. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd8#",
+        "moveUci": "d1d8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rd8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "d8"
+    ],
+    "keySquares": [
+      "d1",
+      "d8"
+    ]
   },
   {
-    "id": "puz_backrank_003",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
+    "id": "puz_br_002",
+    "fen": "6k1/5ppp/8/8/8/8/8/4R1K1 w - - 0 1",
     "moves": [
-      "e2e8"
+      "e1e8"
     ],
-    "rating": 648,
-    "ratingDeviation": 90,
+    "rating": 680,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "E-File Corridor Mate #3 👑",
-    "subtitle": "Crash through on e8!",
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Back-Rank Mate on e8 #2 👑",
+    "subtitle": "1. Re8# slides across the open e-file.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Re8# slides across the open e-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re8#",
+        "moveUci": "e1e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Re8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "e1",
+      "e8"
+    ]
   },
   {
-    "id": "puz_backrank_004",
-    "fen": "6k1/pp3ppp/8/8/8/8/PP3PPP/2R3K1 w - - 0 1",
+    "id": "puz_br_003",
+    "fen": "6k1/5ppp/8/8/8/8/8/2R3K1 w - - 0 1",
     "moves": [
       "c1c8"
     ],
-    "rating": 672,
-    "ratingDeviation": 90,
+    "rating": 700,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "C-File Corridor Smash #4 👑",
-    "subtitle": "Rc8# checkmates the boxed king!",
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Back-Rank Mate on c8 #3 👑",
+    "subtitle": "1. Rc8# seals the back rank on the c-file.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rc8# seals the back rank on the c-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc8#",
+        "moveUci": "c1c8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rc8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "c8"
+    ],
+    "keySquares": [
+      "c1",
+      "c8"
+    ]
   },
   {
-    "id": "puz_backrank_005",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
+    "id": "puz_br_004",
+    "fen": "6k1/5ppp/8/8/8/8/8/1R4K1 w - - 0 1",
     "moves": [
-      "a1a8"
-    ],
-    "rating": 696,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "Back-Rank Lightning #5 👑",
-    "subtitle": "Slide your rook to a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_006",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
-    "moves": [
-      "d1d8"
+      "b1b8"
     ],
     "rating": 720,
-    "ratingDeviation": 90,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "Open File Checkmate #6 👑",
-    "subtitle": "Take on d8 for mate!",
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Back-Rank Mate on b8 #4 👑",
+    "subtitle": "1. Rb8# penetrates on the open b-file.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rb8# penetrates on the open b-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rb8#",
+        "moveUci": "b1b8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rb8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "b8"
+    ],
+    "keySquares": [
+      "b1",
+      "b8"
+    ]
   },
   {
-    "id": "puz_backrank_007",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
-    "moves": [
-      "e2e8"
-    ],
-    "rating": 744,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "E-File Corridor Mate #7 👑",
-    "subtitle": "Crash through on e8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_008",
-    "fen": "6k1/pp3ppp/8/8/8/8/PP3PPP/2R3K1 w - - 0 1",
-    "moves": [
-      "c1c8"
-    ],
-    "rating": 768,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "C-File Corridor Smash #8 👑",
-    "subtitle": "Rc8# checkmates the boxed king!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_009",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
+    "id": "puz_br_005",
+    "fen": "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1",
     "moves": [
       "a1a8"
     ],
-    "rating": 792,
-    "ratingDeviation": 90,
+    "rating": 750,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "Back-Rank Lightning #9 👑",
-    "subtitle": "Slide your rook to a8!",
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Back-Rank Mate on a8 #5 👑",
+    "subtitle": "1. Ra8# finishes the game along the a-file.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Ra8# finishes the game along the a-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra8#",
+        "moveUci": "a1a8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Ra8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "a8"
+    ],
+    "keySquares": [
+      "a1",
+      "a8"
+    ]
   },
   {
-    "id": "puz_backrank_010",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
+    "id": "puz_br_006",
+    "fen": "6k1/5ppp/8/8/8/8/3Q4/6K1 w - - 0 1",
     "moves": [
-      "d1d8"
+      "d2d8"
     ],
-    "rating": 816,
-    "ratingDeviation": 90,
+    "rating": 770,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "Open File Checkmate #10 👑",
-    "subtitle": "Take on d8 for mate!",
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Back-Rank Queen Mate on d8 #6 👑",
+    "subtitle": "1. Qd8# invades on the d-file.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Qd8# invades on the d-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qd8#",
+        "moveUci": "d2d8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qd8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "d8"
+    ],
+    "keySquares": [
+      "d2",
+      "d8"
+    ]
   },
   {
-    "id": "puz_backrank_011",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
+    "id": "puz_br_007",
+    "fen": "6k1/5ppp/8/8/8/8/4Q3/6K1 w - - 0 1",
     "moves": [
       "e2e8"
     ],
-    "rating": 840,
-    "ratingDeviation": 90,
+    "rating": 800,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "E-File Corridor Mate #11 👑",
-    "subtitle": "Crash through on e8!",
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Back-Rank Queen Mate on e8 #7 👑",
+    "subtitle": "1. Qe8# delivers unstoppable checkmate.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Qe8# delivers unstoppable checkmate. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qe8#",
+        "moveUci": "e2e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qe8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "e2",
+      "e8"
+    ]
   },
   {
-    "id": "puz_backrank_012",
-    "fen": "6k1/pp3ppp/8/8/8/8/PP3PPP/2R3K1 w - - 0 1",
+    "id": "puz_br_008",
+    "fen": "6k1/5ppp/8/8/8/8/2Q5/6K1 w - - 0 1",
     "moves": [
-      "c1c8"
+      "c2c8"
     ],
-    "rating": 864,
-    "ratingDeviation": 90,
+    "rating": 830,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "C-File Corridor Smash #12 👑",
-    "subtitle": "Rc8# checkmates the boxed king!",
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Back-Rank Queen Mate on c8 #8 👑",
+    "subtitle": "1. Qc8# finishes Black along the c-file.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Qc8# finishes Black along the c-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qc8#",
+        "moveUci": "c2c8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Qc8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "c8"
+    ],
+    "keySquares": [
+      "c2",
+      "c8"
+    ]
   },
   {
-    "id": "puz_backrank_013",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
+    "id": "puz_br_009",
+    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
     "moves": [
-      "a1a8"
+      "d8d1"
     ],
-    "rating": 888,
-    "ratingDeviation": 90,
+    "rating": 850,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "novice",
-    "title": "Back-Rank Lightning #13 👑",
-    "subtitle": "Slide your rook to a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Black Back-Rank Mate on d1 #9 👑",
+    "subtitle": "1...Rd1# punishes White's lack of luft.",
+    "playerColor": "b",
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rd1# punishes White's lack of luft. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd1#",
+        "moveUci": "d8d1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rd1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "d1"
+    ],
+    "keySquares": [
+      "d8",
+      "d1"
+    ]
   },
   {
-    "id": "puz_backrank_014",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
+    "id": "puz_br_010",
+    "fen": "4r1k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
     "moves": [
+      "e8e1"
+    ],
+    "rating": 880,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Black Back-Rank Mate on e1 #10 👑",
+    "subtitle": "1...Re1# checks White along the e-file.",
+    "playerColor": "b",
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Re1# checks White along the e-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re1#",
+        "moveUci": "e8e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Re1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "e8",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_br_011",
+    "fen": "2r3k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    "moves": [
+      "c8c1"
+    ],
+    "rating": 900,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Black Back-Rank Mate on c1 #11 👑",
+    "subtitle": "1...Rc1# penetrates on the open c-file.",
+    "playerColor": "b",
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rc1# penetrates on the open c-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc1#",
+        "moveUci": "c8c1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rc1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "c1"
+    ],
+    "keySquares": [
+      "c8",
+      "c1"
+    ]
+  },
+  {
+    "id": "puz_br_012",
+    "fen": "1r4k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    "moves": [
+      "b8b1"
+    ],
+    "rating": 920,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Black Back-Rank Mate on b1 #12 👑",
+    "subtitle": "1...Rb1# concludes the back-rank attack.",
+    "playerColor": "b",
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rb1# concludes the back-rank attack. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rb1#",
+        "moveUci": "b8b1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rb1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "b1"
+    ],
+    "keySquares": [
+      "b8",
+      "b1"
+    ]
+  },
+  {
+    "id": "puz_br_013",
+    "fen": "r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    "moves": [
+      "a8a1"
+    ],
+    "rating": 950,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Black Back-Rank Mate on a1 #13 👑",
+    "subtitle": "1...Ra1# delivers mate along the a-file.",
+    "playerColor": "b",
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Ra1# delivers mate along the a-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Ra1#",
+        "moveUci": "a8a1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Ra1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "a1"
+    ],
+    "keySquares": [
+      "a8",
+      "a1"
+    ]
+  },
+  {
+    "id": "puz_br_014",
+    "fen": "6k1/3q1ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    "moves": [
+      "d7d1"
+    ],
+    "rating": 970,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "easy",
+    "title": "Black Queen Mate on d1 #14 👑",
+    "subtitle": "1...Qd1# invades the 1st rank with decisive force.",
+    "playerColor": "b",
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Qd1# invades the 1st rank with decisive force. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qd1#",
+        "moveUci": "d7d1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Qd1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "d1"
+    ],
+    "keySquares": [
+      "d7",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_br_015",
+    "fen": "6k1/4q1pp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    "moves": [
+      "e7e1"
+    ],
+    "rating": 1000,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "medium",
+    "title": "Black Queen Mate on e1 #15 👑",
+    "subtitle": "1...Qe1# delivers instant checkmate on the e-file.",
+    "playerColor": "b",
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Qe1# delivers instant checkmate on the e-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qe1#",
+        "moveUci": "e7e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Qe1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "e7",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_br_016",
+    "fen": "6k1/2q1pppp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    "moves": [
+      "c7c1"
+    ],
+    "rating": 1030,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "medium",
+    "title": "Black Queen Mate on c1 #16 👑",
+    "subtitle": "1...Qc1# finishes White along the c-file.",
+    "playerColor": "b",
+    "solutionPlies": 1,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Qc1# finishes White along the c-file. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Qc1#",
+        "moveUci": "c7c1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Qc1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "c1"
+    ],
+    "keySquares": [
+      "c7",
+      "c1"
+    ]
+  },
+  {
+    "id": "puz_br_017",
+    "fen": "r5k1/5ppp/8/8/8/8/3R4/3R2K1 w - - 0 1",
+    "moves": [
+      "d2d8",
+      "a8d8",
       "d1d8"
     ],
-    "rating": 912,
-    "ratingDeviation": 90,
+    "rating": 1050,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "Open File Checkmate #14 👑",
-    "subtitle": "Take on d8 for mate!",
+    "primaryTheme": "back_rank",
+    "difficulty": "medium",
+    "title": "Doubled Rooks on the d-File #17 👑",
+    "subtitle": "1. Rd8+ Rxd8 2. Rxd8# overpowers the defender.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rd8+ Rxd8 2. Rxd8# overpowers the defender. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd8+",
+        "moveUci": "d2d8",
+        "actor": "w",
+        "explanation": "White checks the King with Rd8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxd8",
+        "moveUci": "a8d8",
+        "actor": "b",
+        "explanation": "Black plays Rxd8, capturing the enemy R on d8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxd8#",
+        "moveUci": "d1d8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rxd8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "d8"
+    ],
+    "keySquares": [
+      "d2",
+      "d8"
+    ]
   },
   {
-    "id": "puz_backrank_015",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
+    "id": "puz_br_018",
+    "fen": "r5k1/5ppp/8/8/8/8/4R3/4R1K1 w - - 0 1",
     "moves": [
-      "e2e8"
+      "e2e8",
+      "a8e8",
+      "e1e8"
     ],
-    "rating": 936,
-    "ratingDeviation": 90,
+    "rating": 1100,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "E-File Corridor Mate #15 👑",
-    "subtitle": "Crash through on e8!",
+    "primaryTheme": "back_rank",
+    "difficulty": "medium",
+    "title": "Doubled Rooks on the e-File #18 👑",
+    "subtitle": "1. Re8+ Rxe8 2. Rxe8# crushes the back rank.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Re8+ Rxe8 2. Rxe8# crushes the back rank. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re8+",
+        "moveUci": "e2e8",
+        "actor": "w",
+        "explanation": "White checks the King with Re8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxe8",
+        "moveUci": "a8e8",
+        "actor": "b",
+        "explanation": "Black plays Rxe8, capturing the enemy R on e8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxe8#",
+        "moveUci": "e1e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rxe8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "e2",
+      "e8"
+    ]
   },
   {
-    "id": "puz_backrank_016",
-    "fen": "6k1/pp3ppp/8/8/8/8/PP3PPP/2R3K1 w - - 0 1",
+    "id": "puz_br_019",
+    "fen": "r5k1/5ppp/8/8/8/8/2R5/2R3K1 w - - 0 1",
     "moves": [
+      "c2c8",
+      "a8c8",
       "c1c8"
     ],
-    "rating": 960,
-    "ratingDeviation": 90,
+    "rating": 1150,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "C-File Corridor Smash #16 👑",
-    "subtitle": "Rc8# checkmates the boxed king!",
+    "primaryTheme": "back_rank",
+    "difficulty": "medium",
+    "title": "Doubled Rooks on the c-File #19 👑",
+    "subtitle": "1. Rc8+ Rxc8 2. Rxc8# overpowers c8.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rc8+ Rxc8 2. Rxc8# overpowers c8. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc8+",
+        "moveUci": "c2c8",
+        "actor": "w",
+        "explanation": "White checks the King with Rc8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxc8",
+        "moveUci": "a8c8",
+        "actor": "b",
+        "explanation": "Black plays Rxc8, capturing the enemy R on c8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxc8#",
+        "moveUci": "c1c8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rxc8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "c8"
+    ],
+    "keySquares": [
+      "c2",
+      "c8"
+    ]
   },
   {
-    "id": "puz_backrank_017",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
+    "id": "puz_br_020",
+    "fen": "r5k1/5ppp/8/8/8/8/1R6/1R4K1 w - - 0 1",
     "moves": [
-      "a1a8"
-    ],
-    "rating": 984,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "Back-Rank Lightning #17 👑",
-    "subtitle": "Slide your rook to a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_018",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
-    "moves": [
-      "d1d8"
-    ],
-    "rating": 1008,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "Open File Checkmate #18 👑",
-    "subtitle": "Take on d8 for mate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_019",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
-    "moves": [
-      "e2e8"
-    ],
-    "rating": 1032,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "E-File Corridor Mate #19 👑",
-    "subtitle": "Crash through on e8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_020",
-    "fen": "6k1/pp3ppp/8/8/8/8/PP3PPP/2R3K1 w - - 0 1",
-    "moves": [
-      "c1c8"
-    ],
-    "rating": 1056,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "C-File Corridor Smash #20 👑",
-    "subtitle": "Rc8# checkmates the boxed king!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_021",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1080,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "Back-Rank Lightning #21 👑",
-    "subtitle": "Slide your rook to a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_022",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
-    "moves": [
-      "d1d8"
-    ],
-    "rating": 1104,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "Open File Checkmate #22 👑",
-    "subtitle": "Take on d8 for mate!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_023",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
-    "moves": [
-      "e2e8"
-    ],
-    "rating": 1128,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "E-File Corridor Mate #23 👑",
-    "subtitle": "Crash through on e8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_024",
-    "fen": "6k1/pp3ppp/8/8/8/8/PP3PPP/2R3K1 w - - 0 1",
-    "moves": [
-      "c1c8"
-    ],
-    "rating": 1152,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "C-File Corridor Smash #24 👑",
-    "subtitle": "Rc8# checkmates the boxed king!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_025",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1176,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "easy",
-    "title": "Back-Rank Lightning #25 👑",
-    "subtitle": "Slide your rook to a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_026",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
-    "moves": [
-      "d1d8"
+      "b2b8",
+      "a8b8",
+      "b1b8"
     ],
     "rating": 1200,
-    "ratingDeviation": 90,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
+    "primaryTheme": "back_rank",
     "difficulty": "medium",
-    "title": "Open File Checkmate #26 👑",
-    "subtitle": "Take on d8 for mate!",
+    "title": "Doubled Rooks on the b-File #20 👑",
+    "subtitle": "1. Rb8+ Rxb8 2. Rxb8# finishes Black on b8.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rb8+ Rxb8 2. Rxb8# finishes Black on b8. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rb8+",
+        "moveUci": "b2b8",
+        "actor": "w",
+        "explanation": "White checks the King with Rb8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxb8",
+        "moveUci": "a8b8",
+        "actor": "b",
+        "explanation": "Black plays Rxb8, capturing the enemy R on b8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxb8#",
+        "moveUci": "b1b8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rxb8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "b8"
+    ],
+    "keySquares": [
+      "b2",
+      "b8"
+    ]
   },
   {
-    "id": "puz_backrank_027",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
+    "id": "puz_br_021",
+    "fen": "r5k1/5ppp/8/8/8/3R4/8/3R2K1 w - - 0 1",
     "moves": [
-      "e2e8"
-    ],
-    "rating": 1224,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "medium",
-    "title": "E-File Corridor Mate #27 👑",
-    "subtitle": "Crash through on e8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_028",
-    "fen": "6k1/pp3ppp/8/8/8/8/PP3PPP/2R3K1 w - - 0 1",
-    "moves": [
-      "c1c8"
-    ],
-    "rating": 1248,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "medium",
-    "title": "C-File Corridor Smash #28 👑",
-    "subtitle": "Rc8# checkmates the boxed king!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_029",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
-    "moves": [
-      "a1a8"
-    ],
-    "rating": 1272,
-    "ratingDeviation": 90,
-    "themes": [
-      "back_rank_mate",
-      "mate_in_1"
-    ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "medium",
-    "title": "Back-Rank Lightning #29 👑",
-    "subtitle": "Slide your rook to a8!",
-    "playerColor": "w",
-    "solutionPlies": 1
-  },
-  {
-    "id": "puz_backrank_030",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
-    "moves": [
+      "d3d8",
+      "a8d8",
       "d1d8"
     ],
-    "rating": 1296,
-    "ratingDeviation": 90,
+    "rating": 1250,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
+    "primaryTheme": "back_rank",
     "difficulty": "medium",
-    "title": "Open File Checkmate #30 👑",
-    "subtitle": "Take on d8 for mate!",
+    "title": "3rd-Rank Lift into Back Rank #21 👑",
+    "subtitle": "1. Rd8+ Rxd8 2. Rxd8# executes a clean sacrifice.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rd8+ Rxd8 2. Rxd8# executes a clean sacrifice. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd8+",
+        "moveUci": "d3d8",
+        "actor": "w",
+        "explanation": "White checks the King with Rd8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxd8",
+        "moveUci": "a8d8",
+        "actor": "b",
+        "explanation": "Black plays Rxd8, capturing the enemy R on d8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxd8#",
+        "moveUci": "d1d8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rxd8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "d8"
+    ],
+    "keySquares": [
+      "d3",
+      "d8"
+    ]
   },
   {
-    "id": "puz_backrank_031",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
+    "id": "puz_br_022",
+    "fen": "r5k1/5ppp/8/8/8/4R3/8/4R1K1 w - - 0 1",
     "moves": [
-      "e2e8"
+      "e3e8",
+      "a8e8",
+      "e1e8"
     ],
-    "rating": 1320,
-    "ratingDeviation": 90,
+    "rating": 1300,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
+    "primaryTheme": "back_rank",
     "difficulty": "medium",
-    "title": "E-File Corridor Mate #31 👑",
-    "subtitle": "Crash through on e8!",
+    "title": "3rd-Rank Lift on the e-File #22 👑",
+    "subtitle": "1. Re8+ Rxe8 2. Rxe8# overwhelms Black.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Re8+ Rxe8 2. Rxe8# overwhelms Black. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re8+",
+        "moveUci": "e3e8",
+        "actor": "w",
+        "explanation": "White checks the King with Re8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxe8",
+        "moveUci": "a8e8",
+        "actor": "b",
+        "explanation": "Black plays Rxe8, capturing the enemy R on e8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxe8#",
+        "moveUci": "e1e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rxe8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "e3",
+      "e8"
+    ]
   },
   {
-    "id": "puz_backrank_032",
-    "fen": "6k1/pp3ppp/8/8/8/8/PP3PPP/2R3K1 w - - 0 1",
+    "id": "puz_br_023",
+    "fen": "r5k1/5ppp/8/8/8/2R5/8/2R3K1 w - - 0 1",
     "moves": [
+      "c3c8",
+      "a8c8",
       "c1c8"
     ],
-    "rating": 1344,
-    "ratingDeviation": 90,
+    "rating": 1350,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
+    "primaryTheme": "back_rank",
     "difficulty": "medium",
-    "title": "C-File Corridor Smash #32 👑",
-    "subtitle": "Rc8# checkmates the boxed king!",
+    "title": "3rd-Rank Lift on the c-File #23 👑",
+    "subtitle": "1. Rc8+ Rxc8 2. Rxc8# finishes the game.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Rc8+ Rxc8 2. Rxc8# finishes the game. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc8+",
+        "moveUci": "c3c8",
+        "actor": "w",
+        "explanation": "White checks the King with Rc8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxc8",
+        "moveUci": "a8c8",
+        "actor": "b",
+        "explanation": "Black plays Rxc8, capturing the enemy R on c8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxc8#",
+        "moveUci": "c1c8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rxc8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "c8"
+    ],
+    "keySquares": [
+      "c3",
+      "c8"
+    ]
   },
   {
-    "id": "puz_backrank_033",
-    "fen": "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
+    "id": "puz_br_024",
+    "fen": "6k1/3q1ppp/8/8/8/8/4R3/4R1K1 w - - 0 1",
     "moves": [
-      "a1a8"
+      "e2e8",
+      "d7e8",
+      "e1e8"
     ],
-    "rating": 1368,
-    "ratingDeviation": 90,
+    "rating": 1400,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
+    "primaryTheme": "back_rank",
     "difficulty": "medium",
-    "title": "Back-Rank Lightning #33 👑",
-    "subtitle": "Slide your rook to a8!",
+    "title": "Queen Deflection into Back-Rank Mate #24 👑",
+    "subtitle": "1. Re8+ Qxe8 2. Rxe8# overpowers the Queen defender.",
     "playerColor": "w",
-    "solutionPlies": 1
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1. Re8+ Qxe8 2. Rxe8# overpowers the Queen defender. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re8+",
+        "moveUci": "e2e8",
+        "actor": "w",
+        "explanation": "White checks the King with Re8+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Qxe8",
+        "moveUci": "d7e8",
+        "actor": "b",
+        "explanation": "Black plays Qxe8, capturing the enemy R on e8!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxe8#",
+        "moveUci": "e1e8",
+        "actor": "w",
+        "explanation": "White delivers checkmate with Rxe8#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e8"
+    ],
+    "keySquares": [
+      "e2",
+      "e8"
+    ]
   },
   {
-    "id": "puz_backrank_034",
-    "fen": "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
+    "id": "puz_br_025",
+    "fen": "3r2k1/3r4/8/8/8/8/5PPP/R5K1 b - - 0 1",
     "moves": [
-      "d1d8"
+      "d7d1",
+      "a1d1",
+      "d8d1"
     ],
-    "rating": 1392,
-    "ratingDeviation": 90,
+    "rating": 1450,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
+    "primaryTheme": "back_rank",
     "difficulty": "medium",
-    "title": "Open File Checkmate #34 👑",
-    "subtitle": "Take on d8 for mate!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "title": "Black Doubled Rooks on d1 #25 👑",
+    "subtitle": "1...Rd1+ 2. Rxd1 Rxd1# overpowers the 1st rank.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rd1+ 2. Rxd1 Rxd1# overpowers the 1st rank. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd1+",
+        "moveUci": "d7d1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rd1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxd1",
+        "moveUci": "a1d1",
+        "actor": "w",
+        "explanation": "White plays Rxd1, capturing the enemy R on d1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxd1#",
+        "moveUci": "d8d1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rxd1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "d1"
+    ],
+    "keySquares": [
+      "d7",
+      "d1"
+    ]
   },
   {
-    "id": "puz_backrank_035",
-    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
+    "id": "puz_br_026",
+    "fen": "4r1k1/4r3/8/8/8/8/5PPP/R5K1 b - - 0 1",
     "moves": [
-      "e2e8"
+      "e7e1",
+      "a1e1",
+      "e8e1"
     ],
-    "rating": 1416,
-    "ratingDeviation": 90,
+    "rating": 1500,
+    "ratingDeviation": 80,
     "themes": [
-      "back_rank_mate",
-      "mate_in_1"
+      "back_rank",
+      "captures_checks_threats"
     ],
-    "primaryTheme": "back_rank_mate",
-    "difficulty": "medium",
-    "title": "E-File Corridor Mate #35 👑",
-    "subtitle": "Crash through on e8!",
-    "playerColor": "w",
-    "solutionPlies": 1
+    "primaryTheme": "back_rank",
+    "difficulty": "hard",
+    "title": "Black Doubled Rooks on e1 #26 👑",
+    "subtitle": "1...Re1+ 2. Rxe1 Rxe1# breaks through on e1.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Re1+ 2. Rxe1 Rxe1# breaks through on e1. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re1+",
+        "moveUci": "e7e1",
+        "actor": "b",
+        "explanation": "Black checks the King with Re1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxe1",
+        "moveUci": "a1e1",
+        "actor": "w",
+        "explanation": "White plays Rxe1, capturing the enemy R on e1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxe1#",
+        "moveUci": "e8e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rxe1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "e7",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_br_027",
+    "fen": "2r3k1/2r5/8/8/8/8/5PPP/R5K1 b - - 0 1",
+    "moves": [
+      "c7c1",
+      "a1c1",
+      "c8c1"
+    ],
+    "rating": 1550,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "hard",
+    "title": "Black Doubled Rooks on c1 #27 👑",
+    "subtitle": "1...Rc1+ 2. Rxc1 Rxc1# concludes the assault.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rc1+ 2. Rxc1 Rxc1# concludes the assault. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc1+",
+        "moveUci": "c7c1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rc1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxc1",
+        "moveUci": "a1c1",
+        "actor": "w",
+        "explanation": "White plays Rxc1, capturing the enemy R on c1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxc1#",
+        "moveUci": "c8c1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rxc1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "c1"
+    ],
+    "keySquares": [
+      "c7",
+      "c1"
+    ]
+  },
+  {
+    "id": "puz_br_028",
+    "fen": "1r4k1/1r6/8/8/8/8/5PPP/R5K1 b - - 0 1",
+    "moves": [
+      "b7b1",
+      "a1b1",
+      "b8b1"
+    ],
+    "rating": 1600,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "hard",
+    "title": "Black Doubled Rooks on b1 #28 👑",
+    "subtitle": "1...Rb1+ 2. Rxb1 Rxb1# crushes the 1st rank.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rb1+ 2. Rxb1 Rxb1# crushes the 1st rank. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rb1+",
+        "moveUci": "b7b1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rb1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxb1",
+        "moveUci": "a1b1",
+        "actor": "w",
+        "explanation": "White plays Rxb1, capturing the enemy R on b1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxb1#",
+        "moveUci": "b8b1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rxb1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "b1"
+    ],
+    "keySquares": [
+      "b7",
+      "b1"
+    ]
+  },
+  {
+    "id": "puz_br_029",
+    "fen": "3r2k1/8/3r4/8/8/8/5PPP/R5K1 b - - 0 1",
+    "moves": [
+      "d6d1",
+      "a1d1",
+      "d8d1"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "hard",
+    "title": "Black 6th-Rank Lift into d1 #29 👑",
+    "subtitle": "1...Rd1+ 2. Rxd1 Rxd1# executes the sacrifice.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rd1+ 2. Rxd1 Rxd1# executes the sacrifice. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rd1+",
+        "moveUci": "d6d1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rd1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxd1",
+        "moveUci": "a1d1",
+        "actor": "w",
+        "explanation": "White plays Rxd1, capturing the enemy R on d1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxd1#",
+        "moveUci": "d8d1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rxd1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "d1"
+    ],
+    "keySquares": [
+      "d6",
+      "d1"
+    ]
+  },
+  {
+    "id": "puz_br_030",
+    "fen": "4r1k1/8/4r3/8/8/8/5PPP/R5K1 b - - 0 1",
+    "moves": [
+      "e6e1",
+      "a1e1",
+      "e8e1"
+    ],
+    "rating": 1700,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "hard",
+    "title": "Black 6th-Rank Lift into e1 #30 👑",
+    "subtitle": "1...Re1+ 2. Rxe1 Rxe1# completes the corridor mate.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Re1+ 2. Rxe1 Rxe1# completes the corridor mate. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re1+",
+        "moveUci": "e6e1",
+        "actor": "b",
+        "explanation": "Black checks the King with Re1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxe1",
+        "moveUci": "a1e1",
+        "actor": "w",
+        "explanation": "White plays Rxe1, capturing the enemy R on e1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxe1#",
+        "moveUci": "e8e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rxe1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "e6",
+      "e1"
+    ]
+  },
+  {
+    "id": "puz_br_031",
+    "fen": "2r3k1/8/2r5/8/8/8/5PPP/R5K1 b - - 0 1",
+    "moves": [
+      "c6c1",
+      "a1c1",
+      "c8c1"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "hard",
+    "title": "Black 6th-Rank Lift into c1 #31 👑",
+    "subtitle": "1...Rc1+ 2. Rxc1 Rxc1# finishes White.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Rc1+ 2. Rxc1 Rxc1# finishes White. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Rc1+",
+        "moveUci": "c6c1",
+        "actor": "b",
+        "explanation": "Black checks the King with Rc1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Rxc1",
+        "moveUci": "a1c1",
+        "actor": "w",
+        "explanation": "White plays Rxc1, capturing the enemy R on c1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxc1#",
+        "moveUci": "c8c1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rxc1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "c1"
+    ],
+    "keySquares": [
+      "c6",
+      "c1"
+    ]
+  },
+  {
+    "id": "puz_br_032",
+    "fen": "4r1k1/4r3/8/8/8/8/5PPP/3Q2K1 b - - 0 1",
+    "moves": [
+      "e7e1",
+      "d1e1",
+      "e8e1"
+    ],
+    "rating": 1800,
+    "ratingDeviation": 80,
+    "themes": [
+      "back_rank",
+      "captures_checks_threats"
+    ],
+    "primaryTheme": "back_rank",
+    "difficulty": "hard",
+    "title": "Black Queen Deflection on e1 #32 👑",
+    "subtitle": "1...Re1+ 2. Qxe1 Rxe1# overpowers White's Queen.",
+    "playerColor": "b",
+    "solutionPlies": 3,
+    "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
+    "tacticalReward": "checkmate",
+    "outcomeAdvantage": "Checkmate 👑",
+    "learningSummary": "1...Re1+ 2. Qxe1 Rxe1# overpowers White's Queen. exploiting the trapped enemy king with zero escape squares.",
+    "keyTakeaway": "Kings lacking escape squares (luft) are vulnerable to decisive corridor checkmates along open files.",
+    "stepExplanations": [
+      {
+        "plyIndex": 0,
+        "moveSan": "Re1+",
+        "moveUci": "e7e1",
+        "actor": "b",
+        "explanation": "Black checks the King with Re1+!"
+      },
+      {
+        "plyIndex": 1,
+        "moveSan": "Qxe1",
+        "moveUci": "d1e1",
+        "actor": "w",
+        "explanation": "White plays Qxe1, capturing the enemy R on e1!"
+      },
+      {
+        "plyIndex": 2,
+        "moveSan": "Rxe1#",
+        "moveUci": "e8e1",
+        "actor": "b",
+        "explanation": "Black delivers checkmate with Rxe1#! 👑"
+      }
+    ],
+    "targetSquares": [
+      "e1"
+    ],
+    "keySquares": [
+      "e7",
+      "e1"
+    ]
   }
 ]
