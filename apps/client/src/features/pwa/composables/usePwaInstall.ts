@@ -157,7 +157,9 @@ export function usePwaInstall() {
   }
 
   function snoozePrompt(days: number = DEFAULT_SNOOZE_DAYS): void {
-    const until = Date.now() + days * 24 * 60 * 60 * 1000;
+    const validDays =
+      typeof days === 'number' && !isNaN(days) && days > 0 ? days : DEFAULT_SNOOZE_DAYS;
+    const until = Date.now() + validDays * 24 * 60 * 60 * 1000;
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(SNOOZE_STORAGE_KEY, until.toString());
@@ -170,7 +172,7 @@ export function usePwaInstall() {
     snoozeTrigger.value++;
     if (typeof console !== 'undefined') {
       console.info(
-        `[FC_PWA] Install prompt snoozed for ${days} days until ${new Date(until).toISOString()}`
+        `[FC_PWA] Install prompt snoozed for ${validDays} days until ${new Date(until).toISOString()}`
       );
     }
   }

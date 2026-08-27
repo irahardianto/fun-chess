@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue';
 import type { StarRating, Puzzle, PuzzleAttemptResult, PuzzleAnalysisResult } from '@fun-chess/shared';
 import BaseModal from '../../../components/base/BaseModal.vue';
 import BaseButton from '../../../components/base/BaseButton.vue';
@@ -259,6 +259,22 @@ const currentStepExplanationText = computed(() => {
   return `Step ${currentPlyIndex.value}: ${currentStepSan.value}`;
 });
 
+const primaryCtaRef = ref<ComponentPublicInstance | HTMLButtonElement | null>(null);
+
+function focusPrimaryCta() {
+  nextTick(() => {
+    if (!internalMinimized.value && props.modelValue) {
+      if (primaryCtaRef.value) {
+        if ('focus' in primaryCtaRef.value && typeof primaryCtaRef.value.focus === 'function') {
+          primaryCtaRef.value.focus();
+        } else if ('$el' in primaryCtaRef.value && primaryCtaRef.value.$el && typeof (primaryCtaRef.value.$el as HTMLElement).focus === 'function') {
+          (primaryCtaRef.value.$el as HTMLElement).focus();
+        }
+      }
+    }
+  });
+}
+
 watch(
   () => props.modelValue,
   (isOpen) => {
@@ -266,6 +282,16 @@ watch(
       celebrate();
       internalMinimized.value = false;
       currentPlyIndex.value = props.replayStepIndex ?? props.puzzle?.moves?.length ?? 0;
+      focusPrimaryCta();
+    }
+  }
+);
+
+watch(
+  isMinimized,
+  (min) => {
+    if (!min && props.modelValue) {
+      focusPrimaryCta();
     }
   }
 );
@@ -340,6 +366,9 @@ function handleKeyDown(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
+  if (props.modelValue && !internalMinimized.value) {
+    focusPrimaryCta();
+  }
 });
 
 onUnmounted(() => {
@@ -562,6 +591,7 @@ onUnmounted(() => {
 
           <BaseButton
             v-if="props.hasNextPuzzle"
+            ref="primaryCtaRef"
             variant="primary"
             size="md"
             data-testid="puzzle-next-btn"
@@ -573,6 +603,7 @@ onUnmounted(() => {
 
           <BaseButton
             v-else
+            ref="primaryCtaRef"
             variant="success"
             size="md"
             data-testid="puzzle-hub-btn"

@@ -196,7 +196,7 @@ describe('useSocket composable', () => {
     });
   });
 
-  it('should clear sessionStorage if reconnect fails', async () => {
+  it('should clear sessionStorage if reconnect fails with ERR_UNAUTHORIZED or ERR_ROOM_NOT_FOUND', async () => {
     sessionStorage.setItem(
       SESSION_STORAGE_KEY,
       JSON.stringify({ roomCode: 'FAIL', playerId: 'p1', sessionToken: 'bad_token' })
@@ -208,7 +208,7 @@ describe('useSocket composable', () => {
       if (event === 'room:reconnect') {
         callback({
           success: false,
-          error: { code: 'ERR_SESSION_INVALID', message: 'Invalid session' },
+          error: { code: 'ERR_UNAUTHORIZED', message: 'Unauthorized' },
         });
       }
     });
@@ -216,6 +216,55 @@ describe('useSocket composable', () => {
     const res = await reconnect('FAIL', 'p1', 'bad_token');
     expect(res.success).toBe(false);
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+
+    // Also test ERR_ROOM_NOT_FOUND
+    sessionStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({ roomCode: 'NONE', playerId: 'p1', sessionToken: 'tok' })
+    );
+    mockSocket.emit.mockImplementation((event: string, _payload: any, callback: Function) => {
+      if (event === 'room:reconnect') {
+        callback({
+          success: false,
+          error: { code: 'ERR_ROOM_NOT_FOUND', message: 'Room not found' },
+        });
+      }
+    });
+
+    const res2 = await reconnect('NONE', 'p1', 'tok');
+    expect(res2.success).toBe(false);
+    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+  });
+
+  it('should NOT clear sessionStorage if reconnect experiences a transient timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      sessionStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({ roomCode: 'TIMEOUT_ROOM', playerId: 'p1', sessionToken: 'keep_token' })
+      );
+
+      const { reconnect } = useSocket(mockSocket);
+
+      // Do not respond to simulate timeout
+      mockSocket.emit.mockImplementation(() => {});
+
+      const reconnectPromise = reconnect('TIMEOUT_ROOM', 'p1', 'keep_token');
+
+      // Fast forward past 8s ack timeout
+      vi.advanceTimersByTime(8500);
+
+      const res = await reconnectPromise;
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.code).toBe('ERR_SOCKET_TIMEOUT');
+      }
+      expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).not.toBeNull();
+      const saved = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEY)!);
+      expect(saved.sessionToken).toBe('keep_token');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should auto-reconnect on socket connect event if saved session exists and currentRoom is null', async () => {
@@ -430,6 +479,76 @@ describe('useSocket composable', () => {
     expect(currentRoom.value).toEqual(rematchRoom);
     expect(currentPlayer.value?.id).toBe('p1');
     expect(currentPlayer.value?.color).toBe('b');
+
+    const savedRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    expect(savedRaw).not.toBeNull();
+    const saved = JSON.parse(savedRaw!);
+    expect(saved).toEqual({
+      roomCode: 'REMT',
+      playerId: 'p1',
+      sessionToken: 'token_1',
+    });
+  });
+
+  it('should auto-reconnect on socket connect when session saved and match is active with old socket id', async () => {
+    sessionStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({ roomCode: 'SYNC', playerId: 'p1', sessionToken: 'sync_token' })
+    );
+
+    mockSocket.id = 'old_sock_1';
+    mockSocket.connected = true;
+    const { currentRoom, currentPlayer } = useSocket(mockSocket);
+
+    currentRoom.value = {
+      roomCode: 'SYNC',
+      status: 'playing',
+      hostId: 'p1',
+      whitePlayer: {
+        id: 'p1',
+        name: 'Player1',
+        color: 'w',
+        isHost: true,
+        isConnected: true,
+        socketId: 'old_sock_1',
+        sessionToken: 'sync_token',
+        connectedAt: Date.now(),
+      },
+      blackPlayer: null,
+      spectators: [],
+      game: {} as GameState,
+      rematch: null,
+      createdAt: Date.now(),
+      lastActivityAt: Date.now(),
+    };
+    currentPlayer.value = currentRoom.value.whitePlayer;
+
+    // Simulate socket reconnecting with a new socket ID
+    mockSocket.id = 'new_sock_2';
+
+    mockSocket.emit.mockImplementation((event: string, payload: any, callback: Function) => {
+      if (event === 'room:reconnect') {
+        expect(payload).toEqual({
+          roomCode: 'SYNC',
+          playerId: 'p1',
+          sessionToken: 'sync_token',
+        });
+        callback({
+          success: true,
+          room: {
+            ...currentRoom.value!,
+            whitePlayer: { ...currentPlayer.value!, socketId: 'new_sock_2' },
+          },
+          player: { ...currentPlayer.value!, socketId: 'new_sock_2' },
+        });
+      }
+    });
+
+    eventHandlers['connect']();
+
+    await vi.waitFor(() => {
+      expect(currentPlayer.value?.socketId).toBe('new_sock_2');
+    });
   });
 
   it('should handle game:rematch_started with fallback GameState payload', () => {

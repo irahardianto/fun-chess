@@ -1,4 +1,9 @@
 /**
+ * Maximum progress backup file size (2MB).
+ */
+export const MAX_PROGRESS_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB limit
+
+/**
  * Service for 1-click JSON backup file download and upload reading.
  * Adheres to Rule 1 (I/O Isolation) and Defensive Programming Mandates.
  */
@@ -46,10 +51,17 @@ export class ProgressFileService {
    *
    * @param file - File selected by user or dropped in dropzone
    * @returns Resolves to UTF-8 text content
+   * @throws Error if file exceeds 2MB limit or cannot be read
    */
   public async readProgressFile(file: File | Blob): Promise<string> {
     if (!file) {
       throw new Error('No file provided for reading');
+    }
+
+    if (file.size > MAX_PROGRESS_FILE_SIZE_BYTES) {
+      throw new Error(
+        `File size exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB uploaded). Please upload a valid Fun Chess backup file.`
+      );
     }
 
     // Modern file.text() API if supported

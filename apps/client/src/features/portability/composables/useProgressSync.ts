@@ -177,6 +177,10 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
         throw new Error('Select a valid save file (.json) or scan a QR code.');
       }
 
+      if (rawStringOrJson.length > 2 * 1024 * 1024) {
+        throw new Error('Save data exceeds maximum allowed size of 2MB.');
+      }
+
       const trimmed = rawStringOrJson.trim();
       let decoded: UnifiedProgressPayload;
 

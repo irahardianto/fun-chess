@@ -429,8 +429,11 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
 .offline-badge-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 4px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 14px;
   border-radius: var(--radius-pill, 9999px);
   background-color: var(--status-offline-bg, rgba(245, 158, 11, 0.16));
   border: 1.5px solid var(--status-offline, #f59e0b);
@@ -438,12 +441,16 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   font-family: var(--font-display);
   font-size: var(--text-xs, 12px);
   font-weight: var(--weight-bold, 700);
+  box-sizing: border-box;
 }
 
 .quick-install-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 6px 14px;
   border-radius: var(--radius-pill, 9999px);
   background-color: var(--color-primary-subtle, rgba(108, 92, 231, 0.14));
@@ -453,6 +460,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   font-size: var(--text-xs, 12px);
   font-weight: var(--weight-bold, 700);
   cursor: pointer;
+  box-sizing: border-box;
   transition: transform var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
@@ -463,6 +471,12 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   box-shadow: 0 4px 12px var(--color-primary-subtle, rgba(108, 92, 231, 0.25));
 }
 
+.quick-install-btn:focus-visible {
+  outline: 2px solid var(--border-focus, var(--color-primary));
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
+}
+
 .quick-install-btn:active {
   transform: translateY(0);
 }
@@ -470,7 +484,10 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
 .quick-sync-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 6px 14px;
   border-radius: var(--radius-pill, 9999px);
   background-color: var(--bg-surface-raised);
@@ -480,6 +497,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   font-size: var(--text-xs, 12px);
   font-weight: var(--weight-bold, 700);
   cursor: pointer;
+  box-sizing: border-box;
   transition: transform var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
@@ -487,6 +505,12 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
   transform: translateY(-2px);
   border-color: var(--color-primary);
   box-shadow: 0 4px 12px var(--color-primary-subtle);
+}
+
+.quick-sync-btn:focus-visible {
+  outline: 2px solid var(--border-focus, var(--color-primary));
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring, 0 0 0 3px hsla(var(--color-primary-h, 255), 85%, 60%, 0.45));
 }
 
 .quick-sync-btn:active {

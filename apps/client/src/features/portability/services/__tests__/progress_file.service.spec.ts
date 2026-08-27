@@ -42,4 +42,16 @@ describe('ProgressFileService', () => {
       'No file provided for reading'
     );
   });
+
+  it('rejects files larger than 2MB with explicit user error message', async () => {
+    const oversizedFile = {
+      size: 2 * 1024 * 1024 + 1024, // 2MB + 1KB
+      text: vi.fn().mockResolvedValue('{"large": true}'),
+    } as unknown as File;
+
+    await expect(service.readProgressFile(oversizedFile)).rejects.toThrow(
+      'File size exceeds 2MB limit'
+    );
+    expect(oversizedFile.text).not.toHaveBeenCalled();
+  });
 });

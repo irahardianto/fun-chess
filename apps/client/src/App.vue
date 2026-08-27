@@ -1100,10 +1100,13 @@ function handleLeaveRoom() {
   flex-shrink: 0;
   background: transparent;
   border: none;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0;
   font: inherit;
   color: inherit;
   text-align: start;
+  box-sizing: border-box;
   transition: transform var(--duration-fast, 150ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
 }
 
@@ -1148,13 +1151,17 @@ function handleLeaveRoom() {
 .room-code-chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  min-height: 44px;
+  min-width: 44px;
   background-color: var(--color-primary-subtle);
   border: 1px dashed var(--color-primary);
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   white-space: nowrap;
+  box-sizing: border-box;
   transition: transform var(--duration-fast) var(--ease-spring);
 }
 
@@ -1216,12 +1223,16 @@ function handleLeaveRoom() {
 .nav-install-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
   gap: 4px;
   font-family: var(--font-display);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
   border-radius: var(--radius-pill);
-  padding: 4px 10px;
+  padding: 4px 12px;
+  box-sizing: border-box;
   animation: float-bounce 3s infinite ease-in-out;
 }
 
@@ -1346,6 +1357,8 @@ function handleLeaveRoom() {
   border: none;
   cursor: pointer;
   padding: 4px;
+  min-width: 44px;
+  min-height: 44px;
   font-size: var(--text-sm);
   color: inherit;
   opacity: 0.75;
@@ -1353,6 +1366,7 @@ function handleLeaveRoom() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   transition: opacity var(--duration-fast, 150ms);
 }
 
@@ -1576,10 +1590,13 @@ function handleLeaveRoom() {
   }
 
   .room-code-chip {
-    padding: 4px 8px;
+    padding: 4px 10px;
     font-size: var(--text-xs);
     white-space: nowrap;
     flex-shrink: 0;
+    min-height: 44px;
+    min-width: 44px;
+    box-sizing: border-box;
   }
 
   .nav-install-btn {

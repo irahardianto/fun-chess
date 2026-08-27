@@ -22,6 +22,8 @@ describe('useAudio composable', () => {
     vi.spyOn(mockSynth, 'playMascotHappy').mockImplementation(() => {});
     vi.spyOn(mockSynth, 'playMascotBlunder').mockImplementation(() => {});
     vi.spyOn(mockSynth, 'playStepComplete').mockImplementation(() => {});
+    vi.spyOn(mockSynth, 'resumeContext').mockImplementation(() => {});
+    vi.spyOn(mockSynth, 'initContext').mockImplementation(() => null);
   });
 
   it('should toggle and set mute reactively', () => {
@@ -140,5 +142,12 @@ describe('useAudio composable', () => {
 
     playStepComplete();
     expect(mockSynth.playStepComplete).toHaveBeenCalledTimes(1);
+
+    const { resumeAudio, initAudio } = useAudio(mockSynth);
+    resumeAudio();
+    expect(mockSynth.resumeContext).toHaveBeenCalledTimes(1);
+
+    initAudio();
+    expect(mockSynth.initContext).toHaveBeenCalledTimes(1);
   });
 });

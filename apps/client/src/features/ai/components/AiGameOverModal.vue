@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, watch, ref, nextTick, onMounted, type ComponentPublicInstance } from 'vue';
 import type { GameOverPayload, MascotPersona } from '@fun-chess/shared';
 import BaseModal from '../../../components/base/BaseModal.vue';
 import BaseButton from '../../../components/base/BaseButton.vue';
@@ -36,6 +36,21 @@ const emit = defineEmits<{
 }>();
 
 const { celebrate } = useConfetti();
+
+const primaryCtaRef = ref<ComponentPublicInstance | HTMLButtonElement | null>(null);
+
+function focusPrimaryCta() {
+  nextTick(() => {
+    const isVisible = props.modelValue || props.isOpen;
+    if (isVisible && primaryCtaRef.value) {
+      if ('focus' in primaryCtaRef.value && typeof primaryCtaRef.value.focus === 'function') {
+        primaryCtaRef.value.focus();
+      } else if ('$el' in primaryCtaRef.value && primaryCtaRef.value.$el && typeof (primaryCtaRef.value.$el as HTMLElement).focus === 'function') {
+        (primaryCtaRef.value.$el as HTMLElement).focus();
+      }
+    }
+  });
+}
 
 const bannerTitle = computed(() => {
   if (props.isPlayerWinner) return 'Victory! 🏆🎉';
@@ -75,15 +90,26 @@ const mascotPraiseDialogue = computed(() => {
   return lines?.[0] ?? 'Good game! Want to try again? 🔄';
 });
 
+// Trigger confetti & auto-focus primary CTA
 watch(
   () => [props.modelValue, props.isOpen, props.isPlayerWinner],
   () => {
-    if ((props.modelValue || props.isOpen) && props.isPlayerWinner) {
-      celebrate();
+    const isVisible = props.modelValue || props.isOpen;
+    if (isVisible) {
+      if (props.isPlayerWinner) {
+        celebrate();
+      }
+      focusPrimaryCta();
     }
   },
   { immediate: true }
 );
+
+onMounted(() => {
+  if (props.modelValue || props.isOpen) {
+    focusPrimaryCta();
+  }
+});
 
 function handleRematch() {
   emit('rematch');
@@ -163,6 +189,7 @@ function handleLobby() {
       <!-- Actions -->
       <div class="action-buttons-group">
         <BaseButton
+          ref="primaryCtaRef"
           data-testid="ai-rematch-btn"
           variant="primary"
           size="lg"

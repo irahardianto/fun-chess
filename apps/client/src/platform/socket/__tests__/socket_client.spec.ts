@@ -25,9 +25,10 @@ describe('socket_client factory', () => {
     expect(io).toHaveBeenCalledWith(customUrl, {
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      timeout: 10000,
+      timeout: 20000,
+      transports: ['websocket', 'polling'],
     });
   });
 
@@ -37,9 +38,10 @@ describe('socket_client factory', () => {
     expect(io).toHaveBeenCalledWith(window.location.origin, expect.objectContaining({
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      timeout: 10000,
+      timeout: 20000,
+      transports: ['websocket', 'polling'],
     }));
   });
 });

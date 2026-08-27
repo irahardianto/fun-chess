@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, watch, ref, nextTick, onMounted, type ComponentPublicInstance } from 'vue';
 import type { GameOverPayload } from '@fun-chess/shared';
 import BaseModal from '../../components/base/BaseModal.vue';
 import BaseButton from '../../components/base/BaseButton.vue';
@@ -35,6 +35,21 @@ const emit = defineEmits<{
 
 const { celebrate } = useConfetti();
 
+const primaryCtaRef = ref<ComponentPublicInstance | HTMLButtonElement | null>(null);
+
+function focusPrimaryCta() {
+  nextTick(() => {
+    const isVisible = props.modelValue || props.isOpen;
+    if (isVisible && primaryCtaRef.value) {
+      if ('focus' in primaryCtaRef.value && typeof primaryCtaRef.value.focus === 'function') {
+        primaryCtaRef.value.focus();
+      } else if ('$el' in primaryCtaRef.value && primaryCtaRef.value.$el && typeof (primaryCtaRef.value.$el as HTMLElement).focus === 'function') {
+        (primaryCtaRef.value.$el as HTMLElement).focus();
+      }
+    }
+  });
+}
+
 const titleEmoji = computed(() => {
   if (props.isWinner) return '🏆';
   if (props.isDraw) return '⚖️';
@@ -58,16 +73,26 @@ const durationFormatted = computed(() => {
   return `${totalSecs}s`;
 });
 
-// Trigger confetti if winner
+// Trigger confetti if winner & focus primary CTA
 watch(
   () => [props.modelValue, props.isOpen, props.isWinner],
   () => {
-    if ((props.modelValue || props.isOpen) && props.isWinner) {
-      celebrate();
+    const isVisible = props.modelValue || props.isOpen;
+    if (isVisible) {
+      if (props.isWinner) {
+        celebrate();
+      }
+      focusPrimaryCta();
     }
   },
   { immediate: true }
 );
+
+onMounted(() => {
+  if (props.modelValue || props.isOpen) {
+    focusPrimaryCta();
+  }
+});
 
 function handleRematch() {
   emit('rematch');
@@ -128,6 +153,7 @@ function handleReturnToLobby() {
       <!-- Action Buttons -->
       <div class="game-over-actions">
         <BaseButton
+          ref="primaryCtaRef"
           data-testid="request-rematch-btn"
           variant="primary"
           size="lg"

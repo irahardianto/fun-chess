@@ -111,4 +111,21 @@ describe('AiGameOverModal.vue', () => {
 
     expect(wrapper.emitted('lobby')).toBeTruthy();
   });
+
+  it('automatically focuses the primary call-to-action button (Play Again) upon modal display', async () => {
+    wrapper = mount(AiGameOverModal, {
+      props: {
+        modelValue: true,
+        payload: mockPayload,
+        mascot: peanutPup,
+      },
+      attachTo: document.body,
+    });
+
+    await wrapper.vm.$nextTick();
+
+    const rematchBtn = document.body.querySelector('[data-testid="ai-rematch-btn"]') as HTMLButtonElement;
+    expect(rematchBtn).not.toBeNull();
+    expect(document.activeElement).toBe(rematchBtn);
+  });
 });

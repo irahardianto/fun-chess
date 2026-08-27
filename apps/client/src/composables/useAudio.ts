@@ -86,5 +86,7 @@ export function useAudio(injectedSynth?: AudioSynthesizer) {
       synth.playStepComplete();
       triggerHaptic([25, 35, 50]);
     },
+    resumeAudio: () => synth.resumeContext(),
+    initAudio: () => synth.initContext(),
   };
 }

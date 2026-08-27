@@ -134,6 +134,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@fun-chess/shared': path.resolve(__dirname, '../../shared/src/index.ts'),
     },
   },
   test: {

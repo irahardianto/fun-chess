@@ -626,6 +626,46 @@ describe('PuzzleCompletionModal.vue Component', () => {
       expect(wrapper.emitted('next')).toHaveLength(1);
       expect(wrapper.emitted('nextPuzzle')).toHaveLength(1);
     });
+
+    it('automatically focuses primary CTA (Next Puzzle) upon modal display when hasNextPuzzle is true', async () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: true,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+          hasNextPuzzle: true,
+        },
+        attachTo: document.body,
+      });
+
+      await wrapper.vm.$nextTick();
+
+      const nextBtn = document.body.querySelector('[data-testid="puzzle-next-btn"]') as HTMLButtonElement;
+      expect(nextBtn).not.toBeNull();
+      expect(document.activeElement).toBe(nextBtn);
+
+      wrapper.unmount();
+    });
+
+    it('automatically focuses primary CTA (Back to Hub) upon modal display when hasNextPuzzle is false', async () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: true,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+          hasNextPuzzle: false,
+        },
+        attachTo: document.body,
+      });
+
+      await wrapper.vm.$nextTick();
+
+      const hubBtn = document.body.querySelector('[data-testid="puzzle-hub-btn"]') as HTMLButtonElement;
+      expect(hubBtn).not.toBeNull();
+      expect(document.activeElement).toBe(hubBtn);
+
+      wrapper.unmount();
+    });
   });
 });
 

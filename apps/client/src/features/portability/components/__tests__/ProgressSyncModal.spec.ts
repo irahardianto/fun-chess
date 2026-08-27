@@ -114,4 +114,38 @@ describe('ProgressSyncModal.vue', () => {
     expect(installBtn.exists()).toBe(true);
     await installBtn.trigger('click');
   });
+
+  it('displays user error message and rejects import when uploaded file exceeds 2MB limit', async () => {
+    const wrapper = mount(ProgressSyncModal, {
+      props: {
+        modelValue: true,
+      },
+      global: {
+        stubs: {
+          Teleport: true,
+        },
+      },
+    });
+
+    // Switch to import tab
+    const importTabBtn = wrapper.find('#tab-import');
+    await importTabBtn.trigger('click');
+
+    const scannerView = wrapper.findComponent(QrScannerView);
+    expect(scannerView.exists()).toBe(true);
+
+    // Emit file > 2MB
+    const oversizedFile = {
+      name: 'huge_save.json',
+      size: 3 * 1024 * 1024, // 3MB
+      text: vi.fn(),
+    } as unknown as File;
+
+    scannerView.vm.$emit('file', oversizedFile);
+    await wrapper.vm.$nextTick();
+
+    const errorBanner = wrapper.find('.sync-error-banner');
+    expect(errorBanner.exists()).toBe(true);
+    expect(errorBanner.text()).toContain('File size exceeds 2MB limit');
+  });
 });

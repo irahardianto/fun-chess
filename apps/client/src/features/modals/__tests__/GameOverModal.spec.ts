@@ -102,4 +102,20 @@ describe('GameOverModal.vue', () => {
 
     expect(wrapper.emitted('lobby')).toHaveLength(1);
   });
+
+  it('automatically focuses the primary call-to-action button (Request Rematch) upon modal display', async () => {
+    wrapper = mount(GameOverModal, {
+      props: {
+        modelValue: true,
+        payload: mockPayload,
+      },
+      attachTo: document.body,
+    });
+
+    await wrapper.vm.$nextTick();
+
+    const rematchBtn = document.body.querySelector('[data-testid="request-rematch-btn"]') as HTMLButtonElement;
+    expect(rematchBtn).not.toBeNull();
+    expect(document.activeElement).toBe(rematchBtn);
+  });
 });

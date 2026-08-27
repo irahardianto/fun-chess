@@ -74,6 +74,10 @@ async function handleImportCode(code: string) {
 
 async function handleImportFile(file: File) {
   try {
+    if (file && file.size > 2 * 1024 * 1024) {
+      syncError.value = `File size exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB uploaded). Please upload a valid Fun Chess backup file.`;
+      return;
+    }
     const text = await defaultProgressFileService.readProgressFile(file);
     const success = await importPayload(text);
     if (success) {

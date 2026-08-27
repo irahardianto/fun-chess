@@ -103,27 +103,26 @@ export function useSocket(injectedSocket?: TypedSocket) {
 
   /**
    * Attempts automatic reconnection if a valid saved session exists in sessionStorage
-   * and the current state requires reconnection.
+   * and the current state requires reconnection or synchronization.
    */
   function checkAndAutoReconnect(): void {
     const saved = getSavedSession();
     if (!saved) return;
 
-    const shouldReconnect =
+    const currentSockId = socket.value?.id || socketId.value;
+    const needsSync =
       !currentRoom.value ||
-      currentRoom.value.status === 'paused_disconnect' ||
-      !currentPlayer.value?.isConnected;
+      currentRoom.value.roomCode !== saved.roomCode ||
+      !currentPlayer.value ||
+      currentPlayer.value.id !== saved.playerId ||
+      currentPlayer.value.socketId !== currentSockId ||
+      !currentPlayer.value.isConnected ||
+      currentRoom.value.status === 'paused_disconnect';
 
-    if (shouldReconnect) {
-      reconnect(saved.roomCode, saved.playerId, saved.sessionToken)
-        .then((res) => {
-          if (!res.success) {
-            clearSession();
-          }
-        })
-        .catch(() => {
-          clearSession();
-        });
+    if (needsSync) {
+      reconnect(saved.roomCode, saved.playerId, saved.sessionToken).catch(() => {
+        // Handled within reconnect(); transient failures do not clear session
+      });
     }
   }
 
@@ -288,6 +287,20 @@ export function useSocket(injectedSocket?: TypedSocket) {
           status: 'playing',
           game: data as GameState,
         };
+      }
+
+      // Ensure session is persisted for the rematch game so reconnection works if dropped
+      const roomCode = currentRoom.value?.roomCode;
+      const pId = currentPlayer.value?.id;
+      const sToken = sessionToken.value || currentPlayer.value?.sessionToken;
+
+      if (roomCode && pId && sToken) {
+        sessionToken.value = sToken;
+        saveSession({
+          roomCode,
+          playerId: pId,
+          sessionToken: sToken,
+        });
       }
     });
 
@@ -458,7 +471,6 @@ export function useSocket(injectedSocket?: TypedSocket) {
           message: 'Reconnection timed out.',
         };
         lastError.value = err;
-        clearSession();
         resolve({ success: false, error: err });
       }, 8000);
 
@@ -476,7 +488,12 @@ export function useSocket(injectedSocket?: TypedSocket) {
           resolve(res);
         } else {
           lastError.value = res.error;
-          clearSession();
+          if (
+            res.error.code === 'ERR_ROOM_NOT_FOUND' ||
+            res.error.code === 'ERR_UNAUTHORIZED'
+          ) {
+            clearSession();
+          }
           resolve(res);
         }
       });

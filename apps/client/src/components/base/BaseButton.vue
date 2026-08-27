@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 export type ButtonVariant = 'primary' | 'accent' | 'danger' | 'ghost' | 'success';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -28,6 +28,17 @@ const emit = defineEmits<{
   click: [event: MouseEvent];
 }>();
 
+const buttonRef = ref<HTMLButtonElement | null>(null);
+
+function focus() {
+  buttonRef.value?.focus();
+}
+
+defineExpose({
+  focus,
+  $el: buttonRef,
+});
+
 const buttonClasses = computed(() => [
   'btn-tactile',
   `btn-tactile--${props.variant}`,
@@ -51,6 +62,7 @@ function handleClick(event: MouseEvent) {
 
 <template>
   <button
+    ref="buttonRef"
     :type="props.type"
     :class="buttonClasses"
     :disabled="props.disabled || props.loading"

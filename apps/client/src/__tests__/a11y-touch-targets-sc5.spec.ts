@@ -73,6 +73,31 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
     it('QrCodeModal LAN config quick prefill chips have accessible target height', () => {
       expect(qrCodeModalSrc).toMatch(/\.prefill-tag\s*\{[^}]*min-height:\s*36px/s);
     });
+
+    it('LobbyView hero action pills and buttons enforce 44px minimum touch target', () => {
+      const lobbyViewPath = path.resolve(__dirname, '../features/lobby/LobbyView.vue');
+      const lobbyViewSrc = fs.readFileSync(lobbyViewPath, 'utf-8');
+
+      expect(lobbyViewSrc).toMatch(/\.quick-install-btn\s*\{[^}]*min-height:\s*44px/s);
+      expect(lobbyViewSrc).toMatch(/\.quick-install-btn\s*\{[^}]*min-width:\s*44px/s);
+      expect(lobbyViewSrc).toMatch(/\.quick-sync-btn\s*\{[^}]*min-height:\s*44px/s);
+      expect(lobbyViewSrc).toMatch(/\.quick-sync-btn\s*\{[^}]*min-width:\s*44px/s);
+      expect(lobbyViewSrc).toMatch(/\.offline-badge-pill\s*\{[^}]*min-height:\s*44px/s);
+      expect(lobbyViewSrc).toMatch(/\.offline-badge-pill\s*\{[^}]*min-width:\s*44px/s);
+      expect(lobbyViewSrc).toMatch(/\.avatar-option-btn\s*\{[^}]*width:\s*44px/s);
+      expect(lobbyViewSrc).toMatch(/\.avatar-option-btn\s*\{[^}]*height:\s*44px/s);
+    });
+
+    it('App.vue interactive pills and action buttons enforce 44px minimum touch target', () => {
+      expect(appVueSrc).toMatch(/\.navbar-brand\s*\{[^}]*min-height:\s*44px/s);
+      expect(appVueSrc).toMatch(/\.navbar-brand\s*\{[^}]*min-width:\s*44px/s);
+      expect(appVueSrc).toMatch(/\.room-code-chip\s*\{[^}]*min-height:\s*44px/s);
+      expect(appVueSrc).toMatch(/\.room-code-chip\s*\{[^}]*min-width:\s*44px/s);
+      expect(appVueSrc).toMatch(/\.nav-install-btn\s*\{[^}]*min-height:\s*44px/s);
+      expect(appVueSrc).toMatch(/\.nav-install-btn\s*\{[^}]*min-width:\s*44px/s);
+      expect(appVueSrc).toMatch(/\.notification-dismiss-btn\s*\{[^}]*min-width:\s*44px/s);
+      expect(appVueSrc).toMatch(/\.notification-dismiss-btn\s*\{[^}]*min-height:\s*44px/s);
+    });
   });
 
   describe('2. ARIA Roles, Labels, and Semantic Hierarchy', () => {

@@ -8,8 +8,9 @@ export function createSocketClient(url?: string): TypedSocket {
   return io(targetUrl, {
     autoConnect: false,
     reconnection: true,
-    reconnectionAttempts: 10,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
-    timeout: 10000,
+    timeout: 20000,
+    transports: ['websocket', 'polling'],
   });
 }
