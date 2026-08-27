@@ -16,7 +16,7 @@ import PuzzleCompletionModal from './components/PuzzleCompletionModal.vue';
 import { useThemedDrills } from './composables/useThemedDrills';
 import { useAdaptiveLadder } from './composables/useAdaptiveLadder';
 import { usePuzzleRunner } from './composables/usePuzzleRunner';
-import { getThemeDescriptor } from './data/puzzle_themes';
+import { getThemeDescriptor, getThemeVisualClues } from './data/puzzle_themes';
 
 interface Props {
   mode?: 'themed_drills' | 'adaptive_ladder';
@@ -62,6 +62,27 @@ const activePuzzle = computed<Puzzle | null>(() => {
 
 const activeThemeDescriptor = computed(() => {
   return getThemeDescriptor(themedDrills.activeTheme.value);
+});
+
+// Thematic teaser clue displayed before move 1 (strictly avoiding solution spoilers)
+const preMoveTeaser = computed<string>(() => {
+  if (!activePuzzle.value) return '';
+  if (activePuzzle.value.subtitle) {
+    return activePuzzle.value.subtitle;
+  }
+  const descriptor =
+    activeThemeDescriptor.value ||
+    (activePuzzle.value.primaryTheme
+      ? getThemeDescriptor(activePuzzle.value.primaryTheme)
+      : undefined);
+  if (descriptor?.kidFriendlyTip) {
+    return descriptor.kidFriendlyTip;
+  }
+  if (activePuzzle.value.primaryTheme) {
+    const clue = getThemeVisualClues(activePuzzle.value.primaryTheme);
+    if (clue) return clue;
+  }
+  return 'Find the winning tactical sequence!';
 });
 
 // --- 3. Promotion Handling ---
@@ -242,9 +263,11 @@ function handleBack() {
         <div class="puzzle-info-card" :class="{ 'is-shaking': activeRunner.isShaking.value }">
           <div class="puzzle-info-header">
             <div class="puzzle-title-wrap">
+              <div class="puzzle-goal-tagline">
+                <span class="goal-icon-badge">🎯</span>
+                <span class="goal-heading-text">Tactical Objective</span>
+              </div>
               <h2 class="puzzle-card-title">{{ activePuzzle.title }}</h2>
-              <span class="puzzle-difficulty-tag">{{ activePuzzle.difficulty }}</span>
-              <span class="puzzle-rating-pill">~{{ activePuzzle.rating }} Elo</span>
             </div>
 
             <div
@@ -255,7 +278,33 @@ function handleBack() {
             </div>
           </div>
 
-          <p v-if="activePuzzle.subtitle" class="puzzle-card-description">{{ activePuzzle.subtitle }}</p>
+          <!-- Tactical Goal Banner Headline -->
+          <h3
+            v-if="activePuzzle.tacticalGoal"
+            class="puzzle-goal-text"
+            data-testid="puzzle-tactical-goal"
+          >
+            {{ activePuzzle.tacticalGoal }}
+          </h3>
+
+          <!-- Pedagogical Thematic Teaser Callout (Pre-Move, Zero Solution Spoilers) -->
+          <div
+            v-if="preMoveTeaser"
+            class="puzzle-why-callout"
+            data-testid="puzzle-why-callout"
+          >
+            <span class="why-label">💡 Why:</span>
+            <span class="why-text">{{ preMoveTeaser }}</span>
+          </div>
+
+          <!-- Metadata Chips Footer -->
+          <div class="puzzle-meta-chips">
+            <span class="meta-chip puzzle-difficulty-tag">{{ activePuzzle.difficulty }}</span>
+            <span class="meta-chip puzzle-rating-pill">~{{ activePuzzle.rating }} Elo</span>
+            <span v-if="activePuzzle.primaryTheme" class="meta-chip meta-chip--theme">
+              {{ activePuzzle.primaryTheme }}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -274,14 +323,15 @@ function handleBack() {
         </transition>
 
         <PuzzleBoardWrapper
-          :fen="activeRunner.currentFen.value"
+          :fen="activeRunner.displayedFen.value"
           :orientation="activeRunner.playerColor.value"
           :turn="activeRunner.playerColor.value"
           :my-color="activeRunner.playerColor.value"
           :selected-square="activeRunner.selectedSquare.value"
           :legal-moves="[...activeRunner.legalMoves.value]"
-          :last-move="activeRunner.lastMove.value"
-          :interactive="!activeRunner.isWaitingForBot.value && !activeRunner.isCompleted.value"
+          :last-move="activeRunner.displayedLastMove.value"
+          :threat-square="activeRunner.lastMistakeRefutation.value?.threatSquare"
+          :interactive="!activeRunner.isWaitingForBot.value && !activeRunner.isCompleted.value && !activeRunner.isReplaying.value"
           :hint-level="activeRunner.progressiveHint.currentHintLevel.value"
           :hint-data="activeRunner.progressiveHint.activeHint.value"
           @select="activeRunner.selectSquare"
@@ -325,10 +375,11 @@ function handleBack() {
       @cancel="handlePromotionCancel"
     />
 
-    <!-- Puzzle Completion Celebratory Modal -->
+    <!-- Puzzle Completion Celebratory Modal & Replay Controller -->
     <PuzzleCompletionModal
       :model-value="activeRunner.isCompleted.value && activeRunner.isSolvedSuccessfully.value"
       :puzzle="activePuzzle"
+      :analysis="activeRunner.analysis.value"
       :stars="activeRunner.calculatedStars.value"
       :result="activeRunner.attemptResult.value"
       :solve-time-seconds="elapsedSeconds"
@@ -336,7 +387,20 @@ function handleBack() {
       :mistakes-count="activeRunner.mistakesCount.value"
       :rating-delta="isLadderMode ? adaptiveLadder.lastRatingDelta.value : null"
       :has-next-puzzle="true"
+      :replay-step-index="activeRunner.replayStepIndex.value"
+      :total-replay-steps="activeRunner.replayTotalSteps.value"
+      :current-replay-san="activeRunner.currentReplaySan.value"
+      :current-step-explanation="activeRunner.currentStepExplanation.value?.explanation || activeRunner.currentReplayStep.value?.explanation"
+      :is-inspecting-board="activeRunner.isInspectingBoard.value"
+      @replay-step="activeRunner.setReplayStep"
+      @replay-start="activeRunner.stepReplayStart"
+      @replay-prev="activeRunner.stepReplayPrev"
+      @replay-next="activeRunner.stepReplayNext"
+      @replay-end="activeRunner.stepReplayEnd"
+      @inspect-board="activeRunner.toggleInspectBoard"
+      @toggle-inspect="activeRunner.toggleInspectBoard"
       @retry="handleRetry"
+      @replay="handleRetry"
       @next="handleNextPuzzle"
       @next-puzzle="handleNextPuzzle"
       @back-to-hub="handleBack"
@@ -514,11 +578,89 @@ function handleBack() {
   border-color: var(--border-medium, #334155);
 }
 
-.puzzle-card-description {
+.puzzle-goal-tagline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5, 6px);
+}
+
+.goal-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-primary-subtle, rgba(108, 92, 231, 0.12));
+  color: var(--color-primary, #6c5ce7);
+  font-size: 0.85rem;
+}
+
+.goal-heading-text {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  font-size: var(--text-xs, 12px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-primary, #6c5ce7);
+}
+
+.puzzle-goal-text {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  font-size: var(--text-base, 16px);
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.puzzle-why-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5, 6px);
   font-family: var(--font-body, 'Nunito', sans-serif);
   font-size: var(--text-sm, 14px);
   color: var(--text-muted, #64748b);
-  margin: 0;
+  line-height: 1.45;
+  background: var(--bg-surface-raised, #f8fafc);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-radius: var(--radius-md, 12px);
+  border-left: 3px solid var(--color-accent, #ffb300);
+}
+
+.why-label {
+  font-weight: 800;
+  color: var(--color-accent-text, #92400e);
+}
+
+.puzzle-meta-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex-wrap: wrap;
+  padding-top: var(--space-0-5, 2px);
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 12px);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-surface-raised, #f8fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  color: var(--text-muted, #64748b);
+}
+
+.meta-chip--theme {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
+  background: var(--color-primary-subtle, rgba(108, 92, 231, 0.12));
+  color: var(--color-primary, #6c5ce7);
+  border-color: transparent;
+  text-transform: capitalize;
 }
 
 .puzzle-feedback-banner {

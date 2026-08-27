@@ -368,6 +368,113 @@
   --snap-target-bg:          rgba(34, 197, 94, 0.45);
   --snap-target-glow:        0 0 20px 4px rgba(34, 197, 94, 0.80);
 
+  /* --------------------------------------------------------------------------
+     TACTICAL THEME PALETTE & MOTIF TOKENS (DESIGN-UX-PUZZLE-003)
+     -------------------------------------------------------------------------- */
+  /* 1. Fork / Double Attack — Radiant Royal Gold */
+  --theme-fork-primary:   hsl(42, 100%, 50%);  /* #ffaa00 */
+  --theme-fork-bevel:     hsl(42, 95%, 36%);   /* #b87b00 */
+  --theme-fork-bg:        hsl(45, 100%, 96%);  /* #fffbeb */
+  --theme-fork-border:    hsl(42, 90%, 75%);   /* #fde68a */
+  --theme-fork-text:      hsl(38, 90%, 22%);   /* #78350f */
+  --theme-fork-glow:      0 0 16px rgba(255, 170, 0, 0.45);
+
+  /* 2. Pin — Laser Cyan / Cobalt Blue */
+  --theme-pin-primary:    hsl(198, 93%, 50%);  /* #0ea5e9 */
+  --theme-pin-bevel:      hsl(198, 85%, 35%);  /* #0369a1 */
+  --theme-pin-bg:         hsl(198, 90%, 96%);  /* #f0f9ff */
+  --theme-pin-border:     hsl(198, 80%, 75%);  /* #bae6fd */
+  --theme-pin-text:       hsl(198, 90%, 20%);  /* #082f49 */
+  --theme-pin-glow:       0 0 16px rgba(14, 165, 233, 0.45);
+
+  /* 3. Skewer — Electric Amethyst / Violet */
+  --theme-skewer-primary: hsl(271, 81%, 56%);  /* #9333ea */
+  --theme-skewer-bevel:   hsl(271, 75%, 38%);  /* #6b21a8 */
+  --theme-skewer-bg:      hsl(271, 85%, 97%);  /* #faf5ff */
+  --theme-skewer-border:  hsl(271, 70%, 82%);  /* #e9d5ff */
+  --theme-skewer-text:    hsl(271, 80%, 22%);  /* #3b0764 */
+  --theme-skewer-glow:    0 0 16px rgba(147, 51, 234, 0.45);
+
+  /* 4. Discovered Check / Attack — Burst Orange */
+  --theme-disc-primary:   hsl(25, 95%, 52%);   /* #f97316 */
+  --theme-disc-bevel:     hsl(25, 90%, 36%);   /* #c2410c */
+  --theme-disc-bg:        hsl(25, 100%, 96%);  /* #fff7ed */
+  --theme-disc-border:    hsl(25, 85%, 78%);   /* #fed7aa */
+  --theme-disc-text:      hsl(25, 90%, 22%);   /* #7c2d12 */
+  --theme-disc-glow:      0 0 16px rgba(249, 115, 22, 0.45);
+
+  /* 5. Checkmate Patterns — Victorious Crimson */
+  --theme-mate-primary:   hsl(350, 88%, 56%);  /* #f43f5e */
+  --theme-mate-bevel:     hsl(350, 80%, 38%);  /* #be123c */
+  --theme-mate-bg:        hsl(350, 85%, 96%);  /* #fff1f2 */
+  --theme-mate-border:    hsl(350, 75%, 80%);  /* #fecdd3 */
+  --theme-mate-text:      hsl(350, 80%, 22%);  /* #881337 */
+  --theme-mate-glow:      0 0 18px rgba(244, 63, 94, 0.50);
+
+  /* 6. Decoy & Deflection — Emerald & Mint */
+  --theme-decoy-primary:  hsl(160, 84%, 39%);  /* #059669 */
+  --theme-decoy-bevel:    hsl(160, 80%, 28%);  /* #065f46 */
+  --theme-decoy-bg:       hsl(160, 80%, 96%);  /* #ecfdf5 */
+  --theme-decoy-border:   hsl(160, 70%, 78%);  /* #a7f3d0 */
+  --theme-decoy-text:     hsl(160, 85%, 18%);  /* #064e3b */
+  --theme-decoy-glow:     0 0 16px rgba(5, 150, 105, 0.45);
+
+  /* 7. Greek Gift & Sacrifices — Deep Coral Ruby */
+  --theme-gift-primary:   hsl(12, 90%, 52%);   /* #ea580c */
+  --theme-gift-bevel:     hsl(12, 85%, 35%);   /* #9a3412 */
+  --theme-gift-bg:        hsl(15, 95%, 96%);   /* #fff7ed */
+  --theme-gift-border:    hsl(15, 80%, 80%);   /* #ffedd5 */
+  --theme-gift-text:      hsl(12, 85%, 20%);   /* #7c2d12 */
+  --theme-gift-glow:      0 0 16px rgba(234, 88, 12, 0.45);
+
+  /* 8. Windmill Carousel — Tornado Cyan */
+  --theme-wind-primary:   hsl(185, 90%, 42%);  /* #0891b2 */
+  --theme-wind-bevel:     hsl(185, 85%, 28%);  /* #155e75 */
+  --theme-wind-bg:        hsl(185, 85%, 96%);  /* #ecfeff */
+  --theme-wind-border:    hsl(185, 75%, 78%);  /* #a5f3fc */
+  --theme-wind-text:      hsl(185, 90%, 18%);  /* #164e63 */
+  --theme-wind-glow:      0 0 16px rgba(8, 145, 178, 0.45);
+
+  /* 9. Endgame Conversion — Warm Amber Timber */
+  --theme-endgame-primary:hsl(32, 90%, 48%);   /* #d97706 */
+  --theme-endgame-bevel:  hsl(32, 85%, 32%);   /* #92400e */
+  --theme-endgame-bg:     hsl(35, 95%, 96%);   /* #fffbeb */
+  --theme-endgame-border: hsl(35, 80%, 80%);   /* #fef3c7 */
+  --theme-endgame-text:   hsl(32, 85%, 20%);   /* #78350f */
+  --theme-endgame-glow:   0 0 16px rgba(217, 119, 6, 0.45);
+
+  /* --------------------------------------------------------------------------
+     MATERIAL DELTA ADVANTAGE TOKENS
+     -------------------------------------------------------------------------- */
+  --advantage-queen-bg:      hsl(280, 85%, 95%);
+  --advantage-queen-border:  hsl(280, 80%, 75%);
+  --advantage-queen-text:    hsl(280, 85%, 25%); /* Won Queen (+9) */
+  --advantage-queen-icon:    #9333ea;
+
+  --advantage-rook-bg:       hsl(215, 90%, 95%);
+  --advantage-rook-border:   hsl(215, 80%, 75%);
+  --advantage-rook-text:     hsl(215, 85%, 24%); /* Won Rook (+5) */
+  --advantage-rook-icon:     #2563eb;
+
+  --advantage-minor-bg:      hsl(150, 75%, 95%);
+  --advantage-minor-border:  hsl(150, 65%, 75%);
+  --advantage-minor-text:    hsl(150, 80%, 20%); /* Won Bishop/Knight (+3) */
+  --advantage-minor-icon:    #16a34a;
+
+  --advantage-pawn-bg:       hsl(45, 100%, 95%);
+  --advantage-pawn-border:   hsl(45, 90%, 75%);
+  --advantage-pawn-text:     hsl(42, 90%, 22%); /* Won Pawns (+1 to +2) */
+  --advantage-pawn-icon:     #ca8a04;
+
+  --advantage-mate-bg:       hsl(350, 88%, 95%);
+  --advantage-mate-border:   hsl(350, 80%, 78%);
+  --advantage-mate-text:     hsl(350, 85%, 25%); /* Checkmate (#) */
+  --advantage-mate-icon:     #e11d48;
+
+  /* Replay & Modal Dock Tokens */
+  --z-minimized-dock:        35;
+  --touch-target-replay:     44px;
+
   /* Button Shadows for Rush & Drills */
   --shadow-btn-rush:           0 5px 0 var(--mode-rush-bevel), 0 8px 18px rgba(234, 88, 12, 0.40);
   --shadow-btn-rush-hover:     0 7px 0 var(--mode-rush-bevel), 0 12px 24px rgba(234, 88, 12, 0.48);
@@ -470,6 +577,64 @@
   /* Sync Conflict Stats Dark Overrides */
   --stat-better-text:      #34d399;
   --stat-neutral-text:     #94a3b8;
+
+  /* Tactical Theme Dark Overrides */
+  --theme-fork-bg:        hsl(42, 40%, 18%);
+  --theme-fork-border:    hsl(42, 55%, 36%);
+  --theme-fork-text:      hsl(42, 90%, 90%);
+
+  --theme-pin-bg:         hsl(198, 40%, 18%);
+  --theme-pin-border:     hsl(198, 55%, 36%);
+  --theme-pin-text:       hsl(198, 90%, 90%);
+
+  --theme-skewer-bg:      hsl(271, 40%, 18%);
+  --theme-skewer-border:  hsl(271, 55%, 36%);
+  --theme-skewer-text:    hsl(271, 90%, 90%);
+
+  --theme-disc-bg:        hsl(25, 40%, 18%);
+  --theme-disc-border:    hsl(25, 55%, 36%);
+  --theme-disc-text:      hsl(25, 90%, 90%);
+
+  --theme-mate-bg:        hsl(350, 40%, 18%);
+  --theme-mate-border:    hsl(350, 55%, 36%);
+  --theme-mate-text:      hsl(350, 90%, 90%);
+
+  --theme-decoy-bg:       hsl(160, 40%, 18%);
+  --theme-decoy-border:   hsl(160, 55%, 36%);
+  --theme-decoy-text:     hsl(160, 90%, 90%);
+
+  --theme-gift-bg:        hsl(12, 40%, 18%);
+  --theme-gift-border:    hsl(12, 55%, 36%);
+  --theme-gift-text:      hsl(12, 90%, 90%);
+
+  --theme-wind-bg:        hsl(185, 40%, 18%);
+  --theme-wind-border:    hsl(185, 55%, 36%);
+  --theme-wind-text:      hsl(185, 90%, 90%);
+
+  --theme-endgame-bg:     hsl(32, 40%, 18%);
+  --theme-endgame-border: hsl(32, 55%, 36%);
+  --theme-endgame-text:   hsl(32, 90%, 90%);
+
+  /* Material Advantage Dark Overrides */
+  --advantage-queen-bg:     hsl(280, 35%, 20%);
+  --advantage-queen-border: hsl(280, 50%, 40%);
+  --advantage-queen-text:   hsl(280, 85%, 90%);
+
+  --advantage-rook-bg:      hsl(215, 35%, 20%);
+  --advantage-rook-border:  hsl(215, 50%, 40%);
+  --advantage-rook-text:    hsl(215, 85%, 90%);
+
+  --advantage-minor-bg:     hsl(150, 35%, 20%);
+  --advantage-minor-border: hsl(150, 50%, 40%);
+  --advantage-minor-text:   hsl(150, 85%, 90%);
+
+  --advantage-pawn-bg:      hsl(45, 35%, 20%);
+  --advantage-pawn-border:  hsl(45, 50%, 40%);
+  --advantage-pawn-text:    hsl(45, 85%, 90%);
+
+  --advantage-mate-bg:      hsl(350, 35%, 20%);
+  --advantage-mate-border:  hsl(350, 50%, 40%);
+  --advantage-mate-text:    hsl(350, 85%, 90%);
 }
 
 /* --------------------------------------------------------------------------
@@ -900,6 +1065,43 @@
   }
   100% {
     stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes arrow-glow {
+  0%, 100% {
+    opacity: 0.85;
+    stroke-width: 2.4;
+  }
+  50% {
+    opacity: 1;
+    stroke-width: 3.4;
+  }
+}
+
+@keyframes advantage-pill-bounce {
+  0% {
+    transform: scale(0.7) translateY(10px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12) translateY(-3px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes dock-slide-up {
+  0% {
+    transform: translate(-50%, 30px) scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, 0) scale(1);
     opacity: 1;
   }
 }

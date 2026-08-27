@@ -208,4 +208,115 @@ describe('ProgressiveHintLayer.vue', () => {
     expect(beaconSquare.attributes('style')).toContain('left: 37.5%');
     expect(beaconSquare.attributes('style')).toContain('top: 37.5%');
   });
+
+  it('transitions hint tiers dynamically (Level 0 -> Tier 1 -> Tier 2 -> Tier 3) on prop updates', async () => {
+    const wrapper = mount(ProgressiveHintLayer, {
+      props: {
+        hintLevel: 0,
+        sourceSquare: 'c3',
+        targetSquare: 'b5',
+        showControls: true,
+      },
+    });
+
+    // Level 0: No highlights, 0 active meter dots, button says 'Tactical Hint'
+    expect(wrapper.find('[data-testid="hint-nudge-square"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="hint-beacon-square"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="hint-arrow-svg"]').exists()).toBe(false);
+    expect(wrapper.findAll('.meter-dot.is-active')).toHaveLength(0);
+    expect(wrapper.find('[data-testid="request-hint-btn"]').text()).toContain('Tactical Hint');
+
+    // Transition to Tier 1: Nudge
+    await wrapper.setProps({
+      hintLevel: 1,
+      hintData: {
+        level: 1,
+        tier: 'piece_nudge',
+        sourceSquare: 'c3',
+        message: 'Look at your Knight on c3!',
+      },
+    });
+    expect(wrapper.find('[data-testid="hint-nudge-square"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="hint-beacon-square"]').exists()).toBe(false);
+    expect(wrapper.findAll('.meter-dot.is-active')).toHaveLength(1);
+    expect(wrapper.find('[data-testid="request-hint-btn"]').text()).toContain('Target Beacon');
+    expect(wrapper.find('.hint-bubble-message').text()).toBe('Look at your Knight on c3!');
+
+    // Transition to Tier 2: Target Glow
+    await wrapper.setProps({
+      hintLevel: 2,
+      hintData: {
+        level: 2,
+        tier: 'target_glow',
+        sourceSquare: 'c3',
+        targetSquare: 'b5',
+        message: 'Aim for the b5 outpost!',
+      },
+    });
+    expect(wrapper.find('[data-testid="hint-nudge-square"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="hint-beacon-square"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="hint-arrow-svg"]').exists()).toBe(false);
+    expect(wrapper.findAll('.meter-dot.is-active')).toHaveLength(2);
+    expect(wrapper.find('[data-testid="request-hint-btn"]').text()).toContain('Solution Line');
+
+    // Transition to Tier 3: Full Solution Vector
+    await wrapper.setProps({
+      hintLevel: 3,
+      movingPiece: { type: 'n', color: 'w' },
+      hintData: {
+        level: 3,
+        tier: 'full_solution',
+        sourceSquare: 'c3',
+        targetSquare: 'b5',
+        solutionSan: 'Nb5',
+        message: 'Play 1. Nb5 to fork!',
+      },
+    });
+    expect(wrapper.find('[data-testid="hint-nudge-square"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="hint-beacon-square"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="hint-arrow-svg"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="hint-ghost-piece"]').exists()).toBe(true);
+    expect(wrapper.findAll('.meter-dot.is-active')).toHaveLength(3);
+    expect(wrapper.find('[data-testid="request-hint-btn"]').text()).toContain('Solution Revealed');
+    expect(wrapper.find('[data-testid="request-hint-btn"]').attributes('disabled')).toBeDefined();
+  });
+
+  describe('Refutation Threat Square Overlay', () => {
+    it('renders pulsing refutation threat square overlay when threatSquare prop is provided', () => {
+      const wrapper = mount(ProgressiveHintLayer, {
+        props: {
+          threatSquare: 'c7',
+          orientation: 'w',
+        },
+      });
+
+      const threatSquare = wrapper.find('[data-testid="refutation-threat-square"]');
+      expect(threatSquare.exists()).toBe(true);
+      // c7 file c=2 => col 2 (25%), rank 7 => row 1 (12.5%)
+      expect(threatSquare.attributes('style')).toContain('left: 25%');
+      expect(threatSquare.attributes('style')).toContain('top: 12.5%');
+      expect(threatSquare.attributes('style')).toContain('width: 12.5%');
+      expect(threatSquare.attributes('style')).toContain('height: 12.5%');
+    });
+
+    it('renders threat square from hintData.threatSquares when prop is omitted', () => {
+      const wrapper = mount(ProgressiveHintLayer, {
+        props: {
+          hintData: {
+            level: 1,
+            tier: 'piece_nudge',
+            sourceSquare: 'e2',
+            threatSquares: ['e7'],
+            message: 'Watch out for threats!',
+          },
+          orientation: 'w',
+        },
+      });
+
+      const threatSquare = wrapper.find('[data-testid="refutation-threat-square"]');
+      expect(threatSquare.exists()).toBe(true);
+      expect(threatSquare.attributes('style')).toContain('left: 50%');
+      expect(threatSquare.attributes('style')).toContain('top: 12.5%');
+    });
+  });
 });

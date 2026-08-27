@@ -31,8 +31,10 @@ export function squareToCoordinates(
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { HintData, HintLevel } from '@fun-chess/shared';
+import { Chess } from 'chess.js';
+import type { HintData, HintLevel, PieceType } from '@fun-chess/shared';
 import BaseButton from '../../../components/base/BaseButton.vue';
+import ChessPieceSvg from '../../../components/base/ChessPieceSvg.vue';
 
 interface Props {
   hintData?: HintData | null;
@@ -41,6 +43,7 @@ interface Props {
   disabled?: boolean;
   sourceSquare?: Square | null;
   targetSquare?: Square | null;
+  threatSquare?: Square | null;
   movingPiece?: { type: string; color: string } | null;
   orientation?: PieceColor;
   boardFlipped?: boolean;
@@ -55,6 +58,7 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   sourceSquare: undefined,
   targetSquare: undefined,
+  threatSquare: undefined,
   movingPiece: undefined,
   orientation: 'w',
   boardFlipped: false,
@@ -76,6 +80,45 @@ const effectiveSource = computed(() => {
 
 const effectiveTarget = computed(() => {
   return props.targetSquare || props.hintData?.targetSquare;
+});
+
+const effectiveThreatSquare = computed(() => {
+  return props.threatSquare || props.hintData?.threatSquares?.[0] || null;
+});
+
+const threatSquareStyle = computed(() => {
+  if (!effectiveThreatSquare.value) return {};
+  const coords = squareToCoordinates(effectiveThreatSquare.value, props.orientation);
+  return {
+    left: `${coords.x}%`,
+    top: `${coords.y}%`,
+    width: '12.5%',
+    height: '12.5%',
+  };
+});
+
+const resolvedMovingPiece = computed<{ type: PieceType; color: PieceColor } | null>(() => {
+  if (props.movingPiece) {
+    return {
+      type: props.movingPiece.type as PieceType,
+      color: props.movingPiece.color as PieceColor,
+    };
+  }
+  if (props.fen && effectiveSource.value) {
+    try {
+      const chess = new Chess(props.fen);
+      const piece = chess.get(effectiveSource.value as any);
+      if (piece) {
+        return {
+          type: piece.type as PieceType,
+          color: piece.color as PieceColor,
+        };
+      }
+    } catch {
+      // Ignore
+    }
+  }
+  return null;
 });
 
 const nudgeSquareStyle = computed(() => {
@@ -124,15 +167,15 @@ const ghostPieceStyle = computed(() => {
 });
 
 const hintLabel = computed(() => {
-  if (effectiveLevel.value === 0) return '💡 Get Hint';
-  if (effectiveLevel.value === 1) return '🎯 Show Target';
-  if (effectiveLevel.value === 2) return '👑 Show Solution';
-  return '👑 Solution Shown';
+  if (effectiveLevel.value === 0) return '💡 Get Tactical Hint';
+  if (effectiveLevel.value === 1) return '🎯 Show Target Beacon';
+  if (effectiveLevel.value === 2) return '👑 Show Solution Line';
+  return '👑 Solution Revealed';
 });
 
 const hintBadge = computed(() => {
-  if (effectiveLevel.value === 0) return 'Level 0/3';
-  return `Level ${effectiveLevel.value}/3`;
+  if (effectiveLevel.value === 0) return 'Tier 0/3';
+  return `Tier ${effectiveLevel.value}/3`;
 });
 </script>
 
@@ -141,6 +184,14 @@ const hintBadge = computed(() => {
     <!-- Visual Board Overlays Frame Anchor -->
     <div class="hint-board-anchor">
       <slot />
+
+      <!-- Threat Square Refutation Warning Ring -->
+      <div
+        v-if="effectiveThreatSquare"
+        class="refutation-threat-square"
+        data-testid="refutation-threat-square"
+        :style="threatSquareStyle"
+      />
 
       <!-- Visual Board Overlays (1:1 with ChessBoard) -->
       <div
@@ -163,6 +214,10 @@ const hintBadge = computed(() => {
         aria-hidden="true"
       >
         <defs>
+          <linearGradient id="hint-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="var(--academy-gold, #ffc107)" />
+            <stop offset="100%" stop-color="var(--color-success, #22c55e)" />
+          </linearGradient>
           <marker
             id="hint-arrowhead"
             viewBox="0 0 10 10"
@@ -172,7 +227,7 @@ const hintBadge = computed(() => {
             markerHeight="6"
             orient="auto"
           >
-            <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--academy-gold, #ffc107)" />
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--color-success, #22c55e)" />
           </marker>
         </defs>
         <line
@@ -181,19 +236,26 @@ const hintBadge = computed(() => {
           :y1="arrowCoords.y1"
           :x2="arrowCoords.x2"
           :y2="arrowCoords.y2"
-          stroke="var(--academy-gold, #ffc107)"
-          stroke-width="2.5"
+          stroke="url(#hint-gradient)"
+          stroke-width="3"
           stroke-linecap="round"
           marker-end="url(#hint-arrowhead)"
           class="hint-arrow-line"
         />
       </svg>
       <div
-        v-if="effectiveLevel >= 3 && movingPiece"
+        v-if="effectiveLevel >= 3 && (props.movingPiece || resolvedMovingPiece)"
         class="hint-ghost-piece"
         data-testid="hint-ghost-piece"
         :style="ghostPieceStyle"
-      />
+      >
+        <ChessPieceSvg
+          v-if="resolvedMovingPiece"
+          :color="resolvedMovingPiece.color"
+          :type="resolvedMovingPiece.type"
+          size="100%"
+        />
+      </div>
     </div>
 
     <!-- Active Hint Card / Speech Bubble & Action Controls (in-flow below board) -->
@@ -279,6 +341,7 @@ const hintBadge = computed(() => {
 
 .hint-nudge-square,
 .hint-beacon-square,
+.refutation-threat-square,
 .hint-arrow-svg,
 .hint-ghost-piece {
   position: absolute;
@@ -287,76 +350,71 @@ const hintBadge = computed(() => {
   z-index: var(--z-board-indicator, 8);
 }
 
+/* Threat Square Refutation Warning Overlay */
+.refutation-threat-square {
+  border: 3.5px solid var(--color-danger, #ef4444);
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.85), inset 0 0 10px rgba(239, 68, 68, 0.50);
+  background-color: rgba(239, 68, 68, 0.28);
+  animation: threat-pulse 1.4s infinite ease-in-out;
+  box-sizing: border-box;
+  z-index: var(--z-board-indicator, 8);
+}
+
+@keyframes threat-pulse {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.85;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.75);
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+    box-shadow: 0 0 24px 6px rgba(239, 68, 68, 0.95);
+  }
+}
+
+/* Tier 1 Nudge Square */
 .hint-nudge-square {
-  position: absolute;
-  inset: 0;
   border: 3.5px solid var(--academy-gold, #ffc107);
   border-radius: var(--radius-sm, 8px);
-  box-shadow: 0 0 14px rgba(255, 193, 7, 0.8), inset 0 0 8px rgba(255, 193, 7, 0.4);
+  box-shadow: 0 0 16px rgba(255, 193, 7, 0.85), inset 0 0 10px rgba(255, 193, 7, 0.45);
   background-color: rgba(255, 193, 7, 0.25);
-  animation: nudge-pulse 1.8s infinite ease-in-out;
+  animation: nudge-pulse 1.6s infinite ease-in-out;
   box-sizing: border-box;
+  z-index: var(--z-board-indicator, 8);
 }
 
+/* Tier 2 Beacon Square */
 .hint-beacon-square {
-  right: auto;
-  bottom: auto;
   border: 3.5px solid var(--color-success, #22c55e);
   border-radius: var(--radius-sm, 8px);
-  box-shadow: 0 0 16px rgba(34, 197, 94, 0.85), inset 0 0 8px rgba(34, 197, 94, 0.45);
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.85), inset 0 0 10px rgba(34, 197, 94, 0.50);
   background-color: rgba(34, 197, 94, 0.28);
-  animation: beacon-pulse 1.8s infinite ease-in-out;
+  animation: beacon-pulse 1.6s infinite ease-in-out;
   box-sizing: border-box;
+  z-index: var(--z-board-indicator, 8);
 }
 
+/* Tier 3 Arrow SVG */
 .hint-arrow-svg {
+  inset: 0;
   width: 100%;
   height: 100%;
   z-index: var(--z-board-indicator, 9);
 }
 
 .hint-arrow-line {
-  filter: drop-shadow(0 0 4px rgba(255, 193, 7, 0.9));
-  animation: arrow-glow 2s infinite ease-in-out;
+  filter: drop-shadow(0 0 6px rgba(255, 193, 7, 0.95));
+  animation: arrow-glow 1.8s infinite ease-in-out;
 }
 
+/* Tier 3 Ghost Piece */
 .hint-ghost-piece {
-  right: auto;
-  bottom: auto;
-  opacity: 0.7;
-}
-
-@keyframes nudge-pulse {
-  0%, 100% {
-    transform: scale(0.95);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 1;
-  }
-}
-
-@keyframes beacon-pulse {
-  0%, 100% {
-    transform: scale(0.95);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 1;
-  }
-}
-
-@keyframes arrow-glow {
-  0%, 100% {
-    opacity: 0.85;
-    stroke-width: 2.2;
-  }
-  50% {
-    opacity: 1;
-    stroke-width: 3.2;
-  }
+  z-index: var(--z-board-indicator, 9);
+  opacity: 0.60;
+  filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.80));
+  animation: ghost-piece-shimmer 2s infinite ease-in-out;
 }
 
 .hint-controls-wrapper {
@@ -368,17 +426,24 @@ const hintBadge = computed(() => {
   max-width: 580px;
 }
 
+/* Hint Bubble Card */
 .hint-speech-bubble {
   width: 100%;
   padding: var(--space-3, 12px) var(--space-4, 16px);
   background: var(--hint-banner-bg, #fffbeb);
   border: 2px solid var(--hint-banner-border, #ffc107);
-  border-radius: var(--radius-card, 22px);
+  border-radius: var(--radius-xl, 22px);
   box-shadow: var(--shadow-sm, 0 2px 6px rgba(15, 23, 42, 0.09));
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 8px);
   box-sizing: border-box;
+  animation: bubble-pop 280ms var(--ease-spring);
+}
+
+[data-theme='dark'] .hint-speech-bubble {
+  background: var(--hint-banner-bg, hsl(45, 30%, 18%));
+  border-color: var(--hint-banner-border, hsl(45, 60%, 38%));
 }
 
 .hint-bubble-header {
@@ -392,7 +457,7 @@ const hintBadge = computed(() => {
   font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
   font-size: var(--text-xs, 12px);
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: var(--radius-pill, 9999px);
   background: var(--academy-gold, #ffc107);
   color: #1e1b4b;
@@ -419,11 +484,16 @@ const hintBadge = computed(() => {
   font-size: var(--text-base, 16px);
   color: var(--hint-banner-text, #451a03);
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: var(--leading-snug, 1.3);
+}
+
+[data-theme='dark'] .hint-bubble-message {
+  color: var(--hint-banner-text, hsl(45, 85%, 90%));
 }
 
 .hint-mascot-dialogue {
-  font-family: var(--font-display);
+  font-family: var(--font-body, 'Nunito', sans-serif);
   font-size: var(--text-sm, 14px);
   color: var(--text-muted, #64748b);
   margin: 0;
@@ -434,13 +504,15 @@ const hintBadge = computed(() => {
   display: flex;
   align-items: center;
   gap: var(--space-2, 8px);
-  padding: var(--space-1, 4px) var(--space-2, 8px);
-  background: rgba(34, 197, 94, 0.15);
-  border-radius: var(--radius-sm, 8px);
+  padding: var(--space-1-5, 6px) var(--space-3, 12px);
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid var(--color-success, #22c55e);
+  border-radius: var(--radius-md, 12px);
   width: fit-content;
 }
 
 .solution-label {
+  font-family: var(--font-display, 'Fredoka', cursive, sans-serif);
   font-size: var(--text-xs, 12px);
   font-weight: 700;
   color: var(--text-muted, #64748b);
@@ -449,6 +521,7 @@ const hintBadge = computed(() => {
 .solution-san {
   font-family: var(--font-mono, monospace);
   font-size: var(--text-base, 16px);
+  font-weight: 700;
   color: var(--color-success-text, #166534);
 }
 
@@ -488,3 +561,4 @@ const hintBadge = computed(() => {
   transform: translateY(-8px) scale(0.96);
 }
 </style>
+

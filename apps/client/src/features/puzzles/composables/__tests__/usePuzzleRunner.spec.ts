@@ -13,6 +13,11 @@ describe('usePuzzleRunner Composable', () => {
     primaryTheme: 'back_rank_mate',
     difficulty: 'novice',
     title: 'Back Rank Mate in 1',
+    tacticalGoal: 'Deliver checkmate on back rank',
+    tacticalReward: 'checkmate',
+    outcomeAdvantage: 'Checkmate 👑',
+    learningSummary: 'Ra8 delivered back rank checkmate.',
+    keyTakeaway: 'Look for trapped back-rank Kings.',
     playerColor: 'w',
     solutionPlies: 1,
   };
@@ -109,6 +114,11 @@ describe('usePuzzleRunner Composable', () => {
       primaryTheme: 'fork',
       difficulty: 'easy',
       title: 'Knight Fork',
+      tacticalGoal: 'Fork King and Rook on c7',
+      tacticalReward: 'win_rook',
+      outcomeAdvantage: '+5 Rook ♜',
+      learningSummary: 'Nc7+ forks King and Rook cleanly.',
+      keyTakeaway: 'Knights are awesome forkers.',
       playerColor: 'w',
       solutionPlies: 3,
     };
@@ -166,6 +176,117 @@ describe('usePuzzleRunner Composable', () => {
       vi.advanceTimersByTime(400);
       expect(runner.isShaking.value).toBe(false);
       vi.useRealTimers();
+    });
+  });
+
+  describe('Move Replay Controller & Board Inspection State', () => {
+    const replayPuzzle: Puzzle = {
+      id: 'runner_replay_001',
+      fen: 'r3k2r/ppp2ppp/8/3N4/8/8/PPP2PPP/R3K2R w KQkq - 0 1',
+      moves: ['d5c7', 'e8d8', 'c7a8'],
+      rating: 900,
+      ratingDeviation: 100,
+      themes: ['fork'],
+      primaryTheme: 'fork',
+      difficulty: 'easy',
+      title: 'Knight Fork',
+      tacticalGoal: 'Fork King and Rook on c7',
+      tacticalReward: 'win_rook',
+      outcomeAdvantage: '+5 Rook ♜',
+      learningSummary: 'Nc7+ forks King and Rook cleanly.',
+      keyTakeaway: 'Knights are awesome forkers.',
+      playerColor: 'w',
+      solutionPlies: 3,
+    };
+
+    it('precomputes replay steps upon puzzle load', () => {
+      const runner = usePuzzleRunner({ puzzle: replayPuzzle, autoPlayAudio: false });
+
+      expect(runner.replaySteps.value.length).toBe(4); // Start + 3 plies
+      expect(runner.replayTotalSteps.value).toBe(3);
+
+      expect(runner.replaySteps.value[0].san).toBe('Start');
+      expect(runner.replaySteps.value[1].san).toBe('Nxc7+');
+      expect(runner.replaySteps.value[2].san).toBe('Kd8');
+      expect(runner.replaySteps.value[3].san).toBe('Nxa8');
+    });
+
+    it('steps forward, backward, to start, and to end with updated displayedFen', () => {
+      const runner = usePuzzleRunner({ puzzle: replayPuzzle, autoPlayAudio: false });
+
+      // Start position
+      runner.stepReplayStart();
+      expect(runner.isReplaying.value).toBe(true);
+      expect(runner.replayStepIndex.value).toBe(0);
+      expect(runner.displayedFen.value).toBe(replayPuzzle.fen);
+
+      // Step forward to ply 1
+      runner.stepReplayNext();
+      expect(runner.replayStepIndex.value).toBe(1);
+      expect(runner.currentReplaySan.value).toBe('Nxc7+');
+      expect(runner.displayedLastMove.value).toEqual({ from: 'd5', to: 'c7' });
+
+      // Step forward to ply 2
+      runner.stepReplayNext();
+      expect(runner.replayStepIndex.value).toBe(2);
+      expect(runner.currentReplaySan.value).toBe('Kd8');
+      expect(runner.displayedLastMove.value).toEqual({ from: 'e8', to: 'd8' });
+
+      // Step backward to ply 1
+      runner.stepReplayPrev();
+      expect(runner.replayStepIndex.value).toBe(1);
+      expect(runner.currentReplaySan.value).toBe('Nxc7+');
+
+      // Jump to end
+      runner.stepReplayEnd();
+      expect(runner.replayStepIndex.value).toBe(3);
+      expect(runner.currentReplaySan.value).toBe('Nxa8');
+      expect(runner.displayedLastMove.value).toEqual({ from: 'c7', to: 'a8' });
+    });
+
+    it('toggles board inspection mode', () => {
+      const runner = usePuzzleRunner({ puzzle: replayPuzzle, autoPlayAudio: false });
+
+      expect(runner.isInspectingBoard.value).toBe(false);
+      runner.toggleInspectBoard(true);
+      expect(runner.isInspectingBoard.value).toBe(true);
+
+      runner.toggleInspectBoard(false);
+      expect(runner.isInspectingBoard.value).toBe(false);
+
+      runner.toggleInspectBoard();
+      expect(runner.isInspectingBoard.value).toBe(true);
+    });
+
+    it('exposes dynamic currentStepExplanation as player steps through replay', () => {
+      const runner = usePuzzleRunner({ puzzle: replayPuzzle, autoPlayAudio: false });
+
+      runner.stepReplayStart();
+      expect(runner.currentStepExplanation.value?.explanation).toContain('Initial puzzle setup');
+
+      runner.stepReplayNext();
+      expect(runner.currentStepExplanation.value?.moveSan).toBe('Nxc7+');
+      expect(runner.currentStepExplanation.value?.explanation).toBeTruthy();
+
+      runner.stepReplayEnd();
+      expect(runner.currentStepExplanation.value?.moveSan).toBe('Nxa8');
+    });
+  });
+
+  describe('Refutation Feedback on Mistakes', () => {
+    it('sets lastMistakeRefutation with threat square and refutation on wrong move', () => {
+      const runner = usePuzzleRunner({ puzzle: samplePuzzle, autoPlayAudio: false });
+
+      // Move a1 to b1 (wrong move)
+      runner.selectSquare('a1');
+      runner.selectSquare('b1');
+
+      expect(runner.mistakesCount.value).toBe(1);
+      expect(runner.lastMistakeRefutation.value).not.toBeNull();
+
+      // Clears on new square selection
+      runner.selectSquare('a1');
+      expect(runner.lastMistakeRefutation.value).toBeNull();
     });
   });
 });

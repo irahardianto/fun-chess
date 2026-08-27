@@ -6,12 +6,27 @@ import type {
   PieceColor,
   StarRating,
   PlayerMoveAction,
+  PlayerMistakeRefutation,
   PuzzleAttemptResult,
+  PuzzleAnalysisResult,
 } from '@fun-chess/shared';
-import { validatePuzzleMove } from '../engine/puzzle_validator';
+import { validatePuzzleMove, parseUciMove } from '../engine/puzzle_validator';
 import { calculatePuzzleStars } from '../engine/star_calculator';
+import { analyzePuzzleSolution } from '../engine/puzzle_analysis_engine';
 import { useProgressiveHint } from './useProgressiveHint';
 import { useAudio } from '../../../composables/useAudio';
+
+export interface ReplayStep {
+  readonly stepIndex: number;
+  readonly plyIndex: number;
+  readonly uci?: string;
+  readonly san?: string;
+  readonly from?: Square;
+  readonly to?: Square;
+  readonly actor?: PieceColor;
+  readonly fen: string;
+  readonly explanation?: string;
+}
 
 export interface UsePuzzleRunnerOptions {
   puzzle?: Puzzle | null;
@@ -44,7 +59,13 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
 
   const mistakesCount = ref<number>(0);
   const feedbackMessage = ref<string | null>(null);
+  const lastMistakeRefutation = ref<PlayerMistakeRefutation | null>(null);
   const attemptResult = ref<PuzzleAttemptResult>('unsolved');
+
+  // Interactive Replay & Board Inspection State
+  const isReplaying = ref<boolean>(false);
+  const isInspectingBoard = ref<boolean>(false);
+  const replayStepIndex = ref<number>(0);
 
   const progressiveHint = useProgressiveHint();
 
@@ -73,6 +94,138 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     return calculatePuzzleStars(progressiveHint.hintsUsedCount.value, mistakesCount.value);
   });
 
+  const analysis = computed<PuzzleAnalysisResult | null>(() => {
+    if (!currentPuzzle.value) return null;
+    return analyzePuzzleSolution(currentPuzzle.value);
+  });
+
+  /**
+   * Precomputes full step-by-step replay history from puzzle.fen and puzzle.moves
+   */
+  const replaySteps = computed<readonly ReplayStep[]>(() => {
+    const p = currentPuzzle.value;
+    if (!p) return [];
+
+    const steps: ReplayStep[] = [
+      {
+        stepIndex: 0,
+        plyIndex: -1,
+        fen: p.fen,
+        san: 'Start',
+        explanation: 'Initial puzzle setup position',
+      },
+    ];
+
+    let sim: Chess;
+    try {
+      sim = new Chess(p.fen);
+    } catch {
+      return steps;
+    }
+
+    for (let i = 0; i < p.moves.length; i++) {
+      const uci = p.moves[i];
+      if (!uci) continue;
+      const { from, to, promotion } = parseUciMove(uci);
+      const actor: PieceColor = sim.turn();
+
+      let moveRes: any = null;
+      try {
+        moveRes = sim.move({
+          from: from as unknown as import('chess.js').Square,
+          to: to as unknown as import('chess.js').Square,
+          promotion,
+        });
+      } catch {
+        moveRes = null;
+      }
+
+      const san = moveRes ? moveRes.san : uci;
+      const ana = analysis.value;
+      const explanation =
+        p.stepExplanations?.[i]?.explanation ||
+        ana?.stepNarratives?.[i]?.explanation ||
+        (moveRes ? `Move: ${san}` : uci);
+
+      steps.push({
+        stepIndex: i + 1,
+        plyIndex: i,
+        uci,
+        san,
+        from,
+        to,
+        actor,
+        fen: sim.fen(),
+        explanation,
+      });
+    }
+
+    return steps;
+  });
+
+  const replayTotalSteps = computed<number>(() => {
+    return Math.max(0, currentPuzzle.value?.moves.length ?? 0);
+  });
+
+  const currentReplayStep = computed<ReplayStep | null>(() => {
+    return replaySteps.value[replayStepIndex.value] ?? null;
+  });
+
+  const currentReplaySan = computed<string>(() => {
+    return currentReplayStep.value?.san || '';
+  });
+
+  const currentStepExplanation = computed<{
+    plyIndex: number;
+    moveSan: string;
+    moveUci: string;
+    actor: PieceColor;
+    explanation: string;
+  } | null>(() => {
+    if (!currentReplayStep.value) return null;
+    const idx = replayStepIndex.value - 1;
+    if (idx < 0) {
+      return {
+        plyIndex: -1,
+        moveSan: 'Start',
+        moveUci: '',
+        actor: currentPuzzle.value?.playerColor || 'w',
+        explanation: 'Initial puzzle setup position',
+      };
+    }
+    const ana = analysis.value;
+    const p = currentPuzzle.value;
+    const predefined = p?.stepExplanations?.[idx];
+    const narrative = ana?.stepNarratives?.[idx];
+    return (
+      predefined ||
+      narrative || {
+        plyIndex: idx,
+        moveSan: currentReplayStep.value.san || '',
+        moveUci: currentReplayStep.value.uci || '',
+        actor: currentReplayStep.value.actor || 'w',
+        explanation: currentReplayStep.value.explanation || '',
+      }
+    );
+  });
+
+  const displayedFen = computed<string>(() => {
+    if (isReplaying.value && currentReplayStep.value) {
+      return currentReplayStep.value.fen;
+    }
+    return currentFen.value;
+  });
+
+  const displayedLastMove = computed<{ from: string; to: string } | null>(() => {
+    if (isReplaying.value && currentReplayStep.value) {
+      if (currentReplayStep.value.from && currentReplayStep.value.to) {
+        return { from: currentReplayStep.value.from, to: currentReplayStep.value.to };
+      }
+      return null;
+    }
+    return lastMove.value;
+  });
+
   function recalculateLegalMoves(fenStr: string, sq: Square | null): Square[] {
     if (!sq) return [];
     try {
@@ -98,7 +251,11 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     isShaking.value = false;
     mistakesCount.value = 0;
     feedbackMessage.value = null;
+    lastMistakeRefutation.value = null;
     attemptResult.value = 'unsolved';
+    isReplaying.value = false;
+    isInspectingBoard.value = false;
+    replayStepIndex.value = 0;
     progressiveHint.resetHints();
   }
 
@@ -123,6 +280,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
       if (piece && piece.color === playerColor.value) {
         selectedSquare.value = sq;
         legalMoves.value = recalculateLegalMoves(currentFen.value, sq);
+        lastMistakeRefutation.value = null;
         if (autoAudio) audio.playPickup();
       } else {
         selectedSquare.value = null;
@@ -148,6 +306,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
       mistakesCount.value += 1;
       isShaking.value = true;
       feedbackMessage.value = outcome.feedback;
+      lastMistakeRefutation.value = outcome.refutation ?? null;
       selectedSquare.value = null;
       legalMoves.value = [];
       if (autoAudio) audio.playError();
@@ -180,6 +339,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     legalMoves.value = [];
     lastMove.value = { from: move.from, to: move.to };
     feedbackMessage.value = outcome.feedback;
+    lastMistakeRefutation.value = null;
     if (autoAudio) audio.playMove();
 
     if (outcome.isPuzzleComplete) {
@@ -187,6 +347,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
       currentMoveIndex.value = outcome.nextMoveIndex;
       isCompleted.value = true;
       isSolvedSuccessfully.value = true;
+      replayStepIndex.value = replayTotalSteps.value;
 
       const hintsUsed = progressiveHint.hintsUsedCount.value;
       if (hintsUsed === 0 && mistakesCount.value === 0) {
@@ -256,6 +417,10 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     isShaking.value = false;
     mistakesCount.value = 0;
     feedbackMessage.value = null;
+    lastMistakeRefutation.value = null;
+    isReplaying.value = false;
+    isInspectingBoard.value = false;
+    replayStepIndex.value = 0;
     progressiveHint.resetHints();
   }
 
@@ -265,6 +430,48 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
 
   function reset() {
     resetCurrentPuzzle();
+  }
+
+  // --- Move Replay Controller Methods ---
+  function stepReplayStart() {
+    isReplaying.value = true;
+    replayStepIndex.value = 0;
+    if (autoAudio) audio.playPickup();
+  }
+
+  function stepReplayPrev() {
+    isReplaying.value = true;
+    if (replayStepIndex.value > 0) {
+      replayStepIndex.value -= 1;
+      if (autoAudio) audio.playMove();
+    }
+  }
+
+  function stepReplayNext() {
+    isReplaying.value = true;
+    if (replayStepIndex.value < replayTotalSteps.value) {
+      replayStepIndex.value += 1;
+      if (autoAudio) audio.playMove();
+    }
+  }
+
+  function stepReplayEnd() {
+    isReplaying.value = true;
+    replayStepIndex.value = replayTotalSteps.value;
+    if (autoAudio) audio.playMove();
+  }
+
+  function setReplayStep(step: number) {
+    isReplaying.value = true;
+    replayStepIndex.value = Math.max(0, Math.min(step, replayTotalSteps.value));
+  }
+
+  function toggleInspectBoard(inspecting?: boolean) {
+    if (typeof inspecting === 'boolean') {
+      isInspectingBoard.value = inspecting;
+    } else {
+      isInspectingBoard.value = !isInspectingBoard.value;
+    }
   }
 
   if (getCurrentInstance()) {
@@ -282,10 +489,12 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     puzzle: readonly(currentPuzzle),
     currentPuzzle: readonly(currentPuzzle),
     currentFen: readonly(currentFen),
+    displayedFen: readonly(displayedFen),
     currentMoveIndex: readonly(currentMoveIndex),
     selectedSquare: readonly(selectedSquare),
     legalMoves: readonly(legalMoves),
     lastMove: readonly(lastMove),
+    displayedLastMove: readonly(displayedLastMove),
     isCompleted: readonly(isCompleted),
     isSolvedSuccessfully: readonly(isSolvedSuccessfully),
     isWaitingForBot: readonly(isWaitingForBot),
@@ -293,11 +502,30 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     isShaking: readonly(isShaking),
     mistakesCount: readonly(mistakesCount),
     feedbackMessage: readonly(feedbackMessage),
+    lastMistakeRefutation: readonly(lastMistakeRefutation),
     attemptResult: readonly(attemptResult),
     playerColor,
     calculatedStars,
+    analysis,
     hintsCount: progressiveHint.hintsCount,
     progressiveHint,
+
+    // Replay & Board Inspection
+    isReplaying: readonly(isReplaying),
+    isInspectingBoard: readonly(isInspectingBoard),
+    replayStepIndex: readonly(replayStepIndex),
+    replaySteps,
+    replayTotalSteps,
+    currentReplayStep,
+    currentReplaySan,
+    currentStepExplanation,
+    stepReplayStart,
+    stepReplayPrev,
+    stepReplayNext,
+    stepReplayEnd,
+    setReplayStep,
+    toggleInspectBoard,
+
     clearTimers,
     loadPuzzle,
     selectSquare,

@@ -83,7 +83,7 @@ describe('PuzzleArena.vue', () => {
       expect(wrapper.emitted('exit')).toBeTruthy();
     });
 
-    it('renders active puzzle guide card and ChessBoard wrapper', () => {
+    it('renders active puzzle guide card with Tactical Goal Banner and "Why" rationale', () => {
       const store = new InMemoryPuzzleProgressStore();
       const wrapper = mount(PuzzleArena, {
         props: {
@@ -100,6 +100,18 @@ describe('PuzzleArena.vue', () => {
 
       expect(wrapper.find('[data-testid="puzzle-guide-slot"]').exists()).toBe(true);
       expect(wrapper.find('.puzzle-card-title').text()).toContain('Knight Fork on c7 #1');
+      expect(wrapper.find('[data-testid="puzzle-tactical-goal"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="puzzle-tactical-goal"]').text()).toContain(
+        'Deliver Nc7+ to fork King and a8 Rook'
+      );
+      expect(wrapper.find('[data-testid="puzzle-why-callout"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="puzzle-why-callout"]').text()).toContain(
+        'Deliver Nc7+ to fork King'
+      );
+      expect(wrapper.find('.turn-indicator-pill').text()).toContain('⚪ White to Move');
+      expect(wrapper.find('.puzzle-meta-chips').text()).toContain('novice');
+      expect(wrapper.find('.puzzle-meta-chips').text()).toContain('~650 Elo');
+      expect(wrapper.find('.puzzle-meta-chips').text()).toContain('fork');
       expect(wrapper.findComponent(PuzzleBoardWrapper).exists()).toBe(true);
     });
 
@@ -159,8 +171,8 @@ describe('PuzzleArena.vue', () => {
 
       const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
 
-      // Apply wrong move: e2e4 instead of c3b5
-      boardWrapper.vm.$emit('move', { from: 'e2', to: 'e4' });
+      // Apply wrong move: e2e4 instead of b5c7
+      boardWrapper.vm.$emit('move', { from: 'a2', to: 'a4' });
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find('[data-testid="puzzle-feedback-banner"]').exists()).toBe(true);
@@ -192,16 +204,16 @@ describe('PuzzleArena.vue', () => {
 
       const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
 
-      // Ply 0: Player moves c3 to b5
-      boardWrapper.vm.$emit('move', { from: 'c3', to: 'b5' });
+      // Ply 0: Player moves b5 to c7
+      boardWrapper.vm.$emit('move', { from: 'b5', to: 'c7' });
       await wrapper.vm.$nextTick();
 
       // Bot responds after 450ms delay with e8d8
       vi.advanceTimersByTime(500);
       await wrapper.vm.$nextTick();
 
-      // Ply 2: Player moves b5 to c7
-      boardWrapper.vm.$emit('move', { from: 'b5', to: 'c7' });
+      // Ply 2: Player moves c7 to a8
+      boardWrapper.vm.$emit('move', { from: 'c7', to: 'a8' });
       await wrapper.vm.$nextTick();
 
       // Puzzle complete!
@@ -229,13 +241,13 @@ describe('PuzzleArena.vue', () => {
         },
       });
 
-      // Solve first puzzle
+      // Solve first puzzle: b5c7 -> e8d8 -> c7a8
       const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
-      boardWrapper.vm.$emit('move', { from: 'c3', to: 'b5' });
+      boardWrapper.vm.$emit('move', { from: 'b5', to: 'c7' });
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(500);
       await wrapper.vm.$nextTick();
-      boardWrapper.vm.$emit('move', { from: 'b5', to: 'c7' });
+      boardWrapper.vm.$emit('move', { from: 'c7', to: 'a8' });
       await wrapper.vm.$nextTick();
 
       const completionModal = wrapper.findComponent(PuzzleCompletionModal);
@@ -247,7 +259,7 @@ describe('PuzzleArena.vue', () => {
 
       // Next puzzle in fork pack should now be loaded
       expect(wrapper.find('[data-testid="drill-progress-tag"]').text()).toContain('Drill 2 /');
-      expect(wrapper.find('.puzzle-card-title').text()).toContain('Fried Liver Fork Assault #2');
+      expect(wrapper.find('.puzzle-card-title').text()).toContain('Knight Fork on c7 #2');
       expect(completionModal.props('modelValue')).toBe(false);
     });
 
@@ -476,6 +488,71 @@ describe('PuzzleArena.vue', () => {
       await wrapper.vm.$nextTick();
 
       expect(promoModal.props('modelValue')).toBe(false);
+    });
+  });
+
+  describe('Pre-Move Solution Spoiler Elimination & Pedagogical Scaffolding', () => {
+    it('does not display learningSummary, keyTakeaway, or stepExplanations in the pre-move guide card before solving', () => {
+      const store = new InMemoryPuzzleProgressStore();
+      const wrapper = mount(PuzzleArena, {
+        props: {
+          mode: 'themed_drills',
+          initialTheme: 'fork',
+          customStore: store,
+        },
+        global: {
+          stubs: {
+            teleport: true,
+          },
+        },
+      });
+
+      const guideSlot = wrapper.find('[data-testid="puzzle-guide-slot"]');
+      expect(guideSlot.exists()).toBe(true);
+
+      const activePuzzle = (wrapper.vm as any).activePuzzle;
+      expect(activePuzzle).toBeDefined();
+
+      // In pre-move state, verify zero spoilers in the arena DOM
+      if (activePuzzle?.learningSummary) {
+        expect(guideSlot.text()).not.toContain(activePuzzle.learningSummary);
+      }
+      if (activePuzzle?.keyTakeaway) {
+        expect(guideSlot.text()).not.toContain(activePuzzle.keyTakeaway);
+      }
+      if (activePuzzle?.stepExplanations?.length) {
+        for (const step of activePuzzle.stepExplanations) {
+          expect(guideSlot.text()).not.toContain(step.explanation);
+        }
+      }
+
+      // Pre-move guide only displays thematic objective teasers
+      expect(wrapper.find('[data-testid="puzzle-tactical-goal"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="puzzle-why-callout"]').exists()).toBe(true);
+    });
+
+    it('passes active puzzle with keySquares and targetSquares to board wrapper', () => {
+      const store = new InMemoryPuzzleProgressStore();
+      const wrapper = mount(PuzzleArena, {
+        props: {
+          mode: 'themed_drills',
+          initialTheme: 'fork',
+          customStore: store,
+        },
+        global: {
+          stubs: {
+            teleport: true,
+          },
+        },
+      });
+
+      const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
+      expect(boardWrapper.exists()).toBe(true);
+      const puzzle = (wrapper.vm as any).activePuzzle;
+      expect(puzzle.keySquares).toBeDefined();
+      expect(puzzle.keySquares.length).toBeGreaterThan(0);
+      expect(puzzle.targetSquares).toBeDefined();
+      expect(puzzle.targetSquares.length).toBeGreaterThan(0);
     });
   });
 });

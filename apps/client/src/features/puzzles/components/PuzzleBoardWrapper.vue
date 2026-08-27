@@ -12,6 +12,7 @@ interface Props {
   legalMoves?: readonly Square[];
   lastMove?: { from: string; to: string } | null;
   kingInCheckSquare?: Square | null;
+  threatSquare?: Square | null;
   interactive?: boolean;
   disabled?: boolean;
   hintLevel?: HintLevel;
@@ -27,6 +28,7 @@ const props = withDefaults(defineProps<Props>(), {
   legalMoves: () => [],
   lastMove: null,
   kingInCheckSquare: null,
+  threatSquare: null,
   interactive: true,
   disabled: false,
   hintLevel: 0,
@@ -51,6 +53,7 @@ const emit = defineEmits<{
         :hint-data="props.hintData"
         :source-square="props.hintData?.sourceSquare"
         :target-square="props.hintData?.targetSquare"
+        :threat-square="props.threatSquare"
         :orientation="props.orientation"
         :fen="props.fen"
         :disabled="props.disabled || !props.interactive"

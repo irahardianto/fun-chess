@@ -13,6 +13,11 @@ describe('useProgressiveHint Composable', () => {
     primaryTheme: 'back_rank_mate',
     difficulty: 'novice',
     title: 'Back Rank Mate in 1',
+    tacticalGoal: 'Deliver checkmate on back rank',
+    tacticalReward: 'checkmate',
+    outcomeAdvantage: 'Checkmate 👑',
+    learningSummary: 'Ra8 delivered back rank checkmate.',
+    keyTakeaway: 'Look for trapped back-rank Kings.',
     playerColor: 'w',
     solutionPlies: 1,
   };

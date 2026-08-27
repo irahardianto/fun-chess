@@ -54,4 +54,77 @@ describe('ThemeDrillSelector.vue', () => {
     await forkCard.trigger('keydown.space');
     expect(wrapper.emitted('selectTheme')?.[1]).toEqual(['fork']);
   });
+
+  describe('Theme Concept Primer Modal Flow', () => {
+    it('opens concept primer modal on clicking primer button and displays motif definition and visual clues', async () => {
+      const wrapper = mount(ThemeDrillSelector, {
+        global: {
+          stubs: { teleport: true },
+        },
+      });
+
+      const primerBtn = wrapper.find('[data-testid="theme-primer-btn-fork"]');
+      expect(primerBtn.exists()).toBe(true);
+
+      await primerBtn.trigger('click');
+
+      const primerModal = wrapper.find('[data-testid="theme-primer-modal"]');
+      expect(primerModal.exists()).toBe(true);
+      expect(wrapper.find('[data-testid="primer-concept-section"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="primer-concept-text"]').text()).toContain('double attack where one piece strikes two or more targets');
+      expect(wrapper.find('[data-testid="primer-clues-section"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="primer-clues-text"]').text()).toContain('Look for two high-value enemy pieces on squares that a Knight');
+      expect(wrapper.find('[data-testid="primer-tip-text"]').text()).toContain('Knights and Pawns love jumping into squares');
+    });
+
+    it('emits selectTheme and closes modal when Start Drill is clicked in primer modal', async () => {
+      const wrapper = mount(ThemeDrillSelector, {
+        global: {
+          stubs: { teleport: true },
+        },
+      });
+
+      const primerBtn = wrapper.find('[data-testid="theme-primer-btn-fork"]');
+      await primerBtn.trigger('click');
+
+      const startDrillBtn = wrapper.find('[data-testid="start-drill-btn"]');
+      expect(startDrillBtn.exists()).toBe(true);
+
+      await startDrillBtn.trigger('click');
+
+      expect(wrapper.emitted('selectTheme')).toBeTruthy();
+      expect(wrapper.emitted('selectTheme')![0]).toEqual(['fork']);
+    });
+  });
+
+  describe('Zero Empty Theme Cards Guarantee across all Category Tabs', () => {
+    it('renders all 24 theme cards in "All Motifs" view without any empty drills', () => {
+      const wrapper = mount(ThemeDrillSelector);
+      const cards = wrapper.findAll('.theme-drill-card');
+      expect(cards).toHaveLength(24);
+    });
+
+    it('renders playable theme cards in every category tab and emits valid theme on click', async () => {
+      const wrapper = mount(ThemeDrillSelector);
+      const categoryTabs = [
+        'basic_tactics',
+        'advanced_tactics',
+        'checkmate_patterns',
+        'endgame_technique',
+        'opening_traps',
+      ] as const;
+
+      for (const cat of categoryTabs) {
+        const tabBtn = wrapper.find(`[data-testid="filter-tab-${cat}"]`);
+        expect(tabBtn.exists(), `Tab button filter-tab-${cat} missing`).toBe(true);
+        await tabBtn.trigger('click');
+
+        const activeCards = wrapper.findAll('.theme-drill-card');
+        expect(
+          activeCards.length,
+          `Category ${cat} has 0 theme cards rendered!`,
+        ).toBeGreaterThan(0);
+      }
+    });
+  });
 });
