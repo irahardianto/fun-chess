@@ -31,11 +31,13 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
     expect(indexHtml).not.toContain('user-scalable=no');
   });
 
-  it('Finding 12: index.html loads Fredoka, JetBrains Mono, and Nunito fonts with correct weights', () => {
+  it('Finding 12 & Finding 9: index.html loads Fredoka, JetBrains Mono, and Nunito fonts with correct weights including 500', () => {
     expect(indexHtml).toContain('family=Fredoka:wght@400;500;600;700');
     expect(indexHtml).toContain('family=JetBrains+Mono:wght@400;500;600;700');
     expect(indexHtml).toContain('family=Nunito');
+    expect(indexHtml).toMatch(/family=Nunito:[^"']*0,500/);
     expect(designTokens).toMatch(/--weight-heavy:\s+700;/);
+    expect(designTokens).toContain("--font-mono:    ui-monospace, 'Cascadia Code', Menlo, Monaco, Consolas, 'JetBrains Mono', monospace;");
   });
 
   it('Finding 2: design-tokens.css defines semantic focus ring token and components use :focus-visible', () => {
@@ -43,9 +45,16 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
     expect(designTokens).toContain('--border-focus:');
     expect(baseButton).toContain(':focus-visible');
     expect(baseButton).toContain('box-shadow: var(--focus-ring);');
+    expect(baseInput).toContain('.base-input-clear-btn:focus-visible');
+    expect(baseInput).toContain('box-shadow: var(--focus-ring);');
+    expect(baseInput).toContain('.base-input-clear-btn::before');
+    expect(baseInput).toContain('min-width: 44px;');
+    expect(baseInput).toContain('min-height: 44px;');
+    expect(baseInput).toContain('aria-label="Clear input text"');
+    expect(baseInput).not.toMatch(/class="base-input-clear-btn"[^>]*tabindex="-1"/);
   });
 
-  it('Finding 5 & 6: design-tokens.css specifies accessible color contrast tokens for light and dark themes', () => {
+  it('Finding 5 & 6 & 8: design-tokens.css specifies accessible color contrast tokens for light and dark themes', () => {
     // Light theme contrast tokens (>= 4.5:1)
     expect(designTokens).toContain('--board-coord-light:       #7d5538;');
     expect(designTokens).toContain('--board-coord-dark:        #3d220f;');
@@ -55,11 +64,15 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
     expect(designTokens).toContain('--color-accent-text:  #92400e;');
     expect(designTokens).toContain('--color-success-text: #166534;');
     expect(designTokens).toContain('--color-primary-text: hsl(var(--color-primary-h) 65% 38%);');
+    expect(designTokens).toContain('--color-danger-l: 48%; /* #dc2626 */');
+    expect(designTokens).toContain('--cat-fundamentals-text: hsl(150, 85%, 20%);');
 
     // Dark theme contrast tokens (>= 4.5:1)
     expect(designTokens).toContain('--color-primary-text: hsl(255 95% 78%);');
     expect(designTokens).toContain('--color-accent-text:  hsl(42 100% 75%);');
     expect(designTokens).toContain('--color-success-text: #34d399;');
+    expect(designTokens).toContain('--text-faint:         hsl(220, 14%, 60%);');
+    expect(designTokens).toContain('--cat-fundamentals-text: hsl(150, 70%, 75%);');
     expect(designTokens).toContain('--mode-ladder-bg:        hsl(271, 85%, 97%);');
     expect(designTokens).toContain('--mode-drills-bg:        hsl(244, 85%, 97%);');
     expect(designTokens).toContain('--mode-rush-bg:          hsl(24, 100%, 97%);');

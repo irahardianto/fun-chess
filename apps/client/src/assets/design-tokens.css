@@ -29,7 +29,7 @@
   /* Danger / Alert — Coral Crimson (Check Warning, Captures, Errors) */
   --color-danger-h: 354;
   --color-danger-s: 88%;
-  --color-danger-l: 58%; /* #ef4444 */
+  --color-danger-l: 48%; /* #dc2626 */
 
   /* Info / Active — Sky Cyan (Spectator, LAN Status) */
   --color-info-h: 198;
@@ -226,6 +226,7 @@
 
   --cat-fundamentals:      hsl(150, 72%, 40%);
   --cat-fundamentals-bg:   hsl(150, 72%, 94%);
+  --cat-fundamentals-text: hsl(150, 85%, 20%);
   --cat-special:           hsl(192, 88%, 42%);
   --cat-special-bg:        hsl(192, 88%, 94%);
   --cat-tactics:           hsl(265, 85%, 58%);
@@ -491,7 +492,7 @@
 
   --text-main:          hsl(220, 20%, 96%);
   --text-muted:         hsl(220, 14%, 68%);
-  --text-faint:         hsl(220, 10%, 46%);
+  --text-faint:         hsl(220, 14%, 60%);
   --color-primary-text: hsl(255 95% 78%);
   --color-accent-text:  hsl(42 100% 75%);
   --color-success-text: #34d399;
@@ -512,6 +513,7 @@
 
   /* Category Dark Overrides */
   --cat-fundamentals-bg:   hsl(150, 40%, 16%);
+  --cat-fundamentals-text: hsl(150, 70%, 75%);
   --cat-special-bg:        hsl(192, 45%, 16%);
   --cat-tactics-bg:        hsl(265, 40%, 18%);
   --cat-checkmates-bg:     hsl(350, 45%, 18%);
@@ -644,7 +646,7 @@
   /* Font Families */
   --font-display: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-body:    'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono:    'JetBrains Mono', monospace;
+  --font-mono:    ui-monospace, 'Cascadia Code', Menlo, Monaco, Consolas, 'JetBrains Mono', monospace;
 
   /* Fluid Typography Scale (320px -> 1280px viewport clamp) */
   --text-hero:    clamp(2.40rem, 1.80rem + 2.8vw, 3.40rem);  /* 38px -> 54px */
