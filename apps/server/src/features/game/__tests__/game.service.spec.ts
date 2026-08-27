@@ -8,6 +8,7 @@ import {
   PlayerNotInRoomError,
   NotYourTurnError,
   InvalidMoveError,
+  InvalidPayloadError,
 } from "../../rooms/room.errors.js";
 import { ChessEngine } from "../chess_engine.js";
 import { Chess } from "chess.js";
@@ -48,6 +49,7 @@ describe("GameService", () => {
       spectators: [],
       game: ChessEngine.extractGameState(chess, null),
       rematch: null,
+      drawOffer: null,
       createdAt: Date.now() - 30000,
       lastActivityAt: Date.now() - 5000,
     };
@@ -174,11 +176,27 @@ describe("GameService", () => {
         ),
       ).rejects.toThrow(InvalidMoveError);
     });
+
+    it("clears pending draw offer when a move is played", async () => {
+      const room = createActiveGameRoom("TEST");
+      room.drawOffer = { offeredBy: "sock_black", offeredAt: Date.now() };
+      await store.save(room);
+
+      const result = await service.makeMove(
+        { roomCode: "TEST", move: { from: "e2", to: "e4" } },
+        "sock_white",
+      );
+
+      expect(result.room.drawOffer).toBeNull();
+      const saved = await store.findByCode("TEST");
+      expect(saved?.drawOffer).toBeNull();
+    });
   });
 
   describe("resign", () => {
-    it("allows white to resign and awards victory to black", async () => {
+    it("allows white to resign, clears drawOffer, and awards victory to black", async () => {
       const room = createActiveGameRoom("TEST");
+      room.drawOffer = { offeredBy: "sock_white", offeredAt: Date.now() };
       await store.save(room);
 
       const { room: updatedRoom, gameOverPayload } = await service.resign(
@@ -187,6 +205,7 @@ describe("GameService", () => {
       );
 
       expect(updatedRoom.status).toBe("game_over");
+      expect(updatedRoom.drawOffer).toBeNull();
       expect(gameOverPayload.winner).toBe("b");
       expect(gameOverPayload.winnerName).toBe("Black Player");
       expect(gameOverPayload.reason).toBe("resignation");
@@ -204,33 +223,83 @@ describe("GameService", () => {
   });
 
   describe("offerDraw and respondDraw", () => {
-    it("returns opponent player for draw offer", async () => {
+    it("sets drawOffer in room and store, and returns opponent player for draw offer", async () => {
       const room = createActiveGameRoom("DRAW");
       await store.save(room);
 
       const result = await service.offerDraw("DRAW", "sock_white");
       expect(result.fromPlayer.id).toBe("p_white_id");
       expect(result.opponentPlayer?.id).toBe("p_black_id");
+      expect(result.room.drawOffer).toEqual({
+        offeredBy: "sock_white",
+        offeredAt: expect.any(Number),
+      });
+
+      const saved = await store.findByCode("DRAW");
+      expect(saved?.drawOffer?.offeredBy).toBe("sock_white");
     });
 
-    it("ends game in draw when accepted", async () => {
+    it("rejects respondDraw if no draw offer is currently pending", async () => {
       const room = createActiveGameRoom("DRAW");
       await store.save(room);
 
+      await expect(
+        service.respondDraw("DRAW", "sock_black", true),
+      ).rejects.toThrow(GameNotActiveError);
+    });
+
+    it("rejects respondDraw if player attempts to accept their own draw offer", async () => {
+      const room = createActiveGameRoom("DRAW");
+      await store.save(room);
+
+      await service.offerDraw("DRAW", "sock_white");
+
+      await expect(
+        service.respondDraw("DRAW", "sock_white", true),
+      ).rejects.toThrow(InvalidPayloadError);
+    });
+
+    it("rejects respondDraw if player attempts to decline their own draw offer", async () => {
+      const room = createActiveGameRoom("DRAW");
+      await store.save(room);
+
+      await service.offerDraw("DRAW", "sock_white");
+
+      await expect(
+        service.respondDraw("DRAW", "sock_white", false),
+      ).rejects.toThrow(InvalidPayloadError);
+    });
+
+    it("ends game in draw and clears drawOffer when accepted", async () => {
+      const room = createActiveGameRoom("DRAW");
+      await store.save(room);
+
+      await service.offerDraw("DRAW", "sock_white");
       const result = await service.respondDraw("DRAW", "sock_black", true);
+
       expect(result.accept).toBe(true);
       expect(result.room.status).toBe("game_over");
+      expect(result.room.drawOffer).toBeNull();
       expect(result.gameOverPayload?.winner).toBe("draw");
       expect(result.gameOverPayload?.reason).toBe("draw_agreement");
+
+      const saved = await store.findByCode("DRAW");
+      expect(saved?.drawOffer).toBeNull();
     });
 
-    it("continues game when draw is declined", async () => {
+    it("continues game and clears drawOffer when draw is declined", async () => {
       const room = createActiveGameRoom("DRAW");
       await store.save(room);
 
+      await service.offerDraw("DRAW", "sock_white");
       const result = await service.respondDraw("DRAW", "sock_black", false);
+
       expect(result.accept).toBe(false);
       expect(result.room.status).toBe("playing");
+      expect(result.room.drawOffer).toBeNull();
+
+      const saved = await store.findByCode("DRAW");
+      expect(saved?.drawOffer).toBeNull();
     });
   });
 
@@ -246,9 +315,10 @@ describe("GameService", () => {
       expect(result.requesterName).toBe("White Player");
     });
 
-    it("swaps player colors and restarts game when rematch is accepted", async () => {
+    it("swaps player colors, clears drawOffer, and restarts game when rematch is accepted", async () => {
       const room = createActiveGameRoom("REMATCH");
       room.status = "game_over";
+      room.drawOffer = { offeredBy: "sock_white", offeredAt: Date.now() };
       await store.save(room);
 
       await service.requestRematch("REMATCH", "sock_white");
@@ -260,15 +330,17 @@ describe("GameService", () => {
 
       expect(result.accept).toBe(true);
       expect(result.room.status).toBe("playing");
+      expect(result.room.drawOffer).toBeNull();
       expect(result.room.whitePlayer?.id).toBe("p_black_id"); // Black became White
       expect(result.room.blackPlayer?.id).toBe("p_white_id"); // White became Black
       expect(result.room.game.turn).toBe("w");
       expect(result.room.game.moveCount).toBe(0);
     });
 
-    it("reverts room to game_over when rematch is declined", async () => {
+    it("reverts room to game_over and clears drawOffer when rematch is declined", async () => {
       const room = createActiveGameRoom("REMATCH");
       room.status = "game_over";
+      room.drawOffer = { offeredBy: "sock_white", offeredAt: Date.now() };
       await store.save(room);
 
       await service.requestRematch("REMATCH", "sock_white");
@@ -280,6 +352,7 @@ describe("GameService", () => {
 
       expect(result.accept).toBe(false);
       expect(result.room.status).toBe("game_over");
+      expect(result.room.drawOffer).toBeNull();
     });
 
     it("rejects rematch response from the same player who requested it", async () => {

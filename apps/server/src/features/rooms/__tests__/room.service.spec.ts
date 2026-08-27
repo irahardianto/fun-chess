@@ -209,6 +209,70 @@ describe("RoomService", () => {
       expect(await service.getRoom(created.roomCode)).toBeNull();
     });
 
+    it("awards abandonment victory when a player leaves during active match", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "WhiteHost", preferredColor: "w" },
+        "sock_w",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "BlackJoiner" },
+        "sock_b",
+      );
+
+      const result = await service.leaveRoom(created.roomCode, "sock_b");
+
+      expect(result.shouldDelete).toBe(false);
+      expect(result.room.status).toBe("game_over");
+      expect(result.gameOverPayload).toBeDefined();
+      expect(result.gameOverPayload?.winner).toBe("w");
+      expect(result.gameOverPayload?.winnerName).toBe("WhiteHost");
+      expect(result.gameOverPayload?.reason).toBe("abandonment");
+      expect(result.gameOverPayload?.message).toContain(
+        "BlackJoiner left the game. WhiteHost won by abandonment!",
+      );
+
+      const saved = await service.getRoom(created.roomCode);
+      expect(saved?.status).toBe("game_over");
+    });
+
+    it("awards abandonment victory to black when white host leaves active match", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "WhiteHost", preferredColor: "w" },
+        "sock_w",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "BlackJoiner" },
+        "sock_b",
+      );
+
+      const result = await service.leaveRoom(created.roomCode, "sock_w");
+
+      expect(result.shouldDelete).toBe(false);
+      expect(result.room.status).toBe("game_over");
+      expect(result.gameOverPayload?.winner).toBe("b");
+      expect(result.gameOverPayload?.winnerName).toBe("BlackJoiner");
+    });
+
+    it("awards abandonment victory if player leaves during paused_disconnect state", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "WhiteHost", preferredColor: "w" },
+        "sock_w",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "BlackJoiner" },
+        "sock_b",
+      );
+
+      await service.handleDisconnect("sock_w");
+
+      const result = await service.leaveRoom(created.roomCode, "sock_b");
+
+      expect(result.shouldDelete).toBe(false);
+      expect(result.room.status).toBe("game_over");
+      expect(result.gameOverPayload?.winner).toBe("w");
+      expect(result.gameOverPayload?.reason).toBe("abandonment");
+    });
+
     it("rejects leaveRoom if socket does not belong to room", async () => {
       const { room: created } = await service.createRoom(
         { playerName: "Host", preferredColor: "w" },

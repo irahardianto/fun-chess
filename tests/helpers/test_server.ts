@@ -601,6 +601,7 @@ export async function createTestServer(
           timestamp: Date.now(),
         };
 
+        (room as any).drawOffer = null;
         nextGameState.moveHistory = [...room.game.moveHistory, moveResult];
         nextGameState.moveCount = nextMoveCount;
         room.game = nextGameState;
@@ -727,50 +728,151 @@ export async function createTestServer(
     });
 
     // 5. game:offer_draw & game:respond_draw
-    socket.on("game:offer_draw", async (payload: OfferDrawRequest) => {
-      const room = await roomStore.findByCode(payload.roomCode);
-      if (!room || room.status !== "playing") return;
+    socket.on(
+      "game:offer_draw",
+      async (payload: OfferDrawRequest, callback) => {
+        const correlationId = randomUUID();
+        try {
+          const room = await roomStore.findByCode(payload.roomCode);
+          if (!room || room.status !== "playing") {
+            const err: SocketErrorPayload = {
+              code: "ERR_GAME_NOT_ACTIVE",
+              message: "Game is not active",
+              correlationId,
+            };
+            if (callback) callback({ success: false, error: err });
+            socket.emit("error", err);
+            return;
+          }
 
-      let player: Player | null = null;
-      if (room.whitePlayer?.socketId === socket.id) player = room.whitePlayer;
-      else if (room.blackPlayer?.socketId === socket.id)
-        player = room.blackPlayer;
-      if (!player) return;
+          let player: Player | null = null;
+          if (room.whitePlayer?.socketId === socket.id)
+            player = room.whitePlayer;
+          else if (room.blackPlayer?.socketId === socket.id)
+            player = room.blackPlayer;
+          if (!player) {
+            const err: SocketErrorPayload = {
+              code: "ERR_PLAYER_NOT_IN_ROOM",
+              message: "Player not in room",
+              correlationId,
+            };
+            if (callback) callback({ success: false, error: err });
+            socket.emit("error", err);
+            return;
+          }
 
-      socket.to(room.roomCode).emit("game:draw_offered", {
-        fromPlayerId: player.id,
-        fromPlayerName: player.name,
-      });
-    });
+          (room as any).drawOffer = {
+            offeredBy: player.id,
+            offeredAt: Date.now(),
+          };
+          await roomStore.save(room);
 
-    socket.on("game:respond_draw", async (payload: RespondDrawRequest) => {
-      const room = await roomStore.findByCode(payload.roomCode);
-      if (!room || room.status !== "playing") return;
+          if (callback) callback({ success: true });
+          socket.to(room.roomCode).emit("game:draw_offered", {
+            fromPlayerId: player.id,
+            fromPlayerName: player.name,
+          });
+        } catch (err: unknown) {
+          const errPayload: SocketErrorPayload = {
+            code: "ERR_INTERNAL_SERVER",
+            message: (err as Error).message || "Failed to offer draw",
+            correlationId,
+          };
+          if (callback) callback({ success: false, error: errPayload });
+          socket.emit("error", errPayload);
+        }
+      },
+    );
 
-      let player: Player | null = null;
-      if (room.whitePlayer?.socketId === socket.id) player = room.whitePlayer;
-      else if (room.blackPlayer?.socketId === socket.id)
-        player = room.blackPlayer;
-      if (!player) return;
+    socket.on(
+      "game:respond_draw",
+      async (payload: RespondDrawRequest, callback) => {
+        const correlationId = randomUUID();
+        try {
+          const room = await roomStore.findByCode(payload.roomCode);
+          if (!room || room.status !== "playing") {
+            const err: SocketErrorPayload = {
+              code: "ERR_GAME_NOT_ACTIVE",
+              message: "Game is not active",
+              correlationId,
+            };
+            if (callback) callback({ success: false, error: err });
+            socket.emit("error", err);
+            return;
+          }
 
-      if (payload.accept) {
-        room.status = "game_over";
-        const gameOverPayload: GameOverPayload = {
-          winner: "draw",
-          reason: "draw_agreement",
-          message: "Game drawn by mutual agreement.",
-          finalFen: room.game.fen,
-          totalMoves: room.game.moveCount,
-          durationSeconds: Math.round((Date.now() - room.createdAt) / 1000),
-        };
-        await roomStore.save(room);
-        io.to(room.roomCode).emit("game:over", gameOverPayload);
-      } else {
-        io.to(room.roomCode).emit("game:draw_declined", {
-          byPlayerId: player.id,
-        });
-      }
-    });
+          let player: Player | null = null;
+          if (room.whitePlayer?.socketId === socket.id)
+            player = room.whitePlayer;
+          else if (room.blackPlayer?.socketId === socket.id)
+            player = room.blackPlayer;
+          if (!player) {
+            const err: SocketErrorPayload = {
+              code: "ERR_PLAYER_NOT_IN_ROOM",
+              message: "Player not in room",
+              correlationId,
+            };
+            if (callback) callback({ success: false, error: err });
+            socket.emit("error", err);
+            return;
+          }
+
+          const drawOffer = (room as any).drawOffer;
+          if (!drawOffer) {
+            const err: SocketErrorPayload = {
+              code: "ERR_INVALID_PAYLOAD",
+              message: "No pending draw offer to respond to",
+              correlationId,
+            };
+            if (callback) callback({ success: false, error: err });
+            socket.emit("error", err);
+            return;
+          }
+
+          if (drawOffer.offeredBy === player.id) {
+            const err: SocketErrorPayload = {
+              code: "ERR_INVALID_PAYLOAD",
+              message: "Cannot accept your own draw offer",
+              correlationId,
+            };
+            if (callback) callback({ success: false, error: err });
+            socket.emit("error", err);
+            return;
+          }
+
+          (room as any).drawOffer = null;
+
+          if (payload.accept) {
+            room.status = "game_over";
+            const gameOverPayload: GameOverPayload = {
+              winner: "draw",
+              reason: "draw_agreement",
+              message: "Game drawn by mutual agreement.",
+              finalFen: room.game.fen,
+              totalMoves: room.game.moveCount,
+              durationSeconds: Math.round((Date.now() - room.createdAt) / 1000),
+            };
+            await roomStore.save(room);
+            if (callback) callback({ success: true });
+            io.to(room.roomCode).emit("game:over", gameOverPayload);
+          } else {
+            await roomStore.save(room);
+            if (callback) callback({ success: true });
+            io.to(room.roomCode).emit("game:draw_declined", {
+              byPlayerId: player.id,
+            });
+          }
+        } catch (err: unknown) {
+          const errPayload: SocketErrorPayload = {
+            code: "ERR_INTERNAL_SERVER",
+            message: (err as Error).message || "Failed to respond to draw",
+            correlationId,
+          };
+          if (callback) callback({ success: false, error: errPayload });
+          socket.emit("error", errPayload);
+        }
+      },
+    );
 
     // 6. game:request_rematch & game:respond_rematch
     socket.on(
@@ -829,7 +931,10 @@ export async function createTestServer(
           room.lastActivityAt = Date.now();
 
           await roomStore.save(room);
-          io.to(room.roomCode).emit("game:rematch_started", freshGameState);
+          (io.to(room.roomCode).emit as any)("game:rematch_started", {
+            gameState: freshGameState,
+            room,
+          });
         } else {
           room.rematch.status = "declined";
           await roomStore.save(room);
@@ -931,11 +1036,45 @@ export async function createTestServer(
         leavingPlayer = room.blackPlayer;
 
       if (leavingPlayer) {
+        const wasPlaying = room.status === "playing";
         socket.to(room.roomCode).emit("room:player_left", {
           playerId: leavingPlayer.id,
           playerName: leavingPlayer.name,
           reason: "Left game",
         });
+
+        if (wasPlaying) {
+          const winnerColor: PieceColor =
+            leavingPlayer.color === "w" ? "b" : "w";
+          const winnerPlayer =
+            winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
+          const winnerName = winnerPlayer?.name || "Opponent";
+
+          room.status = "game_over";
+          if (leavingPlayer.color === "w") {
+            room.whitePlayer = null;
+          } else {
+            room.blackPlayer = null;
+          }
+          room.lastActivityAt = Date.now();
+          await roomStore.save(room);
+
+          const gameOverPayload: GameOverPayload = {
+            winner: winnerColor,
+            winnerName,
+            reason: "abandonment",
+            message: `${leavingPlayer.name} left the game. ${winnerName} won by abandonment!`,
+            finalFen: room.game.fen,
+            totalMoves: room.game.moveCount,
+            durationSeconds: Math.max(
+              1,
+              Math.round((Date.now() - room.createdAt) / 1000),
+            ),
+          };
+
+          socket.to(room.roomCode).emit("game:over", gameOverPayload);
+        }
+
         socket.leave(room.roomCode);
       }
     });

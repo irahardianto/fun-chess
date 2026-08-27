@@ -107,6 +107,7 @@ describe("Game Socket Handlers", () => {
       spectators: [],
       game: ChessEngine.extractGameState(chess, null),
       rematch: null,
+      drawOffer: null,
       createdAt: Date.now() - 30000,
       lastActivityAt: Date.now() - 5000,
     };
@@ -276,6 +277,12 @@ describe("Game Socket Handlers", () => {
     it("emits game:over with draw_agreement reason when draw is accepted", async () => {
       await setupActiveRoom("DRAW");
 
+      await whiteSocket.trigger(
+        "game:offer_draw",
+        { roomCode: "DRAW" },
+        () => {},
+      );
+
       let ackResponse: any;
       await blackSocket.trigger(
         "game:respond_draw",
@@ -295,6 +302,12 @@ describe("Game Socket Handlers", () => {
 
     it("emits game:draw_declined to room when draw is declined", async () => {
       await setupActiveRoom("DRAW");
+
+      await whiteSocket.trigger(
+        "game:offer_draw",
+        { roomCode: "DRAW" },
+        () => {},
+      );
 
       let ackResponse: any;
       await blackSocket.trigger(
@@ -341,7 +354,7 @@ describe("Game Socket Handlers", () => {
       expect((rematchReqEmit?.payload as any).requestedBy).toBe("p_white_id");
     });
 
-    it("swaps colors and emits game:rematch_started when opponent accepts rematch", async () => {
+    it("swaps colors and emits game:rematch_started with gameState and room when opponent accepts rematch", async () => {
       const room = await setupActiveRoom("REMATCH");
       room.status = "game_over";
       await store.save(room);
@@ -368,7 +381,13 @@ describe("Game Socket Handlers", () => {
       );
       expect(rematchStartedEmit).toBeDefined();
       expect(rematchStartedEmit?.room).toBe("REMATCH");
-      expect((rematchStartedEmit?.payload as any).turn).toBe("w");
+      expect((rematchStartedEmit?.payload as any).gameState.turn).toBe("w");
+      expect((rematchStartedEmit?.payload as any).room.whitePlayer.id).toBe(
+        "p_black_id",
+      );
+      expect((rematchStartedEmit?.payload as any).room.blackPlayer.id).toBe(
+        "p_white_id",
+      );
 
       const savedRoom = await store.findByCode("REMATCH");
       expect(savedRoom?.status).toBe("playing");

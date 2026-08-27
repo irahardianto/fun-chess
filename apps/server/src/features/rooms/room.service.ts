@@ -83,6 +83,7 @@ export class RoomService {
       spectators: [],
       game: initialGameState,
       rematch: null,
+      drawOffer: null,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
     };
@@ -206,7 +207,12 @@ export class RoomService {
   public async leaveRoom(
     roomCode: string,
     socketId: string,
-  ): Promise<{ room: RoomState; player: Player; shouldDelete: boolean }> {
+  ): Promise<{
+    room: RoomState;
+    player: Player;
+    shouldDelete: boolean;
+    gameOverPayload?: GameOverPayload;
+  }> {
     const normalizedCode = roomCode.trim().toUpperCase();
     const room = await this.store.findByCode(normalizedCode);
     if (!room) {
@@ -214,12 +220,15 @@ export class RoomService {
     }
 
     let leavingPlayer: Player | null = null;
+    let isPlayingPlayer = false;
     if (room.whitePlayer?.socketId === socketId) {
       leavingPlayer = room.whitePlayer;
       room.whitePlayer = null;
+      isPlayingPlayer = true;
     } else if (room.blackPlayer?.socketId === socketId) {
       leavingPlayer = room.blackPlayer;
       room.blackPlayer = null;
+      isPlayingPlayer = true;
     } else {
       const idx = room.spectators.findIndex((s) => s.socketId === socketId);
       if (idx !== -1 && room.spectators[idx]) {
@@ -230,6 +239,38 @@ export class RoomService {
 
     if (!leavingPlayer) {
       throw new PlayerNotInRoomError(socketId);
+    }
+
+    if (
+      isPlayingPlayer &&
+      (room.status === "playing" || room.status === "paused_disconnect")
+    ) {
+      const remainingPlayer =
+        leavingPlayer.color === "w" ? room.blackPlayer : room.whitePlayer;
+      if (remainingPlayer) {
+        room.status = "game_over";
+        room.lastActivityAt = Date.now();
+        const durationSeconds = Math.max(
+          1,
+          Math.round((Date.now() - room.createdAt) / 1000),
+        );
+        const gameOverPayload: GameOverPayload = {
+          winner: remainingPlayer.color,
+          winnerName: remainingPlayer.name,
+          reason: "abandonment",
+          message: `${leavingPlayer.name} left the game. ${remainingPlayer.name} won by abandonment!`,
+          finalFen: room.game.fen,
+          totalMoves: room.game.moveCount,
+          durationSeconds,
+        };
+        await this.store.save(room);
+        return {
+          room,
+          player: leavingPlayer,
+          shouldDelete: false,
+          gameOverPayload,
+        };
+      }
     }
 
     const shouldDelete =

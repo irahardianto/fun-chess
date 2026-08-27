@@ -157,7 +157,10 @@ export function registerRoomSocketHandlers(
         // Cancel disconnect timers for this player
         cancelDisconnectTimer(roomCode, result.player.id);
 
-        if (result.shouldDelete) {
+        if (result.gameOverPayload) {
+          cancelAllDisconnectTimersForRoom(roomCode);
+          io.to(roomCode).emit("game:over", result.gameOverPayload);
+        } else if (result.shouldDelete) {
           cancelAllDisconnectTimersForRoom(roomCode);
         } else {
           socket.to(roomCode).emit("room:player_left", {

@@ -74,6 +74,9 @@ export class GameService {
 
     room.game = outcome.nextState;
     room.lastActivityAt = Date.now();
+    if (room.drawOffer) {
+      room.drawOffer = null;
+    }
 
     let checkInfo: { inCheck: PieceColor; kingSquare: string } | undefined;
     let gameOverPayload: GameOverPayload | undefined;
@@ -166,6 +169,7 @@ export class GameService {
     const winnerName = winnerPlayer?.name || "Opponent";
 
     room.status = "game_over";
+    room.drawOffer = null;
     room.lastActivityAt = Date.now();
 
     const durationSeconds = Math.max(
@@ -214,6 +218,10 @@ export class GameService {
 
     const opponent = player.color === "w" ? room.blackPlayer : room.whitePlayer;
 
+    room.drawOffer = { offeredBy: socketId, offeredAt: Date.now() };
+    room.lastActivityAt = Date.now();
+    await this.store.save(room);
+
     return { room, fromPlayer: player, opponentPlayer: opponent };
   }
 
@@ -245,7 +253,22 @@ export class GameService {
       throw new PlayerNotInRoomError(socketId);
     }
 
+    if (!room.drawOffer) {
+      throw new GameNotActiveError("No draw offer is currently pending");
+    }
+
+    if (room.drawOffer.offeredBy === socketId) {
+      throw new InvalidPayloadError(
+        "draw",
+        "Cannot accept or decline your own draw offer",
+      );
+    }
+
+    room.drawOffer = null;
+
     if (!accept) {
+      room.lastActivityAt = Date.now();
+      await this.store.save(room);
       return { room, accept: false, byPlayerId: player.id };
     }
 
@@ -341,6 +364,8 @@ export class GameService {
         "Cannot accept or decline your own rematch request",
       );
     }
+
+    room.drawOffer = null;
 
     if (!accept) {
       room.rematch.status = "declined";

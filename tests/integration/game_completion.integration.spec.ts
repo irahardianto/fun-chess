@@ -19,6 +19,7 @@ import {
   CreateRoomRequest,
   GameOverPayload,
   JoinRoomRequest,
+  LeaveRoomRequest,
   MakeMoveRequest,
   MoveResult,
   OfferDrawRequest,
@@ -26,6 +27,7 @@ import {
   ResignRequest,
   RespondDrawRequest,
   RoomState,
+  SocketErrorPayload,
 } from "@fun-chess/shared";
 import { FOOLS_MATE_SEQUENCE } from "../helpers/fixtures";
 
@@ -200,5 +202,78 @@ describe("Game Completion Integration Tests", () => {
 
     // Assert
     expect(declined.byPlayerId).toBeDefined();
+  });
+
+  it("should prevent unilateral draw forgery and return error when responding to draw without an active offer", async () => {
+    // Act: Black tries to accept a draw when no draw offer was made
+    const errorPromise = waitForEvent<SocketErrorPayload>(
+      blackClient,
+      "error",
+    );
+
+    blackClient.emit("game:respond_draw", {
+      roomCode: activeRoomCode,
+      accept: true,
+    } as RespondDrawRequest);
+
+    const err = await errorPromise;
+    expect(err.code).toBe("ERR_INVALID_PAYLOAD");
+
+    // Assert room is still playing
+    const room = await serverInstance.roomStore.findByCode(activeRoomCode);
+    expect(room?.status).toBe("playing");
+  });
+
+  it("should prevent a player from accepting their own draw offer", async () => {
+    // Arrange: White offers draw
+    whiteClient.emit("game:offer_draw", {
+      roomCode: activeRoomCode,
+    } as OfferDrawRequest);
+
+    // Act: White tries to accept their own draw offer
+    const errorPromise = waitForEvent<SocketErrorPayload>(
+      whiteClient,
+      "error",
+    );
+
+    whiteClient.emit("game:respond_draw", {
+      roomCode: activeRoomCode,
+      accept: true,
+    } as RespondDrawRequest);
+
+    const err = await errorPromise;
+    expect(err.code).toBe("ERR_INVALID_PAYLOAD");
+
+    // Assert room is still playing
+    const room = await serverInstance.roomStore.findByCode(activeRoomCode);
+    expect(room?.status).toBe("playing");
+  });
+
+  it("should conclude active game with abandonment and award win to remaining player when player 2 leaves", async () => {
+    // Arrange: Verify room is playing
+    const roomBefore =
+      await serverInstance.roomStore.findByCode(activeRoomCode);
+    expect(roomBefore?.status).toBe("playing");
+
+    // Act: Black (Player 2) leaves active game
+    const gameOverPromise = waitForEvent<GameOverPayload>(
+      whiteClient,
+      "game:over",
+    );
+
+    blackClient.emit("room:leave", {
+      roomCode: activeRoomCode,
+    } as LeaveRoomRequest);
+
+    const gameOver = await gameOverPromise;
+
+    // Assert
+    expect(gameOver.reason).toBe("abandonment");
+    expect(gameOver.winner).toBe("w");
+    expect(gameOver.winnerName).toBe("WhitePlayer");
+
+    const roomAfter =
+      await serverInstance.roomStore.findByCode(activeRoomCode);
+    expect(roomAfter?.status).toBe("game_over");
   });
 });

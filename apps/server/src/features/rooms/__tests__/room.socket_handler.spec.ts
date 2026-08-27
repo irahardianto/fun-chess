@@ -233,7 +233,7 @@ describe("Room Socket Handlers", () => {
   });
 
   describe("room:leave", () => {
-    it("leaves room channel, removes player, and emits room:player_left if non-host leaves", async () => {
+    it("leaves room channel, cancels disconnect timers, and emits game:over with abandonment reason when active player leaves", async () => {
       const { room: created } = await service.createRoom(
         { playerName: "Alice", preferredColor: "w" },
         "sock_host",
@@ -264,11 +264,62 @@ describe("Room Socket Handlers", () => {
       expect(ackResponse.success).toBe(true);
       expect(bobSocket.rooms.has(created.roomCode)).toBe(false);
 
-      const leftEmit = bobSocket.toEmits.find(
+      const gameOverEmit = io.toEmits.find((e) => e.event === "game:over");
+      expect(gameOverEmit).toBeDefined();
+      expect((gameOverEmit?.payload as any).reason).toBe("abandonment");
+      expect((gameOverEmit?.payload as any).winner).toBe("w");
+      expect((gameOverEmit?.payload as any).winnerName).toBe("Alice");
+    });
+
+    it("emits room:player_left when a spectator leaves during an active game", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "Alice", preferredColor: "w" },
+        "sock_host",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Bob" },
+        "sock_bob",
+      );
+      const roomWithPlayers = (await store.findByCode(created.roomCode))!;
+      const specPlayer = {
+        id: "p_spec_id",
+        socketId: "sock_spec",
+        name: "Charlie",
+        color: "w" as const,
+        isHost: false,
+        isConnected: true,
+        sessionToken: "token_spec",
+        connectedAt: Date.now(),
+      };
+      roomWithPlayers.spectators.push(specPlayer);
+      await store.save(roomWithPlayers);
+
+      const specSocket = new TestSocket("sock_spec");
+      specSocket.rooms.add(created.roomCode);
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        specSocket as unknown as Socket,
+        service,
+        logger,
+      );
+
+      let ackResponse: any;
+      await specSocket.trigger(
+        "room:leave",
+        { roomCode: created.roomCode },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(true);
+      expect(specSocket.rooms.has(created.roomCode)).toBe(false);
+
+      const leftEmit = specSocket.toEmits.find(
         (e) => e.event === "room:player_left",
       );
       expect(leftEmit).toBeDefined();
-      expect((leftEmit?.payload as any).playerName).toBe("Bob");
+      expect((leftEmit?.payload as any).playerName).toBe("Charlie");
     });
   });
 

@@ -89,27 +89,40 @@ describe("Rematch Flow Integration Tests", () => {
     expect(rematchReq.requesterName).toBe("Player1");
 
     // Act: Player 2 accepts rematch
-    const p1RematchStartPromise = waitForEvent<GameState>(
-      player1Client,
-      "game:rematch_started",
-    );
-    const p2RematchStartPromise = waitForEvent<GameState>(
-      player2Client,
-      "game:rematch_started",
-    );
+    const p1RematchStartPromise = waitForEvent<{
+      gameState: GameState;
+      room: RoomState;
+    }>(player1Client, "game:rematch_started");
+    const p2RematchStartPromise = waitForEvent<{
+      gameState: GameState;
+      room: RoomState;
+    }>(player2Client, "game:rematch_started");
 
     player2Client.emit("game:respond_rematch", {
       roomCode: activeRoomCode,
       accept: true,
     } as RespondRematchRequest);
 
-    const p1GameState = await p1RematchStartPromise;
-    const p2GameState = await p2RematchStartPromise;
+    const p1RematchData = await p1RematchStartPromise;
+    const p2RematchData = await p2RematchStartPromise;
 
     // Assert
-    expect(p1GameState.turn).toBe("w");
-    expect(p1GameState.moveCount).toBe(0);
-    expect(p2GameState.fen).toBe(p1GameState.fen);
+    expect(p1RematchData.gameState.turn).toBe("w");
+    expect(p1RematchData.gameState.moveCount).toBe(0);
+    expect(p2RematchData.gameState.fen).toBe(p1RematchData.gameState.fen);
+
+    // Verify both player 1 and player 2 receive the updated room and swapped colors
+    expect(p1RematchData.room.status).toBe("playing");
+    expect(p1RematchData.room.whitePlayer?.name).toBe("Player2");
+    expect(p1RematchData.room.whitePlayer?.color).toBe("w");
+    expect(p1RematchData.room.blackPlayer?.name).toBe("Player1");
+    expect(p1RematchData.room.blackPlayer?.color).toBe("b");
+
+    expect(p2RematchData.room.status).toBe("playing");
+    expect(p2RematchData.room.whitePlayer?.name).toBe("Player2");
+    expect(p2RematchData.room.whitePlayer?.color).toBe("w");
+    expect(p2RematchData.room.blackPlayer?.name).toBe("Player1");
+    expect(p2RematchData.room.blackPlayer?.color).toBe("b");
 
     // Verify room state in store: Player 2 should now be White, Player 1 should now be Black
     const updatedRoom =

@@ -160,7 +160,10 @@ export function registerGameSocketHandlers(
         );
 
         if (result.accept && result.nextGameState) {
-          io.to(roomCode).emit("game:rematch_started", result.nextGameState);
+          io.to(roomCode).emit("game:rematch_started", {
+            gameState: result.nextGameState,
+            room: result.room,
+          });
         } else {
           io.to(roomCode).emit("game:rematch_declined", {
             byPlayerId: result.byPlayerId,

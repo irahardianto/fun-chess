@@ -229,28 +229,31 @@ describe("Dual-Client Full Game Lifecycle Integration Suite", () => {
     expect(rematchReq.requesterName).toBe("Alice");
 
     // 4. Bob accepts rematch
-    const p1RematchStarted = waitForEvent<GameState>(
-      player1,
-      "game:rematch_started",
-    );
-    const p2RematchStarted = waitForEvent<GameState>(
-      player2,
-      "game:rematch_started",
-    );
+    const p1RematchStarted = waitForEvent<{
+      gameState: GameState;
+      room: RoomState;
+    }>(player1, "game:rematch_started");
+    const p2RematchStarted = waitForEvent<{
+      gameState: GameState;
+      room: RoomState;
+    }>(player2, "game:rematch_started");
 
     player2.emit("game:respond_rematch", {
       roomCode,
       accept: true,
     } as RespondRematchRequest);
 
-    const [p1State, p2State] = await Promise.all([
+    const [p1Data, p2Data] = await Promise.all([
       p1RematchStarted,
       p2RematchStarted,
     ]);
-    expect(p1State.fen).toBe(
+    expect(p1Data.gameState.fen).toBe(
       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
     );
-    expect(p1State.turn).toBe("w");
+    expect(p1Data.gameState.turn).toBe("w");
+    expect(p1Data.room.whitePlayer?.name).toBe("Bob");
+    expect(p1Data.room.blackPlayer?.name).toBe("Alice");
+    expect(p2Data.room.whitePlayer?.name).toBe("Bob");
 
     // 5. Verify Bob is now White and can make the opening move!
     const moveAck = await emitAck<
