@@ -561,7 +561,7 @@ API keys, passwords, or tokens directly in source.
 
 ❌ Bad
 ```go
-const apiKey = "sk_live_1234567890abcdef"
+const apiKey = "your-api-key-here"
 ```
 
 ✅ Good

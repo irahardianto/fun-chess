@@ -106,7 +106,7 @@ const endgameData = [
    ['f3e3', 'f1e1', 'f4f3', 'e1f1', 'f3f2', 'f1g2', 'e3e2', 'g2g3', 'f2f1q'],
    'b', 1850, 'Black f-Pawn Conversion #24 👑', 'Black takes distant opposition and promotes on f1.'],
 
-  // --- Rook Ending Passed Pawn Converions (25 - 30) ---
+  // --- Rook Ending Passed Pawn Conversions (25 - 30) ---
   // 25: White a-pawn promotion
   ['8/P7/8/r7/8/k7/3K4/1R6 w - - 0 1',
    ['b1a1', 'a3b4', 'a1a5', 'b4a5', 'a7a8q'],

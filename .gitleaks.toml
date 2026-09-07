@@ -1,0 +1,12 @@
+# Gitleaks configuration for Fun Chess
+title = "Fun Chess Gitleaks Configuration"
+
+[allowlist]
+description = "Allowlist for harmless examples, template files, and docs"
+paths = [
+  '''.env\.example$''',
+  '''.env\.template$''',
+  '''infra/terraform/terraform\.tfvars\.example$''',
+  '''\.agents/skills/go-idioms/references/go-patterns-and-anti-patterns\.md$''',
+  '''docs/'''
+]

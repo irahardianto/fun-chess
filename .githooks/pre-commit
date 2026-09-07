@@ -1,0 +1,518 @@
+#!/usr/bin/env bash
+# Fun Chess pre-commit gate.
+#
+# Enforces .agents/rules/*.md (priority order per rule-priority.md), security-mandate (#1),
+# rugged-software-constitution (#2), git-workflow-principles, and the quality
+# requirements for TypeScript, Vue 3, and Node.js.
+#
+# Design: graceful degradation. A gate whose toolchain is absent is reported
+# SKIPPED, never FAILED, so the hook works from day one and grows with the
+# codebase without rewrites.
+#
+# Non-skippable: secrets and gitleaks (security-mandate always wins — rule-priority.md #1).
+# Skippable gates: set FUN_CHESS_HOOK_SKIP=id1,id2 (e.g. test,semgrep,typos).
+# Fast path for quick commits: FUN_CHESS_HOOK_FAST=1 skips slow test and SAST gates.
+#
+# Working-tree isolation: tsc/vue-tsc/vitest/semgrep/typos/etc. read the filesystem,
+# not the git index — they cannot tell staged from unstaged content. Left
+# unguarded, a partially-staged commit (`git add -p`, or staging some files
+# while others sit dirty) gets validated against a tree that is NOT what
+# `git commit` is about to record. Before running any filesystem gate, unstaged
+# and untracked changes are stashed (index preserved) so every gate sees exactly
+# the tree this commit will produce, then unconditionally restored on exit. Disable
+# only if isolation itself is misbehaving: FUN_CHESS_HOOK_NO_ISOLATE=1.
+
+set -uo pipefail
+
+# --- environment -------------------------------------------------------------
+SCRIPT_NAME="$(basename "${0}")"
+SKIP_RAW="${FUN_CHESS_HOOK_SKIP:-${CHESS_HOOK_SKIP:-}}"
+FAST="${FUN_CHESS_HOOK_FAST:-${CHESS_HOOK_FAST:-0}}"
+RUN_ALL="${FUN_CHESS_HOOK_RUN_ALL:-${CHESS_HOOK_RUN_ALL:-0}}"
+
+if [[ "${FUN_CHESS_HOOK_NO_COLOR:-0}" == "1" ]] || [[ ! -t 1 ]]; then
+  C_RED=""; C_YEL=""; C_GRN=""; C_CYN=""; C_DIM=""; C_RST=""
+else
+  C_RED=$'\033[31m'; C_YEL=$'\033[33m'; C_GRN=$'\033[32m'
+  C_CYN=$'\033[36m'; C_DIM=$'\033[2m'; C_RST=$'\033[0m'
+fi
+
+declare -A FAILED_GATES=()
+WARNED=0
+SKIPPED=0
+
+# Skip list parsed once. `secrets` and `gitleaks` are never skippable (security-mandate #1).
+declare -A SKIP_SET=()
+if [[ -n "$SKIP_RAW" && "$RUN_ALL" != "1" ]]; then
+  IFS=',' read -ra _toks <<<"$SKIP_RAW"
+  for t in "${_toks[@]}"; do t="${t// /}"; [[ -n "$t" ]] && SKIP_SET["$t"]=1; done
+fi
+
+should_run() {
+  # $1 = gate id. Returns 0 (run) / 1 (skip). `secrets` and `gitleaks` ignore skip flags.
+  [[ "$1" == "secrets" ]] && return 0
+  [[ "$1" == "gitleaks" ]] && return 0
+  [[ "$RUN_ALL" == "1" ]] && return 0
+  [[ -n "${SKIP_SET[$1]:-}" ]] && return 1
+  return 0
+}
+
+# Branch-level fast alias: skip slow / test gates.
+[[ "$FAST" == "1" ]] && { SKIP_SET["test"]=1; SKIP_SET["semgrep"]=1; }
+
+emit() { # level id msg
+  local lvl="$1" id="$2"; shift 2
+  case "$lvl" in
+    fail) FAILED_GATES["$id"]=1; printf '%s[%sFAIL%s] %s%s%s — %s\n' "$C_RED" "$C_RST" "$C_RED" "$id" "$C_RST" "$C_DIM" "$*" >&2 ;;
+    warn) WARNED=$((WARNED+1)); printf '%s[%sWARN%s] %s%s%s — %s\n' "$C_YEL" "$C_RST" "$C_YEL" "$id" "$C_RST" "$C_DIM" "$*" >&2 ;;
+    skip) SKIPPED=$((SKIPPED+1)); printf '%s[%sSKIP%s] %s%s%s — %s\n' "$C_DIM" "$C_RST" "$C_DIM" "$id" "$C_RST" "$C_DIM" "$*" >&2 ;;
+    *) printf '[%s] %s\n' "$lvl" "$*" ;;
+  esac
+}
+
+pass() { printf '%s  [%sok%s]  %s%s%s\n' "$C_GRN" "$C_RST" "$C_GRN" "$1" "$C_RST" "${2:+ $C_DIM$2$C_RST}"; }
+
+# --- staged file snapshot (honors `git add -p` partial staging) -------------
+mapfile -d '' -t STAGED < <(git diff --cached --name-only --diff-filter=ACMR -z 2>/dev/null || true)
+
+staged_any() { # ext glob(s) -> return 0 if any staged file matches
+  local pat
+  for pat in "$@"; do
+    local f
+    for f in "${STAGED[@]:-}"; do [[ "$f" == $pat ]] && return 0; done
+  done
+  return 1
+}
+
+blob_bytes() { # path -> staged blob size in bytes
+  git cat-file -s ":$1" 2>/dev/null || echo "0"
+}
+
+printf '%sFun Chess pre-commit gate%s\n' "$C_CYN" "$C_RST"
+
+# =============================================================================
+# UNIVERSAL GATES (INDEX-NATIVE) — always run, no toolchain dependency
+# Rules: security-mandate (#1), rugged-software-constitution (#2),
+#        git-workflow-principles, documentation-principles
+# =============================================================================
+
+# --- Gate: secrets -----------------------------------------------------------
+# security-mandate.md (always wins), security-principles.md §Secrets Management,
+# git-workflow-principles.md "Don't commit secrets". NON-SKIPPABLE.
+gate_secrets() {
+  local blocked=0
+  local f base
+  for f in "${STAGED[@]:-}"; do
+    base="$(basename "$f")"
+    case "$base" in
+      .env|.env.local|.env.*.local|\
+      id_rsa|id_rsa.*|id_dsa|id_dsa.*|id_ecdsa|id_ecdsa.*|id_ed25519|id_ed25519.*|\
+      *.pem|*.key|*.p12|*.pfx|\
+      credentials.json|serviceaccount.json|*service-account*.json|google-credentials.json|*.kubeconfig|\
+      .npmrc|.pypirc|.netrc)
+        emit fail secrets "prohibited credential file staged: $f (security-mandate.md)"
+        blocked=1 ;;
+    esac
+    case "$f" in
+      .ssh/*|.aws/*|.gnupg/*|.config/gcloud/*)
+        emit fail secrets "credential directory content staged: $f (security-mandate.md)"; blocked=1 ;;
+    esac
+  done
+
+  local SECRET_SCAN_EXCLUDE_PATTERNS=('.env.template' '.env.example' 'infra/terraform/terraform.tfvars.example' 'docs/' '.agents/')
+  local scan_targets=()
+  for f in "${STAGED[@]:-}"; do
+    local exclude=0
+    for excl in "${SECRET_SCAN_EXCLUDE_PATTERNS[@]}"; do
+      if [[ "$f" == "$excl" || "$f" == ${excl}* ]]; then
+        exclude=1; break
+      fi
+    done
+    [[ $exclude -eq 0 ]] && scan_targets+=("$f")
+  done
+
+  if [[ ${#scan_targets[@]} -gt 0 ]]; then
+    local pats=(
+      '-----BEGIN (RSA |EC |OPENSSH |DSA |PGP |ENCRYPTED )?PRIVATE KEY-----'
+      'AKIA[0-9A-Z]{16}'
+      'gh[pousr]_[A-Za-z0-9]{36,}'
+      'github_pat_[A-Za-z0-9_]{22,}'
+      'AIza[0-9A-Za-z_-]{35}'
+      'xox[baprs]-[A-Za-z0-9-]{10,}'
+      '(password|passwd|secret|api[_-]?key|apikey|access[_-]?token|private[_-]?key)[[:space:]]*[:=][[:space:]]*(['"'"'"][^'"'"'"]{8,}['"'"'"]|[A-Za-z0-9_+/=]{20,})'
+    )
+    local joined
+    joined="$(printf '%s|' "${pats[@]}")"; joined="${joined%|}"
+    local hits
+    hits="$(git grep -niE --cached -- "$joined" -- "${scan_targets[@]}" 2>/dev/null || true)"
+    if [[ -n "$hits" ]]; then
+      while IFS= read -r line; do emit fail secrets "possible secret in staged content: $line"; done <<<"$hits"
+      blocked=1
+    fi
+  fi
+
+  [[ $blocked -eq 1 ]] && return 1
+  pass secrets "no secrets detected in staged content"
+}
+
+# --- Gate: debug / dead code -------------------------------------------------
+# rugged-software-constitution.md, git-workflow-principles.md "Don't commit debug code"
+gate_debug() {
+  if ! staged_any '*.ts' '*.tsx' '*.js' '*.jsx' '*.vue' '*.mjs' '*.cjs'; then
+    return 0
+  fi
+  local blocked=0 warned=0
+  local scan=()
+  local f
+  for f in "${STAGED[@]:-}"; do
+    case "$f" in
+      *.ts|*.tsx|*.js|*.jsx|*.vue|*.mjs|*.cjs)
+        scan+=("$f") ;;
+    esac
+  done
+
+  if [[ ${#scan[@]} -gt 0 ]]; then
+    local dbg_hits
+    dbg_hits="$(git grep -nE --cached -- '\bdebugger;' -- "${scan[@]}" 2>/dev/null || true)"
+    if [[ -n "$dbg_hits" ]]; then
+      while IFS= read -r l; do emit fail debug "$l (remove debugger statement)"; done <<<"$dbg_hits"
+      blocked=1
+    fi
+
+    local sec_hits
+    sec_hits="$(git grep -nEi --cached -- 'TODO[[:space:]]*\((hack|security)\)|FIXME[[:space:]]*:[[:space:]]*(security|sec\b)' -- "${scan[@]}" 2>/dev/null || true)"
+    if [[ -n "$sec_hits" ]]; then
+      while IFS= read -r l; do emit fail debug "$l (security TODO — fix or document severity)"; done <<<"$sec_hits"
+      blocked=1
+    fi
+
+    local prod_scan=()
+    for f in "${scan[@]}"; do
+      case "$f" in
+        *__tests__*|*.spec.*|*.test.*|*features/puzzles/data/scripts/*|apps/server/src/index.ts) ;;
+        *) prod_scan+=("$f") ;;
+      esac
+    done
+    if [[ ${#prod_scan[@]} -gt 0 ]]; then
+      local log_hits
+      log_hits="$(git grep -nE --cached -- '\bconsole\.(log|debug)\b' -- "${prod_scan[@]}" 2>/dev/null || true)"
+      if [[ -n "$log_hits" ]]; then
+        while IFS= read -r l; do emit fail debug "$l (use structured logger instead of console.log in production code)"; done <<<"$log_hits"
+        blocked=1
+      fi
+    fi
+
+    local adv_hits
+    adv_hits="$(git grep -nE --cached -- '\b(TODO|FIXME|XXX)\b' -- "${scan[@]}" 2>/dev/null || true)"
+    if [[ -n "$adv_hits" ]]; then
+      while IFS= read -r l; do emit warn debug "$l (advisory: address before final release)"; done <<<"$adv_hits"
+      warned=1
+    fi
+  fi
+
+  [[ $blocked -eq 1 ]] && return 1
+  pass debug "no debug or security-hole markers${warned:+ (${WARNED} advisory warnings)}"
+}
+
+# --- Gate: merge conflict markers + whitespace ------------------------------
+gate_conflict_whitespace() {
+  local out
+  out="$(git diff --cached --check 2>/dev/null || true)"
+  if [[ -n "$out" ]]; then
+    local has_conf=0
+    while IFS= read -r l; do
+      case "$l" in
+        *conflict*|*'<<<<<<<'*|*'>>>>>>>'*|*'|||||||'*) has_conf=1; emit fail conflict "$l" ;;
+        *) emit warn whitespace "$l (trailing whitespace / space-before-tab)" ;;
+      esac
+    done <<<"$out"
+    [[ $has_conf -eq 1 ]] && return 1
+    return 0
+  fi
+  pass conflict-whitespace "no conflict markers, clean whitespace"
+}
+
+# --- Gate: large files -------------------------------------------------------
+gate_largefile() {
+  local blocked=0 warned=0
+  local f size
+  for f in "${STAGED[@]:-}"; do
+    size="$(blob_bytes "$f")"
+    [[ "$size" -gt 1048576 ]] && { emit warn largefile "$f is $((size/1024)) KiB (>1 MiB)"; warned=1; }
+    [[ "$size" -gt 5242880 ]] && { emit fail largefile "$f is $((size/1048576)) MiB (>5 MiB cap)"; blocked=1; }
+  done
+  [[ $blocked -eq 1 ]] && return 1
+  pass largefile "no oversized files${warned:+ (${WARNED} advisories)}"
+}
+
+# --- Gate: lockfile discipline ----------------------------------------------
+gate_lockfile() {
+  local pnpm_lock_changed=0 pkg_changed=0 blocked=0
+  local f
+  for f in "${STAGED[@]:-}"; do
+    case "$f" in
+      package.json|apps/*/package.json|shared/package.json) pkg_changed=1 ;;
+      pnpm-lock.yaml) pnpm_lock_changed=1 ;;
+      package-lock.json|yarn.lock)
+        emit fail lockfile "prohibited lockfile staged: $f (monorepo strictly standardizes on pnpm-lock.yaml)"
+        blocked=1 ;;
+    esac
+  done
+
+  if [[ $pkg_changed -eq 1 && $pnpm_lock_changed -eq 0 ]]; then
+    if ! git diff --quiet -- pnpm-lock.yaml 2>/dev/null; then
+      emit warn lockfile "package.json staged but pnpm-lock.yaml not staged — ensure lockfile is in sync (dependency-management-principles.md)"
+    fi
+  fi
+
+  [[ $blocked -eq 1 ]] && return 1
+  pass lockfile "lockfile discipline verified"
+}
+
+# --- Gate: .agents/ product integrity ---------------------------------------
+gate_agents() {
+  local md=0 yaml=0 blocked=0 warned=0
+  local f firstline
+  local doc_files=() wf_files=()
+  for f in "${STAGED[@]:-}"; do
+    case "$f" in
+      .agents/agents/*.md|.agents/skills/*/SKILL.md|.agents/rules/*.md) doc_files+=("$f"); md=1 ;;
+      .agents/workflows/*.yaml|.agents/workflows/*.yml|.github/workflows/*.yml|.github/workflows/*.yaml) wf_files+=("$f"); yaml=1 ;;
+    esac
+  done
+
+  for f in "${doc_files[@]:-}"; do
+    [[ -z "$f" ]] && continue
+    local body; body="$(git show ":./$f" 2>/dev/null || true)"
+    if [[ -z "$body" ]]; then emit fail agents "$f is empty"; blocked=1; continue; fi
+    if ! printf '%s' "$body" | grep -qE '^# '; then
+      emit fail agents "$f missing '# Title' H1 header"; blocked=1
+    fi
+    case "$f" in
+      .agents/skills/*|.agents/rules/*)
+        firstline="$(printf '%s' "$body" | head -n1)"
+        if [[ "$firstline" != "---" ]]; then
+          emit warn agents "$f missing YAML front-matter '---'"; warned=1
+        fi ;;
+    esac
+  done
+
+  local yaml_parser=""
+  if command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' 2>/dev/null; then
+    yaml_parser="python3 -c 'import yaml,sys; yaml.safe_load(sys.stdin)'"
+  elif command -v node >/dev/null 2>&1 && node -e "require.resolve('js-yaml')" 2>/dev/null; then
+    yaml_parser="node -e \"const y=require('js-yaml');process.stdin.on('data',d=>{try{y.load(d.toString())}catch(e){process.exit(1)}})\""
+  fi
+
+  if [[ $yaml -eq 1 ]]; then
+    if [[ -z "$yaml_parser" ]]; then
+      emit skip agents "no YAML parser available — workflow syntax check skipped"
+    else
+      for f in "${wf_files[@]:-}"; do
+        [[ -z "$f" ]] && continue
+        if ! git show ":./$f" 2>/dev/null | eval "$yaml_parser" >/dev/null 2>&1; then
+          emit fail agents "$f is not valid YAML"; blocked=1
+        fi
+      done
+    fi
+  fi
+
+  [[ $md -eq 0 && $yaml -eq 0 ]] && { pass agents "no .agents/ or workflow changes"; return 0; }
+  [[ $blocked -eq 1 ]] && return 1
+  pass agents "agents and workflows structure validated"
+}
+
+# --- Gate: gitleaks ----------------------------------------------------------
+# security-mandate.md (always wins). Deep secret scan of staged content.
+gate_gitleaks() {
+  if ! command -v gitleaks >/dev/null 2>&1; then
+    emit warn gitleaks "gitleaks not installed — see https://github.com/gitleaks/gitleaks#installing"
+    return 0
+  fi
+  local cfg_flag=""
+  [[ -f .gitleaks.toml ]] && cfg_flag="--config .gitleaks.toml"
+  if gitleaks protect --staged $cfg_flag --no-banner >/dev/null 2>&1; then
+    pass gitleaks "gitleaks protect --staged (no secrets detected)"
+  else
+    emit fail gitleaks "gitleaks detected potential secrets in staged content — review before committing (security-mandate.md)"
+    return 1
+  fi
+}
+
+# =============================================================================
+# RUN INDEX-NATIVE CHECKS FIRST (Zero filesystem dependency)
+# =============================================================================
+gate_secrets              || true
+gate_debug                || true
+gate_conflict_whitespace  || true
+gate_largefile            || true
+gate_lockfile             || true
+gate_agents               || true
+gate_gitleaks             || true
+
+# Early exit if index-native checks failed (don't waste time on builds)
+if (( ${#FAILED_GATES[@]} > 0 )); then
+  printf '\n%s── early exit%s  index-native gates failed before build/test.\n' "$C_RED" "$C_RST" >&2
+  exit 1
+fi
+
+# =============================================================================
+# WORKING-TREE ISOLATION
+# =============================================================================
+# tsc/vue-tsc/vitest/semgrep/typos read the filesystem, not the git index.
+# We isolate the working tree so that filesystem tools evaluate the EXACT tree
+# about to be committed, avoiding false positives from unstaged/untracked files.
+ISOLATE_PATCH_FILE=""
+ISOLATE_TMPDIR=""
+declare -a ISOLATE_CHANGED_TRACKED=()
+declare -a ISOLATE_UNTRACKED=()
+ISOLATE_APPLIED=0
+
+_isolate_restore() {
+  [[ "$ISOLATE_APPLIED" == "1" ]] || return 0
+  if [[ -n "$ISOLATE_PATCH_FILE" && -s "$ISOLATE_PATCH_FILE" ]]; then
+    if ! git apply "$ISOLATE_PATCH_FILE" 2>/dev/null; then
+      printf '%s[WARN]%s could not auto-restore unstaged tracked changes — patch kept at %s; apply manually with `git apply %s`\n' \
+        "$C_YEL" "$C_RST" "$ISOLATE_PATCH_FILE" "$ISOLATE_PATCH_FILE" >&2
+      ISOLATE_PATCH_FILE=""
+    fi
+  fi
+  local f
+  for f in "${ISOLATE_UNTRACKED[@]:-}"; do
+    [[ -z "$f" ]] && continue
+    mkdir -p "$(dirname "$f")"
+    if ! mv "$ISOLATE_TMPDIR/$f" "$f" 2>/dev/null; then
+      printf '%s[WARN]%s could not auto-restore untracked file %s — check %s\n' "$C_YEL" "$C_RST" "$f" "$ISOLATE_TMPDIR" >&2
+    fi
+  done
+  [[ -n "$ISOLATE_PATCH_FILE" ]] && rm -f "$ISOLATE_PATCH_FILE"
+  [[ -n "$ISOLATE_TMPDIR" ]] && rm -rf "$ISOLATE_TMPDIR"
+}
+trap _isolate_restore EXIT
+
+if [[ "${FUN_CHESS_HOOK_NO_ISOLATE:-0}" == "1" ]]; then
+  emit warn isolate "FUN_CHESS_HOOK_NO_ISOLATE=1 — gates run against working tree, not staged snapshot"
+elif _isolate_tree="$(git write-tree 2>/dev/null)"; then
+  mapfile -d '' -t ISOLATE_CHANGED_TRACKED < <(git diff-index --name-only -r -z --ignore-submodules "$_isolate_tree" 2>/dev/null)
+  mapfile -d '' -t ISOLATE_UNTRACKED < <(git ls-files --others --exclude-standard -z 2>/dev/null)
+  if [[ ${#ISOLATE_CHANGED_TRACKED[@]} -gt 0 || ${#ISOLATE_UNTRACKED[@]} -gt 0 ]]; then
+    ISOLATE_PATCH_FILE="$(mktemp)"
+    git diff-index --binary -r --no-color --no-ext-diff --ignore-submodules "$_isolate_tree" > "$ISOLATE_PATCH_FILE" 2>/dev/null
+    ISOLATE_TMPDIR="$(mktemp -d)"
+    for f in "${ISOLATE_UNTRACKED[@]:-}"; do
+      [[ -z "$f" ]] && continue
+      mkdir -p "$ISOLATE_TMPDIR/$(dirname "$f")"
+      mv "$f" "$ISOLATE_TMPDIR/$f"
+    done
+    if [[ ${#ISOLATE_CHANGED_TRACKED[@]} -gt 0 ]]; then
+      git checkout-index -f -- "${ISOLATE_CHANGED_TRACKED[@]}"
+    fi
+    ISOLATE_APPLIED=1
+    pass isolate "working tree isolated to staged snapshot (${#ISOLATE_CHANGED_TRACKED[@]} tracked, ${#ISOLATE_UNTRACKED[@]} untracked set aside)"
+  else
+    pass isolate "working tree matches staged snapshot"
+  fi
+else
+  emit warn isolate "git write-tree failed — gates run against working tree, not staged snapshot"
+fi
+
+# =============================================================================
+# FILESYSTEM-NATIVE GATES
+# =============================================================================
+
+# --- Gate: typos -------------------------------------------------------------
+gate_typos() {
+  if ! command -v typos >/dev/null 2>&1; then
+    emit warn typos "typos not installed — cargo install typos-cli (code-idioms)"
+    return 0
+  fi
+  if ! should_run typos; then emit skip typos "FUN_CHESS_HOOK_SKIP"; return 0; fi
+  if typos >/dev/null 2>&1; then
+    pass typos "typos clean"
+  else
+    emit fail typos "spelling errors detected — run 'typos' to see details and fix before committing"
+    return 1
+  fi
+}
+
+# --- Gate: semgrep SAST ------------------------------------------------------
+gate_semgrep() {
+  if ! command -v semgrep >/dev/null 2>&1; then
+    emit warn semgrep "semgrep not installed — pip install semgrep (security-mandate.md)"
+    return 0
+  fi
+  if ! should_run semgrep; then emit skip semgrep "FUN_CHESS_HOOK_SKIP / FAST"; return 0; fi
+  if semgrep scan --config auto --error --quiet shared/ apps/server/ apps/client/ >/dev/null 2>&1; then
+    pass semgrep "semgrep SAST scan clean"
+  else
+    emit fail semgrep "semgrep SAST findings detected — run 'semgrep scan --config auto shared/ apps/server/ apps/client/' (security-mandate.md)"
+    return 1
+  fi
+}
+
+# --- Gate: typecheck / build -------------------------------------------------
+gate_typecheck() {
+  if ! command -v pnpm >/dev/null 2>&1; then
+    emit warn typecheck "pnpm not installed — cannot run typecheck"
+    return 0
+  fi
+  if ! should_run typecheck; then emit skip typecheck "FUN_CHESS_HOOK_SKIP"; return 0; fi
+
+  if staged_any '*.ts' '*.tsx' '*.vue' 'tsconfig*.json' 'package.json'; then
+    local out
+    if out="$(pnpm build 2>&1)"; then
+      pass typecheck "TypeScript build and typecheck (pnpm build)"
+    else
+      printf '%s\n' "$out" | grep -E '(error TS|Error:|ERROR)' | head -n 10 | while IFS= read -r l; do emit fail typecheck "$l"; done
+      emit fail typecheck "TypeScript build and typecheck failed — fix errors before committing"
+      return 1
+    fi
+  else
+    pass typecheck "no TypeScript/Vue files changed"
+  fi
+  return 0
+}
+
+# --- Gate: tests -------------------------------------------------------------
+gate_test() {
+  if ! command -v pnpm >/dev/null 2>&1; then
+    emit warn test "pnpm not installed — cannot run tests"
+    return 0
+  fi
+  if ! should_run test; then emit skip test "FUN_CHESS_HOOK_SKIP / FAST"; return 0; fi
+
+  if staged_any '*.ts' '*.vue' '*.js' 'package.json'; then
+    local out
+    if out="$(pnpm test 2>&1)"; then
+      pass test "all test suites passed (unit, contract, integration)"
+    else
+      printf '%s\n' "$out" | grep -E '(FAIL|failed|Error:)' | head -n 10 | while IFS= read -r l; do emit fail test "$l"; done
+      emit fail test "tests failed — never commit broken tests (testing-strategy.md)"
+      return 1
+    fi
+  else
+    pass test "no application code staged"
+  fi
+  return 0
+}
+
+# Run filesystem gates
+gate_typos      || true
+gate_semgrep    || true
+gate_typecheck  || true
+gate_test       || true
+
+# --- summary ----------------------------------------------------------------
+_fail=${#FAILED_GATES[@]}
+printf '\n%s── summary%s  %s%d gate(s) failed%s · %s%d warnings%s · %s%d skipped%s\n' \
+  "$C_CYN" "$C_RST" "$C_RED" "$_fail" "$C_RST" "$C_YEL" "$WARNED" "$C_RST" "$C_DIM" "$SKIPPED" "$C_RST"
+
+if (( _fail > 0 )); then
+  printf '%sCommit blocked.%s Fix the failures above (%s).\n' "$C_RED" "$C_RST" "${!FAILED_GATES[*]}" >&2
+  printf '  Bypass skippable gates with: %sFUN_CHESS_HOOK_SKIP=%s git commit ...%s\n' "$C_DIM" "${!FAILED_GATES[*]}" "$C_RST" >&2
+  printf '  (secrets and gitleaks gates are non-skippable — security-mandate.md always wins)\n' >&2
+  exit 1
+fi
+
+printf '%sAll gates passed.%s\n' "$C_GRN" "$C_RST"
+exit 0

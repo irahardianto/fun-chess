@@ -1,0 +1,6 @@
+[default.extend-words]
+# Chess Standard Algebraic Notation (SAN) piece codes and test fixtures
+Nd = "Nd"
+Nce = "Nce"
+CHCK = "CHCK"
+affinitized = "affinitized"

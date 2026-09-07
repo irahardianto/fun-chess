@@ -1,0 +1,13 @@
+# Dependencies & Build Outputs
+node_modules/
+dist/
+build/
+coverage/
+test-results/
+playwright-report/
+
+# Test files & offline generation scripts
+*.spec.ts
+*.test.ts
+tests/
+apps/client/src/features/puzzles/data/scripts/

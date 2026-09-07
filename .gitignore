@@ -1,13 +1,20 @@
-# Dependencies
+# Dependencies & Package Managers
 node_modules/
 .pnp
 .pnp.js
+.pnpm-store/
+# Monorepo enforces pnpm-lock.yaml only; ignore accidental npm/yarn lockfiles
+package-lock.json
+yarn.lock
 
 # Build & Compilation Outputs
 dist/
 build/
 *.tsbuildinfo
 .turbo/
+.vite/
+.vitest/
+apps/client/vite.config.js
 
 # Logs
 logs/
@@ -24,15 +31,36 @@ coverage/
 test-results/
 playwright-report/
 blob-report/
+.playwright-artifacts/
 
-# Environment & Secrets (NEVER commit secrets or real env files)
+# Environment & Secrets (NEVER commit secrets, credentials, or private keys)
 .env
 .env.*
+*.env
 !.env.example
+!.env.template
 *.pem
 *.key
 *.crt
 *.cert
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_dsa
+id_dsa.*
+id_ecdsa
+id_ecdsa.*
+id_ed25519
+id_ed25519.*
+credentials.json
+serviceaccount.json
+*service-account*.json
+google-credentials.json
+*.kubeconfig
+.npmrc
+.pypirc
+.netrc
 
 # Terraform (State, Variables, Plan, Overrides & Locks)
 **/.terraform/
@@ -53,6 +81,7 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+!terraform.tfvars.example
 
 # Python & Tooling Cache (used by generator scripts)
 __pycache__/
@@ -71,6 +100,7 @@ env/
 .Trashes
 ehthumbs.db
 Thumbs.db
+Desktop.ini
 .vscode/
 .idea/
 *.swp
@@ -80,4 +110,3 @@ Thumbs.db
 # Agent & Workspace Cache
 .agentwork/
 .gemini/
-

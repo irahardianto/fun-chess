@@ -13,13 +13,10 @@ def validate_and_save(filename, var_name, puzzles):
     with open(pack_mjs, 'w') as f:
         f.write(f"export const {var_name} = {json.dumps(puzzles, indent=2)};\n")
     
-    json_path = os.path.join(DATA_DIR, filename)
-    cmd = f"""node -e "
-import {{ {var_name} }} from './apps/client/src/features/puzzles/data/scripts/packs/{filename.replace('.json', '_pack.mjs')}';
+    node_code = f"""import {{ {var_name} }} from './apps/client/src/features/puzzles/data/scripts/packs/{filename.replace('.json', '_pack.mjs')}';
 import {{ savePack }} from './apps/client/src/features/puzzles/data/scripts/validator.mjs';
-savePack('{json_path}', {var_name});
-" """
-    res = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=os.path.expanduser("~/works/projects/fun-chess"))
+savePack('{json_path}', {var_name});"""
+    res = subprocess.run(["node", "-e", node_code], shell=False, capture_output=True, text=True, cwd=os.path.expanduser("~/works/projects/fun-chess"))
     if res.returncode != 0:
         print(f"❌ Error validating {filename}:")
         print(res.stderr or res.stdout)
