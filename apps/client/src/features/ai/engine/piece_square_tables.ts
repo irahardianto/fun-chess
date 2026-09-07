@@ -155,17 +155,17 @@ export function mirrorSquareIndex(index: number): number {
 }
 
 /**
- * Calculates the PST positional value for a specific piece on a specific square.
+ * Calculates the PST positional value for a specific piece on a specific 0..63 square index.
+ * PERF: Direct array access by numeric index without string allocation or parsing.
  */
-export function getPieceSquareValue(
+export function getPieceSquareValueByIndex(
   piece: PieceType,
   color: PieceColor,
-  square: Square | string,
+  index: number,
   isEndgame = false,
   tables: PieceSquareTableSet = DEFAULT_PST_TABLES,
 ): number {
-  const index = squareToIndex(square);
-  const lookupIndex = color === 'w' ? index : mirrorSquareIndex(index);
+  const lookupIndex = color === 'w' ? index : index ^ 56;
 
   let table: PieceSquareTable;
   switch (piece) {
@@ -192,4 +192,18 @@ export function getPieceSquareValue(
   }
 
   return table[lookupIndex] ?? 0;
+}
+
+/**
+ * Calculates the PST positional value for a specific piece on a specific square.
+ */
+export function getPieceSquareValue(
+  piece: PieceType,
+  color: PieceColor,
+  square: Square | string,
+  isEndgame = false,
+  tables: PieceSquareTableSet = DEFAULT_PST_TABLES,
+): number {
+  const index = squareToIndex(square);
+  return getPieceSquareValueByIndex(piece, color, index, isEndgame, tables);
 }

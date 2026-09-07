@@ -5,6 +5,7 @@ import {
   PIECE_VALUES,
   DEFAULT_PST_TABLES,
   getPieceSquareValue,
+  getPieceSquareValueByIndex,
   indexToSquare,
 } from './piece_square_tables.js';
 
@@ -77,16 +78,32 @@ export function evaluateBoard(
   usePst = true,
   customPst: PieceSquareTableSet = DEFAULT_PST_TABLES,
 ): number {
-  if (chess.isCheckmate()) {
+  const inCheck = chess.inCheck();
+  if (inCheck && chess.isCheckmate()) {
     return chess.turn() === 'w' ? -CHECKMATE_SCORE : CHECKMATE_SCORE;
   }
 
-  if (chess.isDraw()) {
+  if (!inCheck && chess.isDraw()) {
     return STALEMATE_SCORE;
   }
 
-  const isEndgame = isEndgamePhase(chess);
+  // PERF: Single allocation of 2D board and single pass to compute both endgame phase and PST values.
+  // Avoids allocating 18 arrays and 130+ objects per evaluation node, and avoids coordinate string churn.
   const board = chess.board();
+  let nonPawnMaterial = 0;
+
+  for (let r = 0; r < 8; r++) {
+    const row = board[r];
+    if (!row) continue;
+    for (let c = 0; c < 8; c++) {
+      const piece = row[c];
+      if (piece && piece.type !== 'p' && piece.type !== 'k') {
+        nonPawnMaterial += PIECE_VALUES[piece.type] ?? 0;
+      }
+    }
+  }
+
+  const isEndgame = nonPawnMaterial <= 1300;
   let score = 0;
 
   for (let r = 0; r < 8; r++) {
@@ -96,10 +113,10 @@ export function evaluateBoard(
       const piece = row[c];
       if (!piece) continue;
 
-      const square = indexToSquare(r * 8 + c);
+      const squareIndex = r * 8 + c;
       const materialVal = PIECE_VALUES[piece.type] ?? 0;
       const pstVal = usePst
-        ? getPieceSquareValue(piece.type, piece.color, square, isEndgame, customPst)
+        ? getPieceSquareValueByIndex(piece.type, piece.color, squareIndex, isEndgame, customPst)
         : 0;
       const totalPieceVal = materialVal + pstVal;
 
