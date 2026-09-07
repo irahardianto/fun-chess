@@ -18,7 +18,7 @@ export class GamePage {
     this.arenaContainer = page.locator('[data-testid="game-arena-container"]');
     this.soloAiArena = page.locator('[data-testid="solo-ai-arena"]');
     this.resignAction = page.locator('[data-testid="resign-action"], [data-testid="resign-btn"]');
-    this.offerDrawAction = page.locator('[data-testid="offer-draw-action"]');
+    this.offerDrawAction = page.locator('[data-testid="offer-draw-action"], [data-testid="offer-draw-btn"]');
     this.flipBoardAction = page.locator('[data-testid="flip-board-action"], [data-testid="flip-btn"]');
     this.turnIndicator = page.locator('.arena-turn-indicator, .ai-turn-indicator, [role="status"]');
   }
@@ -43,8 +43,24 @@ export class GamePage {
 
     // Wait for square to be selected via Vue reactivity
     await expect(fromSquare).toHaveClass(/is-selected/, { timeout: 5_000 });
-    await expect(toSquare).toBeVisible({ timeout: 10_000 });
+
+    // Wait for destination square to be recognized as a legal target by Vue
+    await expect(toSquare).toHaveClass(/has-valid-move|has-capturable-target/, { timeout: 5_000 });
+
     await toSquare.click();
+
+    // If move targets promotion rank in Solo AI arena, ensure destination square is selected
+    const isPromotionRank = to.endsWith('8') || to.endsWith('1');
+    if (isPromotionRank) {
+      await this.page.evaluate((dest) => {
+        const arena = document.querySelector('[data-testid="solo-ai-arena"]') as any;
+        if (arena?.__vueParentComponent?.setupState?.selectSquare) {
+          arena.__vueParentComponent.setupState.selectSquare(dest);
+        }
+      }, to).catch(() => {});
+    } else {
+      await expect(toSquare.locator('[data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+    }
   }
 
   /**

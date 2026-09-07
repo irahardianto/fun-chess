@@ -1,9 +1,9 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "moduleResolution": "NodeNext",
     "module": "NodeNext",
     "types": ["node"]
   },
-  "include": ["src/**/*", "ui/**/*", "api/**/*", "playwright.config.ts"]
+  "include": ["**/*"]
 }

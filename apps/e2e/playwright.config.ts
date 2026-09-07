@@ -7,10 +7,9 @@ const workspaceRoot = path.resolve(__dirname, '../../');
 
 /**
  * Playwright End-to-End Test Suite Configuration for Fun Chess.
- * Configured with dual webServer orchestration for client and server.
+ * Cleanly partitioned into 'api' and 'ui' projects with dual webServer orchestration.
  */
 export default defineConfig({
-  testDir: './tests',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -28,7 +27,14 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'api',
+      testDir: './api',
+      testMatch: '**/*.api.spec.ts',
+    },
+    {
+      name: 'ui',
+      testDir: './ui',
+      testMatch: '**/*.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
         channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
@@ -42,6 +48,10 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       cwd: workspaceRoot,
+      env: {
+        ...process.env,
+        RATE_LIMIT_MAX_REQUESTS: '1000',
+      },
     },
     {
       command: 'pnpm --filter @fun-chess/client dev',

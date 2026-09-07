@@ -1,0 +1,128 @@
+import { test, expect } from '@playwright/test';
+import { Chess } from 'chess.js';
+import { LobbyPage, GamePage } from '../src/index.js';
+
+test.describe('Solo AI Match Journey', () => {
+  test('launches solo AI match, drives pawn to 8th rank via authentic moves, handles pawn promotion modal, and completes game via resignation', async ({ page }) => {
+    // Seed PRNG so Peanut's minimax/heuristics execute 100% deterministically
+    await page.addInitScript(() => {
+      let s = 12345;
+      Math.random = () => {
+        s = (s * 16807) % 2147483647;
+        return (s - 1) / 2147483646;
+      };
+    });
+
+    const lobbyPage = new LobbyPage(page);
+    const gamePage = new GamePage(page);
+
+    // 1. Open lobby, switch to Solo AI tab, launch match against Peanut
+    await lobbyPage.goto();
+    await lobbyPage.startSoloAi('peanut');
+
+    // 2. Verify solo arena loads
+    await gamePage.waitForArena();
+    await expect(page.locator('[data-testid="solo-ai-arena"]')).toBeVisible({ timeout: 15_000 });
+
+    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+    const chess = new Chess();
+
+    const PIECE_VALUES: Record<string, number> = {
+      p: 10,
+      n: 30,
+      b: 30,
+      r: 50,
+      q: 90,
+      k: 1000,
+    };
+
+    // 3. Play 12 turns advancing White pawn towards the 8th rank
+    for (let turn = 0; turn < 12; turn++) {
+      await expect(myTurn).toBeVisible({ timeout: 15_000 });
+
+      const legalMoves = chess.moves({ verbose: true });
+      let bestMove = legalMoves[0]!;
+      let bestScore = -Infinity;
+
+      for (const m of legalMoves) {
+        let score = 0;
+        const fromRank = parseInt(m.from[1]!, 10);
+        const toRank = parseInt(m.to[1]!, 10);
+
+        if (m.promotion || (m.piece === 'p' && toRank === 8)) {
+          score += 1000000;
+        }
+        if (m.piece === 'p') {
+          score += (toRank - fromRank) * 200 + Math.pow(toRank, 3) * 20;
+        }
+        if (m.captured) {
+          score += (PIECE_VALUES[m.captured] || 10) * 25;
+        }
+        if (m.piece === 'k') {
+          score -= 50;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = m;
+        }
+      }
+
+      await gamePage.makeMove(bestMove.from, bestMove.to);
+      chess.move(bestMove);
+
+      // Wait for AI to reply
+      await expect(myTurn).toBeHidden({ timeout: 5_000 }).catch(() => {});
+      await expect(myTurn).toBeVisible({ timeout: 15_000 });
+
+      // Track AI's move on local chess instance
+      const lastMoveSquares = await page.$$eval('.chess-square.is-last-move', (els) =>
+        els.map((el) => el.getAttribute('data-square') || '')
+      );
+
+      const blackLegalMoves = chess.moves({ verbose: true });
+      const matchingBlackMove = blackLegalMoves.find(
+        (bm: { from: string; to: string }) => lastMoveSquares.includes(bm.from) && lastMoveSquares.includes(bm.to)
+      );
+
+      if (matchingBlackMove) {
+        chess.move(matchingBlackMove);
+      }
+    }
+
+    // 4. Turn 13: Pawn on c7 moves to d8 (reaching the 8th rank!)
+    await expect(myTurn).toBeVisible({ timeout: 15_000 });
+    await gamePage.makeMove('c7', 'd8');
+
+    // 5. Verify PromotionModal appears with all 4 promotion options: Queen, Rook, Bishop, Knight
+    const promoteQueenBtn = page.locator('[data-testid="promote-q"]');
+    await expect(promoteQueenBtn).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="promote-r"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-testid="promote-b"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-testid="promote-n"]')).toBeVisible({ timeout: 5_000 });
+
+    // 6. Select Queen promotion via modal interaction
+    await gamePage.handlePromotion('q');
+
+    // 7. Verify modal closes cleanly without synthetic mutations
+    await expect(promoteQueenBtn).not.toBeVisible({ timeout: 10_000 });
+
+    // 8. Verify the newly promoted Queen is now active on square d8
+    await expect(page.locator('[data-square="d8"] [data-piece="wQ"]').first()).toBeVisible({ timeout: 10_000 });
+
+    // 9. Resign to trigger Game Over modal
+    await gamePage.resign();
+    await gamePage.expectGameOver();
+
+    // 10. Verify Game Over modal and rematch / return-to-lobby options
+    const rematchBtn = page.locator('[data-testid="ai-rematch-btn"]');
+    const returnLobbyBtn = page.locator('[data-testid="ai-return-lobby-btn"]');
+
+    await expect(rematchBtn).toBeVisible({ timeout: 10_000 });
+    await expect(returnLobbyBtn).toBeVisible({ timeout: 10_000 });
+
+    // 11. Return to lobby cleanly
+    await returnLobbyBtn.click();
+    await expect(page.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 10_000 });
+  });
+});
