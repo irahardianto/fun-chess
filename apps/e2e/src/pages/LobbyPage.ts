@@ -1,0 +1,129 @@
+import type { Page, Locator } from '@playwright/test';
+import { expect } from '@playwright/test';
+import type { AppGameMode, MascotId } from '@fun-chess/shared';
+
+/**
+ * Page Object Model representing the main Fun Chess Lobby.
+ */
+export class LobbyPage {
+  readonly page: Page;
+  readonly lobbyView: Locator;
+  readonly hostCard: Locator;
+  readonly joinCard: Locator;
+  readonly hostNicknameInput: Locator;
+  readonly joinNicknameInput: Locator;
+  readonly joinRoomCodeInput: Locator;
+  readonly hostGameBtn: Locator;
+  readonly joinGameBtn: Locator;
+  readonly colorWhiteBtn: Locator;
+  readonly colorRandomBtn: Locator;
+  readonly colorBlackBtn: Locator;
+  readonly roomCodeDisplay: Locator;
+  readonly quickSyncBtn: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.lobbyView = page.locator('[data-testid="lobby-view"]');
+    this.hostCard = page.locator('[data-testid="host-card"]');
+    this.joinCard = page.locator('[data-testid="join-card"]');
+    this.hostNicknameInput = page.locator('[data-testid="host-nickname-input"] input');
+    this.joinNicknameInput = page.locator('[data-testid="join-nickname-input"] input');
+    this.joinRoomCodeInput = page.locator('[data-testid="join-room-code-input"] input');
+    this.hostGameBtn = page.locator('[data-testid="host-game-btn"]');
+    this.joinGameBtn = page.locator('[data-testid="join-game-btn"]');
+    this.colorWhiteBtn = page.locator('[data-testid="color-white-btn"]');
+    this.colorRandomBtn = page.locator('[data-testid="color-random-btn"]');
+    this.colorBlackBtn = page.locator('[data-testid="color-black-btn"]');
+    this.roomCodeDisplay = page.locator('[data-testid="room-code-display"]');
+    this.quickSyncBtn = page.locator('[data-testid="lobby-quick-sync-btn"]');
+  }
+
+  /**
+   * Navigates to the lobby root view and verifies readiness.
+   */
+  async goto(path = '/'): Promise<void> {
+    await this.page.goto(path);
+    await expect(this.lobbyView).toBeVisible({ timeout: 15_000 });
+  }
+
+  /**
+   * Fills host credentials, selects preferred side, and initiates room creation.
+   */
+  async hostGame(nickname: string, color?: 'w' | 'random' | 'b'): Promise<void> {
+    await expect(this.hostNicknameInput).toBeVisible({ timeout: 10_000 });
+    await this.hostNicknameInput.fill(nickname);
+
+    if (color === 'w') {
+      await this.colorWhiteBtn.click();
+    } else if (color === 'b') {
+      await this.colorBlackBtn.click();
+    } else if (color === 'random') {
+      await this.colorRandomBtn.click();
+    }
+
+    await expect(this.hostGameBtn).toBeEnabled({ timeout: 5_000 });
+    await this.hostGameBtn.click();
+  }
+
+  /**
+   * Retrieves the 4-character room code from the host QR Code modal.
+   */
+  async getRoomCode(): Promise<string> {
+    await expect(this.roomCodeDisplay).toBeVisible({ timeout: 15_000 });
+
+    const codeValueLocator = this.roomCodeDisplay.locator('.code-value');
+    if (await codeValueLocator.count() > 0 && await codeValueLocator.isVisible()) {
+      const code = (await codeValueLocator.innerText()).trim();
+      if (code) return code;
+    }
+
+    const rawText = (await this.roomCodeDisplay.innerText()).trim();
+    const match = rawText.match(/[A-Z0-9]{4}/);
+    if (!match) {
+      throw new Error(`Failed to extract 4-character room code from text: "${rawText}"`);
+    }
+    return match[0];
+  }
+
+  /**
+   * Fills guest credentials, enters room code, and joins the game room.
+   */
+  async joinGame(nickname: string, roomCode: string): Promise<void> {
+    await expect(this.joinNicknameInput).toBeVisible({ timeout: 10_000 });
+    await this.joinNicknameInput.fill(nickname);
+    await this.joinRoomCodeInput.fill(roomCode);
+    await expect(this.joinGameBtn).toBeEnabled({ timeout: 5_000 });
+    await this.joinGameBtn.click();
+  }
+
+  /**
+   * Selects one of the 4 lobby mode tabs in the navigation bar.
+   */
+  async selectMode(mode: AppGameMode): Promise<void> {
+    const tabLocator = this.page.locator(`[data-testid="mode-tab-${mode}"]`);
+    await expect(tabLocator).toBeVisible({ timeout: 10_000 });
+    await tabLocator.click();
+  }
+
+  /**
+   * Switches to Solo AI mode and starts a match against the selected mascot.
+   */
+  async startSoloAi(mascotId: MascotId = 'peanut'): Promise<void> {
+    await this.selectMode('solo_ai');
+
+    const mascotCard = this.page.locator(`[data-testid="mascot-card-${mascotId}"]`);
+    await expect(mascotCard).toBeVisible({ timeout: 10_000 });
+
+    const challengeBtn = this.page.locator(`[data-testid="challenge-btn-${mascotId}"]`);
+    await expect(challengeBtn).toBeVisible({ timeout: 10_000 });
+    await challengeBtn.click();
+  }
+
+  /**
+   * Clicks the quick sync button in the lobby header to open Progress Sync modal.
+   */
+  async openProgressSync(): Promise<void> {
+    await expect(this.quickSyncBtn).toBeVisible({ timeout: 10_000 });
+    await this.quickSyncBtn.click();
+  }
+}
