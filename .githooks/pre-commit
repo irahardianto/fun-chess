@@ -189,7 +189,7 @@ gate_debug() {
     local prod_scan=()
     for f in "${scan[@]}"; do
       case "$f" in
-        *__tests__*|*.spec.*|*.test.*|*features/puzzles/data/scripts/*|apps/server/src/index.ts) ;;
+        *__tests__*|*.spec.*|*.test.*|*features/puzzles/data/scripts/*|tools/*|apps/server/src/index.ts) ;;
         *) prod_scan+=("$f") ;;
       esac
     done

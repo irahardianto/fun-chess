@@ -10,4 +10,4 @@ playwright-report/
 *.spec.ts
 *.test.ts
 tests/
-apps/client/src/features/puzzles/data/scripts/
+tools/

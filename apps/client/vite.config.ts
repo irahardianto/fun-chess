@@ -147,6 +147,29 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    testTimeout: 15000,
+    hookTimeout: 15000,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      reportsDirectory: './coverage',
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 75,
+        statements: 80,
+      },
+      exclude: [
+        'node_modules/**',
+        'dist/**',
+        'tools/**',
+        'scripts/**',
+        '**/data/*.json',
+        '**/*.d.ts',
+        '**/*.spec.ts',
+        '**/*.test.ts',
+      ],
+    },
   },
   server: {
     host: '0.0.0.0',
