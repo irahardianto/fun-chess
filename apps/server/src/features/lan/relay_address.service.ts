@@ -26,6 +26,8 @@ export interface RelayAddressConfig {
   readonly port?: number;
   /** Optional manual LAN IP override */
   readonly lanIp?: string;
+  /** Optional manual Host IP override */
+  readonly hostIp?: string;
 }
 
 /**
@@ -132,10 +134,10 @@ export class RelayAddressService implements IRelayAddressService {
 
   /**
    * Checks whether the service is operating in Cloud Relay mode.
-   * Returns true if PUBLIC_URL is configured in constructor config or process.env.
+   * Returns true if publicUrl is configured in constructor config.
    */
   public isCloudRelay(): boolean {
-    const publicUrl = this.config.publicUrl ?? process.env.PUBLIC_URL;
+    const publicUrl = this.config.publicUrl;
     return Boolean(publicUrl && publicUrl.trim().length > 0);
   }
 
@@ -143,7 +145,7 @@ export class RelayAddressService implements IRelayAddressService {
    * Returns the normalized public base URL if configured, or undefined.
    */
   public getPublicUrl(): string | undefined {
-    const publicUrl = this.config.publicUrl ?? process.env.PUBLIC_URL;
+    const publicUrl = this.config.publicUrl;
     if (!publicUrl || !publicUrl.trim()) {
       return undefined;
     }
@@ -161,8 +163,7 @@ export class RelayAddressService implements IRelayAddressService {
   ): string[] {
     const addresses: string[] = [];
 
-    const manualIp =
-      this.config.lanIp ?? process.env.LAN_IP ?? process.env.HOST_IP;
+    const manualIp = this.config.lanIp ?? this.config.hostIp;
     if (manualIp && manualIp.trim()) {
       const trimmedIp = manualIp.trim();
       if (!addresses.includes(trimmedIp)) {
@@ -211,8 +212,7 @@ export class RelayAddressService implements IRelayAddressService {
     }
 
     // 2. Manual IP Override
-    const manualIp =
-      this.config.lanIp ?? process.env.LAN_IP ?? process.env.HOST_IP;
+    const manualIp = this.config.lanIp ?? this.config.hostIp;
     if (manualIp && manualIp.trim()) {
       return manualIp.trim();
     }
@@ -249,7 +249,7 @@ export class RelayAddressService implements IRelayAddressService {
   /**
    * Generates a join URL for players on the LAN or remote cloud relay.
    *
-   * @param port - Port number (default: configured port or PORT env or 3000)
+   * @param port - Port number (default: configured port or 3000)
    * @param roomCode - Optional room code to encode into query string
    * @param customInterfaces - Optional network interfaces dictionary for pure testability
    */
@@ -258,8 +258,7 @@ export class RelayAddressService implements IRelayAddressService {
     roomCode?: string,
     customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
   ): string {
-    const effectivePort =
-      port ?? this.config.port ?? (Number(process.env.PORT) || 3000);
+    const effectivePort = port ?? this.config.port ?? 3000;
 
     let base: string;
 
@@ -288,8 +287,7 @@ export class RelayAddressService implements IRelayAddressService {
     port?: number,
     customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
   ): LanInfoResponse {
-    const effectivePort =
-      port ?? this.config.port ?? (Number(process.env.PORT) || 3000);
+    const effectivePort = port ?? this.config.port ?? 3000;
     const lanIp = this.getLocalLanIp(customInterfaces);
     const rawInterfaces = this.getAllLanInterfaces(customInterfaces);
     const interfaces = rawInterfaces.length > 0 ? rawInterfaces : [lanIp];

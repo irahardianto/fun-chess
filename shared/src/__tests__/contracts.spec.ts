@@ -85,6 +85,7 @@ import {
   JoinRoomRequestSchema,
   ReconnectRequestSchema,
   MovePayloadSchema,
+  ServerEnvSchema,
 } from "../index.js";
 
 describe("Shared Contracts & Data Model Specification", () => {
@@ -267,14 +268,17 @@ describe("Shared Contracts & Data Model Specification", () => {
     });
 
     describe("PlayerNameSchema", () => {
-      it("parses and sanitizes valid player names", () => {
+      it("parses and validates valid player names according to allowlist", () => {
         expect(PlayerNameSchema.parse("Alex")).toBe("Alex");
         expect(PlayerNameSchema.parse("  Sam  ")).toBe("Sam");
-        expect(PlayerNameSchema.parse("<b>Sam</b>")).toBe("bSam/b");
-        expect(PlayerNameSchema.parse("Tom & Jerry")).toBe("Tom  Jerry");
+        expect(PlayerNameSchema.parse("Player_1")).toBe("Player_1");
+        expect(PlayerNameSchema.parse("Grandmaster.99")).toBe("Grandmaster.99");
+        expect(PlayerNameSchema.parse("User-Name")).toBe("User-Name");
       });
 
-      it("fails validation for empty, whitespace-only, or overly long player names", () => {
+      it("fails validation for invalid characters, empty, whitespace-only, or overly long names", () => {
+        expect(() => PlayerNameSchema.parse("<b>Sam</b>")).toThrow();
+        expect(() => PlayerNameSchema.parse("Tom & Jerry")).toThrow();
         expect(() => PlayerNameSchema.parse("")).toThrow();
         expect(() => PlayerNameSchema.parse("   ")).toThrow();
         expect(() => PlayerNameSchema.parse("A".repeat(21))).toThrow();
@@ -408,6 +412,78 @@ describe("Shared Contracts & Data Model Specification", () => {
             promotion: "p",
           }),
         ).toThrow();
+      });
+    });
+
+    describe("ServerEnvSchema", () => {
+      it("parses empty environment using safe defaults", () => {
+        const env = ServerEnvSchema.parse({});
+        expect(env.NODE_ENV).toBe("development");
+        expect(env.PORT).toBe(3000);
+        expect(env.HOST).toBe("0.0.0.0");
+        expect(env.LOG_LEVEL).toBe("info");
+        expect(env.CORS_ORIGIN).toBeUndefined();
+        expect(env.PUBLIC_URL).toBeUndefined();
+        expect(env.LAN_IP).toBeUndefined();
+        expect(env.HOST_IP).toBeUndefined();
+      });
+
+      it("coerces numeric string PORT and allows port 0", () => {
+        const env8080 = ServerEnvSchema.parse({ PORT: "8080" });
+        expect(env8080.PORT).toBe(8080);
+
+        const env0 = ServerEnvSchema.parse({ PORT: 0 });
+        expect(env0.PORT).toBe(0);
+
+        const envStr0 = ServerEnvSchema.parse({ PORT: "0" });
+        expect(envStr0.PORT).toBe(0);
+      });
+
+      it("preprocesses empty and whitespace-only strings to undefined", () => {
+        const env = ServerEnvSchema.parse({
+          PORT: "",
+          CORS_ORIGIN: "   ",
+          PUBLIC_URL: "",
+          LAN_IP: "  ",
+          HOST_IP: "",
+        });
+        expect(env.PORT).toBe(3000);
+        expect(env.CORS_ORIGIN).toBeUndefined();
+        expect(env.PUBLIC_URL).toBeUndefined();
+        expect(env.LAN_IP).toBeUndefined();
+        expect(env.HOST_IP).toBeUndefined();
+      });
+
+      it("validates valid custom configuration", () => {
+        const env = ServerEnvSchema.parse({
+          NODE_ENV: "production",
+          PORT: 4000,
+          HOST: "127.0.0.1",
+          CORS_ORIGIN: "https://chess.example.com",
+          PUBLIC_URL: "https://chess.example.com",
+          LAN_IP: "192.168.1.50",
+          HOST_IP: "10.0.0.1",
+          LOG_LEVEL: "warn",
+        });
+        expect(env.NODE_ENV).toBe("production");
+        expect(env.PORT).toBe(4000);
+        expect(env.HOST).toBe("127.0.0.1");
+        expect(env.CORS_ORIGIN).toBe("https://chess.example.com");
+        expect(env.PUBLIC_URL).toBe("https://chess.example.com");
+        expect(env.LAN_IP).toBe("192.168.1.50");
+        expect(env.HOST_IP).toBe("10.0.0.1");
+        expect(env.LOG_LEVEL).toBe("warn");
+      });
+
+      it("fails validation on invalid PORT, NODE_ENV, or malformed URLs/IPs", () => {
+        expect(() => ServerEnvSchema.parse({ PORT: -1 })).toThrow();
+        expect(() => ServerEnvSchema.parse({ PORT: 65536 })).toThrow();
+        expect(() => ServerEnvSchema.parse({ PORT: "not-a-port" })).toThrow();
+        expect(() => ServerEnvSchema.parse({ NODE_ENV: "staging" })).toThrow();
+        expect(() => ServerEnvSchema.parse({ LOG_LEVEL: "verbose" })).toThrow();
+        expect(() => ServerEnvSchema.parse({ PUBLIC_URL: "not-a-valid-url" })).toThrow();
+        expect(() => ServerEnvSchema.parse({ LAN_IP: "999.999.999.999" })).toThrow();
+        expect(() => ServerEnvSchema.parse({ HOST_IP: "invalid-ip" })).toThrow();
       });
     });
   });

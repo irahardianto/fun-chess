@@ -16,4 +16,5 @@ export class NullAudioService implements IAudioService {
   isMuted(): boolean {
     return true;
   }
+  async dispose(): Promise<void> {}
 }

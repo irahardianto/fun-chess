@@ -18,6 +18,7 @@ import { ScenarioCategoryList, useScenarioProgress } from '../scenarios';
 import { PuzzleHubView } from '../puzzles';
 import { useLanDiscovery } from '../../composables/useLanDiscovery';
 import { useNetworkStatus, usePwaInstall } from '../pwa';
+import { safeLocalStorage } from '@/platform/storage';
 import type { PuzzleTheme } from '@fun-chess/shared';
 
 interface Props {
@@ -26,14 +27,16 @@ interface Props {
   loading?: boolean;
   initialMode?: AppGameMode;
   progressMap?: ScenarioProgressMap;
+  initialAvatar?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   initialRoomCode: '',
   lanInfo: null,
   loading: false,
-  initialMode: 'multiplayer_lan',
+  initialMode: undefined,
   progressMap: undefined,
+  initialAvatar: undefined,
 });
 
 const emit = defineEmits<{
@@ -62,14 +65,13 @@ const emit = defineEmits<{
 const STORAGE_KEY = 'fun_chess_player_avatar';
 
 function getSavedAvatar(): string {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && (PLAYER_AVATARS as readonly string[]).includes(saved)) {
-        return saved;
-      }
-    } catch {
-      // Storage access error fallback
+  if (props.initialAvatar && (PLAYER_AVATARS as readonly string[]).includes(props.initialAvatar)) {
+    return props.initialAvatar;
+  }
+  if (typeof window !== 'undefined' && safeLocalStorage.isAvailable()) {
+    const saved = safeLocalStorage.getItem(STORAGE_KEY);
+    if (saved && (PLAYER_AVATARS as readonly string[]).includes(saved)) {
+      return saved;
     }
   }
   return DEFAULT_PLAYER_AVATAR;
@@ -79,13 +81,7 @@ const selectedAvatar = ref<string>(getSavedAvatar());
 
 function selectAvatar(avatar: string) {
   selectedAvatar.value = avatar;
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem(STORAGE_KEY, avatar);
-    } catch {
-      // Storage access error fallback
-    }
-  }
+  safeLocalStorage.safeSetItem(STORAGE_KEY, avatar);
 }
 
 function handleAvatarKeyDown(event: KeyboardEvent, currentEmoji: string) {
@@ -117,23 +113,45 @@ function handleAvatarKeyDown(event: KeyboardEvent, currentEmoji: string) {
   }
 }
 
-const activeMode = ref<AppGameMode>(
-  props.initialMode === 'lobby' ? 'multiplayer_lan' : props.initialMode || 'multiplayer_lan'
-);
+const { serverLanInfo, activeLanIp } = useLanDiscovery();
+const scenarioProgress = useScenarioProgress();
+const { isOffline } = useNetworkStatus();
+const { canInstall, isStandalone, promptInstall } = usePwaInstall();
+
+function resolveInitialMode(): AppGameMode {
+  if (props.initialMode && props.initialMode !== 'lobby') {
+    return props.initialMode;
+  }
+  try {
+    const map = props.progressMap ?? scenarioProgress.progressMap.value;
+    const completed = Object.values(map).filter((item) => item && item.starsEarned > 0).length;
+    if (completed === 0) {
+      if (typeof window !== 'undefined' && safeLocalStorage.isAvailable()) {
+        const raw = safeLocalStorage.getItem('fun_chess_scenario_progress_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const rawCompleted = Object.values(parsed || {}).filter((item: any) => item && item.starsEarned > 0).length;
+          if (rawCompleted > 0) return 'multiplayer_lan';
+        }
+      }
+      return 'academy';
+    }
+  } catch {
+    return 'academy';
+  }
+  return 'multiplayer_lan';
+}
+
+const activeMode = ref<AppGameMode>(resolveInitialMode());
 
 watch(
   () => props.initialMode,
   (newMode) => {
     if (newMode) {
-      activeMode.value = newMode === 'lobby' ? 'multiplayer_lan' : newMode;
+      activeMode.value = newMode === 'lobby' ? resolveInitialMode() : newMode;
     }
   }
 );
-
-const { serverLanInfo, activeLanIp } = useLanDiscovery();
-const scenarioProgress = useScenarioProgress();
-const { isOffline } = useNetworkStatus();
-const { canInstall, isStandalone, promptInstall } = usePwaInstall();
 
 const isCloudMode = computed(() => {
   const info = props.lanInfo || serverLanInfo.value;
@@ -290,6 +308,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
     <!-- 4-Way Mode Switcher Tabs -->
     <LobbyModeSelector
       :model-value="activeMode"
+      :completed-count="scenarioProgress.completedCount.value"
       @update:model-value="handleModeChange"
     />
 

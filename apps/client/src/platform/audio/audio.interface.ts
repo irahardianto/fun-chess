@@ -17,4 +17,6 @@ export interface IAudioService {
   toggleMute(): boolean;
   /** Audio mute status */
   isMuted(): boolean;
+  /** Releases AudioContext resources and unbinds event listeners */
+  dispose?(): Promise<void> | void;
 }

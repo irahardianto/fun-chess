@@ -289,4 +289,118 @@ describe('usePuzzleRunner Composable', () => {
       expect(runner.lastMistakeRefutation.value).toBeNull();
     });
   });
+
+  describe('Full Lifecycle with Composed Hints and Replay', () => {
+    const lifecyclePuzzle: Puzzle = {
+      id: 'runner_lifecycle_001',
+      fen: 'r3k2r/ppp2ppp/8/3N4/8/8/PPP2PPP/R3K2R w KQkq - 0 1',
+      moves: ['d5c7', 'e8d8', 'c7a8'],
+      rating: 900,
+      ratingDeviation: 80,
+      themes: ['fork'],
+      primaryTheme: 'fork',
+      difficulty: 'easy',
+      title: 'Lifecycle Integration Test',
+      tacticalGoal: 'Fork King and Rook on c7',
+      tacticalReward: 'win_rook',
+      outcomeAdvantage: '+5 Rook ♜',
+      learningSummary: 'Nc7+ forked cleanly.',
+      keyTakeaway: 'Knights fork pieces effectively.',
+      playerColor: 'w',
+      solutionPlies: 3,
+    };
+
+    it('preserves full puzzle lifecycle: mistake handling, auto-nudge, bot reply, successful solve, and replay review', () => {
+      vi.useFakeTimers();
+      const onSolved = vi.fn();
+      const onMistake = vi.fn();
+
+      const runner = usePuzzleRunner({
+        puzzle: lifecyclePuzzle,
+        autoPlayAudio: false,
+        onSolved,
+        onMistake,
+      });
+
+      // 1. Initial State Verification
+      expect(runner.isCompleted.value).toBe(false);
+      expect(runner.isPlayerTurn.value).toBe(true);
+      expect(runner.hintsCount.value).toBe(0);
+      expect(runner.mistakesCount.value).toBe(0);
+      expect(runner.isReplaying.value).toBe(false);
+
+      // 2. Mistake 1: Illegal or incorrect move (d5 to b4)
+      runner.selectSquare('d5');
+      runner.selectSquare('b4');
+      expect(runner.mistakesCount.value).toBe(1);
+      expect(onMistake).toHaveBeenCalledWith(lifecyclePuzzle, 1);
+      expect(runner.hintsCount.value).toBe(0); // Auto-nudge not yet triggered at 1 mistake
+
+      // 3. Mistake 2: Second wrong move (d5 to e3)
+      runner.selectSquare('d5');
+      runner.selectSquare('e3');
+      expect(runner.mistakesCount.value).toBe(2);
+      expect(onMistake).toHaveBeenCalledWith(lifecyclePuzzle, 2);
+      // Auto-nudge triggered on consecutive mistakes >= 2!
+      expect(runner.progressiveHint.currentHintLevel.value).toBe(1);
+      expect(runner.progressiveHint.isTier1Active.value).toBe(true);
+      expect(runner.progressiveHint.nudgeSquare.value).toBe('d5');
+
+      // 4. Correct Move Ply 0: Player plays d5 to c7 (Nc7+)
+      runner.selectSquare('d5');
+      runner.selectSquare('c7');
+      expect(runner.isWaitingForBot.value).toBe(true);
+      expect(runner.isPlayerTurn.value).toBe(false);
+
+      // Advance bot response timer (450ms)
+      vi.advanceTimersByTime(450);
+      expect(runner.isWaitingForBot.value).toBe(false);
+      expect(runner.isPlayerTurn.value).toBe(true);
+      expect(runner.currentMoveIndex.value).toBe(2);
+      expect(runner.lastMove.value).toEqual({ from: 'e8', to: 'd8' });
+      // Progressive hint should reset for the next user ply
+      expect(runner.progressiveHint.currentHintLevel.value).toBe(0);
+
+      // 5. Correct Move Ply 2: Player plays c7 to a8 (Nxa8)
+      runner.selectSquare('c7');
+      runner.selectSquare('a8');
+
+      // Puzzle is now solved!
+      expect(runner.isCompleted.value).toBe(true);
+      expect(runner.isSolvedSuccessfully.value).toBe(true);
+      expect(runner.attemptResult.value).toBe('solved_with_retries');
+      expect(onSolved).toHaveBeenCalledTimes(1);
+
+      // 6. Post-Solve Interactive Replay Review
+      expect(runner.replayTotalSteps.value).toBe(3);
+      expect(runner.replaySteps.value.length).toBe(4);
+
+      // Review starting setup position
+      runner.stepReplayStart();
+      expect(runner.isReplaying.value).toBe(true);
+      expect(runner.replayStepIndex.value).toBe(0);
+      expect(runner.displayedFen.value).toBe(lifecyclePuzzle.fen);
+
+      // Step through move 1
+      runner.stepReplayNext();
+      expect(runner.replayStepIndex.value).toBe(1);
+      expect(runner.currentReplaySan.value).toBe('Nxc7+');
+
+      // Step through bot move
+      runner.stepReplayNext();
+      expect(runner.replayStepIndex.value).toBe(2);
+      expect(runner.currentReplaySan.value).toBe('Kd8');
+
+      // Step to decisive final move
+      runner.stepReplayNext();
+      expect(runner.replayStepIndex.value).toBe(3);
+      expect(runner.currentReplaySan.value).toBe('Nxa8');
+
+      // Toggle board inspection
+      runner.toggleInspectBoard(true);
+      expect(runner.isInspectingBoard.value).toBe(true);
+
+      vi.useRealTimers();
+    });
+  });
 });

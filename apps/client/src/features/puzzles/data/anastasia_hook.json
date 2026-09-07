@@ -16,7 +16,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Anastasia's Mate with f4 Rook #1 👑",
     "subtitle": "1. Ne7+ Kh8 2. Qxh7+ Kxh7 3. Rh4# seals Black along the h-file.",
     "playerColor": "w",
@@ -88,7 +88,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Anastasia's Mate from e3 #2 👑",
     "subtitle": "White executes the classic queen sacrifice and rook mate on h3.",
     "playerColor": "w",
@@ -160,7 +160,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Anastasia's Mate with d4 Rook #3 👑",
     "subtitle": "Rook sweeps from d4 to h4 for checkmate.",
     "playerColor": "w",
@@ -232,7 +232,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Anastasia's Mate from c4 #4 👑",
     "subtitle": "Queen sacrifice on h7 opens the h-file for the c4 rook.",
     "playerColor": "w",
@@ -448,7 +448,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Anastasia's Mate from f5 #7 👑",
     "subtitle": "Knight jumps from f5 to e7 establishing the key cutoff.",
     "playerColor": "w",
@@ -520,7 +520,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Anastasia's Mate with f3 Rook #8 👑",
     "subtitle": "1. Ne7+ followed by Qxh7+ and Rh3#.",
     "playerColor": "w",
@@ -592,7 +592,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Black Anastasia's Mate #9 👑",
     "subtitle": "1...Ne2+ 2. Kh1 3...Qxh2+ 4. Kxh2 5...Rh5#.",
     "playerColor": "b",
@@ -664,7 +664,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Black Anastasia's Mate from f6 #10 👑",
     "subtitle": "Black rook on f6 delivers the final checkmate on h6.",
     "playerColor": "b",
@@ -880,7 +880,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Anastasia's Mate from b5 #13 👑",
     "subtitle": "Long-range rook slide to h5 finishes the combination.",
     "playerColor": "b",
@@ -952,7 +952,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Anastasia's Full-Rank Sweep #14 👑",
     "subtitle": "Rook sweeps from a5 to h5.",
     "playerColor": "b",
@@ -1024,7 +1024,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "anastasia_mate",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Anastasia's Mate from f4 #15 👑",
     "subtitle": "Knight on f4 initiates the 5-ply Anastasia mate.",
     "playerColor": "b",
@@ -1094,7 +1094,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Classic White Hook Mate on e8 #16 👑",
     "subtitle": "1. Rd8+ Ke7 2. Re8# supported by the f6 Knight.",
     "playerColor": "w",
@@ -1150,7 +1150,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "White Hook Mate from c1 #17 👑",
     "subtitle": "Rook checks on c8 before delivering Re8#.",
     "playerColor": "w",
@@ -1206,7 +1206,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "White Hook Mate from b1 #18 👑",
     "subtitle": "White slides the b-file rook into the hook mate.",
     "playerColor": "w",
@@ -1262,7 +1262,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "White Hook Mate from a1 #19 👑",
     "subtitle": "Long-range rook check forces the king to e7 before Re8#.",
     "playerColor": "w",
@@ -1430,7 +1430,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "White Hook Mate from b2 #22 👑",
     "subtitle": "b2 rook delivers the forcing check on b8.",
     "playerColor": "w",
@@ -1486,7 +1486,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "White Hook Mate from a2 #23 👑",
     "subtitle": "Rook on a2 drives Black's king into the fatal hook.",
     "playerColor": "w",
@@ -1542,7 +1542,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Black Hook Mate on e1 #24 👑",
     "subtitle": "1...Rd1+ 2. Ke2 3...Re1# supported by the f3 knight.",
     "playerColor": "b",
@@ -1598,7 +1598,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Black Hook Mate from c8 #25 👑",
     "subtitle": "Rook penetrates from c8 into e1.",
     "playerColor": "b",
@@ -1766,7 +1766,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Hook Mate from d7 #28 👑",
     "subtitle": "7th-rank rook crashes in on d1 to deliver Re1#.",
     "playerColor": "b",
@@ -1822,7 +1822,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Hook Mate from c7 #29 👑",
     "subtitle": "Black forces Ke2 before the decisive Re1#.",
     "playerColor": "b",
@@ -1878,7 +1878,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "hook_mate",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Hook Mate from b7 #30 👑",
     "subtitle": "Rook on b7 completes the hook mate combination.",
     "playerColor": "b",

@@ -18,14 +18,6 @@ export async function detectWebRtcLanIp(): Promise<string | null> {
       const pc = new RTCPeerConnection({ iceServers: [] });
       let resolved = false;
 
-      pc.createDataChannel('');
-      pc.createOffer()
-        .then((offer) => pc.setLocalDescription(offer))
-        .catch((err) => {
-          console.warn('[useLanDiscovery] Failed to set WebRTC local description:', err);
-          resolve(null);
-        });
-
       const timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -37,6 +29,23 @@ export async function detectWebRtcLanIp(): Promise<string | null> {
           resolve(null);
         }
       }, 800);
+
+      pc.createDataChannel('');
+      pc.createOffer()
+        .then((offer) => pc.setLocalDescription(offer))
+        .catch((err) => {
+          console.warn('[useLanDiscovery] Failed to set WebRTC local description:', err);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timer);
+            try {
+              pc.close();
+            } catch (closeErr) {
+              console.warn('[useLanDiscovery] Failed to close RTCPeerConnection on offer error:', closeErr);
+            }
+            resolve(null);
+          }
+        });
 
       pc.onicecandidate = (event) => {
         if (!event || !event.candidate || !event.candidate.candidate) {

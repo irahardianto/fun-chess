@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import type { PieceColor, MascotId, MascotPersona } from '@fun-chess/shared';
 import { PLAYER_AVATARS, DEFAULT_PLAYER_AVATAR } from '@fun-chess/shared';
 import { ALL_MASCOTS } from '../data/index.js';
+import { safeLocalStorage } from '@/platform/storage';
 import BaseCard from '../../../components/base/BaseCard.vue';
 import BaseButton from '../../../components/base/BaseButton.vue';
 
@@ -26,15 +27,9 @@ const emit = defineEmits<{
 const STORAGE_KEY = 'fun_chess_player_avatar';
 
 function getSavedAvatar(): string {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && (PLAYER_AVATARS as readonly string[]).includes(saved)) {
-        return saved;
-      }
-    } catch {
-      // Storage access error fallback
-    }
+  const saved = safeLocalStorage.getItem(STORAGE_KEY);
+  if (saved && (PLAYER_AVATARS as readonly string[]).includes(saved)) {
+    return saved;
   }
   return DEFAULT_PLAYER_AVATAR;
 }
@@ -52,13 +47,7 @@ watch(
 
 function selectAvatar(avatar: string) {
   selectedAvatar.value = avatar;
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem(STORAGE_KEY, avatar);
-    } catch {
-      // Storage access error fallback
-    }
-  }
+  safeLocalStorage.safeSetItem(STORAGE_KEY, avatar);
 }
 
 const chosenColor = ref<PieceColor | 'random'>(props.initialPlayerColor);

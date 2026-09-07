@@ -14,10 +14,19 @@ export function isQuotaExceededError(err: unknown): boolean {
       err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
     );
   }
-  // Generic error object inspection for non-standard runtimes / polyfills
-  if (typeof err === 'object' && 'name' in err) {
-    const name = String((err as { name: unknown }).name);
-    return name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED';
+  // Generic error object inspection for non-standard runtimes / polyfills / mocks
+  if (typeof err === 'object') {
+    const errObj = err as Record<string, unknown>;
+    const name = typeof errObj.name === 'string' ? errObj.name : '';
+    const code = typeof errObj.code === 'number' ? errObj.code : 0;
+    const message = typeof errObj.message === 'string' ? errObj.message : '';
+    return (
+      name === 'QuotaExceededError' ||
+      name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      code === 22 ||
+      code === 1014 ||
+      message.includes('QuotaExceededError')
+    );
   }
   return false;
 }

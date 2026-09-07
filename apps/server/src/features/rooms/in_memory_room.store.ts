@@ -115,6 +115,7 @@ export class InMemoryRoomStore implements RoomStore {
     );
 
     let timer: NodeJS.Timeout | undefined;
+    let acquired = false;
     try {
       // PERF: Cancel timeout timer once lock acquired to prevent event loop timer leaks (HIGH-001)
       await Promise.race([
@@ -126,19 +127,36 @@ export class InMemoryRoomStore implements RoomStore {
           );
         }),
       ]);
+      acquired = true;
       if (timer) clearTimeout(timer);
 
       return await action();
     } finally {
       if (timer) clearTimeout(timer);
-      releaseLock();
-      const currentEntry = this.lockQueues.get(code);
-      if (currentEntry) {
-        currentEntry.waitersCount--;
-        if (currentEntry.waitersCount <= 0) {
-          // Prevent memory leak: purge drained queue
-          this.lockQueues.delete(code);
+      if (acquired) {
+        releaseLock();
+        const currentEntry = this.lockQueues.get(code);
+        if (currentEntry) {
+          currentEntry.waitersCount--;
+          if (currentEntry.waitersCount <= 0) {
+            // Prevent memory leak: purge drained queue
+            this.lockQueues.delete(code);
+          }
         }
+      } else {
+        // CRIT-002: On timeout before acquisition, do NOT prematurely release the lock
+        // or delete the queue from lockQueues.
+        // Forward resolution once prevTail settles so queued waiters remain blocked until the slow holder completes.
+        prevTail.finally(() => {
+          releaseLock();
+          const currentEntry = this.lockQueues.get(code);
+          if (currentEntry) {
+            currentEntry.waitersCount--;
+            if (currentEntry.waitersCount <= 0) {
+              this.lockQueues.delete(code);
+            }
+          }
+        });
       }
     }
   }
@@ -170,7 +188,10 @@ export class InMemoryRoomStore implements RoomStore {
       const roomToSave: RoomState = {
         ...structuredClone(updatedRoom),
         version: nextVersion,
-        lastActivityAt: updatedRoom.lastActivityAt ?? Date.now(),
+        lastActivityAt:
+          updatedRoom.lastActivityAt !== existing.lastActivityAt
+            ? updatedRoom.lastActivityAt
+            : Date.now(),
       };
 
       this.rooms.set(code, roomToSave);

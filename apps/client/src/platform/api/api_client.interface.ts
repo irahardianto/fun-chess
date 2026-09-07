@@ -7,6 +7,8 @@ export interface ApiRequestOptions {
   signal?: AbortSignal;
   /** Custom request headers */
   headers?: Record<string, string>;
+  /** Optional correlation ID for tracing across client and server */
+  correlationId?: string;
 }
 
 export interface ApiResponse<T> {

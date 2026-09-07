@@ -29,7 +29,7 @@ export const knightJumpsScenario: ChessScenario = {
       instruction: 'Black left a pawn unprotected on e5! Jump your Knight from f3 to e5 to capture it!',
       conceptExplanation: 'Knights capture whatever is on their final destination square.',
       hint: 'Select the Knight on f3 and leap to e5.',
-      setupFen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 2',
+      setupFen: 'rnbqkbnr/1ppppppp/p7/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 2',
       highlightSquares: ['f3', 'e5'],
       threatSquares: ['e5'],
       playerColor: 'w',

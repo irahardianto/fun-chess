@@ -18,6 +18,7 @@ import { DEFAULT_PLAYER_AVATAR } from '@fun-chess/shared';
 import { createSocketClient, type TypedSocket } from '../platform/socket/socket_client';
 import { audioSynthesizer } from '../platform/audio/audio_synthesizer';
 import { safeSessionStorage, createSafeStorage, type KeyValueStorage } from '../platform/storage';
+import { generateCorrelationId } from '../platform/telemetry';
 
 /** Session storage key for persisting fun-chess multiplayer sessions */
 export const SESSION_STORAGE_KEY = 'fun_chess_session_token';
@@ -381,9 +382,12 @@ function detachListeners(s: TypedSocket): void {
 // ----------------------------------------------------------------------------
 // Public Action Operations
 // ----------------------------------------------------------------------------
-function initSocket(url?: string): TypedSocket {
+function initSocket(url?: string, correlationId?: string): TypedSocket {
   if (!socket.value) {
-    socket.value = createSocketClient(url);
+    socket.value = createSocketClient({
+      url,
+      correlationId: correlationId || generateCorrelationId(),
+    });
   }
   attachListeners(socket.value);
   return socket.value;
@@ -412,12 +416,14 @@ async function createRoom(
   if (!s.connected) s.connect();
 
   return new Promise((resolve) => {
+    let hasTimedOut = false;
     const payload: CreateRoomRequest = {
       playerName,
       preferredColor,
       avatar: avatar || DEFAULT_PLAYER_AVATAR,
     };
     const timer = setTimeout(() => {
+      hasTimedOut = true;
       const err: SocketErrorPayload = {
         code: 'ERR_SOCKET_TIMEOUT',
         message: 'Connection timed out. Please ensure the server is running.',
@@ -427,6 +433,7 @@ async function createRoom(
     }, 8000);
 
     s.emit('room:create', payload, (res) => {
+      if (hasTimedOut) return;
       clearTimeout(timer);
       if (res.success) {
         currentRoom.value = res.room;
@@ -460,12 +467,14 @@ async function joinRoom(
   if (!s.connected) s.connect();
 
   return new Promise((resolve) => {
+    let hasTimedOut = false;
     const payload: JoinRoomRequest = {
       roomCode: roomCode.toUpperCase(),
       playerName,
       avatar: avatar || DEFAULT_PLAYER_AVATAR,
     };
     const timer = setTimeout(() => {
+      hasTimedOut = true;
       const err: SocketErrorPayload = {
         code: 'ERR_SOCKET_TIMEOUT',
         message: 'Connection timed out. Please check the room code and try again.',
@@ -475,6 +484,7 @@ async function joinRoom(
     }, 8000);
 
     s.emit('room:join', payload, (res) => {
+      if (hasTimedOut) return;
       clearTimeout(timer);
       if (res.success) {
         currentRoom.value = res.room;
@@ -507,8 +517,10 @@ async function makeMove(
   }
 
   return new Promise((resolve) => {
+    let hasTimedOut = false;
     const payload: MakeMoveRequest = { roomCode: roomCode.toUpperCase(), move };
     const timer = setTimeout(() => {
+      hasTimedOut = true;
       const err: SocketErrorPayload = {
         code: 'ERR_SOCKET_TIMEOUT',
         message: 'Move submission timed out.',
@@ -518,6 +530,7 @@ async function makeMove(
     }, 8000);
 
     s.emit('game:move', payload, (res) => {
+      if (hasTimedOut) return;
       clearTimeout(timer);
       if (!res.success) {
         lastError.value = res.error;
@@ -536,12 +549,14 @@ async function reconnect(
   if (!s.connected) s.connect();
 
   return new Promise((resolve) => {
+    let hasTimedOut = false;
     const payload: ReconnectRequest = {
       roomCode: roomCode.toUpperCase(),
       playerId,
       sessionToken: token,
     };
     const timer = setTimeout(() => {
+      hasTimedOut = true;
       const err: SocketErrorPayload = {
         code: 'ERR_SOCKET_TIMEOUT',
         message: 'Reconnection timed out.',
@@ -551,6 +566,7 @@ async function reconnect(
     }, 8000);
 
     s.emit('room:reconnect', payload, (res) => {
+      if (hasTimedOut) return;
       clearTimeout(timer);
       if (res.success) {
         currentRoom.value = res.room;
@@ -576,34 +592,131 @@ async function reconnect(
   });
 }
 
-function resign(roomCode: string): void {
+function resign(
+  roomCode: string,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
   if (socket.value) {
-    socket.value.emit('game:resign', { roomCode: roomCode.toUpperCase() });
+    if (callback) {
+      let hasTimedOut = false;
+      const timer = setTimeout(() => {
+        hasTimedOut = true;
+        callback({
+          success: false,
+          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Resign timed out.' },
+        });
+      }, 8000);
+      socket.value.emit('game:resign', { roomCode: roomCode.toUpperCase() }, (res) => {
+        if (hasTimedOut) return;
+        clearTimeout(timer);
+        callback(res);
+      });
+    } else {
+      socket.value.emit('game:resign', { roomCode: roomCode.toUpperCase() });
+    }
   }
 }
 
-function offerDraw(roomCode: string): void {
+function offerDraw(
+  roomCode: string,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
   if (socket.value) {
-    socket.value.emit('game:offer_draw', { roomCode: roomCode.toUpperCase() });
+    if (callback) {
+      let hasTimedOut = false;
+      const timer = setTimeout(() => {
+        hasTimedOut = true;
+        callback({
+          success: false,
+          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Draw offer timed out.' },
+        });
+      }, 8000);
+      socket.value.emit('game:offer_draw', { roomCode: roomCode.toUpperCase() }, (res) => {
+        if (hasTimedOut) return;
+        clearTimeout(timer);
+        callback(res);
+      });
+    } else {
+      socket.value.emit('game:offer_draw', { roomCode: roomCode.toUpperCase() });
+    }
   }
 }
 
-function respondDraw(roomCode: string, accept: boolean): void {
+function respondDraw(
+  roomCode: string,
+  accept: boolean,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
   if (socket.value) {
-    socket.value.emit('game:respond_draw', { roomCode: roomCode.toUpperCase(), accept });
+    if (callback) {
+      let hasTimedOut = false;
+      const timer = setTimeout(() => {
+        hasTimedOut = true;
+        callback({
+          success: false,
+          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Draw response timed out.' },
+        });
+      }, 8000);
+      socket.value.emit('game:respond_draw', { roomCode: roomCode.toUpperCase(), accept }, (res) => {
+        if (hasTimedOut) return;
+        clearTimeout(timer);
+        callback(res);
+      });
+    } else {
+      socket.value.emit('game:respond_draw', { roomCode: roomCode.toUpperCase(), accept });
+    }
     drawOfferedBy.value = null;
   }
 }
 
-function requestRematch(roomCode: string): void {
+function requestRematch(
+  roomCode: string,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
   if (socket.value) {
-    socket.value.emit('game:request_rematch', { roomCode: roomCode.toUpperCase() });
+    if (callback) {
+      let hasTimedOut = false;
+      const timer = setTimeout(() => {
+        hasTimedOut = true;
+        callback({
+          success: false,
+          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch request timed out.' },
+        });
+      }, 8000);
+      socket.value.emit('game:request_rematch', { roomCode: roomCode.toUpperCase() }, (res) => {
+        if (hasTimedOut) return;
+        clearTimeout(timer);
+        callback(res);
+      });
+    } else {
+      socket.value.emit('game:request_rematch', { roomCode: roomCode.toUpperCase() });
+    }
   }
 }
 
-function respondRematch(roomCode: string, accept: boolean): void {
+function respondRematch(
+  roomCode: string,
+  accept: boolean,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
   if (socket.value) {
-    socket.value.emit('game:respond_rematch', { roomCode: roomCode.toUpperCase(), accept });
+    if (callback) {
+      let hasTimedOut = false;
+      const timer = setTimeout(() => {
+        hasTimedOut = true;
+        callback({
+          success: false,
+          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch response timed out.' },
+        });
+      }, 8000);
+      socket.value.emit('game:respond_rematch', { roomCode: roomCode.toUpperCase(), accept }, (res) => {
+        if (hasTimedOut) return;
+        clearTimeout(timer);
+        callback(res);
+      });
+    } else {
+      socket.value.emit('game:respond_rematch', { roomCode: roomCode.toUpperCase(), accept });
+    }
     rematchRequestedBy.value = null;
   }
 }

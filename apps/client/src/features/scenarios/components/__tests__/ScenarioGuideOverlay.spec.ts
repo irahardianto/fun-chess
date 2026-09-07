@@ -58,6 +58,41 @@ describe('ScenarioGuideOverlay.vue', () => {
     expect(wrapper.find('.bubble-text').text()).toBe('Push the e2 pawn two squares forward to e4.');
   });
 
+  it('renders hint bubble in-flow within guide container without obscuring board ranks', () => {
+    const wrapper = mount(ScenarioGuideOverlay, {
+      props: {
+        step: mockStep,
+        currentStepIndex: 0,
+        totalSteps: 1,
+        activeHint: 'Push the e2 pawn two squares forward to e4.',
+      },
+    });
+
+    const guideContainer = wrapper.find('.scenario-guide-container');
+    expect(guideContainer.exists()).toBe(true);
+
+    const hintBubble = guideContainer.find('.guide-hint-bubble');
+    expect(hintBubble.exists()).toBe(true);
+
+    // Verify it is placed inside the in-flow DOM hierarchy within the guide container
+    expect(hintBubble.find('.mascot-avatar-small').text()).toBe('🐶');
+    expect(hintBubble.find('.bubble-speaker').text()).toBe('Peanut’s Hint:');
+    expect(hintBubble.find('.bubble-text').text()).toBe('Push the e2 pawn two squares forward to e4.');
+  });
+
+  it('does not render hint bubble when activeHint is null', () => {
+    const wrapper = mount(ScenarioGuideOverlay, {
+      props: {
+        step: mockStep,
+        currentStepIndex: 0,
+        totalSteps: 1,
+        activeHint: null,
+      },
+    });
+
+    expect(wrapper.find('.guide-hint-bubble').exists()).toBe(false);
+  });
+
   it('emits askHint event when Hint button is clicked', async () => {
     const wrapper = mount(ScenarioGuideOverlay, {
       props: {

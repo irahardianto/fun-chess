@@ -138,13 +138,38 @@ export interface ClientToServerEvents {
     ) => void,
   ) => void;
   /** Resigns from an active game */
-  "game:resign": (req: ResignRequest) => void;
+  "game:resign": (
+    req: ResignRequest,
+    callback?: (
+      res: { success: true } | { success: false; error: SocketErrorPayload },
+    ) => void,
+  ) => void;
   /** Offers a draw to the opponent */
-  "game:offer_draw": (req: OfferDrawRequest) => void;
+  "game:offer_draw": (
+    req: OfferDrawRequest,
+    callback?: (
+      res: { success: true } | { success: false; error: SocketErrorPayload },
+    ) => void,
+  ) => void;
   /** Accepts or declines a received draw offer */
-  "game:respond_draw": (req: RespondDrawRequest) => void;
+  "game:respond_draw": (
+    req: RespondDrawRequest,
+    callback?: (
+      res: { success: true } | { success: false; error: SocketErrorPayload },
+    ) => void,
+  ) => void;
   /** Requests a rematch after game conclusion */
-  "game:request_rematch": (req: RequestRematchRequest) => void;
+  "game:request_rematch": (
+    req: RequestRematchRequest,
+    callback?: (
+      res: { success: true } | { success: false; error: SocketErrorPayload },
+    ) => void,
+  ) => void;
   /** Accepts or declines a received rematch request */
-  "game:respond_rematch": (req: RespondRematchRequest) => void;
+  "game:respond_rematch": (
+    req: RespondRematchRequest,
+    callback?: (
+      res: { success: true } | { success: false; error: SocketErrorPayload },
+    ) => void,
+  ) => void;
 }

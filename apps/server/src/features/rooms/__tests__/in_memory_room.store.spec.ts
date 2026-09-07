@@ -261,6 +261,62 @@ describe("InMemoryRoomStore", () => {
       blockerResolve();
       await holder;
     });
+
+    it("preserves mutual exclusion when an intermediate waiter times out (CRIT-002)", async () => {
+      const code = "CRIT";
+      (store as any).LOCK_TIMEOUT_MS = 30;
+
+      let holderFinished = false;
+      let holderResolve!: () => void;
+      const holderBlocker = new Promise<void>((resolve) => {
+        holderResolve = resolve;
+      });
+
+      // 1. Holder acquires lock and holds it
+      const holder = store.withLock(code, async () => {
+        await holderBlocker;
+        holderFinished = true;
+        return "holder_done";
+      });
+
+      // 2. Waiter 1 is enqueued and will time out in 30ms
+      const waiter1 = store.withLock(code, async () => "waiter1_done");
+
+      // Waiter 1 must reject with LockTimeoutError
+      await expect(waiter1).rejects.toThrow(LockTimeoutError);
+
+      // Verify that holder is STILL running and holder has NOT finished
+      expect(holderFinished).toBe(false);
+      // Verify that the queue is NOT prematurely deleted from lockQueues
+      expect((store as any).lockQueues.has(code)).toBe(true);
+
+      // 3. Waiter 2 is queued behind waiter 1 (with plenty of time)
+      (store as any).LOCK_TIMEOUT_MS = 5000;
+      let waiter2Started = false;
+      const waiter2 = store.withLock(code, async () => {
+        // When waiter 2 runs, holder MUST be finished
+        expect(holderFinished).toBe(true);
+        waiter2Started = true;
+        return "waiter2_done";
+      });
+
+      // Allow a few ticks: waiter 2 should STILL be waiting because holder hasn't finished
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(waiter2Started).toBe(false);
+
+      // Now release holder
+      holderResolve();
+      const holderResult = await holder;
+      expect(holderResult).toBe("holder_done");
+
+      // Waiter 2 can now complete
+      const waiter2Result = await waiter2;
+      expect(waiter2Result).toBe("waiter2_done");
+      expect(waiter2Started).toBe(true);
+
+      // After all complete, lock queue is cleaned up
+      expect((store as any).lockQueues.has(code)).toBe(false);
+    });
   });
 
   describe("mutate", () => {

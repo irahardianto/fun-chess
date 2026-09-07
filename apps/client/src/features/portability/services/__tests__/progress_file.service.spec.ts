@@ -24,6 +24,30 @@ describe('ProgressFileService', () => {
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(appendSpy).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/mock-uuid');
+
+    clickSpy.mockRestore();
+  });
+
+  it('guarantees DOM node removal and URL revocation in finally block even when click throws', () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue('blob:http://localhost/mock-uuid');
+    const mockRevokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', {
+      createObjectURL: mockCreateObjectURL,
+      revokeObjectURL: mockRevokeObjectURL,
+    });
+
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
+      throw new Error('Simulated click failure');
+    });
+    const removeChildSpy = vi.spyOn(document.body, 'removeChild');
+
+    expect(() => service.downloadProgressFile('{"test": true}', 'fail.json')).toThrow(
+      'Unable to download backup file'
+    );
+
+    expect(removeChildSpy).toHaveBeenCalled();
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/mock-uuid');
 
     clickSpy.mockRestore();
   });

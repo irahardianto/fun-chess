@@ -10,7 +10,8 @@ services:
       - NODE_ENV=production
       - LAN_IP=${LAN_IP:-}
       - HOST_IP=${HOST_IP:-}
-      - PUBLIC_URL=${PUBLIC_URL:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost:3000}
     restart: unless-stopped
     healthcheck:
       test:

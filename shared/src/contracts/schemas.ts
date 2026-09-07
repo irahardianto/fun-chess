@@ -12,14 +12,17 @@ export const RoomCodeSchema = z
   .transform((code) => code.toUpperCase());
 
 /**
- * Sanitized player nickname schema (1-20 characters, control characters and HTML tags stripped).
+ * Sanitized player nickname schema (1-20 characters, strict allowlist: letters, digits, space, underscore, dot, dash).
  */
 export const PlayerNameSchema = z
   .string()
   .trim()
   .min(1, "Player name cannot be empty")
   .max(20, "Player name must be 20 characters or fewer")
-  .transform((name) => name.replace(/[<>&"']/g, ""));
+  .regex(
+    /^[a-zA-Z0-9 _.-]{1,20}$/,
+    "Player name must contain only alphanumeric characters, spaces, dots, dashes, or underscores",
+  );
 
 /**
  * Player avatar emoji schema (max 16 characters, defaults to 🦁).
@@ -193,17 +196,37 @@ export const HealthCheckResponseSchema = z.object({
 });
 export type HealthCheckResponse = z.infer<typeof HealthCheckResponseSchema>;
 
+const emptyStringToUndefined = (val: unknown): unknown =>
+  typeof val === "string" && val.trim() === "" ? undefined : val;
+
 /**
  * Server environment configuration validation schema.
  */
 export const ServerEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  PORT: z.coerce.number().int().min(1024).max(65535).default(3000),
+  PORT: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce
+      .number()
+      .int()
+      .min(0, "Port must be >= 0")
+      .max(65535, "Port must be <= 65535")
+      .default(3000),
+  ),
   HOST: z.string().default("0.0.0.0"),
-  CORS_ORIGIN: z.string().optional(),
-  PUBLIC_URL: z.string().url().optional(),
-  LAN_IP: z.string().ip().optional(),
-  HOST_IP: z.string().ip().optional(),
+  CORS_ORIGIN: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  PUBLIC_URL: z.preprocess(
+    emptyStringToUndefined,
+    z.string().url("PUBLIC_URL must be a valid URL").optional(),
+  ),
+  LAN_IP: z.preprocess(
+    emptyStringToUndefined,
+    z.string().ip("LAN_IP must be a valid IP address").optional(),
+  ),
+  HOST_IP: z.preprocess(
+    emptyStringToUndefined,
+    z.string().ip("HOST_IP must be a valid IP address").optional(),
+  ),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
 });
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;

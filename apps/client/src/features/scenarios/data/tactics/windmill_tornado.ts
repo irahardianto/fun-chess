@@ -5,8 +5,8 @@ export const windmillTornadoScenario: ChessScenario = {
   title: 'The Whirlwind Windmill! 🌪️',
   subtitle: 'Spin alternating checks between Rook and Bishop to vacuum up enemy pieces!',
   category: 'intermediate_tactics',
-  difficulty: 'intermediate',
-  targetAgeGroup: '7-10',
+  difficulty: 'advanced',
+  targetAgeGroup: '11-15',
   icon: '🌪️',
   description: 'The "Windmill" (or Whirlwind) is one of the most exciting combinations in chess: a Rook and Bishop alternate checks and discovered checks to sweep off enemy pieces one by one!',
   estimatedMinutes: 3,
@@ -21,7 +21,9 @@ export const windmillTornadoScenario: ChessScenario = {
       highlightSquares: ['g7', 'f7'],
       threatSquares: ['h8'],
       playerColor: 'w',
-      allowedMoves: [{ from: 'g7', to: 'f7' }],
+      allowedMoves: [
+        { from: 'g7', to: 'f7' },
+      ],
       opponentResponse: {
         from: 'h8',
         to: 'g8',
@@ -59,7 +61,9 @@ export const windmillTornadoScenario: ChessScenario = {
       highlightSquares: ['g7', 'g5'],
       threatSquares: ['h8', 'b5'],
       playerColor: 'w',
-      allowedMoves: [{ from: 'g7', to: 'g5' }],
+      allowedMoves: [
+        { from: 'g7', to: 'g5' },
+      ],
       explanationOnSuccess: 'Grand prize won! The windmill vacuumed up material and won the Black Queen!',
     },
   ],

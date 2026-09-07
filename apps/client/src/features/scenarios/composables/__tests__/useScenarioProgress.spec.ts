@@ -51,10 +51,10 @@ describe('useScenarioProgress', () => {
     await progressComposable.loadProgress();
 
     const rulesStats = progressComposable.getCategoryStats('fundamentals');
-    expect(rulesStats.total).toBe(6);
+    expect(rulesStats.total).toBe(8);
     expect(rulesStats.completed).toBe(2);
     expect(rulesStats.starsEarned).toBe(6);
-    expect(rulesStats.maxStars).toBe(18);
+    expect(rulesStats.maxStars).toBe(24);
   });
 
   it('resets all progress cleanly via resetAll', async () => {

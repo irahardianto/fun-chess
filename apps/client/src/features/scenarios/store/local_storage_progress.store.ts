@@ -4,6 +4,7 @@ import type {
   ScenarioProgressStore,
   StarRating,
 } from '@fun-chess/shared';
+import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
 
 export const SCENARIO_PROGRESS_STORAGE_KEY = 'fun_chess_scenario_progress_v1';
 
@@ -14,24 +15,15 @@ export const SCENARIO_PROGRESS_STORAGE_KEY = 'fun_chess_scenario_progress_v1';
  */
 export class LocalStorageProgressStore implements ScenarioProgressStore {
   private readonly storageKey: string;
+  private readonly storage: KeyValueStorage;
   private memoryFallback: Map<string, ScenarioProgress> = new Map();
 
-  constructor(storageKey: string = SCENARIO_PROGRESS_STORAGE_KEY) {
+  constructor(
+    storageKey: string = SCENARIO_PROGRESS_STORAGE_KEY,
+    storage: KeyValueStorage = safeLocalStorage
+  ) {
     this.storageKey = storageKey;
-  }
-
-  private isStorageAvailable(): boolean {
-    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-      return false;
-    }
-    try {
-      const testKey = `__fc_test_${Date.now()}__`;
-      window.localStorage.setItem(testKey, '1');
-      window.localStorage.removeItem(testKey);
-      return true;
-    } catch {
-      return false;
-    }
+    this.storage = storage;
   }
 
   private sanitizeRecord(raw: unknown): ScenarioProgress | null {
@@ -74,7 +66,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
   }
 
   public async getProgressMap(): Promise<ScenarioProgressMap> {
-    if (!this.isStorageAvailable()) {
+    if (!this.storage.isAvailable()) {
       const result: ScenarioProgressMap = {};
       for (const [id, rec] of this.memoryFallback.entries()) {
         result[id] = { ...rec };
@@ -83,7 +75,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
     }
 
     try {
-      const raw = window.localStorage.getItem(this.storageKey);
+      const raw = this.storage.getItem(this.storageKey);
       if (!raw) return {};
 
       const parsed = JSON.parse(raw);
@@ -136,9 +128,9 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
     currentMap[scenarioId] = updated;
     this.memoryFallback.set(scenarioId, updated);
 
-    if (this.isStorageAvailable()) {
+    if (this.storage.isAvailable()) {
       try {
-        window.localStorage.setItem(this.storageKey, JSON.stringify(currentMap));
+        this.storage.setItem(this.storageKey, JSON.stringify(currentMap));
       } catch {
         // Fallback already updated in memoryFallback
       }
@@ -149,9 +141,9 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
 
   public async resetAllProgress(): Promise<void> {
     this.memoryFallback.clear();
-    if (this.isStorageAvailable()) {
+    if (this.storage.isAvailable()) {
       try {
-        window.localStorage.removeItem(this.storageKey);
+        this.storage.removeItem(this.storageKey);
       } catch {
         // Safe ignore
       }

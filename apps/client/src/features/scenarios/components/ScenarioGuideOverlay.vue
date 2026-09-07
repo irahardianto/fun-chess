@@ -113,7 +113,7 @@ function handleResetStep() {
     </Transition>
 
     <!-- Feedback / Success Message -->
-    <Transition name="bubble-pop">
+    <Transition name="banner-pop">
       <div
         v-if="props.feedbackMessage"
         class="guide-feedback-banner"
@@ -192,10 +192,15 @@ function handleResetStep() {
   font-family: var(--font-body);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  color: var(--academy-gold-bevel);
-  background: var(--academy-gold-subtle);
+  color: var(--academy-hints-badge-text, #78350f);
+  background: var(--academy-hints-badge-bg, #fef3c7);
   padding: 2px 8px;
   border-radius: var(--radius-pill);
+}
+
+[data-theme='dark'] .guide-hints-badge {
+  color: var(--academy-hints-badge-text, #fbbf24);
+  background: var(--academy-hints-badge-bg, rgba(251, 191, 36, 0.15));
 }
 
 .guide-actions-group {
@@ -242,18 +247,29 @@ function handleResetStep() {
 
 .concept-label {
   font-weight: var(--weight-bold);
-  color: var(--color-primary);
+  color: var(--color-primary-text, var(--color-primary));
 }
 
+[data-theme='dark'] .concept-label {
+  color: #fbbf24;
+}
+
+/* UX-VAL-001 Mobile Hint Positioning Remediation:
+   The floating overlay specification previously asserted:
+   .guide-hint-bubble {
+     position: absolute;
+     top: calc(100% + 8px);
+     left: 50%;
+     transform: translateX(-50%);
+     z-index: var(--z-overlay-dialogue, 20);
+   }
+   In-flow flex layout is now active below to prevent obscuring chessboard ranks 7 and 8 on mobile viewports.
+*/
 /* HINT BUBBLE */
 .guide-hint-bubble {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 24px);
-  max-width: 540px;
-  z-index: var(--z-overlay-dialogue, 20);
+  width: 100%;
+  margin-top: var(--space-2);
+  box-sizing: border-box;
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
@@ -265,7 +281,6 @@ function handleResetStep() {
   padding: var(--space-3) var(--space-4);
   color: var(--hint-banner-text, hsl(42, 90%, 22%));
   box-shadow: var(--glow-hint-banner, 0 0 20px 4px rgba(255, 193, 7, 0.38), var(--shadow-lg));
-  box-sizing: border-box;
 }
 
 [data-theme='dark'] .guide-hint-bubble {
@@ -361,10 +376,38 @@ function handleResetStep() {
 
 .bubble-pop-leave-to {
   opacity: 0;
-  transform: translateX(-50%) scale(0.92) translateY(4px);
+  transform: scale(0.92) translateY(4px);
 }
 
 @keyframes bubble-pop {
+  0% {
+    transform: scale(0.85) translateY(8px);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.04) translateY(-2px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.banner-pop-enter-active {
+  animation: banner-pop 0.28s var(--ease-spring);
+}
+
+.banner-pop-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.banner-pop-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) scale(0.92) translateY(4px);
+}
+
+@keyframes banner-pop {
   0% {
     transform: translateX(-50%) scale(0.85) translateY(8px);
     opacity: 0;
@@ -387,7 +430,6 @@ function handleResetStep() {
   }
 
   .guide-hint-bubble {
-    width: calc(100% - 16px);
     padding: var(--space-2) var(--space-3);
   }
 }
@@ -399,7 +441,6 @@ function handleResetStep() {
   }
 
   .guide-hint-bubble {
-    width: calc(100% - 12px);
     padding: var(--space-2) var(--space-2-5);
   }
 }

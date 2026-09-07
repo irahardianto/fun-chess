@@ -3,9 +3,9 @@ import { Chess } from 'chess.js';
 import { ALL_SCENARIOS, SCENARIOS_MAP, CURRICULUM_SECTIONS } from '../index';
 
 describe('Scenarios Data Integrity & Chess Rules Validation', () => {
-  it('contains exactly 43 curated scenarios', () => {
-    expect(ALL_SCENARIOS.length).toBe(43);
-    expect(SCENARIOS_MAP.size).toBe(43);
+  it('contains exactly 49 curated scenarios', () => {
+    expect(ALL_SCENARIOS.length).toBe(49);
+    expect(SCENARIOS_MAP.size).toBe(49);
   });
 
   it('has unique identifiers for every scenario', () => {
@@ -50,6 +50,7 @@ describe('Scenarios Data Integrity & Chess Rules Validation', () => {
     'king-queen-mate',
     'king-rook-mate',
     'legals-trap',
+    'stalemate-vs-checkmate',
   ];
 
   it.each(CHECKMATE_DELIVERY_SCENARIOS)('verifies final step delivers true checkmate in %s', (scenarioId) => {

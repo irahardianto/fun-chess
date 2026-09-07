@@ -21,12 +21,15 @@ export const clearanceInterferenceScenario: ChessScenario = {
       highlightSquares: ['d1', 'd7'],
       threatSquares: ['e7'],
       playerColor: 'w',
-      allowedMoves: [{ from: 'd1', to: 'd7' }],
+      allowedMoves: [
+        { from: 'd1', to: 'd7' },
+        { from: 'h5', to: 'h7' },
+      ],
       opponentResponse: {
         from: 'e7',
         to: 'd7',
         delayMs: 500,
-        dialogue: 'You hung your Rook on d7! I must take it with my Queen!',
+        dialogue: 'You attacked my Queen with your Rook! I must capture it with my Queen!',
       },
       explanationOnSuccess: 'Interference successful! Black’s Queen was forced to capture on d7, leaving h7 completely exposed!',
     },

@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted, getCurrentInstance } from 'vue';
+import { ref, computed } from 'vue';
 import type {
   Square,
   PieceColor,
@@ -6,7 +6,6 @@ import type {
   MascotId,
   MascotPersona,
   HintRecommendation,
-  TakebackSnapshot,
   GameOverPayload,
   MoveResult,
 } from '@fun-chess/shared';
@@ -17,10 +16,11 @@ import {
 } from '@fun-chess/shared';
 import {
   getMascotPersona,
-  getAiConfigForMascot,
 } from '../data/index.js';
-import { minimaxEngine, hintEngine } from '../engine/index.js';
+import { hintEngine } from '../engine/index.js';
 import { useMascotBanter } from './useMascotBanter.js';
+import { useAiWorker } from './useAiWorker.js';
+import { useTakebackHistory } from './useTakebackHistory.js';
 import { useBoardSelection, type SelectionMoveResult } from '../../board/index.js';
 
 export interface MoveOutcomeEvent {
@@ -49,6 +49,11 @@ export interface UseAiGameOptions {
   onGameCompletion?: (event: GameCompletionOutcomeEvent) => void;
 }
 
+/**
+ * useAiGame composable (MAJ-041).
+ * Decomposed orchestrator wiring AI worker execution, move history / takebacks,
+ * board selection state machine, and mascot dialogue banter.
+ */
 export function useAiGame(options: UseAiGameOptions = {}) {
   const {
     mascotId: initialMascotId = 'peanut',
@@ -57,20 +62,20 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     autoStart = true,
   } = options;
 
-  // Mascot Persona & Reactive Banter
+  // 1. Mascot Persona & Reactive Banter
   const mascot = ref<MascotPersona>(getMascotPersona(initialMascotId));
   const banter = useMascotBanter({ persona: mascot });
 
-  // Chess Rules Engine Instance
+  // 2. Chess Rules Engine Instance
   const chess = createSafeChess(initialFen);
 
-  // Player & Game Configuration
+  // 3. Player & Game Configuration
   const rawPlayerColor = ref<PieceColor | 'random'>(initialPlayerColor);
   const playerColor = ref<PieceColor>('w');
   const aiColor = computed<PieceColor>(() => (playerColor.value === 'w' ? 'b' : 'w'));
   const orientation = ref<PieceColor>('w');
 
-  // Board State Refs
+  // 4. Board State Signals
   const fen = ref<string>(chess.fen());
   const turn = ref<PieceColor>(chess.turn() as PieceColor);
   const isCheck = ref<boolean>(chess.inCheck());
@@ -78,29 +83,36 @@ export function useAiGame(options: UseAiGameOptions = {}) {
   const isDraw = ref<boolean>(chess.isDraw());
   const isStalemate = ref<boolean>(chess.isStalemate());
   const isGameOver = ref<boolean>(chess.isGameOver());
-  const moveHistory = ref<MoveResult[]>([]);
-  const lastMove = ref<{ from: string; to: string } | null>(null);
   const lastGameOver = ref<GameOverPayload | null>(null);
 
-  // Outcome Events (Decoupled multimedia side effects)
+  // 5. Outcome Events (Decoupled multimedia side effects)
   const lastMoveOutcome = ref<MoveOutcomeEvent | null>(null);
   const lastGameCompletion = ref<GameCompletionOutcomeEvent | null>(null);
 
-  // AI State & Async Operation Control
-  const isAiThinking = ref<boolean>(false);
-  let activeAiOperationId = 0;
   let matchStartTime = Date.now();
 
-  // Captured Pieces & Material (MIN-009)
+  // 6. Captured Pieces & Material (MIN-009)
   const capturedWhite = ref<PieceType[]>([]);
   const capturedBlack = ref<PieceType[]>([]);
   const materialAdvantage = ref<{ white: number; black: number }>({ white: 0, black: 0 });
 
-  // Takeback / Undo Stack
-  const takebackStack = ref<TakebackSnapshot[]>([]);
-  const takebackCount = ref<number>(0);
+  // 7. Sub-composable: AI Worker Execution (MAJ-041)
+  const aiWorker = useAiWorker();
+  const { isAiThinking, cancelCalculation, requestAiMove } = aiWorker;
 
-  // Smart Hints
+  // 8. Sub-composable: Move History & Takeback Stack (MAJ-041)
+  const history = useTakebackHistory({
+    isAiThinking,
+  });
+  const {
+    takebackStack,
+    takebackCount,
+    moveHistory,
+    lastMove,
+    canTakeback,
+  } = history;
+
+  // 9. Smart Hints
   const activeHint = ref<HintRecommendation | null>(null);
   const hintsCount = ref<number>(0);
 
@@ -133,22 +145,12 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     isStalemate.value = chess.isStalemate();
     isGameOver.value = chess.isGameOver();
 
-    // Use shared pure evaluation utility (MIN-009)
+    // Pure evaluation utility
     const { capturedWhite: cW, capturedBlack: cB, materialAdvantage: mA } =
       calculateMaterialAndCaptures(chess);
     capturedWhite.value = cW;
     capturedBlack.value = cB;
     materialAdvantage.value = mA;
-  }
-
-  function captureTakebackSnapshot(): TakebackSnapshot {
-    return {
-      fen: chess.fen(),
-      turn: chess.turn() as PieceColor,
-      moveCount: moveHistory.value.length,
-      capturedWhite: [...capturedWhite.value],
-      capturedBlack: [...capturedBlack.value],
-    };
   }
 
   function resolvePlayerColor(colorOption: PieceColor | 'random'): PieceColor {
@@ -222,8 +224,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
   }
 
   function applyAiMoveResult(result: import('chess.js').Move, isBlunder = false): void {
-    lastMove.value = { from: result.from, to: result.to };
-
     const moveRes: MoveResult = {
       from: result.from,
       to: result.to,
@@ -238,7 +238,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       timestamp: Date.now(),
     };
 
-    moveHistory.value.push(moveRes);
+    history.recordMove(moveRes);
     updateLocalState();
 
     const moveOutcome: MoveOutcomeEvent = {
@@ -269,61 +269,29 @@ export function useAiGame(options: UseAiGameOptions = {}) {
   }
 
   /**
-   * Dispatches the AI turn calculation using Minimax search and blunder generation.
+   * Dispatches the AI turn calculation via useAiWorker.
    */
   async function dispatchAiMove(): Promise<void> {
     if (isGameOver.value || chess.turn() !== aiColor.value) {
       return;
     }
 
-    const currentOpId = ++activeAiOperationId;
-    isAiThinking.value = true;
-
-    try {
-      const config = getAiConfigForMascot(mascot.value.id);
-      const evaluation = await minimaxEngine.findBestMove(chess.fen(), config);
-
-      // Check if this operation was superseded by an undo or reset
-      if (currentOpId !== activeAiOperationId) {
-        return;
-      }
-
-      const chosenMove = evaluation.move;
-      const result = chess.move({
-        from: chosenMove.from as unknown as import('chess.js').Square,
-        to: chosenMove.to as unknown as import('chess.js').Square,
-        promotion: chosenMove.promotion,
-      });
-
-      if (!result) {
-        throw new Error(`AI engine generated invalid move: ${JSON.stringify(chosenMove)}`);
-      }
-
-      applyAiMoveResult(result, evaluation.isBlunder);
-    } catch (err) {
-      if (currentOpId !== activeAiOperationId) {
-        return;
-      }
-      console.error('[useAiGame] AI calculation failed, executing emergency fallback move:', err);
-
-      // Emergency fallback legal move (random or first valid move) so game never freezes
-      const legalMovesList = chess.moves({ verbose: true });
-      if (legalMovesList.length > 0 && !chess.isGameOver()) {
-        const fallback = legalMovesList[Math.floor(Math.random() * legalMovesList.length)];
-        const fallbackResult = chess.move({
-          from: fallback.from,
-          to: fallback.to,
-          promotion: fallback.promotion as 'q' | 'r' | 'b' | 'n' | undefined,
+    await requestAiMove(
+      chess.fen(),
+      mascot.value.id,
+      () => (chess.isGameOver() ? [] : chess.moves({ verbose: true })),
+      (move) => {
+        const res = chess.move({
+          from: move.from as unknown as import('chess.js').Square,
+          to: move.to as unknown as import('chess.js').Square,
+          promotion: move.promotion as 'q' | 'r' | 'b' | 'n' | undefined,
         });
-        if (fallbackResult) {
-          applyAiMoveResult(fallbackResult, false);
+        if (res) {
+          applyAiMoveResult(res, false);
         }
+        return res;
       }
-    } finally {
-      if (currentOpId === activeAiOperationId) {
-        isAiThinking.value = false;
-      }
-    }
+    );
   }
 
   function getSquarePiece(square: Square): { type: PieceType; color: PieceColor } | null {
@@ -364,7 +332,12 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     if (!isPlayerTurn.value) return false;
 
     // Snapshot board state prior to human move for Takeback / Undo
-    const snapshot = captureTakebackSnapshot();
+    const snapshot = history.createSnapshot(
+      chess.fen(),
+      chess.turn() as PieceColor,
+      capturedWhite.value,
+      capturedBlack.value
+    );
 
     try {
       const result = chess.move({
@@ -379,9 +352,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       }
 
       // Commit snapshot to takeback stack
-      takebackStack.value.push(snapshot);
-
-      lastMove.value = { from: result.from, to: result.to };
+      history.pushSnapshot(snapshot);
       activeHint.value = null; // Clear active hint on move
 
       const moveRes: MoveResult = {
@@ -398,7 +369,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
         timestamp: Date.now(),
       };
 
-      moveHistory.value.push(moveRes);
+      history.recordMove(moveRes);
       boardSelection.clearSelection();
       updateLocalState();
 
@@ -435,7 +406,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     }
   }
 
-  // Unified Board Selection State Machine (MIN-010)
+  // Unified Board Selection State Machine
   const boardSelection = useBoardSelection({
     getPieceAt: (sq) => getSquarePiece(sq),
     getLegalMovesForSquare: (sq) => getLegalMoves(sq),
@@ -459,18 +430,14 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     if (takebackStack.value.length === 0) return false;
 
     // Abort pending AI search
-    activeAiOperationId++;
-    isAiThinking.value = false;
+    cancelCalculation();
 
-    const snapshot = takebackStack.value.pop();
+    const snapshot = history.popSnapshot();
     if (!snapshot) return false;
 
     try {
       safeLoadFen(chess, snapshot.fen);
-      moveHistory.value = moveHistory.value.slice(0, snapshot.moveCount);
-      lastMove.value = moveHistory.value.length > 0
-        ? { from: moveHistory.value[moveHistory.value.length - 1]!.from, to: moveHistory.value[moveHistory.value.length - 1]!.to }
-        : null;
+      history.rewindTo(snapshot);
 
       boardSelection.clearSelection();
       activeHint.value = null;
@@ -478,9 +445,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       isGameOver.value = false;
       lastGameOver.value = null;
 
-      takebackCount.value++;
       banter.triggerBanter('takeback_used');
-
       return true;
     } catch (err) {
       console.warn('[useAiGame] takeback failed:', err);
@@ -521,8 +486,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
   function resign(): void {
     if (isGameOver.value) return;
 
-    activeAiOperationId++;
-    isAiThinking.value = false;
+    cancelCalculation();
     isGameOver.value = true;
 
     const durationSeconds = Math.max(1, Math.round((Date.now() - matchStartTime) / 1000));
@@ -556,8 +520,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     newMascotId?: MascotId,
     newPlayerColor?: PieceColor | 'random',
   ): void {
-    activeAiOperationId++;
-    isAiThinking.value = false;
+    cancelCalculation();
 
     if (newMascotId) {
       mascot.value = getMascotPersona(newMascotId);
@@ -577,11 +540,8 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       chess.reset();
     }
 
-    moveHistory.value = [];
-    takebackStack.value = [];
-    takebackCount.value = 0;
+    history.resetHistory();
     hintsCount.value = 0;
-    lastMove.value = null;
     activeHint.value = null;
     isGameOver.value = false;
     lastGameOver.value = null;
@@ -612,13 +572,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     }
   }
 
-  if (getCurrentInstance()) {
-    onUnmounted(() => {
-      activeAiOperationId++;
-      isAiThinking.value = false;
-    });
-  }
-
   return {
     // Mascot & Dialogue
     mascot: computed(() => mascot.value),
@@ -634,7 +587,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     playerColor: computed(() => playerColor.value),
     aiColor,
     isPlayerTurn,
-    isAiThinking: computed(() => isAiThinking.value),
+    isAiThinking,
     isCheck: computed(() => isCheck.value),
     isCheckmate: computed(() => isCheckmate.value),
     isDraw: computed(() => isDraw.value),
@@ -668,7 +621,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     // Learning Tools (Takeback & Hint)
     takebackStack: computed(() => takebackStack.value),
     takebackCount: computed(() => takebackCount.value),
-    canTakeback: computed(() => takebackStack.value.length > 0 && !isAiThinking.value),
+    canTakeback,
     takeback,
 
     activeHint: computed(() => activeHint.value),

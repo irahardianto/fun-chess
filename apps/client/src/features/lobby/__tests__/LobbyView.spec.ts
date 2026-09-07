@@ -3,8 +3,19 @@ import { mount } from '@vue/test-utils';
 import LobbyView from '../LobbyView.vue';
 
 describe('LobbyView.vue', () => {
-  it('renders Mode Switcher, HostCard, JoinCard, and Wi-Fi LAN banner by default', () => {
+  it('defaults fresh users to Chess Academy mode', () => {
     const wrapper = mount(LobbyView);
+
+    expect(wrapper.find('[data-testid="lobby-mode-selector"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="academy-panel"]').exists()).toBe(true);
+    expect(wrapper.find('.academy-browser-container').exists()).toBe(true);
+    expect(wrapper.find('.lan-mode-panel').exists()).toBe(false);
+  });
+
+  it('renders Mode Switcher, HostCard, JoinCard, and Wi-Fi LAN banner in LAN mode', () => {
+    const wrapper = mount(LobbyView, {
+      props: { initialMode: 'multiplayer_lan' },
+    });
 
     expect(wrapper.find('[data-testid="lobby-mode-selector"]').exists()).toBe(true);
     expect(wrapper.find('.host-card').exists()).toBe(true);
@@ -59,7 +70,11 @@ describe('LobbyView.vue', () => {
   });
 
   it('emits host and createRoom events when HostCard submits in LAN mode', async () => {
-    const wrapper = mount(LobbyView);
+    const wrapper = mount(LobbyView, {
+      props: {
+        initialMode: 'multiplayer_lan',
+      },
+    });
 
     const nameInput = wrapper.find('.host-card input');
     await nameInput.setValue('GrandmasterLeo');
@@ -84,6 +99,7 @@ describe('LobbyView.vue', () => {
     const wrapper = mount(LobbyView, {
       props: {
         initialRoomCode: 'STAR',
+        initialMode: 'multiplayer_lan',
       },
     });
 
@@ -117,6 +133,7 @@ describe('LobbyView.vue', () => {
   it('renders Cloud Server Online banner when isCloudRelay is true', () => {
     const wrapper = mount(LobbyView, {
       props: {
+        initialMode: 'multiplayer_lan',
         lanInfo: {
           lanIp: '127.0.0.1',
           port: 3000,
@@ -136,7 +153,11 @@ describe('LobbyView.vue', () => {
   });
 
   it('allows picking an avatar and passes the chosen avatar when hosting a game', async () => {
-    const wrapper = mount(LobbyView);
+    const wrapper = mount(LobbyView, {
+      props: {
+        initialMode: 'multiplayer_lan',
+      },
+    });
 
     // Pick Rocket avatar
     const rocketAvatarBtn = wrapper.find('[data-testid="lobby-avatar-option-🚀"]');
@@ -162,7 +183,11 @@ describe('LobbyView.vue', () => {
   });
 
   it('implements ARIA APG roving tabindex and arrow key navigation for avatar picker', async () => {
-    const wrapper = mount(LobbyView);
+    const wrapper = mount(LobbyView, {
+      props: {
+        initialMode: 'multiplayer_lan',
+      },
+    });
 
     const lionBtn = wrapper.find('[data-testid="lobby-avatar-option-🦁"]');
     const rocketBtn = wrapper.find('[data-testid="lobby-avatar-option-🚀"]');

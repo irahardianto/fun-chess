@@ -159,6 +159,93 @@ describe('Puzzle Validator Engine', () => {
       );
       expect(outcome.isCorrect).toBe(false);
     });
+
+    describe('Alternative Checkmate Acceptance', () => {
+      const dualMatePuzzle: Puzzle = {
+        id: 'test_dual_mate_001',
+        fen: '6k1/5ppp/8/8/8/8/1Q4Q1/4K3 w - - 0 1',
+        moves: ['b2b8'],
+        rating: 800,
+        ratingDeviation: 80,
+        themes: ['mate_in_1'],
+        primaryTheme: 'mate_in_1',
+        difficulty: 'novice',
+        title: 'Dual Checkmate',
+        tacticalGoal: 'Deliver checkmate to the black King',
+        tacticalReward: 'checkmate',
+        outcomeAdvantage: 'Checkmate 👑',
+        learningSummary: 'Delivered decisive checkmate.',
+        keyTakeaway: 'Always prioritize checkmate.',
+        playerColor: 'w',
+        solutionPlies: 1,
+      };
+
+      it('accepts alternative legal move that delivers checkmate even when differing from expected UCI', () => {
+        // Player plays g2g7 (Qg7#) instead of expected b2b8 (Qb8#)
+        const outcome = validatePuzzleMove(
+          dualMatePuzzle,
+          0,
+          dualMatePuzzle.fen,
+          { from: 'g2', to: 'g7' }
+        );
+
+        expect(outcome.isCorrect).toBe(true);
+        expect(outcome.isPuzzleComplete).toBe(true);
+        expect(outcome.nextMoveIndex).toBe(dualMatePuzzle.moves.length);
+        expect(outcome.feedback).toContain('checkmate');
+        expect(outcome.stepExplanation?.moveSan).toContain('#');
+        expect(outcome.analysis?.isCheckmate).toBe(true);
+      });
+
+      it('accepts alternative checkmate on ply 0 of multi-ply puzzle, bypassing longer line and completing puzzle', () => {
+        // Multi-ply puzzle where player plays an immediate checkmate bypassing multi-ply line
+        const multiPlyBypassPuzzle: Puzzle = {
+          id: 'test_bypass_001',
+          fen: '4k2r/8/8/8/8/8/r7/R3K3 b - - 0 1',
+          moves: ['a2a1', 'e1e2', 'a1h1'],
+          rating: 1200,
+          ratingDeviation: 80,
+          themes: ['skewer'],
+          primaryTheme: 'skewer',
+          difficulty: 'medium',
+          title: 'Bypass Skewer With Checkmate',
+          tacticalGoal: 'Skewer the king or checkmate',
+          tacticalReward: 'checkmate',
+          outcomeAdvantage: 'Checkmate 👑',
+          learningSummary: 'Checkmate immediately ended the game.',
+          keyTakeaway: 'Checkmate trumps material gains.',
+          playerColor: 'b',
+          solutionPlies: 3,
+        };
+
+        // Player plays 1... Rh1# (h8h1) instead of 1... Rxa1+ (a2a1)
+        const outcome = validatePuzzleMove(
+          multiPlyBypassPuzzle,
+          0,
+          multiPlyBypassPuzzle.fen,
+          { from: 'h8', to: 'h1' }
+        );
+
+        expect(outcome.isCorrect).toBe(true);
+        expect(outcome.isPuzzleComplete).toBe(true);
+        expect(outcome.nextMoveIndex).toBe(multiPlyBypassPuzzle.moves.length);
+        expect(outcome.botReplyMove).toBeUndefined();
+        expect(outcome.feedback).toContain('checkmate');
+      });
+
+      it('rejects alternative legal move that does NOT deliver checkmate', () => {
+        const outcome = validatePuzzleMove(
+          dualMatePuzzle,
+          0,
+          dualMatePuzzle.fen,
+          { from: 'b2', to: 'b4' }
+        );
+
+        expect(outcome.isCorrect).toBe(false);
+        expect(outcome.isPuzzleComplete).toBe(false);
+        expect(outcome.feedback).toContain('Not quite');
+      });
+    });
   });
 
   describe('Helper Functions', () => {

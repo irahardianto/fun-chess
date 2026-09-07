@@ -8,7 +8,10 @@ import type {
   StarRating,
 } from '@fun-chess/shared';
 import { createSafeChess, safeLoadFen, isPawnPromotion } from '@fun-chess/shared';
-import { validateStepMove } from '../engine/scenario_validator';
+import {
+  validateStepMove,
+  isSourceSquareAllowed,
+} from '../engine/scenario_validator';
 import { calculateStars, calculateAccuracy } from '../engine/star_calculator';
 import { useBoardSelection } from '../../board/index';
 
@@ -112,16 +115,6 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
   }
 
   function getLegalMovesForSquare(sq: Square): Square[] {
-    const step = currentStep.value;
-    if (step && step.allowedMoves && step.allowedMoves.length > 0) {
-      const stepTargets = step.allowedMoves
-        .filter((c) => c.from === sq)
-        .map((c) => c.to);
-      if (stepTargets.length > 0) {
-        return stepTargets;
-      }
-    }
-
     try {
       const moves = chess.moves({
         square: sq as unknown as import('chess.js').Square,
@@ -174,13 +167,18 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     }
 
     const step = currentStep.value;
-    const isValidForStep = validateStepMove(step, move);
+    const isValidForStep = validateStepMove(step, move, chess);
 
     if (!isValidForStep) {
       // Wrong move attempted! Non-punitive feedback
       mistakesCurrentAttempt.value++;
       isShaking.value = true;
       feedbackMessage.value = 'Not quite! Look for the goal square or tap 💡 Hint for a clue.';
+
+      // Auto-hint reveal after 2 mistakes (SC-4 UX Polish)
+      if (mistakesCurrentAttempt.value >= 2 && !activeHint.value) {
+        revealHint();
+      }
 
       if (shakeTimer) clearTimeout(shakeTimer);
       shakeTimer = setTimeout(() => {
@@ -223,8 +221,16 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       currentFen.value = chess.fen();
       lastMove.value = { from: move.from, to: move.to };
       isStepSuccess.value = true;
-      feedbackMessage.value = step.explanationOnSuccess;
+      feedbackMessage.value = chess.isCheckmate()
+        ? 'Checkmate! Beautiful finish! 🏆'
+        : step.explanationOnSuccess;
       boardSelection.clearSelection();
+
+      // Sound alternative checkmate: if move delivers sound checkmate, accept immediately!
+      if (chess.isCheckmate()) {
+        advanceOrCompleteStep();
+        return true;
+      }
 
       // Check if there is an automated opponent response
       if (step.opponentResponse) {
@@ -325,7 +331,9 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     try {
       const piece = chess.get(sq as unknown as import('chess.js').Square);
       const isPieceOfPlayer = piece && piece.color === playerColor.value;
-      const stepAllowedSource = currentStep.value?.allowedMoves?.some((c) => c.from === sq);
+      const stepAllowedSource = currentStep.value
+        ? isSourceSquareAllowed(currentStep.value, sq, chess)
+        : false;
 
       if (isPieceOfPlayer || stepAllowedSource) {
         boardSelection.handleSquareClick(sq);

@@ -9,6 +9,7 @@ import {
   Player,
   RoomState,
   createInitialGameState,
+  createGameOverPayload,
   RoomNotFoundError,
   GameNotActiveError,
   PlayerNotInRoomError,
@@ -18,6 +19,12 @@ import {
 } from "@fun-chess/shared";
 import { RoomStore } from "../rooms/index.js";
 import { ChessEngine } from "./chess_engine.js";
+import {
+  IClock,
+  SystemClock,
+  IIdGenerator,
+  UuidGenerator,
+} from "./clock.js";
 
 export interface MoveApplicationResult {
   room: RoomState;
@@ -31,7 +38,11 @@ export interface MoveApplicationResult {
  * Service orchestrating chess game actions (moves, resignations, draws, and rematches).
  */
 export class GameService {
-  constructor(private readonly store: RoomStore) {}
+  constructor(
+    private readonly store: RoomStore,
+    private readonly clock: IClock = new SystemClock(),
+    private readonly idGenerator: IIdGenerator = new UuidGenerator(),
+  ) {}
 
   /**
    * Validates and applies a move from a player socket.
@@ -68,7 +79,7 @@ export class GameService {
       }
 
       room.game = outcome.nextState;
-      room.lastActivityAt = Date.now();
+      room.lastActivityAt = this.clock.now();
       if (room.drawOffer) {
         room.drawOffer = null;
       }
@@ -78,19 +89,14 @@ export class GameService {
 
       if (outcome.nextState.isCheckmate) {
         room.status = "game_over";
-        const durationSeconds = Math.max(
-          1,
-          Math.round((Date.now() - room.createdAt) / 1000),
-        );
-        gameOverPayload = {
+        gameOverPayload = createGameOverPayload({
           winner: player.color,
           winnerName: player.name,
           reason: "checkmate",
-          message: `Checkmate! ${player.name} won the match.`,
           finalFen: outcome.nextState.fen,
           totalMoves: outcome.nextState.moveCount,
-          durationSeconds,
-        };
+          startTimeMs: room.createdAt,
+        });
       } else if (outcome.nextState.isDraw) {
         room.status = "game_over";
         const reason: GameOverReason = outcome.nextState.isStalemate
@@ -103,18 +109,13 @@ export class GameService {
                 ? "fifty_move_rule"
                 : "draw_agreement";
 
-        const durationSeconds = Math.max(
-          1,
-          Math.round((Date.now() - room.createdAt) / 1000),
-        );
-        gameOverPayload = {
+        gameOverPayload = createGameOverPayload({
           winner: "draw",
           reason,
-          message: `Draw by ${reason.replace(/_/g, " ")}!`,
           finalFen: outcome.nextState.fen,
           totalMoves: outcome.nextState.moveCount,
-          durationSeconds,
-        };
+          startTimeMs: room.createdAt,
+        });
       } else if (outcome.nextState.isCheck) {
         const chess = new Chess(outcome.nextState.fen);
         const kingSquare =
@@ -163,21 +164,17 @@ export class GameService {
 
       room.status = "game_over";
       room.drawOffer = null;
-      room.lastActivityAt = Date.now();
+      room.lastActivityAt = this.clock.now();
 
-      const durationSeconds = Math.max(
-        1,
-        Math.round((Date.now() - room.createdAt) / 1000),
-      );
-      const gameOverPayload: GameOverPayload = {
+      const gameOverPayload: GameOverPayload = createGameOverPayload({
         winner: winnerColor,
         winnerName,
+        loserName: player.name,
         reason: "resignation",
-        message: `${player.name} resigned. ${winnerName} won the match!`,
         finalFen: room.game.fen,
         totalMoves: room.game.moveCount,
-        durationSeconds,
-      };
+        startTimeMs: room.createdAt,
+      });
 
       return {
         updatedRoom: room,
@@ -211,8 +208,8 @@ export class GameService {
       const opponent =
         player.color === "w" ? room.blackPlayer : room.whitePlayer;
 
-      room.drawOffer = { offeredBy: socketId, offeredAt: Date.now() };
-      room.lastActivityAt = Date.now();
+      room.drawOffer = { offeredBy: socketId, offeredAt: this.clock.now() };
+      room.lastActivityAt = this.clock.now();
 
       return {
         updatedRoom: room,
@@ -264,7 +261,7 @@ export class GameService {
       room.drawOffer = null;
 
       if (!accept) {
-        room.lastActivityAt = Date.now();
+        room.lastActivityAt = this.clock.now();
         return {
           updatedRoom: room,
           result: { room, accept: false, byPlayerId: player.id },
@@ -272,20 +269,15 @@ export class GameService {
       }
 
       room.status = "game_over";
-      room.lastActivityAt = Date.now();
+      room.lastActivityAt = this.clock.now();
 
-      const durationSeconds = Math.max(
-        1,
-        Math.round((Date.now() - room.createdAt) / 1000),
-      );
-      const gameOverPayload: GameOverPayload = {
+      const gameOverPayload: GameOverPayload = createGameOverPayload({
         winner: "draw",
         reason: "draw_agreement",
-        message: "Match concluded with a mutually agreed draw.",
         finalFen: room.game.fen,
         totalMoves: room.game.moveCount,
-        durationSeconds,
-      };
+        startTimeMs: room.createdAt,
+      });
 
       return {
         updatedRoom: room,
@@ -316,11 +308,11 @@ export class GameService {
 
       room.rematch = {
         requestedBy: player.id,
-        requestedAt: Date.now(),
+        requestedAt: this.clock.now(),
         status: "pending",
       };
       room.status = "rematch_pending";
-      room.lastActivityAt = Date.now();
+      room.lastActivityAt = this.clock.now();
 
       return {
         updatedRoom: room,
@@ -372,7 +364,7 @@ export class GameService {
       if (!accept) {
         room.rematch.status = "declined";
         room.status = "game_over";
-        room.lastActivityAt = Date.now();
+        room.lastActivityAt = this.clock.now();
         return {
           updatedRoom: room,
           result: { room, accept: false, byPlayerId: player.id },
@@ -404,7 +396,7 @@ export class GameService {
       room.game = createInitialGameState();
       room.rematch.status = "accepted";
       room.status = "playing";
-      room.lastActivityAt = Date.now();
+      room.lastActivityAt = this.clock.now();
 
       return {
         updatedRoom: room,

@@ -1,0 +1,41 @@
+import type { ChessScenario } from '@fun-chess/shared';
+
+export const pieceValuesScenario: ChessScenario = {
+  id: 'piece-values',
+  title: 'Piece Point Values & Material Counting! 💎',
+  subtitle: 'Master the point values: Pawn=1, Knight=3, Bishop=3, Rook=5, Queen=9!',
+  category: 'fundamentals',
+  difficulty: 'beginner',
+  targetAgeGroup: '7-10',
+  icon: '💎',
+  description: 'Pieces have point values based on their power: Pawn (1 pt), Knight (3 pts), Bishop (3 pts), Rook (5 pts), and Queen (9 pts)! The King has infinite value!',
+  estimatedMinutes: 2,
+  steps: [
+    {
+      id: 'value-step-1',
+      stepNumber: 1,
+      instruction: 'Black’s 5-point Rook on d8 is unprotected! Capture it with your 3-point Bishop on g5 to win material!',
+      conceptExplanation: 'A Rook is worth 5 points, while a Bishop is worth 3 points. Trading a bishop for a rook wins you a +2 point advantage!',
+      hint: 'Capture the Rook on d8 with your Bishop on g5.',
+      setupFen: '3r3k/8/8/6B1/8/8/8/4K3 w - - 0 1',
+      highlightSquares: ['g5', 'd8'],
+      threatSquares: ['d8'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'g5', to: 'd8' }],
+      explanationOnSuccess: 'Big profit! You traded a 3-point bishop for a 5-point rook!',
+    },
+    {
+      id: 'value-step-2',
+      stepNumber: 2,
+      instruction: 'Your Knight can jump to two targets! Capture the 9-point Queen on f6 instead of the 1-point pawn!',
+      conceptExplanation: 'Always count the points! A Queen is worth 9 pawns. Winning a Queen gives a decisive winning advantage!',
+      hint: 'Jump your Knight from e4 to f6 to capture the Queen.',
+      setupFen: '7k/8/5q2/2p5/4N3/8/8/4K3 w - - 0 1',
+      highlightSquares: ['e4', 'f6'],
+      threatSquares: ['f6'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e4', to: 'f6' }],
+      explanationOnSuccess: 'Jackpot! 9 points won! Material counting leads to victory!',
+    },
+  ],
+};

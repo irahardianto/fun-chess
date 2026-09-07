@@ -14,13 +14,19 @@ export interface SocketRateLimiterOptions {
    * Default: 60,000ms (1 minute). Set to 0 to disable automatic timer.
    */
   pruneIntervalMs?: number;
+  /**
+   * Maximum number of keys tracked in memory (bounded LRU eviction).
+   * Default: 10,000 keys.
+   */
+  maxKeys?: number;
 }
 
 /**
  * Extracts a reliable client IP address from a Socket.io socket instance.
- * Checks x-forwarded-for header (proxies/Cloud Run) before falling back to socket address.
+ * When trustProxy is true, checks x-forwarded-for header (proxies/Cloud Run) before falling back to socket address.
+ * When trustProxy is false, ignores x-forwarded-for to prevent spoofing (CRIT-001).
  */
-export function extractClientIp(socket: unknown): string {
+export function extractClientIp(socket: unknown, trustProxy = false): string {
   if (!socket || typeof socket !== "object") return "127.0.0.1";
   const s = socket as {
     handshake?: {
@@ -32,13 +38,16 @@ export function extractClientIp(socket: unknown): string {
     };
   };
 
-  const forwarded = s.handshake?.headers?.["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim()) {
-    return forwarded.split(",")[0]?.trim() || "127.0.0.1";
+  if (trustProxy) {
+    const forwarded = s.handshake?.headers?.["x-forwarded-for"];
+    if (typeof forwarded === "string" && forwarded.trim()) {
+      return forwarded.split(",")[0]?.trim() || "127.0.0.1";
+    }
+    if (Array.isArray(forwarded) && forwarded[0]) {
+      return String(forwarded[0]).trim();
+    }
   }
-  if (Array.isArray(forwarded) && forwarded[0]) {
-    return String(forwarded[0]).trim();
-  }
+
   return s.handshake?.address || s.conn?.remoteAddress || "127.0.0.1";
 }
 
@@ -51,23 +60,26 @@ export function createSocketRateLimiter(
   return new SocketRateLimiter({
     maxRequests: 5,
     windowMs: 10_000,
+    maxKeys: 10_000,
     ...options,
   });
 }
 
 /**
  * In-memory sliding window rate limiter for Socket.io events.
- * Keyed by client IP to prevent disconnect evasion (MAJ-001) with bounded memory cleanup (MIN-005).
+ * Keyed by client IP to prevent disconnect evasion (MAJ-001) with bounded LRU memory cleanup (MAJ-003).
  */
 export class SocketRateLimiter {
   private readonly maxRequests: number;
   private readonly windowMs: number;
+  private readonly maxKeys: number;
   private readonly timestamps = new Map<string, number[]>();
   private pruneTimer?: NodeJS.Timeout;
 
   constructor(options?: SocketRateLimiterOptions) {
     this.maxRequests = options?.maxRequests ?? 5;
     this.windowMs = options?.windowMs ?? 10_000;
+    this.maxKeys = options?.maxKeys ?? 10_000;
     const pruneIntervalMs = options?.pruneIntervalMs ?? 60_000;
 
     if (pruneIntervalMs > 0) {
@@ -89,9 +101,19 @@ export class SocketRateLimiter {
     const existing = this.timestamps.get(key);
 
     if (!existing) {
+      if (this.timestamps.size >= this.maxKeys) {
+        // Evict oldest/least recently used entry before adding a new key
+        const oldestKey = this.timestamps.keys().next().value;
+        if (oldestKey !== undefined) {
+          this.timestamps.delete(oldestKey);
+        }
+      }
       this.timestamps.set(key, [now]);
       return true;
     }
+
+    // Refresh LRU order by removing and re-inserting
+    this.timestamps.delete(key);
 
     // Filter out timestamps older than the sliding window
     const valid = existing.filter((t) => t > cutoff);
@@ -118,6 +140,7 @@ export class SocketRateLimiter {
       this.timestamps.delete(key);
       return true;
     }
+    this.timestamps.delete(key);
     this.timestamps.set(key, valid);
     return valid.length < this.maxRequests;
   }
@@ -134,8 +157,16 @@ export class SocketRateLimiter {
       this.timestamps.delete(key);
       return this.maxRequests;
     }
+    this.timestamps.delete(key);
     this.timestamps.set(key, valid);
     return Math.max(0, this.maxRequests - valid.length);
+  }
+
+  /**
+   * Returns the current number of tracked keys in memory.
+   */
+  public size(): number {
+    return this.timestamps.size;
   }
 
   /**

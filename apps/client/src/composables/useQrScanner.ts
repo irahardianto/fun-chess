@@ -1,1 +1,1 @@
-export * from '@/features/portability/composables/useQrScanner';
+export * from '@/features/portability';

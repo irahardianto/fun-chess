@@ -16,7 +16,7 @@ import { LobbyView } from '@/features/lobby';
 import { SoloAiArena } from '@/features/ai';
 import { ScenarioArena } from '@/features/scenarios';
 import { PuzzleArena, PuzzleRushArena } from '@/features/puzzles';
-import MultiplayerArena from '../arena/MultiplayerArena.vue';
+import { MultiplayerArena } from '@/features/multiplayer';
 
 interface Props {
   currentAppMode?: AppGameMode | 'puzzle_drills' | 'puzzle_ladder' | 'puzzle_rush' | string;
@@ -150,14 +150,14 @@ function handleAcademyCompleted(stars: number) { emit('academy-completed', stars
 function handlePuzzleBack() { emit('puzzle-back'); emit('puzzle-exit'); emit('back'); emit('exit'); }
 function handlePuzzleRushExit() { emit('puzzle-rush-exit'); emit('exit'); }
 function handlePuzzleCompleted(stars: number) { emit('puzzle-completed', stars); emit('completed', stars); emit('academy-completed', stars); }
-function handleSelectSquare(sq: Square) { emit('select-square', sq); emit('selectSquare', sq); }
-function handleExecuteMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }) { emit('execute-move', move); emit('executeMove', move); }
-function handlePromotionRequired(payload: { from: Square; to: Square }) { emit('promotion-required', payload); emit('promotionRequired', payload); }
-function handleOfferDraw() { emit('offer-draw'); emit('offerDraw'); }
-function handleAcceptDraw() { emit('accept-draw'); emit('acceptDraw'); }
-function handleDeclineDraw() { emit('decline-draw'); emit('declineDraw'); }
+function handleSelectSquare(sq: Square) { emit('select-square', sq); }
+function handleExecuteMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }) { emit('execute-move', move); }
+function handlePromotionRequired(payload: { from: Square; to: Square }) { emit('promotion-required', payload); }
+function handleOfferDraw() { emit('offer-draw'); }
+function handleAcceptDraw() { emit('accept-draw'); }
+function handleDeclineDraw() { emit('decline-draw'); }
 function handleResign() { emit('resign'); }
-function handleFlipBoard() { emit('flip-board'); emit('flipBoard'); }
+function handleFlipBoard() { emit('flip-board'); }
 </script>
 
 <template>

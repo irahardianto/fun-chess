@@ -12,6 +12,7 @@ import {
 } from "../../rooms/room.errors.js";
 import { ChessEngine } from "../chess_engine.js";
 import { Chess } from "chess.js";
+import { IClock, IIdGenerator } from "../clock.js";
 
 describe("GameService", () => {
   let store: MockRoomStore;
@@ -459,6 +460,30 @@ describe("GameService", () => {
       await expect(
         service.offerDraw("ENDED", "sock_white"),
       ).rejects.toBeInstanceOf(GameNotActiveError);
+    });
+  });
+
+  describe("Dependency Injection: Clock & IdGenerator (MAJ-017)", () => {
+    it("uses injected IClock timestamps on game operations", async () => {
+      const fixedTime = 1750000000000;
+      const fakeClock: IClock = {
+        now: () => fixedTime,
+      };
+      const customService = new GameService(store, fakeClock);
+
+      const room = createActiveGameRoom("TIME");
+      await store.save(room);
+
+      const result = await customService.makeMove(
+        { roomCode: "TIME", move: { from: "e2", to: "e4" } },
+        "sock_white",
+      );
+
+      expect(result.room.lastActivityAt).toBe(fixedTime);
+
+      await customService.offerDraw("TIME", "sock_black");
+      const roomWithDraw = await store.findByCode("TIME");
+      expect(roomWithDraw?.drawOffer?.offeredAt).toBe(fixedTime);
     });
   });
 });

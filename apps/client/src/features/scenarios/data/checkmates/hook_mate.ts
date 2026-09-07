@@ -21,7 +21,10 @@ export const hookMateScenario: ChessScenario = {
       highlightSquares: ['d5', 'f6'],
       threatSquares: ['g8'],
       playerColor: 'w',
-      allowedMoves: [{ from: 'd5', to: 'f6' }],
+      allowedMoves: [
+        { from: 'd5', to: 'f6' },
+        { from: 'e1', to: 'e8' },
+      ],
       opponentResponse: {
         from: 'g8',
         to: 'h8',

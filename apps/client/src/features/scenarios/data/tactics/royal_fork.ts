@@ -3,7 +3,7 @@ import type { ChessScenario } from '@fun-chess/shared';
 export const royalForkScenario: ChessScenario = {
   id: 'royal-fork',
   title: 'The Royal Knight Fork! 🍴',
-  subtitle: 'Attack the King and Queen at the very same time!',
+  subtitle: 'Attack the King and Rook at the very same time!',
   category: 'tactical_patterns',
   difficulty: 'intermediate',
   targetAgeGroup: '7-10',
@@ -14,7 +14,7 @@ export const royalForkScenario: ChessScenario = {
     {
       id: 'fork-step-1',
       stepNumber: 1,
-      instruction: 'Jump your White Knight to c7 to deliver a check on the King and fork the Queen and Rook!',
+      instruction: 'Jump your White Knight to c7 to deliver a check on the King and fork the King and Rook!',
       conceptExplanation: 'Knights are the fork champions of chess because their unique L-shape jumps over defenses!',
       hint: 'Move the Knight on d5 to the c7 square.',
       setupFen: 'r1bqk2r/pppp1ppp/2n5/3N4/4P3/8/PPP2PPP/R1BQKBNR w KQkq - 1 6',

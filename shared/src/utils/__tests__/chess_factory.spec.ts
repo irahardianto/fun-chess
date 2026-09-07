@@ -115,6 +115,11 @@ describe("Safe Chess Factory & FEN Validator", () => {
         expect(chess.turn()).toBe("w");
       }
 
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    it("invokes console.warn if console is explicitly provided (MIN-014)", () => {
+      createSafeChess("invalid-fen-string", console);
       expect(console.warn).toHaveBeenCalled();
     });
 

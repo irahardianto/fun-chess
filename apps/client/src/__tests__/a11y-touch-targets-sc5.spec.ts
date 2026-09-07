@@ -19,6 +19,7 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
   const qrExportViewPath = path.resolve(__dirname, '../features/portability/components/QrExportView.vue');
   const soloAiArenaPath = path.resolve(__dirname, '../features/ai/SoloAiArena.vue');
   const aiMascotBadgePath = path.resolve(__dirname, '../features/ai/components/AiMascotBadge.vue');
+  const scenarioCategoryListPath = path.resolve(__dirname, '../features/scenarios/components/ScenarioCategoryList.vue');
 
   const baseModalSrc = fs.readFileSync(baseModalPath, 'utf-8');
   const baseButtonSrc = fs.readFileSync(baseButtonPath, 'utf-8');
@@ -30,6 +31,7 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
   const qrExportViewSrc = fs.readFileSync(qrExportViewPath, 'utf-8');
   const soloAiArenaSrc = fs.readFileSync(soloAiArenaPath, 'utf-8');
   const aiMascotBadgeSrc = fs.readFileSync(aiMascotBadgePath, 'utf-8');
+  const scenarioCategoryListSrc = fs.readFileSync(scenarioCategoryListPath, 'utf-8');
 
   describe('1. WCAG 2.5.5 Touch Target Sizing (>= 44x44px)', () => {
     it('BaseModal close button enforces 44px minimum touch target', () => {
@@ -97,6 +99,10 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
       expect(appVueSrc).toMatch(/\.nav-install-btn\s*\{[^}]*min-width:\s*44px/s);
       expect(appVueSrc).toMatch(/\.notification-dismiss-btn\s*\{[^}]*min-width:\s*44px/s);
       expect(appVueSrc).toMatch(/\.notification-dismiss-btn\s*\{[^}]*min-height:\s*44px/s);
+    });
+
+    it('ScenarioCategoryList category tab buttons enforce 44px min-height on mobile', () => {
+      expect(scenarioCategoryListSrc).toMatch(/@media\s*\(max-width:\s*640px\)[\s\S]*?\.category-tab-btn\s*\{[\s\S]*?min-height:\s*44px/);
     });
   });
 

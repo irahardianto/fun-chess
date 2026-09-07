@@ -23,3 +23,5 @@ export * from "./utils/progress_merger.js";
 export * from "./utils/progress_codec.js";
 export * from "./utils/chess_factory.js";
 export * from "./utils/chess_evaluation.js";
+export * from "./utils/uci.js";
+export * from "./utils/game_over.js";

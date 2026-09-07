@@ -14,10 +14,11 @@ describe("createHttpServer", () => {
   let server: Server;
   let port: number;
   let store: MockRoomStore;
+  let logger: NullLogger;
 
   beforeAll(async () => {
     store = new MockRoomStore();
-    const logger = new NullLogger();
+    logger = new NullLogger();
     const lanService = new LanService();
     const relayAddressService = new RelayAddressService({
       lanIp: "192.168.1.50",
@@ -30,6 +31,7 @@ describe("createHttpServer", () => {
       relayAddressService,
       logger,
       port: 3000,
+      allowedOrigins: ["http://localhost:5173", "http://localhost:3000"],
       getActiveSocketCount: () => 2,
     });
 
@@ -88,10 +90,12 @@ describe("createHttpServer", () => {
   });
 
   it("responds to GET /api/lan-info with valid LAN info JSON and relay mode metadata", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
+      headers: { Origin: "http://localhost:5173" },
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
-    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
 
     const data = (await res.json()) as LanInfoResponse;
     expect(data.port).toBe(3000);
@@ -101,30 +105,75 @@ describe("createHttpServer", () => {
     expect(data.isCloudRelay).toBe(false);
   });
 
-  it("handles CORS OPTIONS preflight with 204 No Content", async () => {
+  it("handles CORS OPTIONS preflight with 204 No Content for allowed origin", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
       method: "OPTIONS",
+      headers: { Origin: "http://localhost:5173" },
     });
     expect(res.status).toBe(204);
-    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
     expect(res.headers.get("access-control-allow-methods")).toContain("GET");
   });
 
-  it("respects process.env.CORS_ORIGIN in response headers", async () => {
-    const originalCors = process.env.CORS_ORIGIN;
+  it("blocks CORS OPTIONS preflight with 403 for disallowed origin", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
+      method: "OPTIONS",
+      headers: { Origin: "https://evil-hacker.com" },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("does not emit Access-Control-Allow-Origin when Origin header is missing (MAJ-005)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("only emits matching origin and never comma-separated origins (MAJ-005)", async () => {
+    const customHandler = createHttpServer({
+      roomStore: store,
+      logger: new NullLogger(),
+      allowedOrigins: ["https://fun-chess.com", "https://play.fun-chess.com"],
+    });
+    const s = http.createServer(customHandler);
+    let p = 0;
+    await new Promise<void>((resolve) =>
+      s.listen(0, "127.0.0.1", () => {
+        p = (s.address() as any).port;
+        resolve();
+      }),
+    );
+
     try {
-      process.env.CORS_ORIGIN = "https://fun-chess.example.com";
-      const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+      const res = await fetch(`http://127.0.0.1:${p}/healthz`, {
+        headers: { Origin: "https://play.fun-chess.com" },
+      });
       expect(res.headers.get("access-control-allow-origin")).toBe(
-        "https://fun-chess.example.com",
+        "https://play.fun-chess.com",
       );
+      expect(res.headers.get("vary")).toBe("Origin");
+
+      const disallowed = await fetch(`http://127.0.0.1:${p}/healthz`, {
+        headers: { Origin: "https://evil.com" },
+      });
+      expect(disallowed.headers.get("access-control-allow-origin")).toBeNull();
     } finally {
-      if (originalCors !== undefined) {
-        process.env.CORS_ORIGIN = originalCors;
-      } else {
-        delete process.env.CORS_ORIGIN;
-      }
+      await new Promise<void>((resolve) => s.close(() => resolve()));
     }
+  });
+
+  it("allows Google Fonts in Content-Security-Policy (MAJ-001)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+    const csp = res.headers.get("content-security-policy");
+    expect(csp).toBeDefined();
+    expect(csp).toContain("https://fonts.googleapis.com");
+    expect(csp).toContain("https://fonts.gstatic.com");
+  });
+
+  it("allows web workers from blobs in Content-Security-Policy (CONF-002)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+    const csp = res.headers.get("content-security-policy");
+    expect(csp).toBeDefined();
+    expect(csp).toContain("worker-src 'self' blob:;");
   });
 
   it("attaches security headers to all responses (SEC-02)", async () => {
@@ -192,13 +241,20 @@ describe("createHttpServer", () => {
     });
   });
 
-  it("serves SPA fallback HTML for web routes", async () => {
+  it("serves SPA fallback HTML for web routes and logs static file serving at INFO level (MAJ-024)", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/lobby`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
 
     const body = await res.text();
     expect(body).toContain("Fun Chess");
+
+    const staticLog = logger.infoLogs.find((l) =>
+      l.message.includes("HTTP Static served"),
+    );
+    expect(staticLog).toBeDefined();
+    expect(staticLog?.context?.["operation"]).toBe("http_static");
+    expect(staticLog?.context?.["duration"]).toBeTypeOf("number");
   });
 
   it("responds with 404 JSON for unsupported API / non-existent endpoints", async () => {
@@ -214,7 +270,6 @@ describe("createHttpServer", () => {
     };
     expect(json.error.code).toBe("ERR_NOT_FOUND");
   });
-
 
   describe("Cloud Relay Mode", () => {
     let cloudServer: Server;

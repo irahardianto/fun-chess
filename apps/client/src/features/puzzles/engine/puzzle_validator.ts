@@ -12,32 +12,8 @@ import {
   generateStepBreakdowns,
 } from './puzzle_analysis_engine';
 
-/**
- * Normalizes a PlayerMoveAction into a standard 4-5 character UCI string.
- */
-export function formatPlayerMoveToUci(move: PlayerMoveAction): string {
-  const promo = move.promotion ? move.promotion.toLowerCase() : '';
-  return `${move.from}${move.to}${promo}`;
-}
-
-/**
- * Parses a UCI move string (e.g. "e2e4", "e7e8q") into constituent parts.
- */
-export function parseUciMove(uci: string): {
-  from: Square;
-  to: Square;
-  promotion?: 'q' | 'r' | 'b' | 'n';
-} {
-  const from = uci.slice(0, 2) as Square;
-  const to = uci.slice(2, 4) as Square;
-  const promoChar = uci.length > 4 ? uci.charAt(4).toLowerCase() : undefined;
-  const promotion =
-    promoChar === 'q' || promoChar === 'r' || promoChar === 'b' || promoChar === 'n'
-      ? promoChar
-      : undefined;
-
-  return { from, to, promotion };
-}
+import { formatPlayerMoveToUci, parseUciMove } from '@fun-chess/shared';
+export { formatPlayerMoveToUci, parseUciMove };
 
 /**
  * Checks whether a proposed move is a pawn promotion move.
@@ -124,22 +100,6 @@ export function validatePuzzleMove(
   const playerUci = formatPlayerMoveToUci(playerMove);
   const matchesExpected = playerUci === expectedUci;
 
-  if (!matchesExpected) {
-    const refutation = generateMistakeRefutation(currentFen, playerMove);
-    const feedback = refutation
-      ? `Not quite! ${refutation.kidFriendlyExplanation}`
-      : 'Not quite! Look closer for the best tactical move.';
-    return {
-      isCorrect: false,
-      isPuzzleComplete: false,
-      nextFen: currentFen,
-      nextMoveIndex: currentMoveIndex,
-      feedback,
-      refutation: refutation ?? undefined,
-    };
-  }
-
-  // Move matches expected solution! Execute on chess engine to advance state
   let chess: Chess;
   try {
     chess = new Chess(currentFen);
@@ -153,16 +113,57 @@ export function validatePuzzleMove(
     };
   }
 
-  const { from, to, promotion } = parseUciMove(expectedUci);
   let playerResult: any = null;
   try {
     playerResult = chess.move({
-      from: from as unknown as import('chess.js').Square,
-      to: to as unknown as import('chess.js').Square,
-      promotion,
+      from: playerMove.from as unknown as import('chess.js').Square,
+      to: playerMove.to as unknown as import('chess.js').Square,
+      promotion: playerMove.promotion,
     });
   } catch {
     playerResult = null;
+  }
+
+  // Sound Checkmate Acceptance:
+  // If the player proposes a legal move delivering immediate checkmate, accept it
+  // as a valid checkmate completion even if it differs from the expected UCI line.
+  if (playerResult && chess.isCheckmate() && (!matchesExpected || currentMoveIndex + 1 < puzzle.moves.length)) {
+    const finalFen = chess.fen();
+    const stepNarratives = puzzle.stepExplanations ?? generateStepBreakdowns(puzzle);
+    const stepExplanation = stepNarratives[currentMoveIndex] ?? {
+      plyIndex: currentMoveIndex,
+      moveSan: playerResult.san,
+      moveUci: playerUci,
+      actor: puzzle.playerColor,
+      explanation: `Plays ${playerResult.san} delivering checkmate! 👑`,
+    };
+    const analysis = analyzePuzzleSolution(puzzle);
+
+    return {
+      isCorrect: true,
+      isPuzzleComplete: true,
+      intermediateFen: finalFen,
+      nextFen: finalFen,
+      nextMoveIndex: puzzle.moves.length,
+      feedback: 'Brilliant! You found a checkmate! 🎉',
+      stepExplanation,
+      analysis,
+    };
+  }
+
+  if (!matchesExpected) {
+    const refutation = generateMistakeRefutation(currentFen, playerMove);
+    const feedback = refutation
+      ? `Not quite! ${refutation.kidFriendlyExplanation}`
+      : 'Not quite! Look closer for the best tactical move.';
+    return {
+      isCorrect: false,
+      isPuzzleComplete: false,
+      nextFen: currentFen,
+      nextMoveIndex: currentMoveIndex,
+      feedback,
+      refutation: refutation ?? undefined,
+    };
   }
 
   if (!playerResult) {

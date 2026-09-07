@@ -19,7 +19,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Windmill Queen Snatch on e7 #1 ♛",
     "subtitle": "Rook cycles with discovered checks to win Black's Queen on e7!",
     "playerColor": "w",
@@ -109,7 +109,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Windmill Queen Capture on d7 #2 ♛",
     "subtitle": "White extracts Black's Queen with alternating checks.",
     "playerColor": "w",
@@ -199,7 +199,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Windmill Queen Capture on c7 #3 ♛",
     "subtitle": "White captures Black's Queen on c7 via discovered check.",
     "playerColor": "w",
@@ -289,7 +289,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Windmill Queen Capture on b7 #4 ♛",
     "subtitle": "White sweeps across the 7th rank to win the Queen on b7.",
     "playerColor": "w",
@@ -379,7 +379,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Windmill Queen Capture on a7 #5 ♛",
     "subtitle": "White collects the Queen on the far a-file.",
     "playerColor": "w",
@@ -471,7 +471,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Windmill Triple Capture #6 ♛",
     "subtitle": "Rook sweeps Queen and pawn on the 7th rank!",
     "playerColor": "w",
@@ -577,7 +577,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Windmill Multi-Piece Harvest #7 ♛",
     "subtitle": "White extracts Queen on e7 and bishop on d7.",
     "playerColor": "w",
@@ -685,7 +685,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "hard",
     "title": "Windmill Sweeper on the 7th Rank #8 ♜",
     "subtitle": "White clears the rank with four consecutive discovered checks.",
     "playerColor": "w",
@@ -811,7 +811,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "hard",
     "title": "Complete 7th Rank Windmill Sweep #9 ♜",
     "subtitle": "White collects Queen, c-pawn, and b-pawn in a 15-ply sequence!",
     "playerColor": "w",
@@ -959,7 +959,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "easy",
+    "difficulty": "hard",
     "title": "Central Windmill on the e/f Files #10 ♜",
     "subtitle": "Bishop on e6 and Rook on f7 dismantle Black's pawns.",
     "playerColor": "w",
@@ -1065,7 +1065,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Windmill Queen Extraction on d5 #11 ♛",
     "subtitle": "Rook steps back to g5+ discovered check and snatches the d5 Queen!",
     "playerColor": "w",
@@ -1171,7 +1171,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Windmill Queen Snatch on e5 #12 ♛",
     "subtitle": "Rook captures Black Queen on e5 with discovered check cadence.",
     "playerColor": "w",
@@ -1277,7 +1277,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Windmill Queen Snatch on c5 #13 ♛",
     "subtitle": "White harvests the c5 Queen using the long diagonal battery.",
     "playerColor": "w",
@@ -1383,7 +1383,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Windmill Queen Snatch on b5 #14 ♛",
     "subtitle": "White pulls back to g5+ to take the b5 Queen.",
     "playerColor": "w",
@@ -1489,7 +1489,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Windmill Queen Snatch on a5 #15 ♛",
     "subtitle": "White captures the far-flung Queen on a5 via discovered check.",
     "playerColor": "w",
@@ -1575,9 +1575,11 @@
   },
   {
     "id": "puz_wm_016",
-    "fen": "6k1/ppp3pp/8/8/8/5b2/PPP1Qr1P/7K b - - 0 1",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PPP1Qr1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -1591,11 +1593,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Black Windmill Queen Snatch on e2 #16 ♛",
     "subtitle": "Black captures White's Queen on e2 via 2nd-rank battery.",
     "playerColor": "b",
-    "solutionPlies": 5,
+    "solutionPlies": 7,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -1604,34 +1606,48 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxe2+",
         "moveUci": "g2e2",
         "actor": "b",
@@ -1639,8 +1655,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "e2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -1649,9 +1666,11 @@
   },
   {
     "id": "puz_wm_017",
-    "fen": "6k1/ppp3pp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PPPQ1r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -1665,11 +1684,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Black Windmill Queen Snatch on d2 #17 ♛",
     "subtitle": "Black cycles discovered checks to capture the White Queen on d2!",
     "playerColor": "b",
-    "solutionPlies": 5,
+    "solutionPlies": 7,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -1678,34 +1697,48 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxd2+",
         "moveUci": "g2d2",
         "actor": "b",
@@ -1713,8 +1746,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "d2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -1723,9 +1757,11 @@
   },
   {
     "id": "puz_wm_018",
-    "fen": "6k1/ppp3pp/8/8/8/5b2/PPQ2r1P/7K b - - 0 1",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PPQ2r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -1739,11 +1775,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Black Windmill Queen Snatch on c2 #18 ♛",
     "subtitle": "Black picks off White's Queen on c2 with alternating checks.",
     "playerColor": "b",
-    "solutionPlies": 5,
+    "solutionPlies": 7,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -1752,34 +1788,48 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxc2+",
         "moveUci": "g2c2",
         "actor": "b",
@@ -1787,8 +1837,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "c2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -1797,9 +1848,11 @@
   },
   {
     "id": "puz_wm_019",
-    "fen": "6k1/ppp3pp/8/8/8/5b2/PQ3r1P/7K b - - 0 1",
+    "fen": "6k1/ppp3pp/8/8/8/5b2/PQ3r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -1813,11 +1866,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "hard",
     "title": "Black Windmill Queen Snatch on b2 #19 ♛",
     "subtitle": "Black sweeps the 2nd rank and captures the b2 Queen.",
     "playerColor": "b",
-    "solutionPlies": 5,
+    "solutionPlies": 7,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -1826,34 +1879,48 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxb2+",
         "moveUci": "g2b2",
         "actor": "b",
@@ -1861,8 +1928,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "b2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -1871,9 +1939,11 @@
   },
   {
     "id": "puz_wm_020",
-    "fen": "6k1/ppp2p1p/8/8/8/5b2/Q4r1P/7K b - - 0 1",
+    "fen": "6k1/ppp2p1p/8/8/8/5b2/Q4r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -1887,11 +1957,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "medium",
+    "difficulty": "expert",
     "title": "Black Windmill Queen Snatch on a2 #20 ♛",
     "subtitle": "Black takes White's Queen on a2 via discovered check.",
     "playerColor": "b",
-    "solutionPlies": 5,
+    "solutionPlies": 7,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -1900,34 +1970,48 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxa2+",
         "moveUci": "g2a2",
         "actor": "b",
@@ -1935,8 +2019,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "a2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -1963,7 +2048,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Windmill Double Capture #21 ♛",
     "subtitle": "Black harvests Queen on d2 and pawn on c2.",
     "playerColor": "b",
@@ -2035,9 +2120,11 @@
   },
   {
     "id": "puz_wm_022",
-    "fen": "6k1/ppp2ppp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
+    "fen": "6k1/ppp2ppp/8/8/8/5b2/PPPQ1r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2063,11 +2150,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Full 2nd-Rank Black Windmill Sweep #22 ♛",
     "subtitle": "Black scoops Queen and three pawns across the 2nd rank in 17 plies!",
     "playerColor": "b",
-    "solutionPlies": 17,
+    "solutionPlies": 19,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+12 Decisive Material ♛",
@@ -2076,118 +2163,132 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxd2+",
         "moveUci": "g2d2",
         "actor": "b",
         "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
       },
       {
-        "plyIndex": 5,
+        "plyIndex": 7,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rg2+",
         "moveUci": "d2g2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
-        "plyIndex": 7,
+        "plyIndex": 9,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 8,
+        "plyIndex": 10,
         "moveSan": "Rxc2+",
         "moveUci": "g2c2",
         "actor": "b",
         "explanation": "Black plays Rxc2+, capturing the enemy P on c2!"
       },
       {
-        "plyIndex": 9,
+        "plyIndex": 11,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 10,
+        "plyIndex": 12,
         "moveSan": "Rg2+",
         "moveUci": "c2g2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
-        "plyIndex": 11,
+        "plyIndex": 13,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 12,
+        "plyIndex": 14,
         "moveSan": "Rxb2+",
         "moveUci": "g2b2",
         "actor": "b",
         "explanation": "Black plays Rxb2+, capturing the enemy P on b2!"
       },
       {
-        "plyIndex": 13,
+        "plyIndex": 15,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 14,
+        "plyIndex": 16,
         "moveSan": "Rg2+",
         "moveUci": "b2g2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
-        "plyIndex": 15,
+        "plyIndex": 17,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 16,
+        "plyIndex": 18,
         "moveSan": "Rxa2+",
         "moveUci": "g2a2",
         "actor": "b",
@@ -2195,8 +2296,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "a2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -2205,9 +2307,11 @@
   },
   {
     "id": "puz_wm_023",
-    "fen": "5rk1/ppp2p1p/8/3Q4/8/5b2/PPP2r1P/7K b - - 0 1",
+    "fen": "5rk1/ppp2p1p/8/3Q4/8/5b2/PPP2r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2223,11 +2327,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Torre-Lasker Theme on d5 #23 ♛",
     "subtitle": "Black steps back to g5+ discovered check to capture the Queen on d5!",
     "playerColor": "b",
-    "solutionPlies": 7,
+    "solutionPlies": 9,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -2236,48 +2340,62 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 4,
-        "moveSan": "Rg5+",
-        "moveUci": "g2g5",
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg5+!"
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
         "moveSan": "Kh2",
         "moveUci": "h1h2",
         "actor": "w",
         "explanation": "White plays Kh2."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rxd5",
         "moveUci": "g5d5",
         "actor": "b",
@@ -2285,8 +2403,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "d5"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -2295,9 +2414,11 @@
   },
   {
     "id": "puz_wm_024",
-    "fen": "5rk1/ppp2p1p/8/4Q3/8/5b2/PPP2r1P/7K b - - 0 1",
+    "fen": "5rk1/ppp2p1p/8/4Q3/8/5b2/PPP2r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2313,11 +2434,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Windmill Queen Extraction on e5 #24 ♛",
     "subtitle": "Black captures White's Queen on e5 via discovered check cadence.",
     "playerColor": "b",
-    "solutionPlies": 7,
+    "solutionPlies": 9,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -2326,48 +2447,62 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 4,
-        "moveSan": "Rg5+",
-        "moveUci": "g2g5",
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg5+!"
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
         "moveSan": "Kh2",
         "moveUci": "h1h2",
         "actor": "w",
         "explanation": "White plays Kh2."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rxe5",
         "moveUci": "g5e5",
         "actor": "b",
@@ -2375,8 +2510,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "e5"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -2385,9 +2521,11 @@
   },
   {
     "id": "puz_wm_025",
-    "fen": "5rk1/ppp2p1p/8/2Q5/8/5b2/PPP2r1P/7K b - - 0 1",
+    "fen": "5rk1/ppp2p1p/8/2Q5/8/5b2/PPP2r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2403,11 +2541,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Windmill Queen Extraction on c5 #25 ♛",
     "subtitle": "Black captures White's Queen on c5 with discovered check.",
     "playerColor": "b",
-    "solutionPlies": 7,
+    "solutionPlies": 9,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -2416,48 +2554,62 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 4,
-        "moveSan": "Rg5+",
-        "moveUci": "g2g5",
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg5+!"
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
         "moveSan": "Kh2",
         "moveUci": "h1h2",
         "actor": "w",
         "explanation": "White plays Kh2."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rxc5",
         "moveUci": "g5c5",
         "actor": "b",
@@ -2465,8 +2617,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "c5"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -2475,9 +2628,11 @@
   },
   {
     "id": "puz_wm_026",
-    "fen": "5rk1/ppp2p1p/8/1Q6/8/5b2/PPP2r1P/7K b - - 0 1",
+    "fen": "5rk1/ppp2p1p/8/1Q6/8/5b2/PPP2r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2493,11 +2648,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Windmill Queen Extraction on b5 #26 ♛",
     "subtitle": "Black captures White's Queen on b5 via long diagonal battery.",
     "playerColor": "b",
-    "solutionPlies": 7,
+    "solutionPlies": 9,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -2506,48 +2661,62 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 4,
-        "moveSan": "Rg5+",
-        "moveUci": "g2g5",
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg5+!"
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
         "moveSan": "Kh2",
         "moveUci": "h1h2",
         "actor": "w",
         "explanation": "White plays Kh2."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rxb5",
         "moveUci": "g5b5",
         "actor": "b",
@@ -2555,8 +2724,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "b5"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -2565,9 +2735,11 @@
   },
   {
     "id": "puz_wm_027",
-    "fen": "5rk1/ppp2p1p/8/Q7/8/5b2/PPP2r1P/7K b - - 0 1",
+    "fen": "5rk1/ppp2p1p/8/Q7/8/5b2/PPP2r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2583,11 +2755,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Windmill Queen Extraction on a5 #27 ♛",
     "subtitle": "Black captures White's Queen on a5 via discovered check.",
     "playerColor": "b",
-    "solutionPlies": 7,
+    "solutionPlies": 9,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+9 Queen ♛",
@@ -2596,48 +2768,62 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 4,
-        "moveSan": "Rg5+",
-        "moveUci": "g2g5",
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg5+!"
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
+        "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
+        "moveSan": "Rg5+",
+        "moveUci": "g2g5",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg5+!"
+      },
+      {
+        "plyIndex": 7,
         "moveSan": "Kh2",
         "moveUci": "h1h2",
         "actor": "w",
         "explanation": "White plays Kh2."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rxa5",
         "moveUci": "g5a5",
         "actor": "b",
@@ -2645,8 +2831,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "a5"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -2655,9 +2842,11 @@
   },
   {
     "id": "puz_wm_028",
-    "fen": "6k1/1pp3pp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
+    "fen": "6k1/1pp3pp/8/8/8/5b2/PPPQ1r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2675,11 +2864,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Windmill Two-Piece Harvest #28 ♛",
     "subtitle": "Black captures Queen on d2 and pawn on c2 in 9 plies.",
     "playerColor": "b",
-    "solutionPlies": 9,
+    "solutionPlies": 11,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+10 Queen & Pawn ♛",
@@ -2688,62 +2877,76 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxd2+",
         "moveUci": "g2d2",
         "actor": "b",
         "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
       },
       {
-        "plyIndex": 5,
+        "plyIndex": 7,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rg2+",
         "moveUci": "d2g2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
-        "plyIndex": 7,
+        "plyIndex": 9,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 8,
+        "plyIndex": 10,
         "moveSan": "Rxc2+",
         "moveUci": "g2c2",
         "actor": "b",
@@ -2751,8 +2954,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "c2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -2761,9 +2965,11 @@
   },
   {
     "id": "puz_wm_029",
-    "fen": "6k1/p1p3pp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
+    "fen": "6k1/p1p3pp/8/8/8/5b2/PPPQ1r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2783,11 +2989,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Windmill Three-Piece Harvest #29 ♛",
     "subtitle": "Black clears White's 2nd rank from d2 to b2 in 11 plies.",
     "playerColor": "b",
-    "solutionPlies": 11,
+    "solutionPlies": 13,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+11 Queen & Pawns ♛",
@@ -2796,76 +3002,90 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxd2+",
         "moveUci": "g2d2",
         "actor": "b",
         "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
       },
       {
-        "plyIndex": 5,
+        "plyIndex": 7,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rg2+",
         "moveUci": "d2g2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
-        "plyIndex": 7,
+        "plyIndex": 9,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 8,
+        "plyIndex": 10,
         "moveSan": "Rxc2+",
         "moveUci": "g2c2",
         "actor": "b",
         "explanation": "Black plays Rxc2+, capturing the enemy P on c2!"
       },
       {
-        "plyIndex": 9,
+        "plyIndex": 11,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 10,
+        "plyIndex": 12,
         "moveSan": "Rxb2",
         "moveUci": "c2b2",
         "actor": "b",
@@ -2873,8 +3093,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "b2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",
@@ -2883,9 +3104,11 @@
   },
   {
     "id": "puz_wm_030",
-    "fen": "6k1/2p3pp/8/8/8/5b2/PPPQ1r1P/7K b - - 0 1",
+    "fen": "6k1/2p3pp/8/8/8/5b2/PPPQ1r1P/5RK1 b - - 0 1",
     "moves": [
-      "f2h2",
+      "f2g2",
+      "g1h1",
+      "g2h2",
       "h1g1",
       "h2g2",
       "g1h1",
@@ -2911,11 +3134,11 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "windmill",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Full-Rank Extraction #30 ♛",
     "subtitle": "Black sweeps the entire 2nd rank from d2 to a2 in 17 plies.",
     "playerColor": "b",
-    "solutionPlies": 17,
+    "solutionPlies": 19,
     "tacticalGoal": "Execute the Black windmill on the 2nd rank and capture material.",
     "tacticalReward": "win_queen",
     "outcomeAdvantage": "+12 Decisive Material ♛",
@@ -2924,118 +3147,132 @@
     "stepExplanations": [
       {
         "plyIndex": 0,
-        "moveSan": "Rxh2+",
-        "moveUci": "f2h2",
+        "moveSan": "Rg2+",
+        "moveUci": "f2g2",
         "actor": "b",
-        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
         "plyIndex": 1,
-        "moveSan": "Kg1",
-        "moveUci": "h1g1",
-        "actor": "w",
-        "explanation": "White plays Kg1."
-      },
-      {
-        "plyIndex": 2,
-        "moveSan": "Rg2+",
-        "moveUci": "h2g2",
-        "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
-      },
-      {
-        "plyIndex": 3,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
+        "plyIndex": 2,
+        "moveSan": "Rxh2+",
+        "moveUci": "g2h2",
+        "actor": "b",
+        "explanation": "Black plays Rxh2+, capturing the enemy P on h2!"
+      },
+      {
+        "plyIndex": 3,
+        "moveSan": "Kg1",
+        "moveUci": "h1g1",
+        "actor": "w",
+        "explanation": "White plays Kg1."
+      },
+      {
         "plyIndex": 4,
+        "moveSan": "Rg2+",
+        "moveUci": "h2g2",
+        "actor": "b",
+        "explanation": "Black checks the enemy King with Rg2+!"
+      },
+      {
+        "plyIndex": 5,
+        "moveSan": "Kh1",
+        "moveUci": "g1h1",
+        "actor": "w",
+        "explanation": "White plays Kh1."
+      },
+      {
+        "plyIndex": 6,
         "moveSan": "Rxd2+",
         "moveUci": "g2d2",
         "actor": "b",
         "explanation": "Black plays Rxd2+, capturing the enemy Q on d2!"
       },
       {
-        "plyIndex": 5,
+        "plyIndex": 7,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 6,
+        "plyIndex": 8,
         "moveSan": "Rg2+",
         "moveUci": "d2g2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
-        "plyIndex": 7,
+        "plyIndex": 9,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 8,
+        "plyIndex": 10,
         "moveSan": "Rxc2+",
         "moveUci": "g2c2",
         "actor": "b",
         "explanation": "Black plays Rxc2+, capturing the enemy P on c2!"
       },
       {
-        "plyIndex": 9,
+        "plyIndex": 11,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 10,
+        "plyIndex": 12,
         "moveSan": "Rg2+",
         "moveUci": "c2g2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
-        "plyIndex": 11,
+        "plyIndex": 13,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 12,
+        "plyIndex": 14,
         "moveSan": "Rxb2+",
         "moveUci": "g2b2",
         "actor": "b",
         "explanation": "Black plays Rxb2+, capturing the enemy P on b2!"
       },
       {
-        "plyIndex": 13,
+        "plyIndex": 15,
         "moveSan": "Kg1",
         "moveUci": "h1g1",
         "actor": "w",
         "explanation": "White plays Kg1."
       },
       {
-        "plyIndex": 14,
+        "plyIndex": 16,
         "moveSan": "Rg2+",
         "moveUci": "b2g2",
         "actor": "b",
-        "explanation": "Black checks the King with Rg2+!"
+        "explanation": "Black checks the enemy King with Rg2+!"
       },
       {
-        "plyIndex": 15,
+        "plyIndex": 17,
         "moveSan": "Kh1",
         "moveUci": "g1h1",
         "actor": "w",
         "explanation": "White plays Kh1."
       },
       {
-        "plyIndex": 16,
+        "plyIndex": 18,
         "moveSan": "Rxa2+",
         "moveUci": "g2a2",
         "actor": "b",
@@ -3043,8 +3280,9 @@
       }
     ],
     "targetSquares": [
-      "h2",
-      "a2"
+      "g2",
+      "h1",
+      "h2"
     ],
     "keySquares": [
       "f2",

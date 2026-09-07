@@ -1,2 +1,2 @@
-export { default as MultiplayerArena } from './MultiplayerArena.vue';
-export * from './MultiplayerArena.vue';
+export { default as MultiplayerArena } from '@/features/multiplayer/MultiplayerArena.vue';
+export * from '@/features/multiplayer/MultiplayerArena.vue';

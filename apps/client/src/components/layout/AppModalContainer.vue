@@ -13,6 +13,7 @@ import { QrCodeModal } from '@/features/lobby';
 import { PromotionModal, GameOverModal, RematchModal } from '@/features/modals';
 import { ProgressSyncModal, ProgressConflictModal } from '@/features/portability';
 import { PwaInstallModal, PwaInstallBanner } from '@/features/pwa';
+import { BaseModal, BaseButton } from '@/components/base';
 
 interface Props {
   showQrModal?: boolean;
@@ -34,6 +35,12 @@ interface Props {
   diffPreview?: ProgressDiffPreview | Record<string, any> | null;
   isInstallModalOpen?: boolean;
   showInstallBanner?: boolean;
+  showConfirmModal?: boolean;
+  confirmTitle?: string;
+  confirmMessage?: string;
+  confirmButtonText?: string;
+  cancelButtonText?: string;
+  confirmVariant?: 'primary' | 'danger';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -56,6 +63,12 @@ const props = withDefaults(defineProps<Props>(), {
   diffPreview: null,
   isInstallModalOpen: false,
   showInstallBanner: false,
+  showConfirmModal: false,
+  confirmTitle: '',
+  confirmMessage: '',
+  confirmButtonText: 'Confirm',
+  cancelButtonText: 'Cancel',
+  confirmVariant: 'danger',
 });
 
 const emit = defineEmits<{
@@ -64,6 +77,11 @@ const emit = defineEmits<{
   'update:isSyncModalOpen': [value: boolean];
   'update:isConflictModalOpen': [value: boolean];
   'update:isInstallModalOpen': [value: boolean];
+  'update:showConfirmModal': [value: boolean];
+  'confirm-proceed': [];
+  confirmProceed: [];
+  'confirm-cancel': [];
+  confirmCancel: [];
   'promotion-select': [piece: 'q' | 'r' | 'b' | 'n'];
   promotionSelect: [piece: 'q' | 'r' | 'b' | 'n'];
   'promotion-cancel': [];
@@ -89,6 +107,18 @@ const emit = defineEmits<{
   dismiss: [];
   notify: [payload: { message: string; type: 'error' | 'info' | 'success'; durationMs?: number }];
 }>();
+
+function handleConfirmProceed() {
+  emit('update:showConfirmModal', false);
+  emit('confirm-proceed');
+  emit('confirmProceed');
+}
+
+function handleConfirmCancel() {
+  emit('update:showConfirmModal', false);
+  emit('confirm-cancel');
+  emit('confirmCancel');
+}
 
 function handlePromotionSelect(piece: 'q' | 'r' | 'b' | 'n') {
   emit('promotion-select', piece);
@@ -145,6 +175,7 @@ function handleSnoozePrompt() {
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
+    if (props.showConfirmModal) handleConfirmCancel();
     if (props.showQrModal) emit('update:showQrModal', false);
     if (props.pendingPromotion) handlePromotionCancel();
     if (props.showGameOverModal) emit('update:showGameOverModal', false);
@@ -241,11 +272,57 @@ onUnmounted(() => {
       @install="handlePromptInstall"
       @dismiss="handleSnoozePrompt"
     />
+
+    <!-- 9. Accessible Confirmation Dialog (Resign, Leave Room, etc.) -->
+    <BaseModal
+      :model-value="props.showConfirmModal"
+      :title="props.confirmTitle || 'Confirmation Required'"
+      size="sm"
+      @update:model-value="emit('update:showConfirmModal', $event)"
+      @close="handleConfirmCancel"
+    >
+      <div class="confirm-modal-body" data-testid="confirm-dialog-body">
+        <p class="confirm-modal-message" data-testid="confirm-dialog-message">
+          {{ props.confirmMessage }}
+        </p>
+      </div>
+
+      <template #footer>
+        <BaseButton
+          variant="ghost"
+          size="md"
+          data-testid="confirm-cancel-btn"
+          @click="handleConfirmCancel"
+        >
+          {{ props.cancelButtonText || 'Cancel' }}
+        </BaseButton>
+        <BaseButton
+          :variant="props.confirmVariant || 'danger'"
+          size="md"
+          data-testid="confirm-proceed-btn"
+          @click="handleConfirmProceed"
+        >
+          {{ props.confirmButtonText || 'Confirm' }}
+        </BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
 <style scoped>
 .app-modal-container {
   display: contents;
+}
+
+.confirm-modal-body {
+  padding: var(--space-2) 0;
+}
+
+.confirm-modal-message {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text-main);
+  line-height: var(--leading-relaxed);
+  margin: 0;
 }
 </style>

@@ -13,6 +13,7 @@ import {
   DEFAULT_PUZZLE_PROGRESS,
 } from './puzzle_progress.store';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
+import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
 
 export { PUZZLE_PROGRESS_STORAGE_KEY };
 
@@ -27,9 +28,14 @@ export { PUZZLE_PROGRESS_STORAGE_KEY };
 export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
   private memoryCache: PuzzleProgress;
   private readonly storageKey: string;
+  private readonly storage: KeyValueStorage;
 
-  constructor(storageKey: string = PUZZLE_PROGRESS_STORAGE_KEY) {
+  constructor(
+    storageKey: string = PUZZLE_PROGRESS_STORAGE_KEY,
+    storage: KeyValueStorage = safeLocalStorage
+  ) {
     this.storageKey = storageKey;
+    this.storage = storage;
     this.memoryCache = {
       ...DEFAULT_PUZZLE_PROGRESS,
       ratingProfile: { ...DEFAULT_ADAPTIVE_RATING },
@@ -37,23 +43,6 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
       arcadeStats: { ...DEFAULT_PUZZLE_PROGRESS.arcadeStats },
       solvedPuzzles: {},
     };
-  }
-
-  private isStorageAvailable(): boolean {
-    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-      return false;
-    }
-    try {
-      const testKey = `__fc_puz_test_${Date.now()}__`;
-      window.localStorage.setItem(testKey, '1');
-      window.localStorage.removeItem(testKey);
-      return true;
-    } catch (err) {
-      if (isQuotaExceededError(err)) {
-        return true;
-      }
-      return false;
-    }
   }
 
   private sanitizeProgress(raw: unknown): PuzzleProgress {
@@ -160,12 +149,12 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
   }
 
   public async getProgress(): Promise<PuzzleProgress> {
-    if (!this.isStorageAvailable()) {
+    if (!this.storage.isAvailable()) {
       return JSON.parse(JSON.stringify(this.memoryCache));
     }
 
     try {
-      const raw = window.localStorage.getItem(this.storageKey);
+      const raw = this.storage.getItem(this.storageKey);
       if (!raw) {
         return JSON.parse(JSON.stringify(this.memoryCache));
       }
@@ -282,7 +271,7 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
 
   public async restoreProgress(progress: PuzzleProgress): Promise<void> {
     const sanitized = this.sanitizeProgress(progress);
-    await this.persist(sanitized);
+    await this.persist(sanitized, true);
   }
 
   public async resetAll(): Promise<void> {
@@ -297,20 +286,20 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
       lastActiveAt: now,
     };
 
-    if (this.isStorageAvailable()) {
+    if (this.storage.isAvailable()) {
       try {
-        window.localStorage.removeItem(this.storageKey);
+        this.storage.removeItem(this.storageKey);
       } catch (err) {
         console.warn('[FC_PUZZLE_STORE] Failed to clear puzzle storage key', err);
       }
     }
   }
 
-  private async persist(data: PuzzleProgress): Promise<void> {
+  private async persist(data: PuzzleProgress, throwOnQuota: boolean = false): Promise<void> {
     this.memoryCache = JSON.parse(JSON.stringify(data));
-    if (this.isStorageAvailable()) {
+    if (this.storage.isAvailable()) {
       try {
-        window.localStorage.setItem(this.storageKey, JSON.stringify(data));
+        this.storage.setItem(this.storageKey, JSON.stringify(data));
       } catch (err) {
         if (isQuotaExceededError(err)) {
           storageAlertDispatcher.notify({
@@ -321,9 +310,13 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
             message: 'Storage quota exceeded while saving puzzle progress. Local state was preserved in memory.',
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
           });
-          throw err;
+          if (throwOnQuota) {
+            throw err;
+          }
+          // Preserve in-memory without crashing the UI for regular gameplay
+        } else {
+          console.warn('[FC_PUZZLE_STORE] Failed to persist puzzle progress to storage', err);
         }
-        console.warn('[FC_PUZZLE_STORE] Failed to persist puzzle progress to localStorage', err);
       }
     }
   }

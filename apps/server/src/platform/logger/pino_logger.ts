@@ -13,10 +13,16 @@ const DEFAULT_REDACT_PATHS = [
   "*.password",
   "token",
   "*.token",
+  "secret",
+  "*.secret",
   "authorization",
   "headers.authorization",
   "headers.cookie",
   "cookie",
+  "key",
+  "*.key",
+  "apiKey",
+  "*.apiKey",
 ];
 
 /**

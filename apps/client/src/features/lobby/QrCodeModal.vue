@@ -241,8 +241,8 @@ async function copyLink() {
   }
 
   if (!succeeded && typeof document !== 'undefined') {
+    const textarea = document.createElement('textarea');
     try {
-      const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
       textarea.style.top = '0';
@@ -259,9 +259,12 @@ async function copyLink() {
       textarea.focus();
       textarea.select();
       succeeded = document.execCommand('copy');
-      document.body.removeChild(textarea);
     } catch {
       succeeded = false;
+    } finally {
+      if (textarea.parentNode) {
+        document.body.removeChild(textarea);
+      }
     }
   }
 

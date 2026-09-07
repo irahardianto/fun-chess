@@ -18,6 +18,20 @@ describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
       expect(config.LOG_LEVEL).toBe("info");
       expect(config.CORS_ORIGIN).toBeUndefined();
       expect(config.PUBLIC_URL).toBeUndefined();
+      expect(config.TRUST_PROXY).toBe(false);
+    });
+
+    it("parses TRUST_PROXY truthy and falsy values", () => {
+      expect(loadServerConfig({ TRUST_PROXY: "true" }).TRUST_PROXY).toBe(true);
+      expect(loadServerConfig({ TRUST_PROXY: "TRUE" }).TRUST_PROXY).toBe(true);
+      expect(loadServerConfig({ TRUST_PROXY: "1" }).TRUST_PROXY).toBe(true);
+      expect(loadServerConfig({ TRUST_PROXY: true }).TRUST_PROXY).toBe(true);
+
+      expect(loadServerConfig({ TRUST_PROXY: "false" }).TRUST_PROXY).toBe(false);
+      expect(loadServerConfig({ TRUST_PROXY: "0" }).TRUST_PROXY).toBe(false);
+      expect(loadServerConfig({ TRUST_PROXY: false }).TRUST_PROXY).toBe(false);
+      expect(loadServerConfig({ TRUST_PROXY: "random" }).TRUST_PROXY).toBe(false);
+      expect(loadServerConfig({}).TRUST_PROXY).toBe(false);
     });
 
     it("parses valid custom PORT coerced to a number", () => {
@@ -50,16 +64,38 @@ describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
       expect(config.HOST_IP).toBe("10.0.0.5");
     });
 
+    it("parses CLIENT_URL and RATE_LIMIT_* options", () => {
+      const config = loadServerConfig({
+        CLIENT_URL: "https://chess.fun.app",
+        RATE_LIMIT_WINDOW_MS: "15000",
+        RATE_LIMIT_MAX_REQUESTS: "10",
+        RATE_LIMIT_MAX_KEYS: "25000",
+      });
+
+      expect(config.CLIENT_URL).toBe("https://chess.fun.app");
+      expect(config.RATE_LIMIT_WINDOW_MS).toBe(15000);
+      expect(config.RATE_LIMIT_MAX_REQUESTS).toBe(10);
+      expect(config.RATE_LIMIT_MAX_KEYS).toBe(25000);
+    });
+
     it("treats empty string environment variables as undefined", () => {
       const config = loadServerConfig({
         CORS_ORIGIN: "",
         PUBLIC_URL: "",
+        CLIENT_URL: "",
+        RATE_LIMIT_WINDOW_MS: "",
+        RATE_LIMIT_MAX_REQUESTS: "",
+        RATE_LIMIT_MAX_KEYS: "",
         LAN_IP: "",
         HOST_IP: "",
       });
 
       expect(config.CORS_ORIGIN).toBeUndefined();
       expect(config.PUBLIC_URL).toBeUndefined();
+      expect(config.CLIENT_URL).toBeUndefined();
+      expect(config.RATE_LIMIT_WINDOW_MS).toBeUndefined();
+      expect(config.RATE_LIMIT_MAX_REQUESTS).toBeUndefined();
+      expect(config.RATE_LIMIT_MAX_KEYS).toBeUndefined();
       expect(config.LAN_IP).toBeUndefined();
       expect(config.HOST_IP).toBeUndefined();
     });
@@ -127,6 +163,19 @@ describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
 
       const origins = resolveAllowedOrigins(env);
       expect(origins).toEqual(["https://fun-chess-app-prod.a.run.app"]);
+    });
+
+    it("derives origin from CLIENT_URL when CORS_ORIGIN is not set", () => {
+      const env: ServerEnv = {
+        NODE_ENV: "development",
+        PORT: 3000,
+        HOST: "0.0.0.0",
+        LOG_LEVEL: "info",
+        CLIENT_URL: "https://fun-chess-client.example.com/play",
+      };
+
+      const origins = resolveAllowedOrigins(env);
+      expect(origins).toEqual(["https://fun-chess-client.example.com"]);
     });
 
     it("requires CORS_ORIGIN or PUBLIC_URL in production mode and throws if neither is set", () => {

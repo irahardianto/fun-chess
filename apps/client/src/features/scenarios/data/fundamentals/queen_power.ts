@@ -29,7 +29,7 @@ export const queenPowerScenario: ChessScenario = {
       instruction: 'Black left their e5 pawn undefended! Slide your Queen from h5 horizontally to e5 with check!',
       conceptExplanation: 'The Queen can switch from diagonal flight to straight-line flight in a heartbeat!',
       hint: 'Move your Queen from h5 sideways to e5 to capture the pawn.',
-      setupFen: 'r1bqkbnr/pppp1ppp/2n5/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR w KQkq - 1 3',
+      setupFen: 'rnbqkbnr/pppp1pp1/7p/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR w KQkq - 0 3',
       highlightSquares: ['h5', 'e5'],
       threatSquares: ['e5'],
       playerColor: 'w',

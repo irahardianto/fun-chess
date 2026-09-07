@@ -93,7 +93,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
 
   // New tests covering extractClientIp
   describe("extractClientIp", () => {
-    it("extracts the first IP from x-forwarded-for header when comma-separated", () => {
+    it("ignores x-forwarded-for by default (trustProxy = false) and uses address to prevent spoofing (CRIT-001)", () => {
       const socket = {
         handshake: {
           headers: {
@@ -103,10 +103,24 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any)).toBe("203.0.113.195");
+      expect(extractClientIp(socket as any)).toBe("10.0.0.1");
+      expect(extractClientIp(socket as any, false)).toBe("10.0.0.1");
     });
 
-    it("extracts IP from single-value x-forwarded-for header with surrounding whitespace", () => {
+    it("extracts the first IP from x-forwarded-for header when trustProxy is true", () => {
+      const socket = {
+        handshake: {
+          headers: {
+            "x-forwarded-for": "203.0.113.195, 70.41.3.18, 150.172.238.178",
+          },
+          address: "10.0.0.1",
+        },
+      };
+
+      expect(extractClientIp(socket as any, true)).toBe("203.0.113.195");
+    });
+
+    it("extracts IP from single-value x-forwarded-for header with surrounding whitespace when trustProxy is true", () => {
       const socket = {
         handshake: {
           headers: {
@@ -116,7 +130,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any)).toBe("198.51.100.42");
+      expect(extractClientIp(socket as any, true)).toBe("198.51.100.42");
     });
 
     it("falls back to socket.handshake.address when x-forwarded-for is missing", () => {
@@ -128,6 +142,21 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       };
 
       expect(extractClientIp(socket as any)).toBe("192.168.1.100");
+      expect(extractClientIp(socket as any, true)).toBe("192.168.1.100");
+    });
+
+    it("falls back to conn.remoteAddress when handshake.address is missing", () => {
+      const socket = {
+        handshake: {
+          headers: {},
+        },
+        conn: {
+          remoteAddress: "172.16.0.5",
+        },
+      };
+
+      expect(extractClientIp(socket as any)).toBe("172.16.0.5");
+      expect(extractClientIp(socket as any, true)).toBe("172.16.0.5");
     });
 
     it("falls back to '127.0.0.1' when neither header nor address is available", () => {
@@ -139,6 +168,58 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
 
       expect(extractClientIp(socket as any)).toBe("127.0.0.1");
       expect(extractClientIp({} as any)).toBe("127.0.0.1");
+    });
+  });
+
+  describe("Bounded LRU Memory Eviction (MAJ-003)", () => {
+    it("evicts the oldest key when capacity exceeds maxKeys on inserting a new key", () => {
+      const smallLimiter = new SocketRateLimiter({
+        maxRequests: 5,
+        windowMs: 10_000,
+        maxKeys: 3,
+      });
+
+      const now = 100_000;
+      smallLimiter.consume("client-1", now);
+      smallLimiter.consume("client-2", now);
+      smallLimiter.consume("client-3", now);
+      expect(smallLimiter.size()).toBe(3);
+
+      // Consuming client-4 must evict the oldest key ("client-1")
+      smallLimiter.consume("client-4", now);
+      expect(smallLimiter.size()).toBe(3);
+
+      // "client-1" was evicted, so its quota was reset
+      expect(smallLimiter.getRemaining("client-1", now)).toBe(5);
+      // "client-2", "client-3", "client-4" are still present
+      expect(smallLimiter.getRemaining("client-2", now)).toBe(4);
+      expect(smallLimiter.getRemaining("client-3", now)).toBe(4);
+      expect(smallLimiter.getRemaining("client-4", now)).toBe(4);
+    });
+
+    it("refreshes LRU position on access so recently active keys are retained", () => {
+      const smallLimiter = new SocketRateLimiter({
+        maxRequests: 5,
+        windowMs: 10_000,
+        maxKeys: 3,
+      });
+
+      const now = 100_000;
+      smallLimiter.consume("client-1", now);
+      smallLimiter.consume("client-2", now);
+      smallLimiter.consume("client-3", now);
+
+      // Re-access client-1 so it becomes the most recently used
+      smallLimiter.consume("client-1", now + 10);
+
+      // Now insert client-4: client-2 should be evicted (oldest LRU), not client-1
+      smallLimiter.consume("client-4", now + 20);
+      expect(smallLimiter.size()).toBe(3);
+
+      // client-1 was retained
+      expect(smallLimiter.getRemaining("client-1", now + 20)).toBe(3);
+      // client-2 was evicted
+      expect(smallLimiter.getRemaining("client-2", now + 20)).toBe(5);
     });
   });
 

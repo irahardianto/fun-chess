@@ -59,7 +59,7 @@ describe("Dual-Client Full Game Lifecycle Integration Suite", () => {
       CreateRoomRequest,
       { success: true; room: RoomState; sessionToken: string }
     >(player1, "room:create", {
-      playerName: "Leo (Host)",
+      playerName: "Leo Host",
       preferredColor: "w",
       avatar: "🦁",
     });
@@ -83,7 +83,7 @@ describe("Dual-Client Full Game Lifecycle Integration Suite", () => {
     const joinRes = await emitAck<
       JoinRoomRequest,
       { success: true; room: RoomState; player: Player; sessionToken: string }
-    >(player2, "room:join", { roomCode, playerName: "Maya (Joiner)", avatar: "🦁" });
+    >(player2, "room:join", { roomCode, playerName: "Maya Joiner", avatar: "🦁" });
 
     expect(joinRes.success).toBe(true);
     expect(joinRes.player.color).toBe("b");
@@ -159,7 +159,7 @@ describe("Dual-Client Full Game Lifecycle Integration Suite", () => {
 
     expect(gameOverP1.winner).toBe("w");
     expect(gameOverP1.reason).toBe("checkmate");
-    expect(gameOverP1.winnerName).toBe("Leo (Host)");
+    expect(gameOverP1.winnerName).toBe("Leo Host");
     expect(gameOverP2.winner).toBe("w");
     expect(gameOverP2.totalMoves).toBe(7);
   });

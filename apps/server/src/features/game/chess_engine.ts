@@ -6,25 +6,8 @@ import {
   PieceColor,
   PieceType,
   Square,
+  calculateMaterialAndCaptures,
 } from "@fun-chess/shared";
-
-const PIECE_VALUES: Record<PieceType, number> = {
-  p: 1,
-  n: 3,
-  b: 3,
-  r: 5,
-  q: 9,
-  k: 0,
-};
-
-const STARTING_PIECES: Record<PieceType, number> = {
-  p: 8,
-  n: 2,
-  b: 2,
-  r: 2,
-  q: 1,
-  k: 1,
-};
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
@@ -55,6 +38,7 @@ export class ChessEngine {
     move: MovePayload,
     expectedTurn: PieceColor,
     currentHistory: MoveResult[] = [],
+    timestamp: number = Date.now(),
   ): MoveValidationOutcome {
     let chess: Chess;
     try {
@@ -91,7 +75,7 @@ export class ChessEngine {
         flags: result.flags,
         fen: chess.fen(),
         moveNumber: currentHistory.length + 1,
-        timestamp: Date.now(),
+        timestamp,
       };
 
       const updatedHistory = [...currentHistory, moveResult];
@@ -179,80 +163,7 @@ export class ChessEngine {
     capturedBlack: PieceType[];
     materialAdvantage: { white: number; black: number };
   } {
-    const board = chess.board();
-
-    const whiteCounts: Record<PieceType, number> = {
-      p: 0,
-      n: 0,
-      b: 0,
-      r: 0,
-      q: 0,
-      k: 0,
-    };
-    const blackCounts: Record<PieceType, number> = {
-      p: 0,
-      n: 0,
-      b: 0,
-      r: 0,
-      q: 0,
-      k: 0,
-    };
-
-    let whiteMaterial = 0;
-    let blackMaterial = 0;
-
-    for (let r = 0; r < 8; r++) {
-      const row = board[r];
-      if (!row) continue;
-      for (let c = 0; c < 8; c++) {
-        const piece = row[c];
-        if (!piece) continue;
-
-        const pType = piece.type as PieceType;
-        if (piece.color === "w") {
-          whiteCounts[pType]++;
-          whiteMaterial += PIECE_VALUES[pType];
-        } else {
-          blackCounts[pType]++;
-          blackMaterial += PIECE_VALUES[pType];
-        }
-      }
-    }
-
-    const capturedWhite: PieceType[] = [];
-    const capturedBlack: PieceType[] = [];
-
-    // Pieces order: q, r, b, n, p
-    const pieceOrder: PieceType[] = ["q", "r", "b", "n", "p"];
-
-    for (const type of pieceOrder) {
-      const whiteMissing = Math.max(
-        0,
-        STARTING_PIECES[type] - whiteCounts[type],
-      );
-      for (let i = 0; i < whiteMissing; i++) {
-        capturedWhite.push(type);
-      }
-
-      const blackMissing = Math.max(
-        0,
-        STARTING_PIECES[type] - blackCounts[type],
-      );
-      for (let i = 0; i < blackMissing; i++) {
-        capturedBlack.push(type);
-      }
-    }
-
-    const materialAdvantage = {
-      white: Math.max(0, whiteMaterial - blackMaterial),
-      black: Math.max(0, blackMaterial - whiteMaterial),
-    };
-
-    return {
-      capturedWhite,
-      capturedBlack,
-      materialAdvantage,
-    };
+    return calculateMaterialAndCaptures(chess);
   }
 
   // PERF: Standard starting position normalized signature constant. Avoids replaying all moves on new Chess().

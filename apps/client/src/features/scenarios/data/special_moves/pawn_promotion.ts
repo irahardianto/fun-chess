@@ -33,7 +33,10 @@ export const pawnPromotionScenario: ChessScenario = {
       highlightSquares: ['e8', 'h5'],
       threatSquares: ['h2'],
       playerColor: 'w',
-      allowedMoves: [{ from: 'e8', to: 'h5' }],
+      allowedMoves: [
+        { from: 'e8', to: 'h5' },
+        { from: 'e8', to: 'h8' },
+      ],
       explanationOnSuccess: 'Checkmate! The promoted Queen clinched victory for the team!',
     },
   ],

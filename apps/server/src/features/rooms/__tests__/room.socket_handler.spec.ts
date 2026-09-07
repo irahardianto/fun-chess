@@ -4,6 +4,7 @@ import {
   handleSocketDisconnect,
   cancelDisconnectTimer,
   clearAllDisconnectTimers,
+  DisconnectTimerRegistry,
 } from "../room.socket_handler.js";
 import { SocketRateLimiter } from "../../../platform/socket/socket_rate_limiter.js";
 import { RoomService } from "../room.service.js";
@@ -697,6 +698,42 @@ describe("Room Socket Handlers", () => {
       expect(leftEmit).toBeDefined();
       expect((leftEmit?.payload as any).playerName).toBe("Charlie");
     });
+
+    it("rejects room:leave with ERR_RATE_LIMITED and logs structured warning when rate limit is exceeded (MAJ-006)", async () => {
+      const leaveLimiter = new SocketRateLimiter({ maxRequests: 2, windowMs: 10_000 });
+      const testSocket = new TestSocket("sock_rate_leave");
+      testSocket.handshake.address = "192.168.1.100";
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        testSocket as unknown as Socket,
+        service,
+        logger,
+        leaveLimiter,
+      );
+
+      // Consume 2 requests
+      for (let i = 0; i < 2; i++) {
+        await testSocket.trigger("room:leave", { roomCode: "LEAV" }, () => {});
+      }
+
+      // 3rd attempt must be rate limited
+      let ack: any;
+      await testSocket.trigger("room:leave", { roomCode: "LEAV" }, (res) => {
+        ack = res;
+      });
+
+      expect(ack.success).toBe(false);
+      expect(ack.error.code).toBe("ERR_RATE_LIMITED");
+      expect(ack.error.message).toContain("Rate limit exceeded for room leave");
+
+      const warnLog = logger.warnLogs.find(
+        (l) => l.message === "Rate limit exceeded for room:leave",
+      );
+      expect(warnLog).toBeDefined();
+      expect(warnLog?.context?.operation).toBe("room:leave");
+      expect(warnLog?.context?.clientIp).toBe("192.168.1.100");
+    });
   });
 
   describe("handleSocketDisconnect & Abandonment Grace Timer", () => {
@@ -807,6 +844,42 @@ describe("Room Socket Handlers", () => {
       expect((gameOverEmit?.payload as any).message).toBe(
         "Both players disconnected. Game ended by abandonment.",
       );
+    });
+  });
+
+  describe("DisconnectTimerRegistry (MIN-007)", () => {
+    it("tracks, cancels, and clears timers isolated from global scope", () => {
+      const registry = new DisconnectTimerRegistry();
+      const t1 = setTimeout(() => {}, 10_000);
+      const t2 = setTimeout(() => {}, 10_000);
+      const t3 = setTimeout(() => {}, 10_000);
+
+      try {
+        registry.set("ROOM", "p1", t1);
+        registry.set("ROOM", "p2", t2);
+        registry.set("OTHER", "p3", t3);
+
+        expect(registry.size()).toBe(3);
+        expect(registry.get("room", "p1")).toBe(t1);
+
+        // Cancel specific timer
+        expect(registry.cancel("room", "p1")).toBe(true);
+        expect(registry.size()).toBe(2);
+        expect(registry.cancel("room", "p1")).toBe(false);
+
+        // Cancel all for ROOM
+        registry.cancelAllForRoom("room");
+        expect(registry.size()).toBe(1);
+        expect(registry.get("OTHER", "p3")).toBe(t3);
+
+        // Clear all
+        registry.clear();
+        expect(registry.size()).toBe(0);
+      } finally {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      }
     });
   });
 });

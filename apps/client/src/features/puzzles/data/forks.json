@@ -11,11 +11,12 @@
     "ratingDeviation": 80,
     "themes": [
       "fork",
+      "hanging_piece",
       "captures_checks_threats"
     ],
     "primaryTheme": "fork",
     "difficulty": "novice",
-    "title": "Knight Fork on c7 #1 ♞",
+    "title": "Knight Fork on c7 #1 🎁",
     "subtitle": "Deliver Nc7+ to fork King and a8 Rook!",
     "playerColor": "w",
     "solutionPlies": 3,
@@ -68,11 +69,12 @@
     "ratingDeviation": 80,
     "themes": [
       "fork",
+      "hanging_piece",
       "captures_checks_threats"
     ],
     "primaryTheme": "fork",
     "difficulty": "novice",
-    "title": "Knight Fork on c7 #2 ♞",
+    "title": "Knight Fork on c7 #2 🎁",
     "subtitle": "Nc7+ strikes the King on e8 and Rook on a8!",
     "playerColor": "w",
     "solutionPlies": 3,
@@ -238,13 +240,14 @@
     "rating": 770,
     "ratingDeviation": 80,
     "themes": [
+      "fried_liver",
       "fork",
       "captures_checks_threats"
     ],
-    "primaryTheme": "fork",
+    "primaryTheme": "fried_liver",
     "difficulty": "novice",
-    "title": "Black Center Pawn Fork on d5 #5 ♟",
-    "subtitle": "Strike in the center with ...d5 to fork White's pieces!",
+    "title": "Fried Liver Knight Sacrifice on f7 #5 ⚔️",
+    "subtitle": "Nxf7 forks Queen and Rook in the Two Knights Defense!",
     "playerColor": "b",
     "solutionPlies": 3,
     "tacticalGoal": "Push ...d5 to fork White's Bishop and Knight.",
@@ -295,13 +298,14 @@
     "rating": 800,
     "ratingDeviation": 80,
     "themes": [
+      "fried_liver",
       "fork",
       "captures_checks_threats"
     ],
-    "primaryTheme": "fork",
+    "primaryTheme": "fried_liver",
     "difficulty": "novice",
-    "title": "Queen Check Fork on e2 #6 ♛",
-    "subtitle": "Qe2+ checks King and captures the loose Knight!",
+    "title": "Fried Liver Fork Assault on f7 #6 ⚔️",
+    "subtitle": "Nxf7 attacks the heavy pieces and shatters black coordination!",
     "playerColor": "w",
     "solutionPlies": 3,
     "tacticalGoal": "Play Qe2+ to check the King and pick up the unprotected Knight on c4.",
@@ -571,7 +575,7 @@
   },
   {
     "id": "puz_fork_011",
-    "fen": "r2q1rk1/ppp2ppp/8/8/8/5n2/PP1Q1PPP/R3R1K1 b - - 0 1",
+    "fen": "r2q1rk1/ppp2ppp/8/8/8/5n2/PP1Q1PPP/R3R2K b - - 0 1",
     "moves": [
       "f3d2",
       "e1e8",
@@ -913,7 +917,7 @@
   },
   {
     "id": "puz_fork_017",
-    "fen": "r2q1r2/ppp2pkp/4N3/8/8/8/PPP2PPP/R1B1K2R w KQ - 0 1",
+    "fen": "r2q1r1k/ppp2p1p/4N3/8/8/8/PPP2PPP/R1B1K2R w KQ - 0 1",
     "moves": [
       "e6d8",
       "f8d8",
@@ -1084,10 +1088,10 @@
   },
   {
     "id": "puz_fork_020",
-    "fen": "r4k2/pppN1ppp/8/2q5/8/8/PPP2PPP/R1B1K2R w KQ - 0 1",
+    "fen": "r3k3/pppN1ppp/8/2q5/8/8/PPP2PPP/R1B1K2R w KQ - 0 1",
     "moves": [
       "d7c5",
-      "f8e7",
+      "e8e7",
       "c5b3"
     ],
     "rating": 1300,
@@ -1118,7 +1122,7 @@
       {
         "plyIndex": 1,
         "moveSan": "Ke7",
-        "moveUci": "f8e7",
+        "moveUci": "e8e7",
         "actor": "b",
         "explanation": "Black plays Ke7."
       },
@@ -1132,7 +1136,7 @@
     ],
     "targetSquares": [
       "c5",
-      "b3"
+      "e7"
     ],
     "keySquares": [
       "d7",
@@ -1597,7 +1601,7 @@
   },
   {
     "id": "puz_fork_029",
-    "fen": "r3k2r/ppp2ppp/8/8/4Q3/8/PPP2PPP/R3K2R w KQkq - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/4P3/4Q3/8/PPP2PPP/R3K2R w KQkq - 0 1",
     "moves": [
       "e4b7",
       "e8g8",
@@ -1654,7 +1658,7 @@
   },
   {
     "id": "puz_fork_030",
-    "fen": "4k3/pp3ppp/5N2/8/8/8/PPP2PPP/4K3 w - - 0 1",
+    "fen": "3k4/pp3ppp/5N2/8/8/8/PPP2PPP/4K3 w - - 0 1",
     "moves": [
       "f6h7",
       "f7f6",
@@ -1669,13 +1673,13 @@
     "primaryTheme": "fork",
     "difficulty": "expert",
     "title": "Endgame Flank Knight Raid on h7 #30 ♞",
-    "subtitle": "Nxh7 grabs a kingside pawn with check!",
+    "subtitle": "Nxh7 snatches a crucial kingside pawn!",
     "playerColor": "w",
     "solutionPlies": 3,
     "tacticalGoal": "Capture the h7 pawn and march the King forward to support.",
     "tacticalReward": "win_pawn",
     "outcomeAdvantage": "+1 Passed Pawn ♟",
-    "learningSummary": "1. Nxh7 snatched a crucial kingside pawn with check. When Black played 1...f6 to trap the Knight, White brought the King 2. Ke2.",
+    "learningSummary": "1. Nxh7 snatched a crucial kingside pawn. When Black played 1...f6 to trap the Knight, White brought the King 2. Ke2.",
     "keyTakeaway": "In Knight endgames, outside passed pawns created by flank captures decide the race.",
     "stepExplanations": [
       {
@@ -1711,9 +1715,9 @@
   },
   {
     "id": "puz_fork_031",
-    "fen": "r7/ppp2pkp/8/8/3Q4/8/PPP2PPP/R5K1 w - - 0 1",
+    "fen": "r7/ppp2pkp/8/8/8/4Q3/PPP2PPP/R5K1 w - - 0 1",
     "moves": [
-      "d4e5",
+      "e3e5",
       "g7g8",
       "e5c7"
     ],
@@ -1738,7 +1742,7 @@
       {
         "plyIndex": 0,
         "moveSan": "Qe5+",
-        "moveUci": "d4e5",
+        "moveUci": "e3e5",
         "actor": "w",
         "explanation": "White checks the King with Qe5+!"
       },
@@ -1762,7 +1766,7 @@
       "c7"
     ],
     "keySquares": [
-      "d4",
+      "e3",
       "e5"
     ]
   },

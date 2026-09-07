@@ -15,6 +15,13 @@ export interface ChessLogger {
 }
 
 /**
+ * Silent no-op logger for Chess factory operations (MIN-014).
+ */
+export const SILENT_CHESS_LOGGER: ChessLogger = {
+  warn: () => {},
+};
+
+/**
  * Validates whether a given value is a syntactically and structurally valid chess FEN.
  *
  * @param fen - Potential FEN string to validate
@@ -43,12 +50,12 @@ export function isValidFen(fen: unknown): fen is string {
  * - If fen is invalid or causes an error, falls back safely to standard starting position and logs a warning.
  *
  * @param fen - Optional FEN string to initialize
- * @param logger - Optional injectable logger (defaults to console for backward compatibility; safe no-op if null/empty)
+ * @param logger - Optional injectable logger (defaults to silent no-op object; safe no-op if null/empty)
  * @returns A fully valid, initialized Chess instance
  */
 export function createSafeChess(
   fen?: string,
-  logger: ChessLogger = console,
+  logger: ChessLogger = SILENT_CHESS_LOGGER,
 ): Chess {
   if (!fen || typeof fen !== "string") {
     return new Chess();
@@ -83,13 +90,13 @@ export function createSafeChess(
  *
  * @param chess - The Chess instance to update
  * @param fen - The FEN string to load
- * @param logger - Optional injectable logger (defaults to console for backward compatibility; safe no-op if null/empty)
+ * @param logger - Optional injectable logger (defaults to silent no-op object; safe no-op if null/empty)
  * @returns true if the FEN was successfully loaded, false otherwise
  */
 export function safeLoadFen(
   chess: Chess,
   fen: string,
-  logger: ChessLogger = console,
+  logger: ChessLogger = SILENT_CHESS_LOGGER,
 ): boolean {
   if (!chess) {
     return false;

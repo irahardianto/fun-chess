@@ -11,29 +11,39 @@ export class BrowserStorageAdapter implements KeyValueStorage {
     this.probeAvailability();
   }
 
-  private probeAvailability(): void {
+  public probeAvailability(): boolean {
     if (typeof window === 'undefined') {
       this.available = false;
-      return;
+      return false;
     }
     try {
       const storage = window[this.storageType];
       if (!storage) {
         this.available = false;
-        return;
+        return false;
       }
       const probeKey = `__fc_probe_${Date.now()}__`;
       storage.setItem(probeKey, '1');
       storage.removeItem(probeKey);
       this.available = true;
-    } catch {
-      // SecurityError (Safari Private Browsing mode) or QuotaExceededError
+      return true;
+    } catch (err) {
+      if (isQuotaExceededError(err)) {
+        this.available = true;
+        return true;
+      }
+      // SecurityError (Safari Private Browsing mode)
       this.available = false;
+      return false;
     }
   }
 
   private get rawStorage(): Storage | null {
-    if (!this.available || typeof window === 'undefined') return null;
+    if (typeof window === 'undefined') return null;
+    if (!this.available) {
+      this.probeAvailability();
+    }
+    if (!this.available) return null;
     try {
       return window[this.storageType];
     } catch {
@@ -42,7 +52,7 @@ export class BrowserStorageAdapter implements KeyValueStorage {
   }
 
   public isAvailable(): boolean {
-    return this.available;
+    return this.probeAvailability();
   }
 
   public getItem(key: string): string | null {

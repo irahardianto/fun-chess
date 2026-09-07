@@ -8,10 +8,22 @@ import {
   ReconnectRequest,
   RoomState,
   createInitialGameState,
+  createGameOverPayload,
 } from "@fun-chess/shared";
 import { RoomStore } from "./room.store.js";
 import { SessionRegistry } from "./session_registry.js";
 import { InMemorySessionRegistry } from "./in_memory_session_registry.js";
+import {
+  IClock,
+  SystemClock,
+  IIdGenerator,
+  UuidGenerator,
+} from "./clock.js";
+import {
+  IDisconnectTimerRegistry,
+  defaultDisconnectTimerRegistry,
+  cancelAllDisconnectTimersForRoom,
+} from "./room.socket_handler.js";
 import {
   RoomNotFoundError,
   RoomFullError,
@@ -31,6 +43,9 @@ export class RoomService {
   constructor(
     private readonly store: RoomStore,
     private readonly sessionRegistry: SessionRegistry = new InMemorySessionRegistry(),
+    private readonly clock: IClock = new SystemClock(),
+    private readonly idGenerator: IIdGenerator = new UuidGenerator(),
+    private readonly timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
   ) {}
 
   /**
@@ -55,11 +70,11 @@ export class RoomService {
     }
 
     const roomCode = await this.generateUniqueRoomCode();
-    const playerId = randomUUID();
+    const playerId = this.idGenerator.generateId();
 
     let hostColor: PieceColor;
     if (req.preferredColor === "random" || !req.preferredColor) {
-      hostColor = randomInt(0, 2) === 0 ? "w" : "b";
+      hostColor = (this.idGenerator.generateRandomInt ? this.idGenerator.generateRandomInt(0, 2) : randomInt(0, 2)) === 0 ? "w" : "b";
     } else {
       hostColor = req.preferredColor;
     }
@@ -72,7 +87,7 @@ export class RoomService {
       color: hostColor,
       isHost: true,
       isConnected: true,
-      connectedAt: Date.now(),
+      connectedAt: this.clock.now(),
     };
 
     const initialGameState = createInitialGameState();
@@ -87,8 +102,8 @@ export class RoomService {
       game: initialGameState,
       rematch: null,
       drawOffer: null,
-      createdAt: Date.now(),
-      lastActivityAt: Date.now(),
+      createdAt: this.clock.now(),
+      lastActivityAt: this.clock.now(),
     };
 
     await this.store.save(newRoom);
@@ -130,7 +145,7 @@ export class RoomService {
       );
     }
 
-    const playerId = randomUUID();
+    const playerId = this.idGenerator.generateId();
 
     const result = await this.store.mutate(normalizedCode, async (room) => {
       if (room.whitePlayer && room.blackPlayer) {
@@ -147,7 +162,7 @@ export class RoomService {
         color: assignedColor,
         isHost: false,
         isConnected: true,
-        connectedAt: Date.now(),
+        connectedAt: this.clock.now(),
       };
 
       if (assignedColor === "w") {
@@ -157,7 +172,7 @@ export class RoomService {
       }
 
       room.status = "playing";
-      room.lastActivityAt = Date.now();
+      room.lastActivityAt = this.clock.now();
 
       return {
         updatedRoom: room,
@@ -227,7 +242,7 @@ export class RoomService {
         }
       }
 
-      room.lastActivityAt = Date.now();
+      room.lastActivityAt = this.clock.now();
       return {
         updatedRoom: room,
         result: { room, player: targetPlayer },
@@ -288,20 +303,17 @@ export class RoomService {
           leavingPlayer.color === "w" ? room.blackPlayer : room.whitePlayer;
         if (remainingPlayer) {
           room.status = "game_over";
-          room.lastActivityAt = Date.now();
-          const durationSeconds = Math.max(
-            1,
-            Math.round((Date.now() - room.createdAt) / 1000),
-          );
-          const gameOverPayload: GameOverPayload = {
+          room.lastActivityAt = this.clock.now();
+          const gameOverPayload: GameOverPayload = createGameOverPayload({
             winner: remainingPlayer.color,
             winnerName: remainingPlayer.name,
+            loserName: leavingPlayer.name,
             reason: "abandonment",
             message: `${leavingPlayer.name} left the game. ${remainingPlayer.name} won by abandonment!`,
             finalFen: room.game.fen,
             totalMoves: room.game.moveCount,
-            durationSeconds,
-          };
+            startTimeMs: room.createdAt,
+          });
           await this.store.save(room);
           return {
             room,
@@ -321,7 +333,7 @@ export class RoomService {
         await this.store.delete(normalizedCode);
         await this.sessionRegistry.deleteSessionsForRoom(normalizedCode);
       } else {
-        room.lastActivityAt = Date.now();
+        room.lastActivityAt = this.clock.now();
         await this.store.save(room);
       }
 
@@ -369,7 +381,7 @@ export class RoomService {
         room.status = "paused_disconnect";
       }
 
-      room.lastActivityAt = Date.now();
+      room.lastActivityAt = this.clock.now();
       await this.store.save(room);
 
       return { room, player: droppedPlayer, wasActiveGame };
@@ -411,36 +423,29 @@ export class RoomService {
         winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
 
       room.status = "game_over";
-      room.lastActivityAt = Date.now();
-
-      const durationSeconds = Math.max(
-        1,
-        Math.round((Date.now() - room.createdAt) / 1000),
-      );
+      room.lastActivityAt = this.clock.now();
 
       let gameOverPayload: GameOverPayload;
 
       if (winnerPlayer && winnerPlayer.isConnected) {
-        const winnerName = winnerPlayer.name;
-        gameOverPayload = {
+        gameOverPayload = createGameOverPayload({
           winner: winnerColor,
-          winnerName,
+          winnerName: winnerPlayer.name,
+          loserName: disconnectedPlayer.name,
           reason: "abandonment",
-          message: `${disconnectedPlayer.name} disconnected. ${winnerName} won by abandonment!`,
           finalFen: room.game.fen,
           totalMoves: room.game.moveCount,
-          durationSeconds,
-        };
+          startTimeMs: room.createdAt,
+        });
       } else {
         // Both players are disconnected when the grace timer expires
-        gameOverPayload = {
+        gameOverPayload = createGameOverPayload({
           winner: "draw",
           reason: "abandonment",
-          message: "Both players disconnected. Game ended by abandonment.",
           finalFen: room.game.fen,
           totalMoves: room.game.moveCount,
-          durationSeconds,
-        };
+          startTimeMs: room.createdAt,
+        });
       }
 
       await this.store.save(room);
@@ -465,11 +470,13 @@ export class RoomService {
     await this.sessionRegistry.cleanupExpiredSessions();
 
     const rooms = await this.store.listActiveRooms();
-    const now = Date.now();
+    const now = this.clock.now();
     let cleaned = 0;
 
     for (const room of rooms) {
       if (now - room.lastActivityAt > maxAgeMs) {
+        // MIN-006: Cancel disconnect timers when cleaning up abandoned rooms
+        this.timerRegistry.cancelAllForRoom(room.roomCode);
         await this.store.delete(room.roomCode);
         await this.sessionRegistry.deleteSessionsForRoom(room.roomCode);
         cleaned++;
@@ -495,7 +502,9 @@ export class RoomService {
     while (attempts < 100) {
       let code = "";
       for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
-        const idx = randomInt(0, ROOM_CODE_CHARSET.length);
+        const idx = this.idGenerator.generateRandomInt
+          ? this.idGenerator.generateRandomInt(0, ROOM_CODE_CHARSET.length)
+          : randomInt(0, ROOM_CODE_CHARSET.length);
         code += ROOM_CODE_CHARSET.charAt(idx);
       }
 
@@ -507,6 +516,6 @@ export class RoomService {
     }
 
     // Fallback timestamp code
-    return `R${Date.now().toString(36).toUpperCase().slice(-3)}`;
+    return `R${this.clock.now().toString(36).toUpperCase().slice(-3)}`;
   }
 }

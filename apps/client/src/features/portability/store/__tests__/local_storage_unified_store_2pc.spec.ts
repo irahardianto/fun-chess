@@ -104,6 +104,14 @@ describe('LocalStorageUnifiedStore Two-Phase Commit with Rollback (CRIT-003 & EN
       unifiedStore.overwriteAll(null as any)
     ).rejects.toThrow('Invalid payload');
 
+    await expect(
+      unifiedStore.overwriteAll({ scenarios: {} } as any)
+    ).rejects.toThrow('Invalid payload');
+
+    await expect(
+      unifiedStore.overwriteAll({ puzzles: {} } as any)
+    ).rejects.toThrow('Invalid payload');
+
     const unchanged = await unifiedStore.getUnifiedProgress();
     expect(unchanged.scenarios['lesson-intro']).toBeDefined();
     expect(unchanged.puzzles.ratingProfile.rating).toBe(1100);

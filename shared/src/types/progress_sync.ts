@@ -286,6 +286,7 @@ export interface ProgressMergeEngine {
     local: UnifiedProgressPayload,
     incoming: UnifiedProgressPayload,
     strategy: SyncMergeStrategy,
+    now?: number,
   ): UnifiedProgressPayload;
 
   /**

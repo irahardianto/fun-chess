@@ -6,7 +6,7 @@ export const bodensMateScenario: ChessScenario = {
   subtitle: 'Criss-cross your two Bishops to slice through the enemy King’s defenses!',
   category: 'checkmate_families',
   difficulty: 'intermediate',
-  targetAgeGroup: '7-10',
+  targetAgeGroup: '11-15',
   icon: '⚔️',
   description: 'In "Boden’s Mate", two attacking Bishops on intersecting criss-cross diagonals deliver checkmate against a King whose own pieces (like a Rook on d8 and Knight on d7) block all escape!',
   estimatedMinutes: 3,

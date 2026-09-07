@@ -181,12 +181,13 @@
     "rating": 740,
     "ratingDeviation": 80,
     "themes": [
+      "trapped_piece",
       "skewer",
       "captures_checks_threats"
     ],
-    "primaryTheme": "skewer",
+    "primaryTheme": "trapped_piece",
     "difficulty": "novice",
-    "title": "Black 1st Rank Rook Skewer on a1 #4 ♜",
+    "title": "Trapped Queen on the File #4 🪤",
     "subtitle": "Ra1+ skewers King to win the h1 Rook!",
     "playerColor": "b",
     "solutionPlies": 3,
@@ -238,12 +239,13 @@
     "rating": 780,
     "ratingDeviation": 80,
     "themes": [
+      "trapped_piece",
       "skewer",
       "captures_checks_threats"
     ],
-    "primaryTheme": "skewer",
+    "primaryTheme": "trapped_piece",
     "difficulty": "novice",
-    "title": "Bishop Long Diagonal Queen Skewer #5 ♝",
+    "title": "Trapped Bishop on the Diagonal #5 🪤",
     "subtitle": "Bxc6+ skewers Queen and wrecks structure!",
     "playerColor": "w",
     "solutionPlies": 3,
@@ -514,9 +516,9 @@
   },
   {
     "id": "puz_skewer_010",
-    "fen": "4k2r/ppp2ppp/8/8/4q3/8/PPP2PPP/R1B1K2R b KQk - 0 1",
+    "fen": "4k2r/ppp2ppp/8/3q4/8/8/PPP2PPP/R1B1K2R b KQk - 0 1",
     "moves": [
-      "e4g2",
+      "d5g2",
       "h1f1",
       "e8g8"
     ],
@@ -541,7 +543,7 @@
       {
         "plyIndex": 0,
         "moveSan": "Qxg2",
-        "moveUci": "e4g2",
+        "moveUci": "d5g2",
         "actor": "b",
         "explanation": "Black plays Qxg2, capturing the enemy P on g2!"
       },
@@ -562,18 +564,18 @@
     ],
     "targetSquares": [
       "g2",
-      "g8"
+      "f1"
     ],
     "keySquares": [
-      "e4",
-      "e8"
+      "d5",
+      "g2"
     ]
   },
   {
     "id": "puz_skewer_011",
-    "fen": "r3k2r/ppp2ppp/8/4Q3/8/8/PPP2PPP/R1B1K2R w KQkq - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/8/3Q4/8/PPP2PPP/R1B1K2R w KQkq - 0 1",
     "moves": [
-      "e5g7",
+      "d4g7",
       "e8e7",
       "g7h8"
     ],
@@ -598,7 +600,7 @@
       {
         "plyIndex": 0,
         "moveSan": "Qxg7",
-        "moveUci": "e5g7",
+        "moveUci": "d4g7",
         "actor": "w",
         "explanation": "White plays Qxg7, capturing the enemy P on g7!"
       },
@@ -622,7 +624,7 @@
       "h8"
     ],
     "keySquares": [
-      "e5",
+      "d4",
       "g7"
     ]
   },
@@ -970,9 +972,9 @@
   },
   {
     "id": "puz_skewer_018",
-    "fen": "r3k2r/ppp2ppp/8/4Q3/8/8/PPP2PPP/4K2R w Kkq - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/8/3Q4/8/PPP2PPP/4K2R w Kkq - 0 1",
     "moves": [
-      "e5g7",
+      "d4g7",
       "e8d7",
       "g7h8"
     ],
@@ -997,7 +999,7 @@
       {
         "plyIndex": 0,
         "moveSan": "Qxg7",
-        "moveUci": "e5g7",
+        "moveUci": "d4g7",
         "actor": "w",
         "explanation": "White plays Qxg7, capturing the enemy P on g7!"
       },
@@ -1021,15 +1023,15 @@
       "h8"
     ],
     "keySquares": [
-      "e5",
+      "d4",
       "g7"
     ]
   },
   {
     "id": "puz_skewer_019",
-    "fen": "r3k2r/ppp2ppp/8/8/4q3/8/PPP2PPP/4K2R b Kkq - 0 1",
+    "fen": "r3k2r/ppp2ppp/8/3q4/8/8/PPP2PPP/4K2R b Kkq - 0 1",
     "moves": [
-      "e4g2",
+      "d5g2",
       "e1d2",
       "g2h1"
     ],
@@ -1054,7 +1056,7 @@
       {
         "plyIndex": 0,
         "moveSan": "Qxg2",
-        "moveUci": "e4g2",
+        "moveUci": "d5g2",
         "actor": "b",
         "explanation": "Black plays Qxg2, capturing the enemy P on g2!"
       },
@@ -1078,7 +1080,7 @@
       "h1"
     ],
     "keySquares": [
-      "e4",
+      "d5",
       "g2"
     ]
   },
@@ -1654,7 +1656,7 @@
   },
   {
     "id": "puz_skewer_030",
-    "fen": "4k2r/8/8/8/8/8/r7/R3K3 b - - 0 1",
+    "fen": "4k2r/8/8/8/8/8/r2P1P1P/R3K2R b - - 0 1",
     "moves": [
       "a2a1",
       "e1e2",
@@ -1694,7 +1696,7 @@
       },
       {
         "plyIndex": 2,
-        "moveSan": "Rah1",
+        "moveSan": "Rxh1",
         "moveUci": "a1h1",
         "actor": "b",
         "explanation": "Black plays Rah1."

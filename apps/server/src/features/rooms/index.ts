@@ -15,8 +15,19 @@ export {
   cancelDisconnectTimer,
   cancelAllDisconnectTimersForRoom,
   clearAllDisconnectTimers,
+  DisconnectTimerRegistry,
+  defaultDisconnectTimerRegistry,
   DISCONNECT_GRACE_PERIOD_MS,
 } from "./room.socket_handler.js";
+export type { IDisconnectTimerRegistry } from "./room.socket_handler.js";
+export {
+  SystemClock,
+  UuidGenerator,
+} from "./clock.js";
+export type {
+  IClock,
+  IIdGenerator,
+} from "./clock.js";
 export {
   AppError,
   RoomNotFoundError,

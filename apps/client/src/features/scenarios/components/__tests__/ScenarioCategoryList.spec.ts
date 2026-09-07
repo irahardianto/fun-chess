@@ -52,4 +52,76 @@ describe('ScenarioCategoryList.vue', () => {
 
     expect(wrapper.emitted('selectScenario')).toBeTruthy();
   });
+
+  it('renders "Continue Learning" hero card pointing to the first uncompleted lesson', async () => {
+    const firstScenario = CURRICULUM_SECTIONS[0]!.scenarios[0]!;
+    const secondScenario = CURRICULUM_SECTIONS[0]!.scenarios[1]!;
+
+    // Case 1: No progress -> first scenario is next
+    const wrapperEmpty = mount(ScenarioCategoryList, {
+      props: {
+        sections: CURRICULUM_SECTIONS,
+        progressMap: {},
+      },
+    });
+
+    const heroEmpty = wrapperEmpty.find('[data-testid="continue-learning-hero"]');
+    expect(heroEmpty.exists()).toBe(true);
+    expect(heroEmpty.text()).toContain(firstScenario.title);
+
+    // Case 2: First completed -> second scenario is next
+    const wrapperPartial = mount(ScenarioCategoryList, {
+      props: {
+        sections: CURRICULUM_SECTIONS,
+        progressMap: {
+          [firstScenario.id]: {
+            scenarioId: firstScenario.id,
+            starsEarned: 3,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: Date.now(),
+            lastCompletedAt: Date.now(),
+          },
+        },
+      },
+    });
+
+    const heroPartial = wrapperPartial.find('[data-testid="continue-learning-hero"]');
+    expect(heroPartial.exists()).toBe(true);
+    expect(heroPartial.text()).toContain(secondScenario.title);
+
+    // Clicking the continue button emits selectScenario with the second scenario
+    const resumeBtn = wrapperPartial.find('[data-testid="resume-lesson-btn"]');
+    expect(resumeBtn.exists()).toBe(true);
+    await resumeBtn.trigger('click');
+
+    expect(wrapperPartial.emitted('selectScenario')).toBeTruthy();
+    expect(wrapperPartial.emitted('selectScenario')?.[0]?.[0]).toEqual(secondScenario);
+  });
+
+  it('does not render "Continue Learning" hero card when all lessons are completed', () => {
+    const progressMap: Record<string, any> = {};
+    for (const sec of CURRICULUM_SECTIONS) {
+      for (const sc of sec.scenarios) {
+        progressMap[sc.id] = {
+          scenarioId: sc.id,
+          starsEarned: 3,
+          attemptsCount: 1,
+          hintsUsedTotal: 0,
+          firstCompletedAt: Date.now(),
+          lastCompletedAt: Date.now(),
+        };
+      }
+    }
+
+    const wrapper = mount(ScenarioCategoryList, {
+      props: {
+        sections: CURRICULUM_SECTIONS,
+        progressMap,
+      },
+    });
+
+    const hero = wrapper.find('[data-testid="continue-learning-hero"]');
+    expect(hero.exists()).toBe(false);
+  });
 });

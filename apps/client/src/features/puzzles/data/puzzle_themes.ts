@@ -18,7 +18,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Attack two or more enemy pieces at the same time with one clever move!",
     kidFriendlyTip:
       "Knights and Pawns love jumping into squares that attack King and Queen at once!",
-    estimatedRatingRange: [600, 1400],
+    estimatedRatingRange: [600, 1950],
   },
   {
     id: "pin",
@@ -29,7 +29,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Freeze an enemy piece in place because moving it exposes a higher value target!",
     kidFriendlyTip:
       "If a piece is pinned to the King, it cannot move at all — attack it again!",
-    estimatedRatingRange: [700, 1500],
+    estimatedRatingRange: [650, 1900],
   },
   {
     id: "skewer",
@@ -40,7 +40,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Attack a high-value piece in front, forcing it to run and leaving the piece behind it vulnerable!",
     kidFriendlyTip:
       "Like a tasty shish-kebab! Hit the King or Queen first to capture what is behind.",
-    estimatedRatingRange: [800, 1500],
+    estimatedRatingRange: [650, 1950],
   },
   {
     id: "discovered_check",
@@ -51,7 +51,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Move one piece out of the way to unleash a surprise check from the piece behind it!",
     kidFriendlyTip:
       "Double danger! Move with tempo while your back piece fires laser check.",
-    estimatedRatingRange: [850, 1600],
+    estimatedRatingRange: [650, 2100],
   },
   {
     id: "discovered_attack",
@@ -61,7 +61,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
     description: "Unmask an attack by jumping a piece out of the line of fire.",
     kidFriendlyTip:
       "The jumping piece can capture something while the back piece attacks too!",
-    estimatedRatingRange: [850, 1600],
+    estimatedRatingRange: [650, 2100],
   },
   {
     id: "hanging_piece",
@@ -71,7 +71,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
     description: "Spot unprotected enemy pieces and snatch them cleanly!",
     kidFriendlyTip:
       "Always check if any enemy piece is without a defender before you move.",
-    estimatedRatingRange: [600, 1100],
+    estimatedRatingRange: [600, 2050],
   },
   {
     id: "trapped_piece",
@@ -81,7 +81,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
     description: "Cut off all escape squares and bag a high-value piece!",
     kidFriendlyTip:
       "Queens and Bishops can get trapped on the edge if you close their exit diagonals.",
-    estimatedRatingRange: [900, 1500],
+    estimatedRatingRange: [650, 2000],
   },
 
   // --- Domain 2: Advanced & Intermediate Tactics ---
@@ -94,7 +94,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Lure or force a key defender away from its crucial guard duty!",
     kidFriendlyTip:
       "Distract the guard piece so you can strike the undefended treasure square!",
-    estimatedRatingRange: [1100, 1700],
+    estimatedRatingRange: [650, 2100],
   },
   {
     id: "decoy",
@@ -105,7 +105,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Bait an enemy King or Queen onto a poisonous square with a tactical sacrifice!",
     kidFriendlyTip:
       "Offer a juicy piece as bait to set up an unstoppable fork or skewer.",
-    estimatedRatingRange: [1150, 1750],
+    estimatedRatingRange: [650, 2100],
   },
   {
     id: "greek_gift",
@@ -116,7 +116,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Sacrifice a Bishop on h7/h2 to rip open the enemy King shield for a devastating assault!",
     kidFriendlyTip:
       "Bxh7+ followed by Ng5+ and Qh5 delivers an unstoppable checkmating storm!",
-    estimatedRatingRange: [1200, 1800],
+    estimatedRatingRange: [1225, 1950],
   },
   {
     id: "windmill",
@@ -127,7 +127,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Use repeated discovered checks with Rook and Bishop to sweep all enemy pieces!",
     kidFriendlyTip:
       "Check, take a piece, discover check again, repeat — unstoppable!",
-    estimatedRatingRange: [1250, 1850],
+    estimatedRatingRange: [1325, 2050],
   },
   {
     id: "clearance",
@@ -138,7 +138,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Clear a blocked square or diagonal for your most dangerous attacking piece.",
     kidFriendlyTip:
       "Move your own piece out of the way — even sacrificing it — to open the winning path.",
-    estimatedRatingRange: [1200, 1750],
+    estimatedRatingRange: [1050, 1950],
   },
   {
     id: "battery",
@@ -149,7 +149,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Stack Queen and Bishop or two Rooks on the same line for maximum firepower!",
     kidFriendlyTip:
       "Two rooks on the 7th rank act like pigs in a clover patch!",
-    estimatedRatingRange: [1100, 1650],
+    estimatedRatingRange: [1050, 2050],
   },
   {
     id: "captures_checks_threats",
@@ -160,7 +160,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Master the master calculation method: Checks, Captures, and Threats on every move.",
     kidFriendlyTip:
       "Always calculate every check first, then every capture, then your strongest threats!",
-    estimatedRatingRange: [1000, 1600],
+    estimatedRatingRange: [650, 2100],
   },
 
   // --- Domain 3: Checkmate Patterns ---
@@ -173,7 +173,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Checkmate a King trapped on the 8th or 1st rank behind their own pawn wall!",
     kidFriendlyTip:
       "When pawns trap their own King, slide your Rook or Queen to the back rank!",
-    estimatedRatingRange: [600, 1300],
+    estimatedRatingRange: [600, 1800],
   },
   {
     id: "mate_in_1",
@@ -183,7 +183,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
     description: "Deliver checkmate in a single decisive strike!",
     kidFriendlyTip:
       "Look for checks where the enemy King has zero escape squares and no defender can block!",
-    estimatedRatingRange: [500, 1000],
+    estimatedRatingRange: [500, 1050],
   },
   {
     id: "smothered_mate",
@@ -194,7 +194,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Checkmate the King with a single Knight leap when he's completely surrounded by his own troops!",
     kidFriendlyTip:
       "The King is boxed in by his own pieces — a single Knight jump seals checkmate!",
-    estimatedRatingRange: [750, 1500],
+    estimatedRatingRange: [1300, 2000],
   },
   {
     id: "anastasia_mate",
@@ -205,7 +205,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Knight walls off escape squares while Rook checks down the open h-file!",
     kidFriendlyTip:
       "Knight on e7 covers g8 & g6; Rook crashes down the open h-file for mate.",
-    estimatedRatingRange: [800, 1550],
+    estimatedRatingRange: [1200, 1900],
   },
   {
     id: "hook_mate",
@@ -216,7 +216,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Knight, Rook, and Pawn interlock in a deadly hook formation around the enemy King.",
     kidFriendlyTip:
       "The pawn protects the knight, the knight protects the rook, and the King is caught!",
-    estimatedRatingRange: [850, 1500],
+    estimatedRatingRange: [1200, 1900],
   },
 
   // --- Domain 4: Endgame Technique ---
@@ -229,7 +229,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Escort passed pawns safely across the board to crown new Queens!",
     kidFriendlyTip:
       "Use your King to clear the road in front of your passed pawns!",
-    estimatedRatingRange: [700, 1400],
+    estimatedRatingRange: [1200, 2100],
   },
   {
     id: "rook_endgame",
@@ -240,7 +240,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Keep your rooks active behind passed pawns and cut off the enemy King!",
     kidFriendlyTip:
       "Rooks belong behind passed pawns, whether they are yours or your opponent’s!",
-    estimatedRatingRange: [800, 1600],
+    estimatedRatingRange: [1200, 2150],
   },
 
   // --- Domain 5: Opening Traps & Defenses ---
@@ -253,7 +253,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Queen and Bishop target the weak f7 or f2 square for an early checkmate!",
     kidFriendlyTip:
       "The f7 square is only guarded by the King — defend it or attack it with Queen + Bishop!",
-    estimatedRatingRange: [500, 1000],
+    estimatedRatingRange: [500, 2000],
   },
   {
     id: "fried_liver",
@@ -264,7 +264,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "Sacrifice a Knight on f7 in the Two Knights Defense to draw the enemy King into the open center!",
     kidFriendlyTip:
       "Nxf7 forces the Black King into the danger zone where your Queen and Bishop strike!",
-    estimatedRatingRange: [850, 1450],
+    estimatedRatingRange: [650, 2000],
   },
   {
     id: "legals_trap",
@@ -275,7 +275,7 @@ export const ALL_PUZZLE_THEMES: readonly PuzzleThemeDescriptor[] = [
       "A dazzling Queen sacrifice leading to a checkmate with two Knights and a Bishop!",
     kidFriendlyTip:
       "Pretend your Queen is pinned to let the opponent take it, then checkmate with minor pieces!",
-    estimatedRatingRange: [900, 1500],
+    estimatedRatingRange: [650, 1950],
   },
 ];
 

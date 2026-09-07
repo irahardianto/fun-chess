@@ -1,20 +1,31 @@
 import { z } from "zod";
+import { ServerEnvSchema as BaseServerEnvSchema } from "@fun-chess/shared";
 
-const emptyStringToUndefined = (val: unknown): unknown =>
+const emptyStringToUndefined = (val: unknown) =>
   typeof val === "string" && val.trim() === "" ? undefined : val;
 
-export const ServerEnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  PORT: z.preprocess(
+export const ServerEnvSchema = BaseServerEnvSchema.extend({
+  TRUST_PROXY: z.preprocess((val) => {
+    if (typeof val === "boolean") return val;
+    if (typeof val === "string") return val.toLowerCase() === "true" || val === "1";
+    return false;
+  }, z.boolean().default(false)),
+  CLIENT_URL: z.preprocess(
     emptyStringToUndefined,
-    z.coerce.number().int().min(0, "Port must be >= 0").max(65535, "Port must be <= 65535").default(3000),
+    z.string().url("CLIENT_URL must be a valid URL").optional(),
   ),
-  HOST: z.string().default("0.0.0.0"),
-  CORS_ORIGIN: z.preprocess(emptyStringToUndefined, z.string().optional()),
-  PUBLIC_URL: z.preprocess(emptyStringToUndefined, z.string().url("PUBLIC_URL must be a valid URL").optional()),
-  LAN_IP: z.preprocess(emptyStringToUndefined, z.string().ip("LAN_IP must be a valid IP address").optional()),
-  HOST_IP: z.preprocess(emptyStringToUndefined, z.string().ip("HOST_IP must be a valid IP address").optional()),
-  LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
+  RATE_LIMIT_WINDOW_MS: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().optional(),
+  ),
+  RATE_LIMIT_MAX_REQUESTS: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().optional(),
+  ),
+  RATE_LIMIT_MAX_KEYS: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().optional(),
+  ),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
@@ -26,6 +37,7 @@ export type ServerEnv = z.infer<typeof ServerEnvSchema>;
 export function resolveAllowedOrigins(env?: Partial<ServerEnv>): string[] {
   const nodeEnv = env?.NODE_ENV ?? process.env.NODE_ENV ?? "development";
   const corsOrigin = env?.CORS_ORIGIN ?? process.env.CORS_ORIGIN;
+  const clientUrl = env?.CLIENT_URL ?? process.env.CLIENT_URL;
   const publicUrl = env?.PUBLIC_URL ?? process.env.PUBLIC_URL;
 
   if (corsOrigin) {
@@ -33,6 +45,10 @@ export function resolveAllowedOrigins(env?: Partial<ServerEnv>): string[] {
       .split(",")
       .map((o) => o.trim())
       .filter(Boolean);
+  }
+  if (clientUrl) {
+    const parsed = new URL(clientUrl);
+    return [parsed.origin];
   }
   if (publicUrl) {
     const parsed = new URL(publicUrl);

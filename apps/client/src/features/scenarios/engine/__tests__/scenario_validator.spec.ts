@@ -166,4 +166,35 @@ describe('scenario_validator', () => {
       expect(getAllowedTargetsForSource(null as unknown as TutorialStep, 'e2')).toEqual([]);
     });
   });
+
+  describe('Sound Checkmate Validation (Alternative Moves)', () => {
+    const stepWithCheckmate: TutorialStep = {
+      id: 'step-cm',
+      stepNumber: 1,
+      instruction: 'Deliver checkmate!',
+      hint: 'Qg7# or Qh2#',
+      setupFen: '7k/5K2/8/8/8/8/8/2R3Q1 w - - 0 1',
+      allowedMoves: [{ from: 'g1', to: 'g7' }],
+      explanationOnSuccess: 'Checkmate!',
+    };
+
+    it('returns true when move is not in allowedMoves but delivers sound checkmate', () => {
+      // Qh2# is sound checkmate, but not explicitly in allowedMoves
+      expect(validateStepMove(stepWithCheckmate, { from: 'g1', to: 'h2' })).toBe(true);
+
+      // Non-checkmating move is not accepted
+      expect(validateStepMove(stepWithCheckmate, { from: 'c1', to: 'c4' })).toBe(false);
+    });
+
+    it('includes checkmating destination squares in getAllowedTargetsForSource', () => {
+      const targets = getAllowedTargetsForSource(stepWithCheckmate, 'g1');
+      expect(targets).toContain('g7'); // from allowedMoves
+      expect(targets).toContain('h2'); // sound checkmate alternative
+      expect(targets).toContain('h1'); // sound checkmate alternative
+    });
+
+    it('returns true in isSourceSquareAllowed for square with checkmating moves', () => {
+      expect(isSourceSquareAllowed(stepWithCheckmate, 'g1')).toBe(true);
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue';
+import { ref, type Ref, onScopeDispose, getCurrentScope } from 'vue';
 import { safeLocalStorage } from '@/platform/storage';
 
 export interface UseThemeReturn {
@@ -75,12 +75,19 @@ export function useTheme(): UseThemeReturn {
       if (mediaQuery.matches) {
         applyTheme(true);
       }
-      mediaQuery.addEventListener?.('change', (e) => {
+      const listener = (e: MediaQueryListEvent) => {
         const explicit = safeLocalStorage.getItem('fun_chess_theme');
         if (!explicit) {
           applyTheme(e.matches);
         }
-      });
+      };
+      mediaQuery.addEventListener?.('change', listener);
+
+      if (getCurrentScope()) {
+        onScopeDispose(() => {
+          mediaQuery.removeEventListener?.('change', listener);
+        });
+      }
     }
   }
 

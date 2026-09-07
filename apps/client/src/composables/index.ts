@@ -6,4 +6,5 @@ export * from './useLanDiscovery';
 export * from './useNetworkStatus';
 export * from './usePwaInstall';
 export * from './useQrScanner';
+export * from './useTheme';
 

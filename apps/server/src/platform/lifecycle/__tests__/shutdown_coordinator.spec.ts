@@ -5,8 +5,8 @@ import { Server as HttpServer } from "node:http";
 import { TypedSocketServer } from "../../socket/socket_server.js";
 
 describe("ShutdownCoordinator", () => {
-  let mockServer: Partial<HttpServer>;
-  let mockIo: Partial<TypedSocketServer>;
+  let mockServer: any;
+  let mockIo: any;
   let logger: NullLogger;
   let exitCalls: number[];
 
@@ -20,6 +20,8 @@ describe("ShutdownCoordinator", () => {
         if (cb) cb();
         return mockServer as HttpServer;
       }),
+      closeIdleConnections: vi.fn(),
+      closeAllConnections: vi.fn(),
       on: vi.fn(),
     };
 
@@ -27,6 +29,7 @@ describe("ShutdownCoordinator", () => {
       close: vi.fn((cb?: () => void) => {
         if (cb) cb();
       }),
+      disconnectSockets: vi.fn(),
     };
   });
 
@@ -34,7 +37,7 @@ describe("ShutdownCoordinator", () => {
     vi.useRealTimers();
   });
 
-  it("gracefully shuts down servers, invokes additional cleanups, and exits with 0", async () => {
+  it("gracefully shuts down servers, disconnects sockets, closes idle connections, and logs duration (MAJ-010, MIN-013)", async () => {
     let cleanupCalled = false;
     const additionalCleanup = async () => {
       cleanupCalled = true;
@@ -55,12 +58,20 @@ describe("ShutdownCoordinator", () => {
     await coordinator.shutdown("SIGTERM");
 
     expect(cleanupCalled).toBe(true);
+    expect(mockIo.disconnectSockets).toHaveBeenCalledWith(true);
+    expect(mockServer.closeIdleConnections).toHaveBeenCalledTimes(1);
+    expect(mockServer.closeAllConnections).toHaveBeenCalledTimes(1);
     expect(mockIo.close).toHaveBeenCalledTimes(1);
     expect(mockServer.close).toHaveBeenCalledTimes(1);
     expect(exitCalls).toEqual([0]);
 
     expect(logger.infoLogs.some((l) => l.message.includes("Received SIGTERM"))).toBe(true);
-    expect(logger.infoLogs.some((l) => l.message.includes("Fun Chess server closed successfully"))).toBe(true);
+    const completeLog = logger.infoLogs.find((l) =>
+      l.message.includes("Fun Chess server closed successfully"),
+    );
+    expect(completeLog).toBeDefined();
+    expect(completeLog?.context?.["duration"]).toBeTypeOf("number");
+    expect(completeLog?.context?.["durationMs"]).toBeTypeOf("number");
   });
 
   it("handles duplicate shutdown calls idempotently", async () => {
@@ -80,12 +91,14 @@ describe("ShutdownCoordinator", () => {
     expect(exitCalls).toEqual([0]);
   });
 
-  it("forces exit with code 1 if server.close hangs beyond timeout", async () => {
+  it("forces exit with code 1 if server.close hangs beyond timeout and records duration (MIN-013)", async () => {
     const hangingServer = {
       close: vi.fn(() => {
         // never calls callback
         return hangingServer as unknown as HttpServer;
       }),
+      closeIdleConnections: vi.fn(),
+      closeAllConnections: vi.fn(),
       on: vi.fn(),
     };
 
@@ -105,7 +118,9 @@ describe("ShutdownCoordinator", () => {
     await shutdownPromise.catch(() => {});
 
     expect(exitCalls).toContain(1);
-    const fatalOrError = ((logger as any).fatalLogs ?? logger.errorLogs) as Array<{ message: string }>;
-    expect(fatalOrError.some((l) => l.message.includes("Forced shutdown due to timeout"))).toBe(true);
+    const fatalOrError = ((logger as any).fatalLogs ?? logger.errorLogs) as Array<{ message: string; context?: Record<string, unknown> }>;
+    const timeoutLog = fatalOrError.find((l) => l.message.includes("Forced shutdown due to timeout"));
+    expect(timeoutLog).toBeDefined();
+    expect(timeoutLog?.context?.["duration"]).toBeTypeOf("number");
   });
 });

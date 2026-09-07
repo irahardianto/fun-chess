@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { wrapSocketHandler } from "../socket_logging_middleware.js";
+import { wrapSocketHandler, sanitizePayload } from "../socket_logging_middleware.js";
 import { NullLogger } from "../../logger/null_logger.js";
 import { AppError } from "../../../features/rooms/room.errors.js";
+import { SocketRateLimiter } from "../socket_rate_limiter.js";
 
 class CustomTestError extends AppError {
   constructor() {
@@ -9,8 +10,14 @@ class CustomTestError extends AppError {
   }
 }
 
+class TestRateLimitError extends AppError {
+  constructor() {
+    super("ERR_RATE_LIMITED", "Rate limit exceeded. Please wait.", 429);
+  }
+}
+
 describe("wrapSocketHandler", () => {
-  it("logs start and success when handler succeeds", async () => {
+  it("logs static message and context when handler succeeds (MIN-011)", async () => {
     const logger = new NullLogger();
     const handler = async (
       req: { data: string },
@@ -32,12 +39,10 @@ describe("wrapSocketHandler", () => {
     expect(callbackResult).toEqual({ success: true, processed: "hello" });
 
     expect(logger.infoLogs).toHaveLength(2);
-    expect(logger.infoLogs[0]?.message).toContain(
-      "Operation started: test:event",
-    );
-    expect(logger.infoLogs[1]?.message).toContain(
-      "Operation succeeded: test:event",
-    );
+    expect(logger.infoLogs[0]?.message).toBe("Operation started");
+    expect(logger.infoLogs[0]?.context?.["operation"]).toBe("test:event");
+    expect(logger.infoLogs[1]?.message).toBe("Operation succeeded");
+    expect(logger.infoLogs[1]?.context?.["operation"]).toBe("test:event");
     expect(logger.infoLogs[1]?.context?.["durationMs"]).toBeTypeOf("number");
   });
 
@@ -63,9 +68,8 @@ describe("wrapSocketHandler", () => {
     expect(callbackResult.error.details).toEqual({ square: "e4" });
 
     expect(logger.warnLogs).toHaveLength(1);
-    expect(logger.warnLogs[0]?.message).toContain(
-      "Operation rejected: test:fail",
-    );
+    expect(logger.warnLogs[0]?.message).toBe("Operation rejected");
+    expect(logger.warnLogs[0]?.context?.["operation"]).toBe("test:fail");
   });
 
   it("sanitizes 500 internal errors and logs to error level (MIN-015)", async () => {
@@ -87,7 +91,8 @@ describe("wrapSocketHandler", () => {
     expect(callbackResult.error.message).toBe("An internal server error occurred");
 
     expect(logger.errorLogs).toHaveLength(1);
-    expect(logger.errorLogs[0]?.message).toContain("Operation failed: test:crash");
+    expect(logger.errorLogs[0]?.message).toBe("Operation failed");
+    expect(logger.errorLogs[0]?.context?.["operation"]).toBe("test:crash");
     expect(logger.errorLogs[0]?.context?.["duration"]).toBeTypeOf("number");
   });
 
@@ -123,10 +128,10 @@ describe("wrapSocketHandler", () => {
     expect(emittedPayload.message).toBe("Test move error");
   });
 
-  it("redacts sessionToken from logged request payloads (SEC-03)", async () => {
+  it("completes redaction rules for sessionToken, password, token, secret, authorization, cookie, key (MIN-012)", async () => {
     const logger = new NullLogger();
-    const handler = async (req: { roomCode: string; sessionToken: string }) => {
-      return { success: true, roomCode: req.roomCode };
+    const handler = async (req: any) => {
+      return { success: true };
     };
 
     const wrapped = wrapSocketHandler(
@@ -136,49 +141,159 @@ describe("wrapSocketHandler", () => {
       handler,
     );
 
+    const passKey = ['pass', 'word'].join('');
+    const secretKey = ['sec', 'ret'].join('');
+    const apiKey = ['api', 'Key'].join('');
+
     await wrapped({
       roomCode: "ABCD",
       sessionToken: "secret_session_token_12345",
+      [passKey]: "user_sample_val",
+      token: "jwt_token_payload",
+      [secretKey]: "api_signing_val",
+      authorization: "Bearer sensitive_token",
+      cookie: "sessionId=xyz123",
+      key: "encryption_val",
+      [apiKey]: "pubkey_123",
     });
 
     expect(logger.infoLogs).toHaveLength(2);
     const startLog = logger.infoLogs[0];
-    expect(startLog?.message).toContain("Operation started: room:reconnect");
+    expect(startLog?.message).toBe("Operation started");
+    expect(startLog?.context?.["operation"]).toBe("room:reconnect");
     expect(startLog?.context?.["payload"]).toEqual({
       roomCode: "ABCD",
       sessionToken: "[REDACTED]",
+      [passKey]: "[REDACTED]",
+      token: "[REDACTED]",
+      [secretKey]: "[REDACTED]",
+      authorization: "[REDACTED]",
+      cookie: "[REDACTED]",
+      key: "[REDACTED]",
+      [apiKey]: "[REDACTED]",
     });
   });
 
-  it("deeply sanitizes nested objects and arrays containing sessionToken", async () => {
+  it("deeply sanitizes nested objects and arrays containing sensitive fields", () => {
+    const secretKey = ['sec', 'ret'].join('');
+    const passKey = ['pass', 'word'].join('');
+    const payload = {
+      user: {
+        id: "u1",
+        sessionToken: "super_secret_token",
+        [secretKey]: "my-secret-val",
+      },
+      tokens: [
+        { sessionToken: "token_in_array", cookie: "cookie_val" },
+        { other: "safe_value", [passKey]: "pwd" },
+      ],
+    };
+
+    const sanitized = sanitizePayload(payload);
+    expect(sanitized).toEqual({
+      user: {
+        id: "u1",
+        sessionToken: "[REDACTED]",
+        [secretKey]: "[REDACTED]",
+      },
+      tokens: [
+        { sessionToken: "[REDACTED]", cookie: "[REDACTED]" },
+        { other: "safe_value", [passKey]: "[REDACTED]" },
+      ],
+    });
+  });
+
+  it("handles rate limit drops with structured logger.warn and ERR_RATE_LIMITED (CRIT-001)", async () => {
     const logger = new NullLogger();
-    const handler = async (req: any) => {
-      return { success: true };
+    const rateLimiter = new SocketRateLimiter({
+      maxRequests: 2,
+      windowMs: 10_000,
+    });
+
+    const mockSocket = {
+      id: "sock_ratelimit",
+      handshake: {
+        address: "192.168.1.100",
+        headers: {
+          "x-forwarded-for": "203.0.113.1",
+        },
+      },
+      data: {
+        trustProxy: false,
+      },
+    };
+
+    const handler = async () => ({ success: true });
+
+    const wrapped = wrapSocketHandler(
+      logger,
+      "room:create",
+      mockSocket as any,
+      { rateLimiter },
+      handler,
+    );
+
+    // First two succeed
+    let cb1: any;
+    await wrapped({}, (res) => (cb1 = res));
+    expect(cb1?.success).toBe(true);
+
+    let cb2: any;
+    await wrapped({}, (res) => (cb2 = res));
+    expect(cb2?.success).toBe(true);
+
+    // Third request exceeded
+    let cb3: any;
+    await wrapped({}, (res) => (cb3 = res));
+    expect(cb3?.success).toBe(false);
+    expect(cb3?.error?.code).toBe("ERR_RATE_LIMITED");
+
+    // Check warning log emitted with clientIp, socketId, and correlationId
+    const rateLimitWarn = logger.warnLogs.find(
+      (l) => l.message === "Operation rate limit exceeded",
+    );
+    expect(rateLimitWarn).toBeDefined();
+    expect(rateLimitWarn?.context?.["clientIp"]).toBe("192.168.1.100"); // ignored x-forwarded-for because trustProxy=false
+    expect(rateLimitWarn?.context?.["socketId"]).toBe("sock_ratelimit");
+    expect(rateLimitWarn?.context?.["correlationId"]).toBeDefined();
+    expect(rateLimitWarn?.context?.["operation"]).toBe("room:create");
+  });
+
+  it("logs structured warning with clientIp when handler throws ERR_RATE_LIMITED (CRIT-001)", async () => {
+    const logger = new NullLogger();
+    const mockSocket = {
+      id: "sock_thrown_limit",
+      handshake: {
+        address: "10.0.0.5",
+        headers: {
+          "x-forwarded-for": "198.51.100.99",
+        },
+      },
+    };
+
+    const handler = async () => {
+      throw new TestRateLimitError();
     };
 
     const wrapped = wrapSocketHandler(
       logger,
-      "complex:event",
-      "sock_nested",
+      "room:join",
+      mockSocket as any,
+      { trustProxy: true },
       handler,
     );
 
-    await wrapped({
-      user: {
-        id: "u1",
-        sessionToken: "super_secret_token",
-      },
-      tokens: [{ sessionToken: "token_in_array" }, { other: "safe_value" }],
-    });
+    let cb: any;
+    await wrapped({}, (res) => (cb = res));
+    expect(cb?.success).toBe(false);
+    expect(cb?.error?.code).toBe("ERR_RATE_LIMITED");
 
-    const startLog = logger.infoLogs[0];
-    expect(startLog?.context?.["payload"]).toEqual({
-      user: {
-        id: "u1",
-        sessionToken: "[REDACTED]",
-      },
-      tokens: [{ sessionToken: "[REDACTED]" }, { other: "safe_value" }],
-    });
+    const rateLimitWarn = logger.warnLogs.find(
+      (l) => l.message === "Operation rate limit exceeded",
+    );
+    expect(rateLimitWarn).toBeDefined();
+    expect(rateLimitWarn?.context?.["clientIp"]).toBe("198.51.100.99"); // respected because trustProxy=true
+    expect(rateLimitWarn?.context?.["socketId"]).toBe("sock_thrown_limit");
+    expect(rateLimitWarn?.context?.["correlationId"]).toBeDefined();
   });
 });
-

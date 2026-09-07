@@ -29,7 +29,7 @@ export const rookLinesScenario: ChessScenario = {
       instruction: 'Capture the undefended Black pawn on b7 with your Rook on e7!',
       conceptExplanation: 'Once on the 7th rank, the Rook can sweep horizontally across to gobble enemy pawns!',
       hint: 'Slide your Rook from e7 sideways along the 7th rank to b7.',
-      setupFen: '4k3/1p2R3/8/8/8/8/8/6K1 w - - 0 2',
+      setupFen: '5k2/1p2R3/8/8/8/8/8/6K1 w - - 0 2',
       highlightSquares: ['e7', 'b7'],
       threatSquares: ['b7'],
       playerColor: 'w',

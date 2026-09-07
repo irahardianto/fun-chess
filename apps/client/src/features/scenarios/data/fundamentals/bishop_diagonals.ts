@@ -29,7 +29,7 @@ export const bishopDiagonalsScenario: ChessScenario = {
       instruction: 'Black left their f7 pawn unprotected! Capture the f7 pawn with your Bishop from c4 to deliver check!',
       conceptExplanation: 'Look for vulnerable targets under attack by your long-range sniper Bishop!',
       hint: 'Slide the Bishop from c4 all the way to f7 with check!',
-      setupFen: 'r1bqk2r/pppp1ppp/2n5/4p3/2B1n3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 0 4',
+      setupFen: 'r1bqk2r/pppp1ppp/2n5/4p3/2B5/1Q3N2/PPPP1PPP/RNB2RK1 w kq - 0 4',
       highlightSquares: ['c4', 'f7'],
       threatSquares: ['f7'],
       playerColor: 'w',

@@ -7,6 +7,7 @@ import { ChessBoard } from '../board/index.js';
 import { PlayerBadge, CapturedTray, MoveHistoryList } from '../hud/index.js';
 import { PromotionModal } from '../modals/index.js';
 import BaseButton from '../../components/base/BaseButton.vue';
+import BaseModal from '../../components/base/BaseModal.vue';
 import { useAudio } from '../../composables/useAudio.js';
 import { useConfetti } from '../../composables/useConfetti.js';
 import type { MoveOutcomeEvent, GameCompletionOutcomeEvent } from './composables/useAiGame.js';
@@ -120,10 +121,22 @@ function handlePromotionSelect(piece: 'q' | 'r' | 'b' | 'n') {
   completePromotion(piece);
 }
 
+const showResignModal = ref(false);
+
 function handleResign() {
-  if (confirm(`Resign this match against ${mascot.value.name}? 🏳️`)) {
-    resign();
-  }
+  audio.playClick();
+  showResignModal.value = true;
+}
+
+function confirmResign() {
+  audio.playClick();
+  showResignModal.value = false;
+  resign();
+}
+
+function cancelResign() {
+  audio.playClick();
+  showResignModal.value = false;
 }
 
 function handleRematch() {
@@ -333,6 +346,38 @@ function handleExit() {
       @lobby="handleExit"
       @close="showGameOverModal = false"
     />
+
+    <!-- Accessible Resign Confirmation Modal -->
+    <BaseModal
+      :model-value="showResignModal"
+      size="sm"
+      title="Resign Match?"
+      aria-label="Confirm Resignation"
+      @close="cancelResign"
+    >
+      <div class="confirm-modal-content">
+        <p class="confirm-modal-message">
+          Resign this match against {{ mascot.name }}? 🏳️
+        </p>
+        <div class="confirm-modal-actions">
+          <BaseButton
+            variant="ghost"
+            size="md"
+            @click="cancelResign"
+          >
+            Keep Playing
+          </BaseButton>
+          <BaseButton
+            variant="danger"
+            size="md"
+            data-testid="confirm-resign-btn"
+            @click="confirmResign"
+          >
+            Resign
+          </BaseButton>
+        </div>
+      </div>
+    </BaseModal>
   </div>
 </template>
 
@@ -551,6 +596,27 @@ function handleExit() {
 .history-slide-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+
+.confirm-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+}
+
+.confirm-modal-message {
+  font-size: var(--text-base);
+  color: var(--text-subtle);
+  margin: 0;
+  line-height: var(--leading-relaxed);
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .sr-only {

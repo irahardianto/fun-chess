@@ -22,27 +22,28 @@ export class ProgressFileService {
       return;
     }
 
+    let url: string | undefined;
+    let link: HTMLAnchorElement | undefined;
     try {
       const blob = new Blob([envelopeJson], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      url = URL.createObjectURL(blob);
+      link = document.createElement('a');
       link.href = url;
       link.download = filename;
       link.style.display = 'none';
 
       document.body.appendChild(link);
       link.click();
-
-      // Clean up after click dispatch
-      setTimeout(() => {
-        if (link.parentNode) {
-          link.parentNode.removeChild(link);
-        }
-        URL.revokeObjectURL(url);
-      }, 100);
     } catch (err) {
       console.error('[FC_PROGRESS_SYNC] Failed to initiate file download', err);
       throw new Error('Unable to download backup file');
+    } finally {
+      if (link && link.parentNode) {
+        link.parentNode.removeChild(link);
+      }
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
     }
   }
 

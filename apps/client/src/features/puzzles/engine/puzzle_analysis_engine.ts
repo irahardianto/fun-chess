@@ -12,7 +12,10 @@ import type {
   PuzzleStepExplanation,
   PuzzleAnalysisEngineService,
 } from '@fun-chess/shared';
-import { parseUciMove, formatPlayerMoveToUci } from './puzzle_validator';
+import {
+  parseUciMove,
+  formatPlayerMoveToUci,
+} from '@fun-chess/shared';
 
 /**
  * Centipawn values for chess pieces.

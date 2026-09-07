@@ -6,9 +6,9 @@ import type {
   ScenarioProgressMap,
   PuzzleProgress,
 } from '@fun-chess/shared';
-import { UNIFIED_PROGRESS_SCHEMA_VERSION } from '@fun-chess/shared';
-import { LocalStorageProgressStore } from '@/features/scenarios/store/local_storage_progress.store';
-import { LocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_store';
+import { UNIFIED_PROGRESS_SCHEMA_VERSION, assertValidProgress } from '@fun-chess/shared';
+import { LocalStorageProgressStore } from '@/features/scenarios';
+import { LocalStoragePuzzleProgressStore } from '@/features/puzzles';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
 
 export class StorageCommitError extends Error {
@@ -57,10 +57,11 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
    * Two-phase commit overwrite with pre-write snapshot and rollback on write failure.
    */
   public async overwriteAll(payload: UnifiedProgressPayload): Promise<void> {
-    // Phase 0: Validate payload structure
+    // Phase 0: Validate payload structure against authoritative schema
     if (!payload || typeof payload !== 'object' || !payload.scenarios || !payload.puzzles) {
       throw new Error('Invalid payload: missing scenarios or puzzles data');
     }
+    const validatedPayload = assertValidProgress(payload);
 
     // Phase 1: Capture pre-write snapshot
     const snapshot: StorageSnapshot = {
@@ -72,7 +73,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
     try {
       // 2a. Reset and write scenario records
       await this.scenarioStore.resetAllProgress();
-      for (const [id, progress] of Object.entries(payload.scenarios)) {
+      for (const [id, progress] of Object.entries(validatedPayload.scenarios)) {
         await this.scenarioStore.saveProgress(
           id,
           progress.starsEarned,
@@ -81,7 +82,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
       }
 
       // 2b. Write full puzzle state (including themeMastery & arcadeStats)
-      await this.puzzleStore.restoreProgress(payload.puzzles);
+      await this.puzzleStore.restoreProgress(validatedPayload.puzzles);
     } catch (writeErr) {
       // Compensating Rollback: restore from snapshot
       let rollbackSucceeded = false;

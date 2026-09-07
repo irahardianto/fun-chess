@@ -1,4 +1,4 @@
-import { AppError } from "@fun-chess/shared";
+import { AppError, type ErrorCode } from "@fun-chess/shared";
 
 export {
   AppError,
@@ -20,8 +20,8 @@ export {
 export class OptimisticLockConflictError extends AppError {
   constructor(roomCode: string, expectedVersion: number, actualVersion: number) {
     super(
-      "ERR_INTERNAL_SERVER",
-      `Optimistic lock conflict for room '${roomCode}': expected version ${expectedVersion}, found ${actualVersion}`,
+      "ERR_CONFLICT" as ErrorCode,
+      `State conflict for room '${roomCode}': expected version ${expectedVersion}, found ${actualVersion}. The room was updated concurrently.`,
       409,
       { roomCode, expectedVersion, actualVersion },
     );

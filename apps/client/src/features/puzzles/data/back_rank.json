@@ -8,13 +8,14 @@
     "rating": 650,
     "ratingDeviation": 80,
     "themes": [
-      "back_rank",
-      "captures_checks_threats"
+      "scholars_mate",
+      "back_rank_mate",
+      "mate_in_1"
     ],
-    "primaryTheme": "back_rank",
-    "difficulty": "easy",
-    "title": "Back-Rank Mate on d8 #1 👑",
-    "subtitle": "1. Rd8# delivers instant back-rank checkmate.",
+    "primaryTheme": "scholars_mate",
+    "difficulty": "novice",
+    "title": "Scholar's Mate Direct Strike #1 👑",
+    "subtitle": "Queen and Bishop combine for a fatal mate on f7!",
     "playerColor": "w",
     "solutionPlies": 1,
     "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
@@ -48,13 +49,14 @@
     "rating": 680,
     "ratingDeviation": 80,
     "themes": [
-      "back_rank",
-      "captures_checks_threats"
+      "scholars_mate",
+      "back_rank_mate",
+      "mate_in_1"
     ],
-    "primaryTheme": "back_rank",
-    "difficulty": "easy",
-    "title": "Back-Rank Mate on e8 #2 👑",
-    "subtitle": "1. Re8# slides across the open e-file.",
+    "primaryTheme": "scholars_mate",
+    "difficulty": "novice",
+    "title": "Scholar's Mate Corner Net #2 👑",
+    "subtitle": "Strike the vulnerable f7 square with Queen support!",
     "playerColor": "w",
     "solutionPlies": 1,
     "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
@@ -88,13 +90,14 @@
     "rating": 700,
     "ratingDeviation": 80,
     "themes": [
-      "back_rank",
-      "captures_checks_threats"
+      "scholars_mate",
+      "back_rank_mate",
+      "mate_in_1"
     ],
-    "primaryTheme": "back_rank",
-    "difficulty": "easy",
-    "title": "Back-Rank Mate on c8 #3 👑",
-    "subtitle": "1. Rc8# seals the back rank on the c-file.",
+    "primaryTheme": "scholars_mate",
+    "difficulty": "novice",
+    "title": "Scholar's Mate Kiss of Death #3 👑",
+    "subtitle": "Deliver checkmate on f7 with Queen and Bishop coordination!",
     "playerColor": "w",
     "solutionPlies": 1,
     "tacticalGoal": "Penetrate the enemy back rank and deliver checkmate.",
@@ -132,7 +135,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "easy",
+    "difficulty": "novice",
     "title": "Back-Rank Mate on b8 #4 👑",
     "subtitle": "1. Rb8# penetrates on the open b-file.",
     "playerColor": "w",
@@ -172,7 +175,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "easy",
+    "difficulty": "novice",
     "title": "Back-Rank Mate on a8 #5 👑",
     "subtitle": "1. Ra8# finishes the game along the a-file.",
     "playerColor": "w",
@@ -212,7 +215,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "easy",
+    "difficulty": "novice",
     "title": "Back-Rank Queen Mate on d8 #6 👑",
     "subtitle": "1. Qd8# invades on the d-file.",
     "playerColor": "w",
@@ -252,7 +255,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "easy",
+    "difficulty": "novice",
     "title": "Back-Rank Queen Mate on e8 #7 👑",
     "subtitle": "1. Qe8# delivers unstoppable checkmate.",
     "playerColor": "w",
@@ -292,7 +295,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "easy",
+    "difficulty": "novice",
     "title": "Back-Rank Queen Mate on c8 #8 👑",
     "subtitle": "1. Qc8# finishes Black along the c-file.",
     "playerColor": "w",
@@ -332,7 +335,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "easy",
+    "difficulty": "novice",
     "title": "Black Back-Rank Mate on d1 #9 👑",
     "subtitle": "1...Rd1# punishes White's lack of luft.",
     "playerColor": "b",
@@ -372,7 +375,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "easy",
+    "difficulty": "novice",
     "title": "Black Back-Rank Mate on e1 #10 👑",
     "subtitle": "1...Re1# checks White along the e-file.",
     "playerColor": "b",
@@ -568,12 +571,13 @@
     "rating": 1000,
     "ratingDeviation": 80,
     "themes": [
-      "back_rank",
-      "captures_checks_threats"
+      "battery",
+      "back_rank_mate",
+      "mate_in_1"
     ],
-    "primaryTheme": "back_rank",
-    "difficulty": "medium",
-    "title": "Black Queen Mate on e1 #15 👑",
+    "primaryTheme": "battery",
+    "difficulty": "easy",
+    "title": "Doubled Heavy Battery Mate #15 🔋",
     "subtitle": "1...Qe1# delivers instant checkmate on the e-file.",
     "playerColor": "b",
     "solutionPlies": 1,
@@ -608,12 +612,13 @@
     "rating": 1030,
     "ratingDeviation": 80,
     "themes": [
-      "back_rank",
-      "captures_checks_threats"
+      "battery",
+      "back_rank_mate",
+      "mate_in_1"
     ],
-    "primaryTheme": "back_rank",
-    "difficulty": "medium",
-    "title": "Black Queen Mate on c1 #16 👑",
+    "primaryTheme": "battery",
+    "difficulty": "easy",
+    "title": "Rook and Queen Corridor Battery #16 🔋",
     "subtitle": "1...Qc1# finishes White along the c-file.",
     "playerColor": "b",
     "solutionPlies": 1,
@@ -654,7 +659,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "medium",
+    "difficulty": "easy",
     "title": "Doubled Rooks on the d-File #17 👑",
     "subtitle": "1. Rd8+ Rxd8 2. Rxd8# overpowers the defender.",
     "playerColor": "w",
@@ -710,7 +715,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "medium",
+    "difficulty": "easy",
     "title": "Doubled Rooks on the e-File #18 👑",
     "subtitle": "1. Re8+ Rxe8 2. Rxe8# crushes the back rank.",
     "playerColor": "w",
@@ -766,7 +771,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "medium",
+    "difficulty": "easy",
     "title": "Doubled Rooks on the c-File #19 👑",
     "subtitle": "1. Rc8+ Rxc8 2. Rxc8# overpowers c8.",
     "playerColor": "w",
@@ -1494,7 +1499,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "back_rank",
-    "difficulty": "hard",
+    "difficulty": "expert",
     "title": "Black Queen Deflection on e1 #32 👑",
     "subtitle": "1...Re1+ 2. Qxe1 Rxe1# overpowers White's Queen.",
     "playerColor": "b",

@@ -131,6 +131,88 @@ describe('FetchApiClient', () => {
     // Use a very short timeoutMs for this test to verify signal aborts
     await expect(client.get('/hang', { timeoutMs: 20 })).rejects.toThrow();
   });
+
+  it('attaches generated or custom X-Correlation-ID header', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ ok: true }),
+    });
+
+    const client = new FetchApiClient('http://localhost:3000');
+
+    // 1. Auto-generated correlation ID
+    await client.get('/test');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/test',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'X-Correlation-ID': expect.any(String),
+        }),
+      })
+    );
+
+    // 2. Custom correlation ID passed via options
+    await client.post('/test-custom', { hello: 'world' }, { correlationId: 'custom-corr-123' });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/test-custom',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'X-Correlation-ID': 'custom-corr-123',
+        }),
+      })
+    );
+  });
+
+  it('cleans up abort event listener from callerSignal on completion', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ done: true }),
+    });
+
+    const callerController = new AbortController();
+    const removeEventListenerSpy = vi.spyOn(callerController.signal, 'removeEventListener');
+
+    const client = new FetchApiClient();
+    await client.get('/caller-signal-test', { signal: callerController.signal });
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+  });
+
+  it('handles HTML error pages and non-JSON responses safely without throwing SyntaxError', async () => {
+    const htmlBody = '<html><head><title>502 Bad Gateway</title></head><body><h1>Bad Gateway</h1></body></html>';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      headers: new Headers({ 'content-type': 'text/html; charset=UTF-8' }),
+      text: async () => htmlBody,
+    });
+
+    const client = new FetchApiClient();
+    const response = await client.get<string>('/proxy-error');
+
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(502);
+    expect(response.data).toBe(htmlBody);
+  });
+
+  it('handles 204 No Content response returning null data', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      headers: new Headers(),
+    });
+
+    const client = new FetchApiClient();
+    const response = await client.get('/no-content');
+
+    expect(response.ok).toBe(true);
+    expect(response.status).toBe(204);
+    expect(response.data).toBeNull();
+  });
 });
 
 describe('MockApiClient & Default Singleton', () => {

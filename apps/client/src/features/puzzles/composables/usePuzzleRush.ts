@@ -1,4 +1,4 @@
-import { ref, computed, readonly, onUnmounted, getCurrentInstance } from 'vue';
+import { ref, computed, readonly, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope } from 'vue';
 import type {
   PuzzleProgressStore,
 } from '@fun-chess/shared';
@@ -57,7 +57,17 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   const lastTimeBonus = ref<number>(0);
 
   let timerInterval: ReturnType<typeof setInterval> | null = null;
+  const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
   let puzzleStartTimeMs = Date.now();
+
+  function setTrackedTimeout(fn: () => void, ms: number): ReturnType<typeof setTimeout> {
+    const timer = setTimeout(() => {
+      pendingTimers.delete(timer);
+      fn();
+    }, ms);
+    pendingTimers.add(timer);
+    return timer;
+  }
 
   const runner = usePuzzleRunner({
     autoPlayAudio: true,
@@ -80,8 +90,16 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
     isTimerRunning.value = false;
   }
 
-  function startRun(selectedMode: 'puzzle_rush' | 'streak_survivor' = initialMode): void {
+  function clearAllTimers(): void {
     clearTimer();
+    for (const timer of pendingTimers) {
+      clearTimeout(timer);
+    }
+    pendingTimers.clear();
+  }
+
+  function startRun(selectedMode: 'puzzle_rush' | 'streak_survivor' = initialMode): void {
+    clearAllTimers();
     mode.value = selectedMode;
     timeRemainingSeconds.value = initialDuration;
     score.value = 0;
@@ -161,7 +179,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       await progressStore.saveArcadeResult('streak_survivor', score.value, bestStreak.value);
     }
 
-    setTimeout(() => {
+    setTrackedTimeout(() => {
       if (!isGameOver.value) {
         loadNextPuzzle();
       }
@@ -180,7 +198,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       if (strikeResult.isGameOver) {
         endGame();
       } else {
-        setTimeout(() => {
+        setTrackedTimeout(() => {
           if (!isGameOver.value) loadNextPuzzle();
         }, 500);
       }
@@ -193,7 +211,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       if (strikeResult.isGameOver || strikes.value >= maxStrikesLimit) {
         endGame();
       } else {
-        setTimeout(() => {
+        setTrackedTimeout(() => {
           if (!isGameOver.value) loadNextPuzzle();
         }, 500);
       }
@@ -201,18 +219,22 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   }
 
   function endGame(): void {
-    clearTimer();
+    clearAllTimers();
     isGameOver.value = true;
   }
 
   function stopRun(): void {
-    clearTimer();
+    clearAllTimers();
     isGameOver.value = true;
   }
 
-  if (getCurrentInstance()) {
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      clearAllTimers();
+    });
+  } else if (getCurrentInstance()) {
     onUnmounted(() => {
-      clearTimer();
+      clearAllTimers();
     });
   }
 

@@ -10,6 +10,8 @@ import {
   PlayerNotInRoomError,
   InvalidPayloadError,
 } from "../room.errors.js";
+import { DisconnectTimerRegistry } from "../room.socket_handler.js";
+import { IClock, IIdGenerator } from "../clock.js";
 
 describe("RoomService", () => {
   let store: MockRoomStore;
@@ -601,6 +603,66 @@ describe("RoomService", () => {
     it("returns null for non-existent room", async () => {
       const result = await service.handleAbandonmentForfeit("NONO", "some_id");
       expect(result).toBeNull();
+    });
+  });
+
+  describe("Dependency Injection: Clock, IdGenerator & TimerRegistry (MAJ-017, MIN-006)", () => {
+    it("uses injected IClock and IIdGenerator (MAJ-017)", async () => {
+      const fixedTime = 1700000000000;
+      const fakeClock: IClock = {
+        now: () => fixedTime,
+      };
+      const fakeIdGen: IIdGenerator = {
+        generateId: () => "custom-player-id-001",
+        generateRandomInt: () => 0,
+      };
+
+      const customService = new RoomService(
+        store,
+        sessionRegistry,
+        fakeClock,
+        fakeIdGen,
+      );
+
+      const { room } = await customService.createRoom(
+        { playerName: "Alice", preferredColor: "w" },
+        "sock_alice",
+      );
+
+      expect(room.createdAt).toBe(fixedTime);
+      expect(room.lastActivityAt).toBe(fixedTime);
+      expect(room.hostId).toBe("custom-player-id-001");
+      expect(room.whitePlayer?.id).toBe("custom-player-id-001");
+      expect(room.whitePlayer?.connectedAt).toBe(fixedTime);
+    });
+
+    it("cancels disconnect timers via injected IDisconnectTimerRegistry on cleanup (MIN-006)", async () => {
+      const registry = new DisconnectTimerRegistry();
+      const customService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        registry,
+      );
+
+      const { room } = await customService.createRoom(
+        { playerName: "Bob", preferredColor: "w" },
+        "sock_bob",
+      );
+
+      const timer = setTimeout(() => {}, 10_000);
+      registry.set(room.roomCode, "p_bob", timer);
+      expect(registry.size()).toBe(1);
+
+      // Make room old
+      room.lastActivityAt = Date.now() - 20 * 60 * 1000;
+      await store.save(room);
+
+      const cleaned = await customService.cleanupAbandonedRooms(10 * 60 * 1000);
+      expect(cleaned).toBe(1);
+      expect(registry.size()).toBe(0);
+      expect(registry.get(room.roomCode, "p_bob")).toBeUndefined();
     });
   });
 });

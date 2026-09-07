@@ -100,4 +100,44 @@ describe('LobbyModeSelector.vue', () => {
     await lanTab.trigger('keydown', { key: 'Home' });
     expect(wrapper.emitted('update:modelValue')?.[2]).toEqual(['multiplayer_lan']);
   });
+
+  describe('Academy Mode "Start Here" Badge', () => {
+    it('renders animated "⭐ Start Here!" badge on Chess Academy tab when completedCount === 0', () => {
+      const wrapper = mount(LobbyModeSelector, {
+        props: {
+          modelValue: 'multiplayer_lan',
+          completedCount: 0,
+        },
+      });
+
+      const academyTab = wrapper.find('[data-testid="mode-tab-academy"]');
+      expect(academyTab.exists()).toBe(true);
+      expect(academyTab.text()).toContain('⭐ Start Here!');
+    });
+
+    it('renders animated "⭐ Start Here!" badge when completedCount is undefined (defaults to 0)', () => {
+      const wrapper = mount(LobbyModeSelector, {
+        props: {
+          modelValue: 'multiplayer_lan',
+        },
+      });
+
+      const academyTab = wrapper.find('[data-testid="mode-tab-academy"]');
+      expect(academyTab.exists()).toBe(true);
+      expect(academyTab.text()).toContain('⭐ Start Here!');
+    });
+
+    it('does not render "⭐ Start Here!" badge when completedCount > 0', () => {
+      const wrapper = mount(LobbyModeSelector, {
+        props: {
+          modelValue: 'multiplayer_lan',
+          completedCount: 5,
+        },
+      });
+
+      const academyTab = wrapper.find('[data-testid="mode-tab-academy"]');
+      expect(academyTab.exists()).toBe(true);
+      expect(academyTab.text()).not.toContain('Start Here');
+    });
+  });
 });

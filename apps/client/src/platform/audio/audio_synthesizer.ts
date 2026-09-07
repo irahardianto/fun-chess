@@ -14,6 +14,8 @@ export class AudioSynthesizer implements IAudioService {
   private _isMuted: boolean = false;
   private masterGain: GainNode | null = null;
   private bootstrapped: boolean = false;
+  private visibilityHandler: (() => void) | null = null;
+  private unlockHandler: (() => void) | null = null;
 
   constructor(options?: AudioSynthesizerOptions) {
     if (options?.muted !== undefined) {
@@ -88,32 +90,75 @@ export class AudioSynthesizer implements IAudioService {
     this.bootstrapped = true;
 
     const unlockEvents = ['pointerdown', 'touchstart', 'keydown', 'click'];
-    const unlockHandler = () => {
+    this.unlockHandler = () => {
       this.initContext();
-      unlockEvents.forEach((evt) => {
-        try {
-          window.removeEventListener(evt, unlockHandler, true);
-        } catch (err) {
-          console.warn('[FC_AUDIO] Failed to remove unlock listener', err);
-        }
-      });
+      if (this.unlockHandler) {
+        unlockEvents.forEach((evt) => {
+          try {
+            window.removeEventListener(evt, this.unlockHandler!, true);
+          } catch (err) {
+            console.warn('[FC_AUDIO] Failed to remove unlock listener', err);
+          }
+        });
+        this.unlockHandler = null;
+      }
     };
 
     unlockEvents.forEach((evt) => {
       try {
-        window.addEventListener(evt, unlockHandler, { once: true, capture: true, passive: true });
+        window.addEventListener(evt, this.unlockHandler!, { once: true, capture: true, passive: true });
       } catch (err) {
         console.warn('[FC_AUDIO] Failed to attach unlock listener', err);
       }
     });
 
     if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', () => {
+      this.visibilityHandler = () => {
         if (document.visibilityState === 'visible') {
           this.resumeContext();
         }
-      });
+      };
+      document.addEventListener('visibilitychange', this.visibilityHandler);
     }
+  }
+
+  /**
+   * Closes AudioContext and removes all DOM event listeners (MIN-005).
+   */
+  public async dispose(): Promise<void> {
+    if (this.visibilityHandler && typeof document !== 'undefined') {
+      try {
+        document.removeEventListener('visibilitychange', this.visibilityHandler);
+      } catch (err) {
+        console.warn('[FC_AUDIO] Failed to remove visibilitychange listener', err);
+      }
+      this.visibilityHandler = null;
+    }
+
+    if (this.unlockHandler && typeof window !== 'undefined') {
+      const unlockEvents = ['pointerdown', 'touchstart', 'keydown', 'click'];
+      unlockEvents.forEach((evt) => {
+        try {
+          window.removeEventListener(evt, this.unlockHandler!, true);
+        } catch (err) {
+          console.warn('[FC_AUDIO] Failed to remove unlock listener', err);
+        }
+      });
+      this.unlockHandler = null;
+    }
+
+    if (this.ctx) {
+      try {
+        if (this.ctx.state !== 'closed') {
+          await this.ctx.close();
+        }
+      } catch (err) {
+        console.warn('[FC_AUDIO] Failed to close AudioContext during disposal', err);
+      }
+      this.ctx = null;
+    }
+    this.masterGain = null;
+    this.bootstrapped = false;
   }
 
   /**

@@ -41,22 +41,10 @@ export class GamePage {
     await expect(fromSquare).toBeVisible({ timeout: 10_000 });
     await fromSquare.click();
 
-    // Check if square was selected via click event
-    const isSelected = await fromSquare.evaluate((el) => el.classList.contains('is-selected')).catch(() => false);
-    if (isSelected) {
-      await expect(toSquare).toBeVisible({ timeout: 10_000 });
-      await toSquare.click();
-    } else {
-      // Fallback for multiplayer router event handling
-      await this.page.evaluate(({ from, to }) => {
-        const app = (document.querySelector('[data-testid="app-shell"]') as any)?.__vueParentComponent?.setupState;
-        if (app?.handleExecuteMove) {
-          app.handleExecuteMove({ from, to });
-        } else if (app?.selectSquare) {
-          app.selectSquare(from);
-        }
-      }, { from, to });
-    }
+    // Wait for square to be selected via Vue reactivity
+    await expect(fromSquare).toHaveClass(/is-selected/, { timeout: 5_000 });
+    await expect(toSquare).toBeVisible({ timeout: 10_000 });
+    await toSquare.click();
   }
 
   /**
@@ -69,16 +57,24 @@ export class GamePage {
   }
 
   /**
-   * Resigns the active match, accepting the browser confirmation dialog.
+   * Resigns the active match, accepting either browser confirmation dialog or in-app modal.
    */
   async resign(): Promise<void> {
     this.page.once('dialog', async (dialog) => {
-      await dialog.accept();
+      await dialog.accept().catch(() => {});
     });
 
     const activeResignBtn = this.page.locator('[data-testid="resign-action"]:visible, [data-testid="resign-btn"]:visible').first();
     await expect(activeResignBtn).toBeVisible({ timeout: 10_000 });
     await activeResignBtn.click();
+
+    // Check for in-app confirmation modal (AI arena or Multiplayer arena)
+    const confirmBtn = this.page.locator(
+      '[data-testid="confirm-resign-btn"]:visible, [data-testid="confirm-proceed-btn"]:visible, button:has-text("Resign"):visible'
+    ).last();
+    if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await confirmBtn.click();
+    }
   }
 
   /**

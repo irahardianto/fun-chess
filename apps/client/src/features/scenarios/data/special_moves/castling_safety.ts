@@ -35,5 +35,18 @@ export const castlingSafetyScenario: ChessScenario = {
       allowedMoves: [{ from: 'e1', to: 'c1' }],
       explanationOnSuccess: 'Grand Castle! Long castling activated both your King’s defense and your Queen’s Rook!',
     },
+    {
+      id: 'castle-step-3',
+      stepNumber: 3,
+      instruction: 'Castling Restrictions: Black’s Bishop on a6 controls the f1 square! You cannot castle through check. Castle Queenside (O-O-O) by moving your King from e1 to c1 instead!',
+      conceptExplanation: 'You cannot castle if your King is in check, passes through a square controlled by an enemy piece, or lands in check! Because f1 is attacked, Kingside castling is illegal, but Queenside is wide open!',
+      hint: 'Move your King from e1 two squares left to c1.',
+      setupFen: 'r3k2r/pppp1ppp/b7/4p3/4P3/8/PPP2PPP/R3K2R w KQkq - 0 1',
+      highlightSquares: ['e1', 'c1'],
+      threatSquares: ['f1'],
+      playerColor: 'w',
+      allowedMoves: [{ from: 'e1', to: 'c1' }],
+      explanationOnSuccess: 'Brilliant rule knowledge! You avoided the illegal path through f1 and safely castled Queenside!',
+    },
   ],
 };

@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from "node:http";
-import { stat, readFile } from "node:fs/promises";
 import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
+import { IFileStorage, NodeFileStorage } from "./file_storage.js";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -28,10 +28,14 @@ const MIME_TYPES: Record<string, string> = {
 export interface StaticFileHandlerOptions {
   distPath: string;
   fallbackHtml?: string;
+  fileStorage?: IFileStorage;
+  trustProxy?: boolean;
 }
 
 /**
  * Handles static asset serving and SPA HTML5 history mode fallback.
+ * Uses injected IFileStorage abstraction (MAJ-016).
+ * Inspects error codes and returns 500 on non-ENOENT system errors (MAJ-014).
  * Hardened against directory traversal (CRIT-008) and 200 asset masking.
  */
 export async function serveStaticFile(
@@ -40,11 +44,13 @@ export async function serveStaticFile(
   options: StaticFileHandlerOptions,
   logger?: Logger,
 ): Promise<boolean> {
+  const fileStorage = options.fileStorage ?? new NodeFileStorage();
   const isHead = req.method?.toUpperCase() === "HEAD";
   const urlPath = req.url?.split("?")[0] || "/";
   const rootDir = path.resolve(options.distPath);
 
-  const forwarded = req.headers?.["x-forwarded-for"];
+  const forwarded =
+    options.trustProxy === false ? undefined : req.headers?.["x-forwarded-for"];
   const clientIp =
     (typeof forwarded === "string"
       ? forwarded.split(",")[0]?.trim()
@@ -123,12 +129,32 @@ export async function serveStaticFile(
   const acceptHeader = (req.headers?.["accept"] as string) || "";
 
   try {
-    const fileStat = await stat(targetFilePath);
-    if (fileStat.isDirectory()) {
+    const fileStat = await fileStorage.stat(targetFilePath);
+    if (fileStat.isDirectory) {
       targetFilePath = path.join(targetFilePath, "index.html");
-      await stat(targetFilePath);
+      await fileStorage.stat(targetFilePath);
     }
-  } catch {
+  } catch (err: unknown) {
+    const errCode = (err as { code?: string })?.code;
+    if (errCode && errCode !== "ENOENT") {
+      logger?.error("Failed to stat static file", {
+        operation: "static_file_stat_error",
+        path: urlPath,
+        targetFilePath,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message, stack: err.stack }
+            : { raw: err },
+      });
+      res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+      if (isHead) {
+        res.end();
+      } else {
+        res.end("Internal Server Error");
+      }
+      return true;
+    }
+
     // 2. Missing asset handling (CRIT-008):
     // If request has a file extension (e.g. .js, .css, .png, .json), NEVER rewrite to index.html with 200!
     if (ext) {
@@ -156,7 +182,7 @@ export async function serveStaticFile(
   }
 
   try {
-    const content = await readFile(targetFilePath);
+    const content = await fileStorage.readFile(targetFilePath);
     const resolvedExt = path.extname(targetFilePath).toLowerCase();
     const contentType = MIME_TYPES[resolvedExt] || "application/octet-stream";
 
@@ -177,9 +203,33 @@ export async function serveStaticFile(
       res.end(content);
     }
     return true;
-  } catch (err) {
+  } catch (err: unknown) {
+    const errCode = (err as { code?: string })?.code;
+    if (errCode && errCode !== "ENOENT") {
+      logger?.error("Failed to read static file", {
+        operation: "static_file_read_error",
+        path: urlPath,
+        targetFilePath,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message, stack: err.stack }
+            : { raw: err },
+      });
+      res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+      if (isHead) {
+        res.end();
+      } else {
+        res.end("Internal Server Error");
+      }
+      return true;
+    }
+
     // Fallback HTML if disk assets (index.html) don't exist in dev/container preview
-    if (options.fallbackHtml && !ext && (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader)) {
+    if (
+      options.fallbackHtml &&
+      !ext &&
+      (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader)
+    ) {
       const fbLength = Buffer.byteLength(options.fallbackHtml);
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
@@ -196,7 +246,7 @@ export async function serveStaticFile(
 
     logger?.debug("Static file not found and no fallback provided", {
       targetFilePath,
-      error: (err as Error).message,
+      error: err instanceof Error ? err.message : String(err),
     });
 
     return false;

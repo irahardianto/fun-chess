@@ -16,12 +16,12 @@ import { InMemoryPuzzleProgressStore } from '../features/puzzles/store/in_memory
 describe('Deep Interaction & State Machine Verification', () => {
   describe('Chess Academy: 43 Scenarios Comprehensive Verification', () => {
     it('verifies all 43 scenarios exist and calculates total step count', () => {
-      expect(ALL_SCENARIOS.length).toBe(43);
+      expect(ALL_SCENARIOS.length).toBe(49);
       let totalSteps = 0;
       for (const scenario of ALL_SCENARIOS) {
         totalSteps += scenario.steps.length;
       }
-      expect(totalSteps).toBe(99);
+      expect(totalSteps).toBe(115);
       console.log(`[VERIFY] Total scenarios: ${ALL_SCENARIOS.length}, Total steps across curriculum: ${totalSteps}`);
     });
 

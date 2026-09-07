@@ -279,6 +279,7 @@ export function mergeUnifiedProgress(
   local: UnifiedProgressPayload,
   incoming: UnifiedProgressPayload,
   strategy: SyncMergeStrategy,
+  now: number = Date.now(),
 ): UnifiedProgressPayload {
   if (strategy === "keep_local") {
     return structuredClone(local);
@@ -309,17 +310,17 @@ export function mergeUnifiedProgress(
   const createdAt =
     local.puzzles?.createdAt && incoming.puzzles?.createdAt
       ? Math.min(local.puzzles.createdAt, incoming.puzzles.createdAt)
-      : local.puzzles?.createdAt || incoming.puzzles?.createdAt || Date.now();
+      : local.puzzles?.createdAt || incoming.puzzles?.createdAt || now;
 
   const lastActiveAt = Math.max(
     local.puzzles?.lastActiveAt || 0,
     incoming.puzzles?.lastActiveAt || 0,
-    Date.now(),
+    now,
   );
 
   return {
     version: UNIFIED_PROGRESS_SCHEMA_VERSION,
-    exportedAt: Date.now(),
+    exportedAt: now,
     clientVersion: incoming.clientVersion || local.clientVersion,
     scenarios: mergedScenarios,
     puzzles: {
@@ -515,8 +516,9 @@ export class DefaultProgressMergeEngine implements ProgressMergeEngine {
     local: UnifiedProgressPayload,
     incoming: UnifiedProgressPayload,
     strategy: SyncMergeStrategy,
+    now: number = Date.now(),
   ): UnifiedProgressPayload {
-    return mergeUnifiedProgress(local, incoming, strategy);
+    return mergeUnifiedProgress(local, incoming, strategy, now);
   }
 
   public calculateDiff(

@@ -137,21 +137,12 @@ describe("LanService", () => {
       expect(localIp).toBe("127.0.0.1");
     });
 
-    it("honors LAN_IP environment variable when set", () => {
-      const originalEnv = process.env.LAN_IP;
-      process.env.LAN_IP = "192.168.1.77";
-      try {
-        const localIp = service.getLocalLanIp({});
-        expect(localIp).toBe("192.168.1.77");
-        const allIps = service.getAllLanInterfaces({});
-        expect(allIps).toContain("192.168.1.77");
-      } finally {
-        if (originalEnv === undefined) {
-          delete process.env.LAN_IP;
-        } else {
-          process.env.LAN_IP = originalEnv;
-        }
-      }
+    it("honors lanIp config option when provided", () => {
+      const customService = new LanService({ lanIp: "192.168.1.77" });
+      const localIp = customService.getLocalLanIp({});
+      expect(localIp).toBe("192.168.1.77");
+      const allIps = customService.getAllLanInterfaces({});
+      expect(allIps).toContain("192.168.1.77");
     });
   });
 

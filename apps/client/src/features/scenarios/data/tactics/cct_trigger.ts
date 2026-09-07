@@ -33,7 +33,7 @@ export const cctTriggerScenario: ChessScenario = {
     {
       id: 'cct-step-2',
       stepNumber: 2,
-      instruction: 'Now find the lethal Threat! Jump your Knight into e6 to fork the King and Queen!',
+      instruction: 'Now deliver another forcing Check! Jump your Knight into e6 with check to fork the King and Queen!',
       conceptExplanation: 'The Knight on e6 is guarded by your Bishop on f7. Black is forced to capture your Bishop to escape check!',
       hint: 'Jump your Knight from g5 into e6.',
       setupFen: 'r1bq1k1r/pppn1Bpp/3p1n2/4p1N1/4P3/3P4/PPP2PPP/RNBQK2R w KQ - 1 2',
@@ -47,7 +47,7 @@ export const cctTriggerScenario: ChessScenario = {
         delayMs: 500,
         dialogue: 'A devastating fork! I have to capture the Bishop with my King!',
       },
-      explanationOnSuccess: 'Brilliant threat! Black was forced to break their defensive coordination!',
+      explanationOnSuccess: 'Brilliant check and fork! Black was forced to break their defensive coordination!',
     },
     {
       id: 'cct-step-3',

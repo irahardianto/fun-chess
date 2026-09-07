@@ -20,6 +20,7 @@ export class LobbyPage {
   readonly colorBlackBtn: Locator;
   readonly roomCodeDisplay: Locator;
   readonly quickSyncBtn: Locator;
+  readonly startHereBadge: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -36,6 +37,7 @@ export class LobbyPage {
     this.colorBlackBtn = page.locator('[data-testid="color-black-btn"]');
     this.roomCodeDisplay = page.locator('[data-testid="room-code-display"]');
     this.quickSyncBtn = page.locator('[data-testid="lobby-quick-sync-btn"]');
+    this.startHereBadge = page.locator('[data-testid="start-here-badge"]');
   }
 
   /**
@@ -50,6 +52,9 @@ export class LobbyPage {
    * Fills host credentials, selects preferred side, and initiates room creation.
    */
   async hostGame(nickname: string, color?: 'w' | 'random' | 'b'): Promise<void> {
+    if (!(await this.hostNicknameInput.isVisible())) {
+      await this.selectMode('multiplayer_lan');
+    }
     await expect(this.hostNicknameInput).toBeVisible({ timeout: 10_000 });
     await this.hostNicknameInput.fill(nickname);
 
@@ -89,6 +94,9 @@ export class LobbyPage {
    * Fills guest credentials, enters room code, and joins the game room.
    */
   async joinGame(nickname: string, roomCode: string): Promise<void> {
+    if (!(await this.joinNicknameInput.isVisible())) {
+      await this.selectMode('multiplayer_lan');
+    }
     await expect(this.joinNicknameInput).toBeVisible({ timeout: 10_000 });
     await this.joinNicknameInput.fill(nickname);
     await this.joinRoomCodeInput.fill(roomCode);
@@ -125,5 +133,19 @@ export class LobbyPage {
   async openProgressSync(): Promise<void> {
     await expect(this.quickSyncBtn).toBeVisible({ timeout: 10_000 });
     await this.quickSyncBtn.click();
+  }
+
+  /**
+   * Switches to Chess Academy mode tab.
+   */
+  async openAcademy(): Promise<void> {
+    await this.selectMode('academy');
+  }
+
+  /**
+   * Switches to Tactical Puzzle Hub mode tab.
+   */
+  async openPuzzles(): Promise<void> {
+    await this.selectMode('puzzle_hub');
   }
 }

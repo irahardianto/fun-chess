@@ -1,11 +1,27 @@
 import os, { NetworkInterfaceInfo } from "node:os";
 import QRCode from "qrcode";
-import { LanInfoResponse } from "@fun-chess/shared";
+import {
+  IRelayAddressService,
+  LanInfoResponse,
+} from "./relay_address.service.js";
+
+/**
+ * Configuration options for LanService.
+ */
+export interface LanServiceConfig {
+  readonly lanIp?: string;
+  readonly hostIp?: string;
+  readonly publicUrl?: string;
+  readonly port?: number;
+}
 
 /**
  * Service for local network interface discovery, IP resolution, and QR code generation.
+ * @deprecated Standardize on RelayAddressService implementing IRelayAddressService instead (MAJ-021).
  */
-export class LanService {
+export class LanService implements IRelayAddressService {
+  constructor(private readonly config: LanServiceConfig = {}) {}
+
   /**
    * Retrieves all non-internal IPv4 network interface addresses.
    */
@@ -14,7 +30,7 @@ export class LanService {
   ): string[] {
     const addresses: string[] = [];
 
-    const envIp = process.env.LAN_IP || process.env.HOST_IP;
+    const envIp = this.config.lanIp ?? this.config.hostIp;
     if (envIp && !addresses.includes(envIp)) {
       addresses.push(envIp);
     }
@@ -45,7 +61,7 @@ export class LanService {
   public getLocalLanIp(
     customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
   ): string {
-    const envIp = process.env.LAN_IP || process.env.HOST_IP;
+    const envIp = this.config.lanIp ?? this.config.hostIp;
     if (envIp) {
       return envIp;
     }
@@ -79,12 +95,16 @@ export class LanService {
    * Generates a join URL for players on the LAN.
    */
   public generateJoinUrl(
-    port: number,
+    port?: number,
     roomCode?: string,
-    customIp?: string,
+    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]> | string,
   ): string {
-    const ip = customIp || this.getLocalLanIp();
-    const base = `http://${ip}:${port}`;
+    const effectivePort = port ?? this.config.port ?? 3000;
+    const ip =
+      typeof customInterfaces === "string"
+        ? customInterfaces
+        : this.getLocalLanIp(customInterfaces);
+    const base = `http://${ip}:${effectivePort}`;
     if (roomCode) {
       return `${base}?room=${encodeURIComponent(roomCode.toUpperCase())}`;
     }
@@ -123,25 +143,29 @@ export class LanService {
    */
   public isCloudRelay(): boolean {
     return Boolean(
-      process.env.PUBLIC_URL && process.env.PUBLIC_URL.trim().length > 0,
+      this.config.publicUrl && this.config.publicUrl.trim().length > 0,
     );
   }
 
   /**
    * Generates comprehensive LAN info response structure.
    */
-  public getLanInfo(port: number): LanInfoResponse {
+  public getLanInfo(port?: number): LanInfoResponse {
+    const effectivePort = port ?? this.config.port ?? 3000;
     const lanIp = this.getLocalLanIp();
     const interfaces = this.getAllLanInterfaces();
-    const localUrl = `http://localhost:${port}`;
-    const joinUrl = `http://${lanIp}:${port}`;
+    const localUrl = `http://localhost:${effectivePort}`;
+    const joinUrl = `http://${lanIp}:${effectivePort}`;
 
     return {
       lanIp,
-      port,
+      port: effectivePort,
       localUrl,
       joinUrl,
       interfaces: interfaces.length > 0 ? interfaces : [lanIp],
+      relayMode: this.isCloudRelay() ? "cloud" : "lan",
+      isCloudRelay: this.isCloudRelay(),
+      publicUrl: this.config.publicUrl,
     };
   }
 
@@ -149,20 +173,24 @@ export class LanService {
    * Compatibility alias matching IRelayAddressService.getAddressingInfo.
    */
   public getAddressingInfo(
-    port: number = 3000,
+    port?: number,
     customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
   ): LanInfoResponse {
+    const effectivePort = port ?? this.config.port ?? 3000;
     const lanIp = this.getLocalLanIp(customInterfaces);
     const interfaces = this.getAllLanInterfaces(customInterfaces);
-    const localUrl = `http://localhost:${port}`;
-    const joinUrl = `http://${lanIp}:${port}`;
+    const localUrl = `http://localhost:${effectivePort}`;
+    const joinUrl = `http://${lanIp}:${effectivePort}`;
 
     return {
       lanIp,
-      port,
+      port: effectivePort,
       localUrl,
       joinUrl,
       interfaces: interfaces.length > 0 ? interfaces : [lanIp],
+      relayMode: this.isCloudRelay() ? "cloud" : "lan",
+      isCloudRelay: this.isCloudRelay(),
+      publicUrl: this.config.publicUrl,
     };
   }
 }

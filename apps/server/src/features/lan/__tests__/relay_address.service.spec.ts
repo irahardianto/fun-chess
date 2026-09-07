@@ -95,9 +95,10 @@ describe("RelayAddressService", () => {
       expect(service.getLocalLanIp()).toBe("fun-chess-xyz.a.run.app");
     });
 
-    it("identifies cloud relay mode via process.env.PUBLIC_URL", () => {
-      process.env.PUBLIC_URL = "https://fun-chess-prod.a.run.app/";
-      const service = new RelayAddressService();
+    it("identifies cloud relay mode via config.publicUrl", () => {
+      const service = new RelayAddressService({
+        publicUrl: "https://fun-chess-prod.a.run.app/",
+      });
 
       expect(service.isCloudRelay()).toBe(true);
       expect(service.getPublicUrl()).toBe("https://fun-chess-prod.a.run.app");
@@ -201,9 +202,8 @@ describe("RelayAddressService", () => {
       expect(service.getAllLanInterfaces(mockInterfaces)).toContain("10.0.0.5");
     });
 
-    it("honors process.env.LAN_IP and process.env.HOST_IP", () => {
-      process.env.HOST_IP = "172.28.0.50";
-      const service = new RelayAddressService();
+    it("honors config.lanIp and config.hostIp", () => {
+      const service = new RelayAddressService({ hostIp: "172.28.0.50" });
 
       expect(service.getLocalLanIp({})).toBe("172.28.0.50");
       expect(service.getAllLanInterfaces({})).toEqual(["172.28.0.50"]);

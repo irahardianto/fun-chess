@@ -10,12 +10,13 @@
     "rating": 650,
     "ratingDeviation": 80,
     "themes": [
+      "hanging_piece",
       "pin",
       "captures_checks_threats"
     ],
-    "primaryTheme": "pin",
+    "primaryTheme": "hanging_piece",
     "difficulty": "novice",
-    "title": "Ruy Lopez Classical Pin on c6 #1 📌",
+    "title": "Hanging Piece Snatch via Pin #1 🎁",
     "subtitle": "Pin the c6 Knight and win the e5 pawn!",
     "playerColor": "w",
     "solutionPlies": 3,
@@ -67,12 +68,13 @@
     "rating": 680,
     "ratingDeviation": 80,
     "themes": [
+      "hanging_piece",
       "pin",
       "captures_checks_threats"
     ],
-    "primaryTheme": "pin",
+    "primaryTheme": "hanging_piece",
     "difficulty": "novice",
-    "title": "Absolute Knight Pin on c6 #2 📌",
+    "title": "Undefended Piece Win on e5 #2 🎁",
     "subtitle": "Eliminate the pinned defender on c6!",
     "playerColor": "w",
     "solutionPlies": 3,
@@ -238,12 +240,13 @@
     "rating": 770,
     "ratingDeviation": 80,
     "themes": [
+      "trapped_piece",
       "pin",
       "captures_checks_threats"
     ],
-    "primaryTheme": "pin",
+    "primaryTheme": "trapped_piece",
     "difficulty": "novice",
-    "title": "Black Bishop Pin on g4 #5 📌",
+    "title": "Trapped Bishop in the Pin Net #5 🪤",
     "subtitle": "Pin White's f3 Knight and eliminate it!",
     "playerColor": "b",
     "solutionPlies": 3,
@@ -295,12 +298,13 @@
     "rating": 800,
     "ratingDeviation": 80,
     "themes": [
+      "trapped_piece",
       "pin",
       "captures_checks_threats"
     ],
-    "primaryTheme": "pin",
+    "primaryTheme": "trapped_piece",
     "difficulty": "novice",
-    "title": "Pawn Advance Against Pinned Knight #6 ♟",
+    "title": "Noah's Ark Bishop Trap #6 🪤",
     "subtitle": "Push d5 to exploit the pinned c6 Knight!",
     "playerColor": "w",
     "solutionPlies": 3,
@@ -983,7 +987,7 @@
       "captures_checks_threats"
     ],
     "primaryTheme": "pin",
-    "difficulty": "easy",
+    "difficulty": "medium",
     "title": "Black Center Pawn Snatch on e4 #18 ♟",
     "subtitle": "Bxc3+ eliminates defender and Nxe4 grabs pawn!",
     "playerColor": "b",

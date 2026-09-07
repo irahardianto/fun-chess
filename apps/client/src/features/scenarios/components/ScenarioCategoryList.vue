@@ -50,6 +50,18 @@ const totalCompletedLessons = computed(() => {
   return Object.values(props.progressMap).filter((item) => item.starsEarned > 0).length;
 });
 
+const nextUncompletedScenario = computed<ChessScenario | null>(() => {
+  for (const section of props.sections) {
+    for (const scenario of section.scenarios) {
+      const rec = props.progressMap[scenario.id];
+      if (!rec || !rec.starsEarned) {
+        return scenario;
+      }
+    }
+  }
+  return null;
+});
+
 const filteredSections = computed(() => {
   if (activeFilter.value === 'all') {
     return props.sections;
@@ -160,6 +172,35 @@ function getSectionStats(section: CurriculumSection) {
         </div>
       </div>
     </header>
+
+    <!-- Continue Learning Hero Card (SC-4 UX Polish) -->
+    <section
+      v-if="nextUncompletedScenario"
+      class="continue-learning-hero"
+      aria-label="Continue Learning"
+      data-testid="continue-learning-hero"
+    >
+      <div class="continue-learning-content">
+        <div class="continue-learning-pill">
+          <span>🎯 Next Lesson</span>
+        </div>
+        <div class="continue-learning-main">
+          <span class="continue-learning-icon" aria-hidden="true">{{ nextUncompletedScenario.icon }}</span>
+          <div class="continue-learning-text-group">
+            <h2 class="continue-learning-title">{{ nextUncompletedScenario.title }}</h2>
+            <p class="continue-learning-subtitle">{{ nextUncompletedScenario.subtitle }}</p>
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="resume-lesson-btn"
+        data-testid="resume-lesson-btn"
+        @click="handlePlayScenario(nextUncompletedScenario)"
+      >
+        Resume Lesson ➡️
+      </button>
+    </section>
 
     <!-- Category Filter Tabs -->
     <nav class="academy-category-tabs" role="tablist" aria-label="Curriculum categories">
@@ -366,6 +407,103 @@ function getSectionStats(section: CurriculumSection) {
   box-shadow: 0 0 10px rgba(255, 193, 7, 0.6);
 }
 
+/* CONTINUE LEARNING HERO CARD */
+.continue-learning-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  background: var(--bg-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4) var(--space-6);
+  box-shadow: var(--shadow-md);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.continue-learning-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 280px;
+}
+
+.continue-learning-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle, rgba(108, 92, 231, 0.12));
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.5px;
+}
+
+.continue-learning-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.continue-learning-icon {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.continue-learning-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.continue-learning-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--text-main);
+  margin: 0;
+}
+
+.continue-learning-subtitle {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.resume-lesson-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-6);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: var(--weight-heavy);
+  background: var(--color-primary);
+  color: var(--text-on-primary, #ffffff);
+  border: none;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-btn-primary);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) ease;
+  white-space: nowrap;
+}
+
+.resume-lesson-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--color-primary-bevel), 0 10px 20px rgba(108, 92, 231, 0.4);
+}
+
+.resume-lesson-btn:active {
+  transform: translateY(4px) scale(0.98);
+}
+
 /* CATEGORY TABS */
 .academy-category-tabs {
   display: flex;
@@ -510,6 +648,10 @@ function getSectionStats(section: CurriculumSection) {
   .section-header-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .category-tab-btn {
+    min-height: 44px;
+    box-sizing: border-box;
   }
 }
 </style>

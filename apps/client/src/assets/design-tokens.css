@@ -211,6 +211,8 @@
   --academy-gold-bevel:    hsl(45, 95%, 35%);
   --academy-gold-subtle:   hsl(45, 100%, 51% / 0.16);
   --academy-gold-glow:     0 0 20px 4px rgba(255, 193, 7, 0.45);
+  --academy-hints-badge-text: #78350f; /* High contrast amber (>= 4.5:1) */
+  --academy-hints-badge-bg:   #fef3c7;
 
   --star-filled:           hsl(48, 100%, 50%); /* #ffcc00 */
   --star-filled-stroke:    hsl(42, 100%, 36%);
@@ -508,6 +510,8 @@
   --academy-step-bg:       hsl(255, 30%, 18%);
   --academy-step-border:   hsl(255, 40%, 32%);
   --academy-step-text:     hsl(255, 85%, 92%);
+  --academy-hints-badge-text: #fbbf24;
+  --academy-hints-badge-bg:   rgba(251, 191, 36, 0.15);
   --star-empty:            hsl(225, 15%, 28%);
   --star-empty-stroke:     hsl(225, 15%, 40%);
 

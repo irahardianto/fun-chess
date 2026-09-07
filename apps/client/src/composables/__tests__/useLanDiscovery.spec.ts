@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { useLanDiscovery, isValidIPv4 } from '../useLanDiscovery';
+import { useLanDiscovery, isValidIPv4, detectWebRtcLanIp } from '../useLanDiscovery';
 
 describe('useLanDiscovery composable', () => {
   let mockStorage: Record<string, string> = {};
@@ -133,5 +133,23 @@ describe('useLanDiscovery composable', () => {
 
     expect(detectedWebRtcIp.value).toBe('192.168.1.199');
     expect(activeLanIp.value).toBe('192.168.1.199');
+  });
+
+  it('clears timeout timer and closes RTCPeerConnection when WebRTC negotiation fails', async () => {
+    const closeSpy = vi.fn();
+    class FailingRTCPeerConnection {
+      createDataChannel() {}
+      async createOffer() {
+        throw new Error('WebRTC offer failed');
+      }
+      async setLocalDescription() {}
+      close = closeSpy;
+    }
+
+    vi.stubGlobal('RTCPeerConnection', FailingRTCPeerConnection);
+
+    const ip = await detectWebRtcLanIp();
+    expect(ip).toBeNull();
+    expect(closeSpy).toHaveBeenCalled();
   });
 });

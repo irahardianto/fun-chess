@@ -44,4 +44,13 @@ describe('socket_client factory', () => {
       transports: ['websocket', 'polling'],
     }));
   });
+
+  it('attaches correlationId to auth and query when provided in options', () => {
+    createSocketClient({ url: 'http://localhost:3000', correlationId: 'corr-xyz-123' });
+
+    expect(io).toHaveBeenCalledWith('http://localhost:3000', expect.objectContaining({
+      auth: { correlationId: 'corr-xyz-123' },
+      query: { correlationId: 'corr-xyz-123' },
+    }));
+  });
 });

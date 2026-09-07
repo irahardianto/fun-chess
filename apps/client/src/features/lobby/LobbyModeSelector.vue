@@ -3,10 +3,12 @@ import type { AppGameMode, LobbyModeOption } from '@fun-chess/shared';
 
 interface Props {
   modelValue?: AppGameMode;
+  completedCount?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: 'multiplayer_lan',
+  completedCount: undefined,
 });
 
 const emit = defineEmits<{
@@ -109,6 +111,13 @@ function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
         <span class="mode-title">{{ mode.title }}</span>
         <span class="mode-badge">{{ mode.subtitle }}</span>
       </div>
+      <span
+        v-if="mode.id === 'academy' && (props.completedCount ?? 0) === 0"
+        class="start-here-badge"
+        data-testid="start-here-badge"
+      >
+        ⭐ Start Here!
+      </span>
     </button>
   </nav>
 </template>
@@ -130,6 +139,7 @@ function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
 }
 
 .mode-tab-button {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -146,6 +156,41 @@ function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
   transition: transform var(--duration-fast) var(--ease-spring), color var(--duration-fast) ease, background-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
   text-decoration: none;
   user-select: none;
+}
+
+.start-here-badge {
+  position: absolute;
+  top: -10px;
+  right: -4px;
+  background: var(--color-accent, #ff4757);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: var(--weight-heavy);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 2px 8px rgba(255, 71, 87, 0.5);
+  animation: pulse-badge 1.8s infinite ease-in-out;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(255, 71, 87, 0.5);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 4px 14px rgba(255, 71, 87, 0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-here-badge {
+    animation: none;
+  }
 }
 
 .mode-tab-button:hover:not(.is-active) {

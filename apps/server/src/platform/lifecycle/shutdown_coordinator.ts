@@ -1,4 +1,5 @@
 import { Server as HttpServer } from "node:http";
+import { performance } from "node:perf_hooks";
 import { TypedSocketServer } from "../socket/socket_server.js";
 import { Logger } from "../logger/logger.interface.js";
 
@@ -15,6 +16,8 @@ export interface ShutdownCoordinatorOptions {
 /**
  * Coordinates graceful shutdown, timer disposal, socket draining,
  * and process crash guarding for the Fun Chess server.
+ * Ensures active sockets are disconnected and idle connections closed (MAJ-010).
+ * Measures and logs shutdown duration (MIN-013).
  */
 export class ShutdownCoordinator {
   private isShuttingDown = false;
@@ -61,6 +64,7 @@ export class ShutdownCoordinator {
       return;
     }
     this.isShuttingDown = true;
+    const startTime = performance.now();
 
     this.logger.info(`Received ${signal}. Shutting down gracefully...`, {
       operation: "server_shutdown",
@@ -88,9 +92,12 @@ export class ShutdownCoordinator {
     // 3. Set force exit timer in case sockets or server hang
     const timeoutPromise = new Promise<"timeout">((resolve) => {
       this.forceExitTimer = setTimeout(() => {
+        const duration = Math.round(performance.now() - startTime);
         this.logFatal("Forced shutdown due to timeout waiting for connections to close.", {
           operation: "server_shutdown_timeout",
           timeoutMs: this.timeoutMs,
+          duration,
+          durationMs: duration,
         });
         this.onExit(1);
         resolve("timeout");
@@ -101,7 +108,18 @@ export class ShutdownCoordinator {
       }
     });
 
-    // 4. Close Socket.io server and HTTP server concurrently
+    // 4. Disconnect all sockets and close idle/all connections before closing (MAJ-010)
+    if (typeof this.io.disconnectSockets === "function") {
+      this.io.disconnectSockets(true);
+    }
+    if (typeof (this.server as any).closeIdleConnections === "function") {
+      (this.server as any).closeIdleConnections();
+    }
+    if (typeof (this.server as any).closeAllConnections === "function") {
+      (this.server as any).closeAllConnections();
+    }
+
+    // 5. Close Socket.io server and HTTP server concurrently
     const closeServers = Promise.all([
       new Promise<void>((resolve) => {
         this.io.close(() => resolve());
@@ -119,8 +137,11 @@ export class ShutdownCoordinator {
       }
 
       if (outcome === "ok") {
+        const duration = Math.round(performance.now() - startTime);
         this.logger.info("Fun Chess server closed successfully.", {
           operation: "server_shutdown_complete",
+          duration,
+          durationMs: duration,
         });
         this.onExit(0);
       }
@@ -129,8 +150,11 @@ export class ShutdownCoordinator {
         clearTimeout(this.forceExitTimer);
       }
 
+      const duration = Math.round(performance.now() - startTime);
       this.logFatal("Error closing server during shutdown", {
         operation: "server_shutdown_error",
+        duration,
+        durationMs: duration,
         error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
       });
 

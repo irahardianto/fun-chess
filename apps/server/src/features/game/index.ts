@@ -11,3 +11,11 @@ export type {
 export { GameService } from "./game.service.js";
 export type { MoveApplicationResult } from "./game.service.js";
 export { registerGameSocketHandlers } from "./game.socket_handler.js";
+export {
+  SystemClock,
+  UuidGenerator,
+} from "./clock.js";
+export type {
+  IClock,
+  IIdGenerator,
+} from "./clock.js";

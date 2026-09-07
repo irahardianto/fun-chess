@@ -500,5 +500,21 @@ describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => 
       expect(merged.puzzles.ratingProfile.rating).toBe(1300);
       expect(diff.hasUpgrades).toBe(true);
     });
+
+    it("respects explicit now timestamp parameter instead of calling Date.now() (MAJ-018)", () => {
+      const local = createLocalPayload();
+      const incoming = createIncomingPayload();
+      const explicitTimestamp = 1750000000000;
+
+      const merged = mergeUnifiedProgress(
+        local,
+        incoming,
+        "smart_merge",
+        explicitTimestamp,
+      );
+
+      expect(merged.exportedAt).toBe(explicitTimestamp);
+      expect(merged.puzzles.lastActiveAt).toBe(explicitTimestamp);
+    });
   });
 });

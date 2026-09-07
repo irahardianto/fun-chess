@@ -59,7 +59,10 @@ export const legalsTrapScenario: ChessScenario = {
       highlightSquares: ['c3', 'd5'],
       threatSquares: ['e7'],
       playerColor: 'w',
-      allowedMoves: [{ from: 'c3', to: 'd5' }],
+      allowedMoves: [
+        { from: 'c3', to: 'd5' },
+        { from: 'c1', to: 'g5' },
+      ],
       explanationOnSuccess: 'Checkmate! You executed Legal’s Trap and proved that checkmating the King beats winning a Queen!',
     },
   ],

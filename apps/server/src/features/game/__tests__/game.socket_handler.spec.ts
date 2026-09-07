@@ -178,11 +178,11 @@ describe("Game Socket Handlers", () => {
       // Let's create a move that delivers check: White plays Qh5+ after 1. e4 e5 2. f4 exf4
       const preCheckFen =
         "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
-      await setupActiveRoom("DELIVER_CHECK", preCheckFen);
+      await setupActiveRoom("DCHK", preCheckFen);
 
       await whiteSocket.trigger(
         "game:move",
-        { roomCode: "DELIVER_CHECK", move: { from: "d1", to: "h5" } },
+        { roomCode: "DCHK", move: { from: "d1", to: "h5" } },
         () => {},
       );
 
@@ -226,7 +226,7 @@ describe("Game Socket Handlers", () => {
     });
 
     it("rejects game:move with ERR_RATE_LIMITED when rate limit is exceeded (SEC-HIGH-001)", async () => {
-      await setupActiveRoom("FLOOD_MOVE");
+      await setupActiveRoom("FLOD");
       const floodSocket = new TestSocket("sock_flood");
       floodSocket.handshake.address = "192.168.5.55";
       const limiter = new SocketRateLimiter({ maxRequests: 5, windowMs: 10_000 });
@@ -244,7 +244,7 @@ describe("Game Socket Handlers", () => {
         let ack: any;
         await floodSocket.trigger(
           "game:move",
-          { roomCode: "FLOOD_MOVE", move: { from: "e2", to: "e4" } },
+          { roomCode: "FLOD", move: { from: "e2", to: "e4" } },
           (res) => {
             ack = res;
           },
@@ -255,7 +255,7 @@ describe("Game Socket Handlers", () => {
       let rateLimitAck: any;
       await floodSocket.trigger(
         "game:move",
-        { roomCode: "FLOOD_MOVE", move: { from: "e2", to: "e4" } },
+        { roomCode: "FLOD", move: { from: "e2", to: "e4" } },
         (res) => {
           rateLimitAck = res;
         },
@@ -269,12 +269,12 @@ describe("Game Socket Handlers", () => {
 
   describe("game:resign", () => {
     it("concedes game, emits game:over to room with resignation reason and awards win to opponent", async () => {
-      await setupActiveRoom("RESIGN");
+      await setupActiveRoom("RSGN");
 
       let ackResponse: any;
       await whiteSocket.trigger(
         "game:resign",
-        { roomCode: "RESIGN" },
+        { roomCode: "RSGN" },
         (res) => {
           ackResponse = res;
         },
@@ -372,14 +372,14 @@ describe("Game Socket Handlers", () => {
 
   describe("game:request_rematch & game:respond_rematch", () => {
     it("broadcasts game:rematch_requested when requested after game over", async () => {
-      const room = await setupActiveRoom("REMATCH");
+      const room = await setupActiveRoom("MTCH");
       room.status = "game_over";
       await store.save(room);
 
       let ackResponse: any;
       await whiteSocket.trigger(
         "game:request_rematch",
-        { roomCode: "REMATCH" },
+        { roomCode: "MTCH" },
         (res) => {
           ackResponse = res;
         },
@@ -391,25 +391,25 @@ describe("Game Socket Handlers", () => {
         (e) => e.event === "game:rematch_requested",
       );
       expect(rematchReqEmit).toBeDefined();
-      expect(rematchReqEmit?.room).toBe("REMATCH");
+      expect(rematchReqEmit?.room).toBe("MTCH");
       expect((rematchReqEmit?.payload as any).requestedBy).toBe("p_white_id");
     });
 
     it("swaps colors and emits game:rematch_started with gameState and room when opponent accepts rematch", async () => {
-      const room = await setupActiveRoom("REMATCH");
+      const room = await setupActiveRoom("MTCH");
       room.status = "game_over";
       await store.save(room);
 
       await whiteSocket.trigger(
         "game:request_rematch",
-        { roomCode: "REMATCH" },
+        { roomCode: "MTCH" },
         () => {},
       );
 
       let ackResponse: any;
       await blackSocket.trigger(
         "game:respond_rematch",
-        { roomCode: "REMATCH", accept: true },
+        { roomCode: "MTCH", accept: true },
         (res) => {
           ackResponse = res;
         },
@@ -421,7 +421,7 @@ describe("Game Socket Handlers", () => {
         (e) => e.event === "game:rematch_started",
       );
       expect(rematchStartedEmit).toBeDefined();
-      expect(rematchStartedEmit?.room).toBe("REMATCH");
+      expect(rematchStartedEmit?.room).toBe("MTCH");
       expect((rematchStartedEmit?.payload as any).gameState.turn).toBe("w");
       expect((rematchStartedEmit?.payload as any).room.whitePlayer.id).toBe(
         "p_black_id",
@@ -430,27 +430,27 @@ describe("Game Socket Handlers", () => {
         "p_white_id",
       );
 
-      const savedRoom = await store.findByCode("REMATCH");
+      const savedRoom = await store.findByCode("MTCH");
       expect(savedRoom?.status).toBe("playing");
       expect(savedRoom?.whitePlayer?.id).toBe("p_black_id"); // Black swapped to White
       expect(savedRoom?.blackPlayer?.id).toBe("p_white_id"); // White swapped to Black
     });
 
     it("emits game:rematch_declined when opponent declines rematch", async () => {
-      const room = await setupActiveRoom("REMATCH");
+      const room = await setupActiveRoom("MTCH");
       room.status = "game_over";
       await store.save(room);
 
       await whiteSocket.trigger(
         "game:request_rematch",
-        { roomCode: "REMATCH" },
+        { roomCode: "MTCH" },
         () => {},
       );
 
       let ackResponse: any;
       await blackSocket.trigger(
         "game:respond_rematch",
-        { roomCode: "REMATCH", accept: false },
+        { roomCode: "MTCH", accept: false },
         (res) => {
           ackResponse = res;
         },
@@ -462,7 +462,7 @@ describe("Game Socket Handlers", () => {
         (e) => e.event === "game:rematch_declined",
       );
       expect(rematchDeclinedEmit).toBeDefined();
-      expect(rematchDeclinedEmit?.room).toBe("REMATCH");
+      expect(rematchDeclinedEmit?.room).toBe("MTCH");
       expect((rematchDeclinedEmit?.payload as any).byPlayerId).toBe(
         "p_black_id",
       );
@@ -487,7 +487,7 @@ describe("Game Socket Handlers", () => {
       });
 
       expect(ackResponse.success).toBe(false);
-      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
     });
 
     it("handles missing roomCode in game:offer_draw gracefully", async () => {
@@ -497,7 +497,7 @@ describe("Game Socket Handlers", () => {
       });
 
       expect(ackResponse.success).toBe(false);
-      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
     });
 
     it("handles missing roomCode in game:respond_draw gracefully", async () => {
@@ -507,7 +507,7 @@ describe("Game Socket Handlers", () => {
       });
 
       expect(ackResponse.success).toBe(false);
-      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
     });
 
     it("handles missing roomCode in game:request_rematch gracefully", async () => {
@@ -517,7 +517,7 @@ describe("Game Socket Handlers", () => {
       });
 
       expect(ackResponse.success).toBe(false);
-      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
     });
 
     it("handles missing roomCode in game:respond_rematch gracefully", async () => {
@@ -527,7 +527,7 @@ describe("Game Socket Handlers", () => {
       });
 
       expect(ackResponse.success).toBe(false);
-      expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
     });
 
     it("rejects malformed move payload with ERR_INVALID_PAYLOAD when coordinates are invalid", async () => {
@@ -606,6 +606,157 @@ describe("Game Socket Handlers", () => {
 
       expect(ackResponse.success).toBe(false);
       expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+    });
+  });
+
+  describe("Rate limiting across game operations (MAJ-006)", () => {
+    it("enforces rate limit and emits structured logger.warn on game:resign", async () => {
+      const limiter = new SocketRateLimiter({ maxRequests: 1, windowMs: 10_000 });
+      const testSocket = new TestSocket("sock_rate_resign");
+      testSocket.handshake.address = "192.168.10.10";
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        testSocket as unknown as Socket,
+        service,
+        logger,
+        limiter,
+      );
+
+      // Consume 1 permit
+      await testSocket.trigger("game:resign", { roomCode: "RSGN" }, () => {});
+
+      // 2nd should be blocked
+      let ack: any;
+      await testSocket.trigger("game:resign", { roomCode: "RSGN" }, (res) => {
+        ack = res;
+      });
+
+      expect(ack.success).toBe(false);
+      expect(ack.error.code).toBe("ERR_RATE_LIMITED");
+
+      const warnLog = logger.warnLogs.find(
+        (l) => l.message === "Rate limit exceeded for game:resign",
+      );
+      expect(warnLog).toBeDefined();
+      expect(warnLog?.context?.operation).toBe("game:resign");
+      expect(warnLog?.context?.clientIp).toBe("192.168.10.10");
+    });
+
+    it("enforces rate limit and emits structured logger.warn on game:offer_draw", async () => {
+      const limiter = new SocketRateLimiter({ maxRequests: 1, windowMs: 10_000 });
+      const testSocket = new TestSocket("sock_rate_draw");
+      testSocket.handshake.address = "192.168.10.11";
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        testSocket as unknown as Socket,
+        service,
+        logger,
+        limiter,
+      );
+
+      await testSocket.trigger("game:offer_draw", { roomCode: "DRAW" }, () => {});
+
+      let ack: any;
+      await testSocket.trigger("game:offer_draw", { roomCode: "DRAW" }, (res) => {
+        ack = res;
+      });
+
+      expect(ack.success).toBe(false);
+      expect(ack.error.code).toBe("ERR_RATE_LIMITED");
+
+      const warnLog = logger.warnLogs.find(
+        (l) => l.message === "Rate limit exceeded for game:offer_draw",
+      );
+      expect(warnLog).toBeDefined();
+    });
+
+    it("enforces rate limit and emits structured logger.warn on game:respond_draw", async () => {
+      const limiter = new SocketRateLimiter({ maxRequests: 1, windowMs: 10_000 });
+      const testSocket = new TestSocket("sock_rate_resp_draw");
+      testSocket.handshake.address = "192.168.10.12";
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        testSocket as unknown as Socket,
+        service,
+        logger,
+        limiter,
+      );
+
+      await testSocket.trigger("game:respond_draw", { roomCode: "DRAW", accept: true }, () => {});
+
+      let ack: any;
+      await testSocket.trigger("game:respond_draw", { roomCode: "DRAW", accept: true }, (res) => {
+        ack = res;
+      });
+
+      expect(ack.success).toBe(false);
+      expect(ack.error.code).toBe("ERR_RATE_LIMITED");
+
+      const warnLog = logger.warnLogs.find(
+        (l) => l.message === "Rate limit exceeded for game:respond_draw",
+      );
+      expect(warnLog).toBeDefined();
+    });
+
+    it("enforces rate limit and emits structured logger.warn on game:request_rematch", async () => {
+      const limiter = new SocketRateLimiter({ maxRequests: 1, windowMs: 10_000 });
+      const testSocket = new TestSocket("sock_rate_rematch");
+      testSocket.handshake.address = "192.168.10.13";
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        testSocket as unknown as Socket,
+        service,
+        logger,
+        limiter,
+      );
+
+      await testSocket.trigger("game:request_rematch", { roomCode: "MTCH" }, () => {});
+
+      let ack: any;
+      await testSocket.trigger("game:request_rematch", { roomCode: "MTCH" }, (res) => {
+        ack = res;
+      });
+
+      expect(ack.success).toBe(false);
+      expect(ack.error.code).toBe("ERR_RATE_LIMITED");
+
+      const warnLog = logger.warnLogs.find(
+        (l) => l.message === "Rate limit exceeded for game:request_rematch",
+      );
+      expect(warnLog).toBeDefined();
+    });
+
+    it("enforces rate limit and emits structured logger.warn on game:respond_rematch", async () => {
+      const limiter = new SocketRateLimiter({ maxRequests: 1, windowMs: 10_000 });
+      const testSocket = new TestSocket("sock_rate_resp_rematch");
+      testSocket.handshake.address = "192.168.10.14";
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        testSocket as unknown as Socket,
+        service,
+        logger,
+        limiter,
+      );
+
+      await testSocket.trigger("game:respond_rematch", { roomCode: "MTCH", accept: true }, () => {});
+
+      let ack: any;
+      await testSocket.trigger("game:respond_rematch", { roomCode: "MTCH", accept: true }, (res) => {
+        ack = res;
+      });
+
+      expect(ack.success).toBe(false);
+      expect(ack.error.code).toBe("ERR_RATE_LIMITED");
+
+      const warnLog = logger.warnLogs.find(
+        (l) => l.message === "Rate limit exceeded for game:respond_rematch",
+      );
+      expect(warnLog).toBeDefined();
     });
   });
 });

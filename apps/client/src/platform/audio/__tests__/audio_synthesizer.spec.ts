@@ -169,10 +169,43 @@ describe('AudioSynthesizer', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('closes AudioContext and removes event listeners when disposed (MIN-005)', async () => {
+    const mockClose = vi.fn().mockResolvedValue(undefined);
+    const mockAudioContext = {
+      currentTime: 0,
+      state: 'running',
+      destination: {},
+      createGain: vi.fn(() => ({
+        gain: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      })),
+      close: mockClose,
+    };
+
+    vi.stubGlobal('AudioContext', vi.fn(() => mockAudioContext));
+
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+
+    const audioSynth = new AudioSynthesizer();
+    audioSynth.bootstrap();
+    audioSynth.initContext();
+
+    await audioSynth.dispose();
+
+    expect(mockClose).toHaveBeenCalled();
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+
+    // Calling dispose again should be safe and idempotent
+    await expect(audioSynth.dispose()).resolves.toBeUndefined();
+
+    removeEventListenerSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('NullAudioService', () => {
-  it('conforms to IAudioService as a no-op test double', () => {
+  it('conforms to IAudioService as a no-op test double', async () => {
     const nullAudio: IAudioService = new NullAudioService();
     expect(nullAudio.isMuted()).toBe(true);
     expect(nullAudio.toggleMute()).toBe(false);
@@ -184,5 +217,7 @@ describe('NullAudioService', () => {
       nullAudio.playVictory();
       nullAudio.playDefeat();
     }).not.toThrow();
+
+    await expect(nullAudio.dispose?.()).resolves.toBeUndefined();
   });
 });

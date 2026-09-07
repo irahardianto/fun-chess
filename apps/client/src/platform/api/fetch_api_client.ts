@@ -5,6 +5,7 @@ import {
   type LanInfoResponse,
   type HealthCheckResponse,
 } from '@fun-chess/shared';
+import { generateCorrelationId } from '../telemetry';
 
 export class FetchApiClient implements IApiClient {
   constructor(private readonly baseUrl: string = '') {}
@@ -18,11 +19,14 @@ export class FetchApiClient implements IApiClient {
       controller.abort(new Error(`Request timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
+    let onAbort: (() => void) | undefined;
+
     if (callerSignal) {
       if (callerSignal.aborted) {
         controller.abort(callerSignal.reason);
       } else {
-        callerSignal.addEventListener('abort', () => controller.abort(callerSignal.reason), {
+        onAbort = () => controller.abort(callerSignal.reason);
+        callerSignal.addEventListener('abort', onAbort, {
           once: true,
         });
       }
@@ -30,20 +34,67 @@ export class FetchApiClient implements IApiClient {
 
     return {
       signal: controller.signal,
-      cleanup: () => clearTimeout(timeoutId),
+      cleanup: () => {
+        clearTimeout(timeoutId);
+        if (callerSignal && onAbort) {
+          callerSignal.removeEventListener('abort', onAbort);
+        }
+      },
     };
+  }
+
+  private async parseResponseBody<T>(response: Response): Promise<T> {
+    if (!response) {
+      return null as T;
+    }
+    if (response.status === 204) {
+      return null as T;
+    }
+
+    const contentType = response.headers?.get?.('content-type') ?? '';
+    const hasContentType = Boolean(contentType);
+    const isJson = contentType.includes('json');
+
+    if (hasContentType && !isJson) {
+      const text = typeof response.text === 'function' ? await response.text() : null;
+      return (text ? (text as unknown as T) : (null as T));
+    }
+
+    if (typeof response.json === 'function') {
+      try {
+        return await response.json();
+      } catch {
+        if (typeof response.text === 'function') {
+          const text = await response.text();
+          return (text ? (text as unknown as T) : (null as T));
+        }
+        return null as T;
+      }
+    }
+
+    if (typeof response.text === 'function') {
+      const text = await response.text();
+      return (text ? (text as unknown as T) : (null as T));
+    }
+
+    return null as T;
   }
 
   async get<T>(url: string, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
     const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 3000, options.signal);
+    const correlationId = options.correlationId ?? generateCorrelationId();
     try {
       const response = await fetch(`${this.baseUrl}${url}`, {
         method: 'GET',
-        headers: { Accept: 'application/json', ...options.headers },
+        headers: {
+          Accept: 'application/json',
+          'X-Correlation-ID': correlationId,
+          ...options.headers,
+        },
         signal,
       });
-      const data = response.status === 204 ? (null as T) : await response.json();
-      return { data, status: response.status, ok: response.ok };
+      const data = await this.parseResponseBody<T>(response);
+      return { data, status: response?.status ?? 0, ok: response?.ok ?? false };
     } finally {
       cleanup();
     }
@@ -51,15 +102,21 @@ export class FetchApiClient implements IApiClient {
 
   async post<T>(url: string, body?: unknown, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
     const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 3000, options.signal);
+    const correlationId = options.correlationId ?? generateCorrelationId();
     try {
       const response = await fetch(`${this.baseUrl}${url}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...options.headers },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Correlation-ID': correlationId,
+          ...options.headers,
+        },
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal,
       });
-      const data = response.status === 204 ? (null as T) : await response.json();
-      return { data, status: response.status, ok: response.ok };
+      const data = await this.parseResponseBody<T>(response);
+      return { data, status: response?.status ?? 0, ok: response?.ok ?? false };
     } finally {
       cleanup();
     }
@@ -82,10 +139,15 @@ export class FetchApiClient implements IApiClient {
     options: ApiRequestOptions = {}
   ): Promise<boolean> {
     const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 2000, options.signal);
+    const correlationId = options.correlationId ?? generateCorrelationId();
     try {
       const res = await fetch(`${probeUrl}?_t=${Date.now()}`, {
         method: 'HEAD',
         cache: 'no-store',
+        headers: {
+          'X-Correlation-ID': correlationId,
+          ...options.headers,
+        },
         signal,
       });
       return res.ok;

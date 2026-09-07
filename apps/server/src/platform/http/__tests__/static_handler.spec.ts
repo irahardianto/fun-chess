@@ -392,4 +392,136 @@ describe("serveStaticFile", () => {
       await fs.rm(emptyDir, { recursive: true, force: true });
     });
   });
+
+  describe("IFileStorage & Non-ENOENT Error Handling (MAJ-014, MAJ-016)", () => {
+    it("serves files and handles 404s using injected MemoryFileStorage without disk I/O", async () => {
+      const { MemoryFileStorage } = await import("../file_storage.js");
+      const memoryStorage = new MemoryFileStorage({
+        "/virtual/dist/index.html": "<!DOCTYPE html><html>Memory Dist</html>",
+        "/virtual/dist/app.js": "console.log('memory');",
+      });
+
+      let statusCode: number | undefined;
+      let headers: any;
+      let body = "";
+
+      const mockReq = {
+        method: "GET",
+        url: "/app.js",
+        headers: {},
+      } as IncomingMessage;
+
+      const mockRes = {
+        writeHead: (status: number, hdrs: any) => {
+          statusCode = status;
+          headers = hdrs;
+          return mockRes;
+        },
+        end: (data?: any) => {
+          if (data) body += data.toString();
+          return mockRes;
+        },
+      } as unknown as ServerResponse;
+
+      const handled = await serveStaticFile(mockReq, mockRes, {
+        distPath: "/virtual/dist",
+        fileStorage: memoryStorage,
+      });
+
+      expect(handled).toBe(true);
+      expect(statusCode).toBe(200);
+      expect(headers["Content-Type"]).toBe("application/javascript; charset=utf-8");
+      expect(body).toBe("console.log('memory');");
+    });
+
+    it("returns 500 on non-ENOENT stat errors like EACCES (MAJ-014)", async () => {
+      const { MemoryFileStorage } = await import("../file_storage.js");
+      const memoryStorage = new MemoryFileStorage({
+        "/virtual/dist/secret.txt": "sensitive",
+      });
+
+      memoryStorage.setErrorSimulator((_path, op) => {
+        if (op === "stat") {
+          const err = new Error("Permission denied") as any;
+          err.code = "EACCES";
+          return err;
+        }
+        return undefined;
+      });
+
+      let statusCode: number | undefined;
+      let body = "";
+
+      const mockReq = {
+        method: "GET",
+        url: "/secret.txt",
+        headers: {},
+      } as IncomingMessage;
+
+      const mockRes = {
+        writeHead: (status: number) => {
+          statusCode = status;
+          return mockRes;
+        },
+        end: (data?: any) => {
+          if (data) body += data.toString();
+          return mockRes;
+        },
+      } as unknown as ServerResponse;
+
+      const handled = await serveStaticFile(mockReq, mockRes, {
+        distPath: "/virtual/dist",
+        fileStorage: memoryStorage,
+      });
+
+      expect(handled).toBe(true);
+      expect(statusCode).toBe(500);
+      expect(body).toBe("Internal Server Error");
+    });
+
+    it("returns 500 on non-ENOENT readFile errors like EMFILE (MAJ-014)", async () => {
+      const { MemoryFileStorage } = await import("../file_storage.js");
+      const memoryStorage = new MemoryFileStorage({
+        "/virtual/dist/file.txt": "content",
+      });
+
+      memoryStorage.setErrorSimulator((_path, op) => {
+        if (op === "readFile") {
+          const err = new Error("Too many open files") as any;
+          err.code = "EMFILE";
+          return err;
+        }
+        return undefined;
+      });
+
+      let statusCode: number | undefined;
+      let body = "";
+
+      const mockReq = {
+        method: "GET",
+        url: "/file.txt",
+        headers: {},
+      } as IncomingMessage;
+
+      const mockRes = {
+        writeHead: (status: number) => {
+          statusCode = status;
+          return mockRes;
+        },
+        end: (data?: any) => {
+          if (data) body += data.toString();
+          return mockRes;
+        },
+      } as unknown as ServerResponse;
+
+      const handled = await serveStaticFile(mockReq, mockRes, {
+        distPath: "/virtual/dist",
+        fileStorage: memoryStorage,
+      });
+
+      expect(handled).toBe(true);
+      expect(statusCode).toBe(500);
+      expect(body).toBe("Internal Server Error");
+    });
+  });
 });

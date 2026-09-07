@@ -1,4 +1,5 @@
 import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
+import { safeLocalStorage } from '@/platform/storage';
 
 export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -21,11 +22,8 @@ let initialized = false;
 function checkSnoozeStatus(): boolean {
   // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   snoozeTrigger.value; // reactive dependency
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-    return false;
-  }
   try {
-    const snoozedUntil = localStorage.getItem(SNOOZE_STORAGE_KEY);
+    const snoozedUntil = safeLocalStorage.getItem(SNOOZE_STORAGE_KEY);
     if (!snoozedUntil) return false;
     const until = Number(snoozedUntil);
     return !isNaN(until) && until > Date.now();
@@ -161,9 +159,7 @@ export function usePwaInstall() {
       typeof days === 'number' && !isNaN(days) && days > 0 ? days : DEFAULT_SNOOZE_DAYS;
     const until = Date.now() + validDays * 24 * 60 * 60 * 1000;
     try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(SNOOZE_STORAGE_KEY, until.toString());
-      }
+      safeLocalStorage.setItem(SNOOZE_STORAGE_KEY, until.toString());
     } catch (err) {
       if (typeof console !== 'undefined') {
         console.warn('[FC_PWA] Failed to persist install snooze:', err);
@@ -191,9 +187,7 @@ export function usePwaInstall() {
 
   function resetSnooze(): void {
     try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(SNOOZE_STORAGE_KEY);
-      }
+      safeLocalStorage.removeItem(SNOOZE_STORAGE_KEY);
     } catch {}
     snoozeTrigger.value++;
   }

@@ -1,1 +1,1 @@
-export * from "../features/pwa/composables/usePwaInstall";
+export * from '@/features/pwa';

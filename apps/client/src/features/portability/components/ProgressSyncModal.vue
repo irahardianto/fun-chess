@@ -7,7 +7,7 @@ import QrScannerView from './QrScannerView.vue';
 import ProgressConflictModal from './ProgressConflictModal.vue';
 import { useProgressSync } from '../composables/useProgressSync';
 import { defaultProgressFileService } from '../services/progress_file.service';
-import { usePwaInstall } from '@/features/pwa/composables/usePwaInstall';
+import { usePwaInstall } from '@/features/pwa';
 
 const modelValue = defineModel<boolean>({ default: false });
 

@@ -4,6 +4,7 @@ import { performance } from "node:perf_hooks";
 import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
 import { serveStaticFile } from "./static_handler.js";
+import { IFileStorage } from "./file_storage.js";
 import { RoomStore } from "../../features/rooms/room.store.js";
 import { LanService } from "../../features/lan/lan.service.js";
 import {
@@ -11,7 +12,7 @@ import {
   IRelayAddressService,
 } from "../../features/lan/relay_address.service.js";
 import { HealthCheckResponse } from "@fun-chess/shared";
-import { isOriginAllowed, resolveAllowedOrigins } from "../config/index.js";
+import { isOriginAllowed, resolveAllowedOrigins, type ServerEnv } from "../config/index.js";
 
 export interface HttpServerConfig {
   roomStore: RoomStore;
@@ -21,14 +22,17 @@ export interface HttpServerConfig {
   port?: number;
   distPath?: string;
   allowedOrigins?: string[];
+  env?: ServerEnv;
+  fileStorage?: IFileStorage;
   getActiveSocketCount?: () => number;
 }
 
 const START_TIME = Date.now();
 
+// CSP updated to allow Google Fonts (MAJ-001) and Web Workers from blobs (CONF-002)
 const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss:; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
@@ -36,29 +40,52 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=()",
 };
 
+// --- Extracted HTTP Helpers (MAJ-038) ---
+
+function applySecurityHeaders(res: ServerResponse, correlationId: string): void {
+  for (const [headerKey, headerVal] of Object.entries(SECURITY_HEADERS)) {
+    res.setHeader(headerKey, headerVal);
+  }
+  res.setHeader("X-Correlation-ID", correlationId);
+}
+
 /**
- * Creates the HTTP request listener for Fun Chess API endpoints and static SPA hosting.
+ * Applies CORS headers to incoming requests.
+ * Only emits Access-Control-Allow-Origin when Origin header is present and validated (MAJ-005).
  */
-export function createHttpServer(config: HttpServerConfig): RequestListener {
-  const {
-    roomStore,
-    lanService,
-    relayAddressService = new RelayAddressService(),
-    logger,
-    port = Number(process.env.PORT) || 3000,
-    distPath = path.resolve(process.cwd(), "../client/dist"),
-    allowedOrigins: configuredAllowedOrigins,
-    getActiveSocketCount = () => 0,
-  } = config;
+function applyCorsHeaders(
+  req: IncomingMessage,
+  res: ServerResponse,
+  allowedOrigins: string[],
+): { origin: string | undefined; isOriginPermitted: boolean } {
+  const origin = req.headers["origin"] as string | undefined;
+  let isOriginPermitted = false;
 
-  // If a custom lanService was provided but not relayAddressService, adapt it
-  const addressService: IRelayAddressService =
-    config.relayAddressService ??
-    (lanService
-      ? (lanService as unknown as IRelayAddressService)
-      : relayAddressService);
+  if (origin) {
+    isOriginPermitted = isOriginAllowed(origin, allowedOrigins);
+    if (isOriginPermitted) {
+      if (allowedOrigins.includes("*")) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      } else {
+        // nosemgrep: javascript.express.security.cors-misconfiguration.cors-misconfiguration
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+      }
+    }
+  }
 
-  const fallbackHtml = `<!DOCTYPE html>
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Correlation-ID",
+  );
+
+  return { origin, isOriginPermitted };
+}
+
+function createFallbackHtml(port: number): string {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -82,6 +109,83 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
   </div>
 </body>
 </html>`;
+}
+
+async function handleHealthRequest(
+  roomStore: RoomStore,
+  addressService: IRelayAddressService,
+  port: number,
+  getActiveSocketCount: () => number,
+): Promise<HealthCheckResponse> {
+  const mem = process.memoryUsage();
+  const activeRooms = await roomStore.count();
+  const activeSockets = getActiveSocketCount();
+  const isCloud = addressService.isCloudRelay
+    ? addressService.isCloudRelay()
+    : false;
+  const addrInfo = addressService.getAddressingInfo(port);
+
+  return {
+    status: "ok",
+    uptimeSeconds: Math.round((Date.now() - START_TIME) / 100) / 10,
+    timestamp: new Date().toISOString(),
+    activeRooms,
+    activeSockets,
+    memoryUsageMb: {
+      rss: Math.round((mem.rss / 1024 / 1024) * 10) / 10,
+      heapTotal: Math.round((mem.heapTotal / 1024 / 1024) * 10) / 10,
+      heapUsed: Math.round((mem.heapUsed / 1024 / 1024) * 10) / 10,
+    },
+    relay: {
+      mode: isCloud ? "cloud" : "lan",
+      ...(addrInfo.publicUrl ? { publicUrl: addrInfo.publicUrl } : {}),
+    },
+  };
+}
+
+/**
+ * Creates the HTTP request listener for Fun Chess API endpoints and static SPA hosting.
+ * Validates configuration via caller injection without direct process.env reads (MAJ-004).
+ * Enforces valid matching CORS headers (MAJ-005) and Google Fonts CSP (MAJ-001).
+ * Logs static asset deliveries at INFO level (MAJ-024).
+ * Decomposed into modular helper handlers (MAJ-038).
+ */
+export function createHttpServer(config: HttpServerConfig): RequestListener {
+  const {
+    roomStore,
+    lanService,
+    relayAddressService = new RelayAddressService(
+      config.env
+        ? {
+            publicUrl: config.env.PUBLIC_URL,
+            host: config.env.HOST,
+            port: config.env.PORT,
+            lanIp: config.env.LAN_IP,
+          }
+        : undefined,
+    ),
+    logger,
+    port = config.env?.PORT ?? 3000,
+    distPath = path.resolve(process.cwd(), "../client/dist"),
+    fileStorage,
+    env = config.env,
+    allowedOrigins: configuredAllowedOrigins,
+    getActiveSocketCount = () => 0,
+  } = config;
+
+  const effectiveAllowedOrigins =
+    configuredAllowedOrigins ??
+    (config.env
+      ? resolveAllowedOrigins(config.env)
+      : resolveAllowedOrigins({}));
+
+  const addressService: IRelayAddressService =
+    config.relayAddressService ??
+    (lanService
+      ? (lanService as unknown as IRelayAddressService)
+      : relayAddressService);
+
+  const fallbackHtml = createFallbackHtml(port);
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const correlationId =
@@ -91,49 +195,17 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     const url = req.url || "/";
     const [pathname] = url.split("?");
 
-    // Security Headers (SEC-02, ENH-004)
-    for (const [headerKey, headerVal] of Object.entries(SECURITY_HEADERS)) {
-      res.setHeader(headerKey, headerVal);
-    }
-    res.setHeader("X-Correlation-ID", correlationId);
+    // 1. Security Headers (SEC-02, MAJ-001)
+    applySecurityHeaders(res, correlationId);
 
-    // Dynamic origin resolution if not passed statically in config
-    const effectiveAllowedOrigins =
-      configuredAllowedOrigins ?? resolveAllowedOrigins();
-    const origin = req.headers["origin"] as string | undefined;
-
-    let isOriginPermitted = false;
-    if (origin) {
-      isOriginPermitted = isOriginAllowed(origin, effectiveAllowedOrigins);
-      if (isOriginPermitted) {
-        if (effectiveAllowedOrigins.includes("*")) {
-          res.setHeader("Access-Control-Allow-Origin", "*");
-        } else {
-          res.setHeader("Access-Control-Allow-Origin", origin); // nosemgrep: javascript.express.security.cors-misconfiguration.cors-misconfiguration
-          res.setHeader("Vary", "Origin");
-          res.setHeader("Access-Control-Allow-Credentials", "true");
-        }
-      }
-    } else {
-      // Direct / server-to-server / curl request without Origin header
-      if (effectiveAllowedOrigins.includes("*")) {
-        res.setHeader("Access-Control-Allow-Origin", "*");
-      } else if (process.env.CORS_ORIGIN) {
-        res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN);
-      } else if (effectiveAllowedOrigins.length === 1) {
-        res.setHeader("Access-Control-Allow-Origin", effectiveAllowedOrigins[0]);
-      } else if (process.env.NODE_ENV !== "production") {
-        res.setHeader("Access-Control-Allow-Origin", "*");
-      }
-    }
-
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Correlation-ID",
+    // 2. CORS Handling (MAJ-005)
+    const { origin, isOriginPermitted } = applyCorsHeaders(
+      req,
+      res,
+      effectiveAllowedOrigins,
     );
 
-    // Handle preflight OPTIONS
+    // 3. Preflight OPTIONS
     if (method === "OPTIONS") {
       if (origin && !isOriginPermitted && !effectiveAllowedOrigins.includes("*")) {
         res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
@@ -201,64 +273,49 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     };
 
     try {
-      // 1. GET / HEAD /healthz - Container Liveness & Readiness Probe
+      // 4. GET / HEAD /healthz - Container Liveness & Readiness Probe
       if ((method === "GET" || method === "HEAD") && pathname === "/healthz") {
         sendTextResponse(200, "OK");
         return;
       }
 
-      // 2. GET / HEAD /health & GET / HEAD /api/health - Operational Telemetry Health Check
+      // 5. GET / HEAD /health & /api/health - Operational Telemetry Health Check
+      const requestPort = port || req.socket?.localPort || 3000;
+
       if (
         (method === "GET" || method === "HEAD") &&
         (pathname === "/health" || pathname === "/api/health")
       ) {
-        const mem = process.memoryUsage();
-        const activeRooms = await roomStore.count();
-        const activeSockets = getActiveSocketCount();
-        const isCloud = addressService.isCloudRelay
-          ? addressService.isCloudRelay()
-          : false;
-        const addrInfo = addressService.getAddressingInfo(port);
-
-        const health: HealthCheckResponse = {
-          status: "ok",
-          uptimeSeconds: Math.round((Date.now() - START_TIME) / 100) / 10,
-          timestamp: new Date().toISOString(),
-          activeRooms,
-          activeSockets,
-          memoryUsageMb: {
-            rss: Math.round((mem.rss / 1024 / 1024) * 10) / 10,
-            heapTotal: Math.round((mem.heapTotal / 1024 / 1024) * 10) / 10,
-            heapUsed: Math.round((mem.heapUsed / 1024 / 1024) * 10) / 10,
-          },
-          relay: {
-            mode: isCloud ? "cloud" : "lan",
-            ...(addrInfo.publicUrl ? { publicUrl: addrInfo.publicUrl } : {}),
-          },
-        };
+        const health = await handleHealthRequest(
+          roomStore,
+          addressService,
+          requestPort,
+          getActiveSocketCount,
+        );
         sendJsonResponse(200, health);
         return;
       }
 
-      // 3. GET / HEAD /api/lan-info - Host Addressing & QR Discovery
+      // 6. GET / HEAD /api/lan-info - Host Addressing & QR Discovery
       if ((method === "GET" || method === "HEAD") && pathname === "/api/lan-info") {
-        const lanInfo = addressService.getAddressingInfo(port);
+        const lanInfo = addressService.getAddressingInfo(requestPort);
         sendJsonResponse(200, lanInfo);
         return;
       }
 
-      // 4. Static Assets / SPA Fallback (non-API routes)
+      // 7. Static Assets / SPA Fallback (non-API routes)
       if ((method === "GET" || method === "HEAD") && !pathname.startsWith("/api/")) {
         const served = await serveStaticFile(
           req,
           res,
-          { distPath, fallbackHtml },
+          { distPath, fallbackHtml, fileStorage, trustProxy: env?.TRUST_PROXY },
           logger,
         );
 
         if (served) {
           const duration = Math.round(performance.now() - startTime);
-          logger.debug(`HTTP Static served: ${pathname}`, {
+          // Log static file serving at INFO level (MAJ-024)
+          logger.info(`HTTP Static served: ${pathname}`, {
             operation: "http_static",
             correlationId,
             path: pathname,
@@ -269,7 +326,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         }
       }
 
-      // 5. Unhandled 404
+      // 8. Unhandled 404
       sendJsonResponse(404, {
         error: {
           code: "ERR_NOT_FOUND",

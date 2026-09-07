@@ -4,6 +4,8 @@ import type {
   PuzzleDifficultyTier,
   PuzzlePackMetadata,
 } from "@fun-chess/shared";
+import { parseUciMove, formatPlayerMoveToUci } from "@fun-chess/shared";
+export { parseUciMove, formatPlayerMoveToUci };
 
 // Import raw JSON puzzle packs
 import forksJson from "./forks.json";
@@ -83,17 +85,10 @@ export const THEME_ALIASES: Readonly<
   rook_endgame: ["endgame_conversion", "queen_endgame"],
   endgame_conversion: ["pawn_endgame", "rook_endgame", "promotion"],
 
-  // Tactical motif cross-mappings & fallbacks
+  // Tactical motif cross-mappings
   decoy: ["deflection"],
   deflection: ["decoy"],
   discovered_attack: ["discovered_check", "windmill"],
-  hanging_piece: ["fork", "pin", "skewer"],
-  trapped_piece: ["smothered", "smothered_mate", "skewer", "pin"],
-  clearance: ["greek_gift", "deflection", "anastasia_hook"],
-  battery: ["back_rank_mate", "windmill", "greek_gift"],
-  scholars_mate: ["mate_in_1", "back_rank_mate", "greek_gift"],
-  fried_liver: ["fork", "greek_gift"],
-  legals_trap: ["deflection", "greek_gift", "smothered_mate"],
 };
 
 /**
@@ -126,146 +121,391 @@ const ROOK_ENDGAME_PUZZLE_IDS: ReadonlySet<string> = new Set([
   "puz_eg_025", "puz_eg_026", "puz_eg_027", "puz_eg_028", "puz_eg_029", "puz_eg_030",
 ]);
 
+interface PuzzleRuleContext {
+  puzzle: Puzzle;
+  id: string;
+  title: string;
+  primaryThemeStr: string;
+  currentThemes: Set<PuzzleTheme>;
+}
+
+interface PuzzleThemeMappingRule {
+  name: string;
+  matches: (ctx: PuzzleRuleContext) => boolean;
+  apply: (ctx: PuzzleRuleContext, themes: Set<PuzzleTheme>) => void;
+}
+
+/**
+ * Declarative theme mapping rules table (MAJ-037).
+ * Replaces high-complexity if-cascade with predictable, testable pattern definitions.
+ */
+const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
+  // 1. Back rank mate mapping (back_rank <-> back_rank_mate)
+  {
+    name: 'back_rank_mate',
+    matches: (ctx) =>
+      ctx.primaryThemeStr === 'back_rank' ||
+      ctx.primaryThemeStr === 'back_rank_mate' ||
+      ctx.currentThemes.has('back_rank' as PuzzleTheme) ||
+      ctx.currentThemes.has('back_rank_mate') ||
+      ctx.id.startsWith('puz_br') ||
+      ctx.id.startsWith('puz_back_rank'),
+    apply: (_ctx, themes) => {
+      themes.add('back_rank_mate');
+    },
+  },
+
+  // 2. Smothered mate mapping (smothered <-> smothered_mate)
+  {
+    name: 'smothered_mate',
+    matches: (ctx) =>
+      ctx.primaryThemeStr === 'smothered' ||
+      ctx.primaryThemeStr === 'smothered_mate' ||
+      ctx.currentThemes.has('smothered') ||
+      ctx.currentThemes.has('smothered_mate') ||
+      ctx.id.startsWith('puz_sm'),
+    apply: (_ctx, themes) => {
+      themes.add('smothered');
+      themes.add('smothered_mate');
+    },
+  },
+
+  // 3. Anastasia & Hook mate mapping (anastasia_mate, hook_mate <-> anastasia_hook)
+  {
+    name: 'anastasia_hook',
+    matches: (ctx) =>
+      ctx.primaryThemeStr === 'anastasia_hook' ||
+      ctx.primaryThemeStr === 'anastasia_mate' ||
+      ctx.primaryThemeStr === 'hook_mate' ||
+      ctx.currentThemes.has('anastasia_hook') ||
+      ctx.currentThemes.has('anastasia_mate') ||
+      ctx.currentThemes.has('hook_mate') ||
+      ctx.id.startsWith('puz_ah') ||
+      ctx.id.startsWith('puz_anastasia'),
+    apply: (ctx, themes) => {
+      themes.add('anastasia_hook');
+      if (
+        ctx.title.includes('anastasia') ||
+        ctx.currentThemes.has('anastasia_mate') ||
+        ANASTASIA_MATE_PUZZLE_IDS.has(ctx.id)
+      ) {
+        themes.add('anastasia_mate');
+      }
+      if (
+        ctx.title.includes('hook') ||
+        ctx.currentThemes.has('hook_mate') ||
+        HOOK_MATE_PUZZLE_IDS.has(ctx.id)
+      ) {
+        themes.add('hook_mate');
+      }
+    },
+  },
+
+  // 4. Endgame conversion mapping (pawn_endgame, rook_endgame <-> endgame_conversion)
+  {
+    name: 'endgame_conversion',
+    matches: (ctx) =>
+      ctx.primaryThemeStr === 'endgame_conversion' ||
+      ctx.primaryThemeStr === 'pawn_endgame' ||
+      ctx.primaryThemeStr === 'rook_endgame' ||
+      ctx.primaryThemeStr === 'lucena_position' ||
+      ctx.primaryThemeStr === 'pawn_breakthrough' ||
+      ctx.primaryThemeStr === 'king_opposition' ||
+      ctx.currentThemes.has('endgame_conversion') ||
+      ctx.currentThemes.has('pawn_endgame') ||
+      ctx.currentThemes.has('rook_endgame') ||
+      ctx.id.startsWith('puz_eg') ||
+      ctx.id.startsWith('puz_endgame'),
+    apply: (ctx, themes) => {
+      themes.add('endgame_conversion');
+      if (
+        ctx.title.includes('pawn') ||
+        ctx.primaryThemeStr === 'pawn_endgame' ||
+        ctx.primaryThemeStr === 'pawn_breakthrough' ||
+        ctx.primaryThemeStr === 'king_opposition' ||
+        PAWN_ENDGAME_PUZZLE_IDS.has(ctx.id)
+      ) {
+        themes.add('pawn_endgame');
+        themes.add('promotion');
+      }
+      if (
+        ctx.title.includes('queen') ||
+        ctx.title.includes('rook') ||
+        ctx.title.includes('endgame') ||
+        ctx.primaryThemeStr === 'rook_endgame' ||
+        ctx.primaryThemeStr === 'lucena_position' ||
+        ROOK_ENDGAME_PUZZLE_IDS.has(ctx.id)
+      ) {
+        themes.add('rook_endgame');
+        themes.add('queen_endgame');
+      }
+    },
+  },
+
+  // 5. Deflection & Decoy mapping
+  {
+    name: 'deflection_decoy',
+    matches: (ctx) =>
+      ctx.primaryThemeStr === 'deflection' ||
+      ctx.primaryThemeStr === 'decoy' ||
+      ctx.primaryThemeStr === 'deflection_decoy' ||
+      ctx.currentThemes.has('deflection') ||
+      ctx.currentThemes.has('decoy') ||
+      ctx.currentThemes.has('deflection_decoy' as PuzzleTheme) ||
+      ctx.id.startsWith('puz_defl') ||
+      ctx.id.startsWith('puz_deflection'),
+    apply: (_ctx, themes) => {
+      themes.add('deflection');
+      themes.add('decoy');
+    },
+  },
+
+  // 6. Discovered Check & Discovered Attack mapping
+  {
+    name: 'discovered_check_attack',
+    matches: (ctx) =>
+      ctx.primaryThemeStr === 'discovered_check' ||
+      ctx.primaryThemeStr === 'discovered_attack' ||
+      ctx.currentThemes.has('discovered_check') ||
+      ctx.currentThemes.has('discovered_attack') ||
+      ctx.id.startsWith('puz_disc') ||
+      ctx.id.startsWith('puz_discovered'),
+    apply: (_ctx, themes) => {
+      themes.add('discovered_check');
+      themes.add('discovered_attack');
+    },
+  },
+
+  // 7. Mate depth tagging
+  {
+    name: 'mate_depth',
+    matches: (ctx) => ctx.puzzle.tacticalReward === 'checkmate',
+    apply: (ctx, themes) => {
+      const plies = ctx.puzzle.solutionPlies ?? ctx.puzzle.moves.length;
+      if (plies === 1 || ctx.puzzle.moves.length === 1) {
+        themes.add('mate_in_1');
+      } else if (plies === 3 || ctx.puzzle.moves.length === 3) {
+        themes.add('mate_in_2');
+      } else if (plies === 5 || ctx.puzzle.moves.length === 5) {
+        themes.add('mate_in_3');
+      }
+    },
+  },
+
+  // 8. Hanging piece mapping
+  {
+    name: 'hanging_piece',
+    matches: (ctx) => {
+      const p = ctx.puzzle;
+      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      return (
+        ctx.primaryThemeStr === 'hanging_piece' ||
+        ctx.currentThemes.has('hanging_piece') ||
+        text.includes('undefended') ||
+        text.includes('hanging') ||
+        text.includes('unprotected') ||
+        text.includes('free piece') ||
+        text.includes('free pawn') ||
+        text.includes('snatch') ||
+        ctx.id === 'puz_fork_007' ||
+        ctx.id === 'puz_fork_009' ||
+        ctx.id === 'puz_fork_013' ||
+        ctx.id === 'puz_skewer_001' ||
+        ctx.id === 'puz_skewer_002' ||
+        ctx.id === 'puz_pin_014' ||
+        ctx.id === 'puz_pin_026' ||
+        ctx.id === 'puz_disc_008' ||
+        ctx.id === 'puz_disc_026'
+      );
+    },
+    apply: (_ctx, themes) => {
+      themes.add('hanging_piece');
+    },
+  },
+
+  // 9. Trapped piece mapping
+  {
+    name: 'trapped_piece',
+    matches: (ctx) => {
+      const p = ctx.puzzle;
+      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      return (
+        ctx.primaryThemeStr === 'trapped_piece' ||
+        ctx.currentThemes.has('trapped_piece') ||
+        text.includes('trapped') ||
+        text.includes('trap') ||
+        text.includes('boxes in') ||
+        text.includes('boxed in') ||
+        text.includes('no escape') ||
+        text.includes('cornered') ||
+        ctx.id === 'puz_skewer_027' ||
+        ctx.id === 'puz_skewer_028' ||
+        ctx.id === 'puz_skewer_029' ||
+        ctx.id === 'puz_skewer_030' ||
+        ctx.id.startsWith('puz_sm_')
+      );
+    },
+    apply: (_ctx, themes) => {
+      themes.add('trapped_piece');
+    },
+  },
+
+  // 10. Clearance mapping
+  {
+    name: 'clearance',
+    matches: (ctx) => {
+      const p = ctx.puzzle;
+      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      return (
+        ctx.primaryThemeStr === 'clearance' ||
+        ctx.currentThemes.has('clearance') ||
+        text.includes('clearance') ||
+        text.includes('clear the') ||
+        text.includes('clears the') ||
+        text.includes('clearing') ||
+        text.includes('vacate') ||
+        text.includes('open the file') ||
+        text.includes('open the h-file') ||
+        text.includes('opens the h-file') ||
+        ANASTASIA_MATE_PUZZLE_IDS.has(ctx.id) ||
+        (ctx.id.startsWith('puz_gg') && (text.includes('sacrifice') || text.includes('assault') || text.includes('open'))) ||
+        (ctx.id.startsWith('puz_br') && (p.solutionPlies ?? p.moves.length) >= 3)
+      );
+    },
+    apply: (_ctx, themes) => {
+      themes.add('clearance');
+    },
+  },
+
+  // 11. Battery mapping
+  {
+    name: 'battery',
+    matches: (ctx) => {
+      const p = ctx.puzzle;
+      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      return (
+        ctx.primaryThemeStr === 'battery' ||
+        ctx.currentThemes.has('battery') ||
+        text.includes('battery') ||
+        text.includes('batteries') ||
+        text.includes('doubled') ||
+        ctx.id.startsWith('puz_wm') ||
+        (ctx.id.startsWith('puz_br') && (text.includes('overpower') || text.includes('crush') || (p.solutionPlies ?? p.moves.length) >= 3)) ||
+        ctx.id === 'puz_sm_007' ||
+        ctx.id === 'puz_sm_018'
+      );
+    },
+    apply: (_ctx, themes) => {
+      themes.add('battery');
+    },
+  },
+
+  // 12. Scholar's mate mapping
+  {
+    name: 'scholars_mate',
+    matches: (ctx) => {
+      const p = ctx.puzzle;
+      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      const targetsF7orF2 = p.moves.some((m) => m.endsWith('f7') || m.endsWith('f2')) || text.includes('f7') || text.includes('f2');
+      const involvesQueenOrBishop = text.includes('queen') || text.includes('bishop') || text.includes('bxf7') || text.includes('qxf7');
+      return (
+        ctx.primaryThemeStr === 'scholars_mate' ||
+        ctx.currentThemes.has('scholars_mate') ||
+        text.includes('scholar') ||
+        (targetsF7orF2 && involvesQueenOrBishop && (
+          ctx.id.startsWith('puz_defl_001') ||
+          ctx.id.startsWith('puz_defl_011') ||
+          ctx.id.startsWith('puz_disc_001') ||
+          ctx.id.startsWith('puz_disc_011') ||
+          text.includes('bishop strike on f7') ||
+          text.includes('bishop decoy on f7') ||
+          text.includes('king deflection on f7') ||
+          (p.tacticalReward === 'checkmate' && targetsF7orF2)
+        ))
+      );
+    },
+    apply: (_ctx, themes) => {
+      themes.add('scholars_mate');
+    },
+  },
+
+  // 13. Fried Liver mapping
+  {
+    name: 'fried_liver',
+    matches: (ctx) => {
+      const p = ctx.puzzle;
+      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      const targetsF7orF2 = p.moves.some((m) => m.endsWith('f7') || m.endsWith('f2')) || text.includes('f7') || text.includes('f2');
+      const involvesKnight = text.includes('knight') || text.includes('nxf7') || text.includes('nc7');
+      return (
+        ctx.primaryThemeStr === 'fried_liver' ||
+        ctx.currentThemes.has('fried_liver') ||
+        text.includes('fried liver') ||
+        (targetsF7orF2 && involvesKnight && (
+          ctx.id === 'puz_fork_001' ||
+          ctx.id === 'puz_fork_002' ||
+          ctx.id === 'puz_fork_003' ||
+          ctx.id === 'puz_fork_017' ||
+          ctx.id === 'puz_fork_030' ||
+          (text.includes('f7') && text.includes('knight'))
+        ))
+      );
+    },
+    apply: (_ctx, themes) => {
+      themes.add('fried_liver');
+    },
+  },
+
+  // 14. Légal's Trap mapping
+  {
+    name: 'legals_trap',
+    matches: (ctx) => {
+      const p = ctx.puzzle;
+      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      return (
+        ctx.primaryThemeStr === 'legals_trap' ||
+        ctx.currentThemes.has('legals_trap') ||
+        text.includes('légal') ||
+        text.includes('legals') ||
+        text.includes("legal's") ||
+        (text.includes('nxe5') && text.includes('pinned')) ||
+        ctx.id === 'puz_disc_008' ||
+        ctx.id === 'puz_disc_026' ||
+        ctx.id === 'puz_pin_026' ||
+        (text.includes('bxf7+') && text.includes('winning the knight')) ||
+        ctx.id === 'puz_defl_001' ||
+        ctx.id === 'puz_defl_011' ||
+        ctx.id === 'puz_disc_001' ||
+        ctx.id === 'puz_disc_011'
+      );
+    },
+    apply: (_ctx, themes) => {
+      themes.add('legals_trap');
+    },
+  },
+];
+
 /**
  * Extracts and enriches tactical themes for a puzzle to ensure bidirectional mapping.
+ * Uses declarative rule definitions (MAJ-037).
  */
-function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
+export function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
   const themes = new Set<PuzzleTheme>(p.themes);
   if (p.primaryTheme) {
     themes.add(p.primaryTheme);
   }
 
-  const id = p.id;
-  const title = p.title.toLowerCase();
-  const primaryThemeStr = p.primaryTheme as string;
-  const themesRaw = themes as Set<string>;
+  const ctx: PuzzleRuleContext = {
+    puzzle: p,
+    id: p.id,
+    title: p.title.toLowerCase(),
+    primaryThemeStr: (p.primaryTheme as string) ?? '',
+    currentThemes: themes,
+  };
 
-  // Back rank mate mapping (back_rank <-> back_rank_mate)
-  if (
-    primaryThemeStr === "back_rank" ||
-    p.primaryTheme === "back_rank_mate" ||
-    themesRaw.has("back_rank") ||
-    themes.has("back_rank_mate") ||
-    id.startsWith("puz_br") ||
-    id.startsWith("puz_back_rank")
-  ) {
-    themes.add("back_rank_mate");
-  }
-
-  // Smothered mate mapping (smothered <-> smothered_mate)
-  if (
-    p.primaryTheme === "smothered" ||
-    p.primaryTheme === "smothered_mate" ||
-    themes.has("smothered") ||
-    themes.has("smothered_mate") ||
-    id.startsWith("puz_sm")
-  ) {
-    themes.add("smothered");
-    themes.add("smothered_mate");
-  }
-
-  // Anastasia & Hook mate mapping (anastasia_mate, hook_mate <-> anastasia_hook)
-  if (
-    p.primaryTheme === "anastasia_hook" ||
-    p.primaryTheme === "anastasia_mate" ||
-    p.primaryTheme === "hook_mate" ||
-    themes.has("anastasia_hook") ||
-    themes.has("anastasia_mate") ||
-    themes.has("hook_mate") ||
-    id.startsWith("puz_ah") ||
-    id.startsWith("puz_anastasia")
-  ) {
-    themes.add("anastasia_hook");
-    if (
-      title.includes("anastasia") ||
-      themes.has("anastasia_mate") ||
-      ANASTASIA_MATE_PUZZLE_IDS.has(id)
-    ) {
-      themes.add("anastasia_mate");
-    }
-    if (
-      title.includes("hook") ||
-      themes.has("hook_mate") ||
-      HOOK_MATE_PUZZLE_IDS.has(id)
-    ) {
-      themes.add("hook_mate");
-    }
-  }
-
-  // Endgame conversion mapping (pawn_endgame, rook_endgame <-> endgame_conversion)
-  if (
-    p.primaryTheme === "endgame_conversion" ||
-    p.primaryTheme === "pawn_endgame" ||
-    p.primaryTheme === "rook_endgame" ||
-    p.primaryTheme === "lucena_position" ||
-    primaryThemeStr === "pawn_breakthrough" ||
-    primaryThemeStr === "king_opposition" ||
-    themes.has("endgame_conversion") ||
-    themes.has("pawn_endgame") ||
-    themes.has("rook_endgame") ||
-    id.startsWith("puz_eg") ||
-    id.startsWith("puz_endgame")
-  ) {
-    themes.add("endgame_conversion");
-    if (
-      title.includes("pawn") ||
-      p.primaryTheme === "pawn_endgame" ||
-      primaryThemeStr === "pawn_breakthrough" ||
-      primaryThemeStr === "king_opposition" ||
-      PAWN_ENDGAME_PUZZLE_IDS.has(id)
-    ) {
-      themes.add("pawn_endgame");
-      themes.add("promotion");
-    }
-    if (
-      title.includes("queen") ||
-      title.includes("rook") ||
-      title.includes("endgame") ||
-      p.primaryTheme === "rook_endgame" ||
-      p.primaryTheme === "lucena_position" ||
-      ROOK_ENDGAME_PUZZLE_IDS.has(id)
-    ) {
-      themes.add("rook_endgame");
-      themes.add("queen_endgame");
-    }
-  }
-
-  // Deflection & Decoy mapping
-  if (
-    p.primaryTheme === "deflection" ||
-    p.primaryTheme === "decoy" ||
-    primaryThemeStr === "deflection_decoy" ||
-    themes.has("deflection") ||
-    themes.has("decoy") ||
-    themesRaw.has("deflection_decoy") ||
-    id.startsWith("puz_defl") ||
-    id.startsWith("puz_deflection")
-  ) {
-    themes.add("deflection");
-    themes.add("decoy");
-  }
-
-  // Discovered Check & Discovered Attack mapping
-  if (
-    p.primaryTheme === "discovered_check" ||
-    p.primaryTheme === "discovered_attack" ||
-    themes.has("discovered_check") ||
-    themes.has("discovered_attack") ||
-    id.startsWith("puz_disc") ||
-    id.startsWith("puz_discovered")
-  ) {
-    themes.add("discovered_check");
-    themes.add("discovered_attack");
-  }
-
-  // Mate depth tagging
-  if (p.tacticalReward === "checkmate") {
-    if (p.solutionPlies === 1 || p.moves.length === 1) {
-      themes.add("mate_in_1");
-    } else if (p.solutionPlies === 3 || p.moves.length === 3) {
-      themes.add("mate_in_2");
-    } else if (p.solutionPlies === 5 || p.moves.length === 5) {
-      themes.add("mate_in_3");
+  for (const rule of PUZZLE_THEME_RULES) {
+    if (rule.matches(ctx)) {
+      rule.apply(ctx, themes);
     }
   }
 
@@ -277,9 +517,30 @@ function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
  */
 const _puzzlesByTheme = new Map<PuzzleTheme, Puzzle[]>();
 
-// 1. Index enriched themes for all puzzles
+// 1. Index enriched themes and calibrate difficulty for all puzzles
 for (const p of ALL_PUZZLES) {
+  // Calibrate difficulty tag according to canonical rating band (SC-5 / MIN-014)
+  let calibratedDifficulty: PuzzleDifficultyTier;
+  if (p.rating < 900) {
+    calibratedDifficulty = 'novice';
+  } else if (p.rating < 1200) {
+    calibratedDifficulty = 'easy';
+  } else if (p.rating < 1500) {
+    calibratedDifficulty = 'medium';
+  } else if (p.rating < 1800) {
+    calibratedDifficulty = 'hard';
+  } else {
+    calibratedDifficulty = 'expert';
+  }
+  (p as { difficulty: PuzzleDifficultyTier }).difficulty = calibratedDifficulty;
+
   const enrichedThemes = extractPuzzleThemes(p);
+  const currentThemes = new Set(p.themes);
+  for (const t of enrichedThemes) {
+    currentThemes.add(t);
+  }
+  (p as { themes: readonly PuzzleTheme[] }).themes = Array.from(currentThemes);
+
   for (const theme of enrichedThemes) {
     const list = _puzzlesByTheme.get(theme) ?? [];
     list.push(p);
