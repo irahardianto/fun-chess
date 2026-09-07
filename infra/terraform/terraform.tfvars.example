@@ -25,3 +25,7 @@ memory_limit = "512Mi"
 # Optional: Public URL (e.g. custom domain or pre-allocated Cloud Run domain)
 # If left empty, join links will automatically adapt to the incoming host.
 public_url = ""
+
+# Optional: Allowed CORS origins (e.g. "https://fun-chess.example.com")
+# In production, either cors_origin or public_url must be specified.
+cors_origin = ""

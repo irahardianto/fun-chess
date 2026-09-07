@@ -1,924 +1,822 @@
----
-$schema: "https://raw.githubusercontent.com/irahardianto/awesome-agv/main/.agents/skills/structured-spec/spec-schema.json"
-spec_id: "TSD-PUZZLE-PEDAGOGICAL-REMEDIATION-V1"
-title: "Puzzle Hub Pedagogical Remediation — Frozen API & Engine Contracts"
-doc_type: "tsd"
-status: "approved"
-version: "1.0.0"
-owners: ["architect", "backend-engineer", "frontend-engineer"]
-created: "2026-08-27"
-modified: "2026-08-27"
-dependencies:
-  specs: ["PRD-PUZZLE-PEDAGOGY-V1"]
+# Frozen API & Network Contracts: Fun Chess Remediation
+
+**Status**: FROZEN CONTRACT
+**Author**: @architect (System Architecture)
+**Date**: 2026-09-07
+**Scope**: Full Codebase Remediation (Findings CRIT-001, CRIT-002, CRIT-005, CRIT-008, MAJ-001, MAJ-002, MAJ-003, MAJ-007, MAJ-015, MAJ-016, MAJ-018, MIN-002, MIN-004, ENH-001, ENH-005)
+**Target Locations**: `@fun-chess/shared`, `apps/server`, `apps/client`, `infra/terraform`
+
 ---
 
-# Puzzle Hub Pedagogical Remediation: API & Engine Contracts
+## 1. Executive Architecture Summary
 
-## 1. Executive Architecture Overview
+This document establishes the authoritative, frozen network and API contracts across the Fun Chess monorepo. All builders and tech leads implementing Scope Cards 1 through 7 must adhere strictly to these types, schemas, wire protocols, and interface contracts.
 
-This specification establishes the **frozen schema contracts**, **data structures**, and **algorithmic interfaces** for transforming the Fun Chess Puzzle Hub from a mechanical string-matching move validator into an intuitive, high-impact tactical tutor.
+### Core Architectural Invariants:
+1. **Zero Secret Leakage**: The secret `sessionToken` is strictly excised from all public models (`Player`, `RoomState`). Session credentials are treated as private authentication secrets: stored server-side only in a private session registry and communicated only to the authorized client in a private acknowledgement callback.
+2. **Strict Ingress Schema Validation**: Every inbound Socket.IO event payload and HTTP endpoint request is validated at runtime using declarative Zod schemas before reaching domain services.
+3. **Deterministic Error Handling & Sanitization**: Socket errors are normalized into a unified `SocketErrorPayload`. Acknowledged events receive error objects via callbacks; unacknowledged events receive the `error` event. 4xx validation/client errors are demoted to `WARN`; 500 errors are logged at `ERROR` and sanitized to prevent leaking stack traces or internal runtime details.
+4. **Hardened HTTP Ingress**: Wildcard `*` CORS is rejected in production. Modern HTTP security headers (CSP, HSTS, Permissions-Policy, X-Frame-Options) are enforced across all HTTP responses.
+5. **Abstracted I/O with Fail-Safe Timeouts**: Client HTTP calls are encapsulated in an `IApiClient` service enforcing a 3-second timeout (`AbortSignal.timeout(3000)`).
+
+---
+
+## 2. Private Session Token Separation & Reconnection Protocol
+
+### 2.1 Problem Analysis (CRIT-001)
+Previously, `sessionToken` was declared as a field on `interface Player` (`shared/src/contracts/models.ts:96`). Because `RoomState` contains `whitePlayer`, `blackPlayer`, and `spectators`, every state broadcast (`room:joined`, `room:player_joined`, `game:moved`, `game:rematch_started`) transmitted the victim's plaintext `sessionToken` to all connected peers, enabling trivial session hijacking via `room:reconnect`.
+
+### 2.2 Model Definitions
+
+#### A. Public Player Model (`shared/src/contracts/models.ts`)
+```typescript
+import { PieceColor, PieceType, Square } from "./models.js";
+
+/**
+ * Public representation of a player inside a room.
+ * MUST NEVER contain private session credentials or secret tokens.
+ */
+export interface Player {
+  /** Unique UUID v4 identifier for the player */
+  id: string;
+  /** Ephemeral Socket.io connection identifier */
+  socketId: string;
+  /** Player display name (1-20 characters, sanitized) */
+  name: string;
+  /** Selected emoji avatar (e.g. 🦁, 🚀, 🦄, ⚡, 👑, 🐼) */
+  avatar?: string;
+  /** Active piece color assignment ('w' or 'b') */
+  color: PieceColor;
+  /** Indicates whether the player is the room creator */
+  isHost: boolean;
+  /** Real-time socket connectivity state */
+  isConnected: boolean;
+  /** Epoch timestamp (milliseconds) when the player joined */
+  connectedAt: number;
+}
+
+/**
+ * Semantic alias for Player explicitly denoting public view visibility.
+ */
+export type PublicPlayer = Player;
+```
+
+#### B. Private Session Credential Model (`shared/src/contracts/models.ts`)
+```typescript
+/**
+ * Private authentication credential stored server-side and client-side (sessionStorage).
+ * Exchanged ONLY over initial private room establishment and reconnection handshakes.
+ */
+export interface SessionInfo {
+  /** Cryptographic secret UUID token used to authenticate reconnection */
+  sessionToken: string;
+  /** Player ID associated with this session */
+  playerId: string;
+  /** Room code associated with this session */
+  roomCode: string;
+  /** Epoch timestamp (milliseconds) when session was created */
+  createdAt: number;
+  /** Epoch timestamp (milliseconds) of last observed activity */
+  lastSeenAt: number;
+}
+
+/**
+ * Client-persisted session data stored in browser sessionStorage.
+ */
+export interface SavedSession {
+  roomCode: string;
+  playerId: string;
+  sessionToken: string;
+}
+```
+
+#### C. Sanitized Room State (`shared/src/contracts/models.ts`)
+```typescript
+export interface RoomState {
+  /** 4-character uppercase alphanumeric code */
+  roomCode: string;
+  /** Room lifecycle phase */
+  status: RoomStatus;
+  /** Player ID of host */
+  hostId: string;
+  /** Assigned white player (clean of session secrets) */
+  whitePlayer: Player | null;
+  /** Assigned black player (clean of session secrets) */
+  blackPlayer: Player | null;
+  /** Spectators in the room (clean of session secrets) */
+  spectators: Player[];
+  /** Authoritative chess match state */
+  game: GameState;
+  /** Active rematch proposal state */
+  rematch: RematchState | null;
+  /** Active draw offer state */
+  drawOffer?: { offeredBy: string; offeredAt: number } | null;
+  /** Epoch timestamp of room creation */
+  createdAt: number;
+  /** Epoch timestamp of last mutation */
+  lastActivityAt: number;
+}
+```
+
+### 2.3 Reconnection Authentication Protocol Sequence
 
 ```mermaid
-graph TD
-    A[Static Curated Puzzle JSON Packs] -->|Import| B[puzzle_catalog.ts]
-    B -->|Provides Puzzle| C[PuzzleEngineService / puzzle_validator.ts]
-    B -->|Provides Puzzle| D[PuzzleAnalysisEngine / puzzle_analysis_engine.ts]
-    C -->|Move Validation & Refutation| E[usePuzzleRunner.ts]
-    D -->|Material Delta & Pedagogical Breakdown| E
-    E -->|State & Badges| F[PuzzleArena.vue HUD]
-    E -->|Progressive Hints| G[ProgressiveHintLayer.vue]
-    E -->|Post-Solve Debrief & Move Replay| H[PuzzleCompletionModal.vue]
+sequenceDiagram
+    autonumber
+    actor Client as Player Client
+    participant Svr as Socket Server (wrapSocketHandler)
+    participant Reg as Server Session Registry (Private)
+    participant Store as Room Store (InMemoryRoomStore)
+    participant Peers as Opponent & Spectators
+
+    Note over Client, Svr: 1. Room Creation or Join Flow
+    Client->>Svr: emit("room:create" | "room:join", payload, ackCallback)
+    Svr->>Store: Save RoomState (Contains Player without sessionToken)
+    Svr->>Reg: Store SessionInfo (playerId, roomCode, sessionToken)
+    Svr-->>Peers: broadcast("room:player_joined", { player, room }) [NO TOKEN]
+    Svr-->>Client: ackCallback({ success: true, room, player, sessionToken }) [PRIVATE]
+    Client->>Client: sessionStorage.setItem("fun_chess_session", { roomCode, playerId, sessionToken })
+
+    Note over Client, Svr: 2. Network Interruption & Disconnect
+    Client-xSvr: Transport disconnects (socketId terminates)
+    Svr->>Store: Mark Player.isConnected = false
+    Svr->>Svr: Start 60-second Disconnect Grace Timer
+    Svr-->>Peers: broadcast("room:player_disconnected", { playerId, gracePeriodMs: 60000 })
+
+    Note over Client, Svr: 3. Secure Reconnection Handshake
+    Client->>Svr: New Socket connects -> emit("room:reconnect", { roomCode, playerId, sessionToken }, ackCallback)
+    Svr->>Reg: Validate sessionToken for (roomCode, playerId)
+    alt Invalid or Expired Token
+        Svr-->>Client: ackCallback({ success: false, error: ERR_UNAUTHORIZED })
+    else Valid Token
+        Svr->>Svr: Cancel Disconnect Grace Timer
+        Svr->>Store: Rebind Player.socketId = newSocketId, isConnected = true
+        Svr->>Svr: socket.join(roomCode)
+        Svr-->>Peers: broadcast("room:player_reconnected", { playerId, playerName })
+        Svr-->>Client: ackCallback({ success: true, room, player })
+    end
 ```
 
-<!-- requirement
-  id: REQ-PUZ-PEDAGOGY-001
-  title: Pedagogical Puzzle Schema Definition
-  priority: must
-  category: functional
-  rationale: Puzzles must convey why a move was played, the concrete tactical objective, the material advantage won, and the lesson to take away.
--->
+### 2.4 Server Session Store Contract (`apps/server/src/features/rooms/session.interface.ts`)
+```typescript
+export interface ISessionRegistry {
+  /** Stores a private session token for a given player in a room */
+  registerSession(roomCode: string, playerId: string, sessionToken: string): Promise<void>;
 
-<!-- requirement
-  id: REQ-PUZ-ENGINE-002
-  title: Client-Side Puzzle Analysis Engine
-  priority: must
-  category: functional
-  rationale: Zero-latency client-side engine must calculate net material delta, detect tactical motifs, generate kid-friendly explanations, and provide mistake refutations without network or external LLM dependencies.
--->
+  /** Validates that the provided session token matches the registered player */
+  validateSession(roomCode: string, playerId: string, sessionToken: string): Promise<boolean>;
+
+  /** Updates lastSeenAt timestamp for session activity tracking */
+  touchSession(roomCode: string, playerId: string): Promise<void>;
+
+  /** Removes session on explicit leave or room abandonment */
+  removeSession(roomCode: string, playerId: string): Promise<void>;
+
+  /** Prunes all sessions associated with a terminated room */
+  pruneRoomSessions(roomCode: string): Promise<void>;
+}
+```
 
 ---
 
-## 2. Shared Data Contracts (`shared/src/contracts/puzzle.ts`)
+## 3. Runtime Ingress Validation Schemas (Zod)
 
-The following definitions represent the frozen contract for `@fun-chess/shared`.
+All schemas are placed in `@fun-chess/shared/src/contracts/schemas.ts` and exported via `@fun-chess/shared`. Both server and client consume these schemas.
 
-<!-- contract
-  id: CT-PUZ-SCHEMA-001
-  type: type-definition
-  title: Enhanced Puzzle Entity & Pedagogical Metadata Contract
-  stack_category: shared-contract
-  implements_requirements: [REQ-PUZ-PEDAGOGY-001]
--->
-
+### 3.1 Common Primitives & Domain Enums
 ```typescript
-import type { Square, PieceColor, PieceType } from "./models.js";
-import type { StarRating } from "./scenario.js";
-import type { PuzzleErrorCode, PuzzleErrorPayload } from "./errors.js";
+import { z } from "zod";
 
-/**
- * Comprehensive tactical and positional motif themes for curated puzzles.
- * Grouped into 5 pedagogical domains for structured chess learning.
- */
-export type PuzzleTheme =
-  // --- Domain 1: Fundamental Tactics ---
-  | "fork"
-  | "pin"
-  | "skewer"
-  | "discovered_attack"
-  | "discovered_check"
-  | "double_check"
-  | "hanging_piece"
-  | "trapped_piece"
-  // --- Domain 2: Intermediate Tactical Motifs ---
-  | "captures_checks_threats" // CCT calculation discipline
-  | "knight_outpost"
-  | "cross_pin"
-  | "battery"
-  | "deflection"
-  | "decoy"
-  | "interference"
-  | "clearance"
-  | "greek_gift"
-  | "windmill"
-  | "zwischenzug" // In-between move
-  | "desperado"
-  | "overloaded_piece"
-  | "x_ray_attack"
-  // --- Domain 3: Checkmate Pattern Families ---
-  | "mate_in_1"
-  | "mate_in_2"
-  | "mate_in_3"
-  | "back_rank_mate"
-  | "scholars_mate"
-  | "smothered_mate"
-  | "anastasia_mate"
-  | "arabian_mate"
-  | "hook_mate"
-  | "vukovic_mate"
-  | "boden_mate"
-  | "balestra_mate"
-  | "blackburne_mate"
-  | "lolli_mate"
-  | "damiano_mate"
-  | "kill_box_mate"
-  | "railroad_mate"
-  | "blind_swine_mate"
-  | "dovetail_mate"
-  // --- Domain 4: Endgame Conversions ---
-  | "pawn_endgame"
-  | "rook_endgame"
-  | "queen_endgame"
-  | "minor_piece_endgame"
-  | "lucena_position"
-  | "philidor_defense"
-  | "two_bishops_mate"
-  // --- Domain 5: Opening Traps & Defenses ---
-  | "legals_trap"
-  | "fried_liver"
-  | "noahs_ark_trap"
-  | "fools_mate";
+export const RoomCodeSchema = z
+  .string()
+  .trim()
+  .length(4, "Room code must be exactly 4 characters")
+  .regex(/^[A-Za-z0-9]{4}$/, "Room code must contain only alphanumeric characters")
+  .transform((code) => code.toUpperCase());
 
-/**
- * High-level theme category for drill filtering.
- */
-export type PuzzleThemeCategory =
-  | "basic_tactics"
-  | "advanced_tactics"
-  | "checkmate_patterns"
-  | "endgame_technique"
-  | "opening_traps";
+export const PlayerNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Player name cannot be empty")
+  .max(20, "Player name must be 20 characters or fewer")
+  // Strip control characters & dangerous HTML brackets
+  .transform((name) => name.replace(/[<>&"']/g, ""));
 
-/**
- * Metadata descriptor for rendering theme cards in Themed Drills.
- */
-export interface PuzzleThemeDescriptor {
-  readonly id: PuzzleTheme;
-  readonly category: PuzzleThemeCategory;
-  readonly name: string;
-  readonly icon: string;
-  readonly description: string;
-  readonly kidFriendlyTip: string;
-  readonly estimatedRatingRange: readonly [number, number];
-}
+export const AvatarEmojiSchema = z
+  .string()
+  .trim()
+  .max(16, "Avatar emoji must be 16 characters or fewer")
+  .optional()
+  .default("🦁");
 
-/**
- * Calibrated puzzle difficulty tier based on target ELO.
- */
-export type PuzzleDifficultyTier =
-  | "novice" // 600 - 900  (1-move captures / simple mate in 1)
-  | "easy" // 900 - 1200 (2-ply forks, pins, simple mates)
-  | "medium" // 1200 - 1500 (3-4 ply intermediate tactics)
-  | "hard" // 1500 - 1800 (Complex multi-ply combinations)
-  | "expert"; // 1800+       (Subtle sacrifices & endgame accuracy)
+export const PieceColorSchema = z.enum(["w", "b"]);
 
-/**
- * Concrete pedagogical reward / tactical payoff expected from completing a puzzle.
- */
-export type TacticalReward =
-  | "checkmate"
-  | "win_queen"
-  | "win_rook"
-  | "win_minor_piece"
-  | "win_exchange"
-  | "win_pawn"
-  | "pawn_promotion"
-  | "perpetual_defense"
-  | "escape_danger";
+export const PreferredColorSchema = z
+  .enum(["w", "b", "random"])
+  .optional()
+  .default("random");
 
-/**
- * Turn-by-turn breakdown explaining individual plies in a multi-move solution.
- */
-export interface PuzzleStepExplanation {
-  /** 0-based ply index in puzzle.moves */
-  readonly plyIndex: number;
-  /** Standard Algebraic Notation of the move (e.g. "Nc7+", "Kd8", "Nxa8") */
-  readonly moveSan: string;
-  /** UCI move format (e.g. "b5c7") */
-  readonly moveUci: string;
-  /** Actor executing the move ('w' | 'b') */
-  readonly actor: PieceColor;
-  /** Kid-friendly explanation of the tactical purpose or consequence of this move */
-  readonly explanation: string;
-}
+export const ChessSquareSchema = z
+  .string()
+  .regex(/^[a-h][1-8]$/, "Must be a valid chess square notation (a1-h8)");
 
-/**
- * Structured summary of net material advantage gained upon puzzle completion.
- */
-export interface MaterialAdvantageSummary {
-  /** Target piece captured or promoted (if applicable) */
-  readonly pieceType?: PieceType;
-  /** Net centipawn swing from player's perspective */
-  readonly netCentipawns: number;
-  /** Net standard point advantage (+9 Queen, +5 Rook, +3 Minor, +2 Exchange, +1 Pawn) */
-  readonly netPoints: number;
-  /** Human-readable pill label, e.g. "+5 Rook ♜", "+9 Queen ♛", "Checkmate 👑" */
-  readonly formattedAdvantage: string;
-  /** Whether the resulting material lead is completely decisive */
-  readonly isDecisive: boolean;
-}
+export const PromotionPieceSchema = z.enum(["q", "r", "b", "n"]);
+```
 
-/**
- * Full pedagogical analysis payload generated by PuzzleAnalysisEngine.
- */
-export interface PuzzleAnalysisResult {
-  /** Material balance in initial position */
-  readonly initialMaterial: {
-    readonly white: number;
-    readonly black: number;
-    readonly net: number;
-  };
-  /** Material balance in final position */
-  readonly finalMaterial: {
-    readonly white: number;
-    readonly black: number;
-    readonly net: number;
-  };
-  /** Net centipawn swing (final - initial from player's perspective) */
-  readonly materialDeltaCentipawns: number;
-  /** Net points gained (+9, +5, +3, etc.) */
-  readonly netPointsDelta: number;
-  /** Formatted advantage summary */
-  readonly advantageSummary: MaterialAdvantageSummary;
-  /** Primary tactical motif detected */
-  readonly detectedTheme: PuzzleTheme;
-  /** Whether solution ends in checkmate */
-  readonly isCheckmate: boolean;
-  /** Whether solution involves a pawn promotion */
-  readonly isPawnPromotion: boolean;
-  /** Catchy headline for the modal, e.g. "Royal Knight Fork on c7!" */
-  readonly tacticalHeadline: string;
-  /** 1-2 sentence kid-friendly explanation of why the tactic won */
-  readonly kidFriendlyExplanation: string;
-  /** Coach Sparky rule of thumb / takeaway tip */
-  readonly ruleOfThumb: string;
-  /** Detailed turn-by-turn narratives */
-  readonly stepNarratives: readonly PuzzleStepExplanation[];
-}
+### 3.2 Socket Ingress Payload Schemas
 
-/**
- * Diagnostic analysis for an incorrect player move (refutation).
- */
-export interface PlayerMistakeRefutation {
-  /** Player's attempted move in UCI */
-  readonly playerMoveUci: string;
-  /** Player's attempted move in SAN */
-  readonly playerMoveSan: string;
-  /** Opponent's punishing counter-move in UCI */
-  readonly refutationMoveUci: string;
-  /** Opponent's punishing counter-move in SAN */
-  readonly refutationMoveSan: string;
-  /** Color of the punishing actor */
-  readonly punishingActor: PieceColor;
-  /** Piece lost or targeted in the mistake */
-  readonly capturedPiece?: PieceType;
-  /** Short tactical reason (e.g. "Leaves your Queen undefended") */
-  readonly blunderReason: string;
-  /** Kid-friendly coaching explanation */
-  readonly kidFriendlyExplanation: string;
-  /** Key square to highlight on board for the mistake warning */
-  readonly threatSquare?: Square;
-}
+#### A. `CreateRoomRequestSchema`
+```typescript
+export const CreateRoomRequestSchema = z.object({
+  playerName: PlayerNameSchema,
+  preferredColor: PreferredColorSchema,
+  avatar: AvatarEmojiSchema,
+});
+export type CreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;
+```
 
-/**
- * Core immutable puzzle representation derived from curated offline positions.
- * Contains both structural move validation data and rich pedagogical metadata.
- */
-export interface Puzzle {
-  /** Unique puzzle identifier, e.g. "puz_fork_001" */
-  readonly id: string;
-  /** Initial board FEN position before the setup move or player move */
-  readonly fen: string;
-  /**
-   * Solution line represented as standard UCI move strings (e.g. ["c3b5", "e8d8", "b5c7", "d8e7", "c7a8"]).
-   */
-  readonly moves: readonly string[];
-  /** Calibrated difficulty rating (Elo / Glicko) */
-  readonly rating: number;
-  /** Rating deviation / confidence (Glicko RD) */
-  readonly ratingDeviation: number;
-  /** Identified tactical themes and motifs */
-  readonly themes: readonly PuzzleTheme[];
-  /** Primary theme of the puzzle for categorized drills */
-  readonly primaryTheme: PuzzleTheme;
-  /** Difficulty tier classification */
-  readonly difficulty: PuzzleDifficultyTier;
-  /** Kid-friendly puzzle title, e.g. "The Royal Knight Leap! ♞" */
-  readonly title: string;
-  /** Catchy subtitle or hint clue */
-  readonly subtitle?: string;
-  /** Side to move for the player ('w' | 'b') */
-  readonly playerColor: PieceColor;
-  /** Number of half-moves in the complete solution */
-  readonly solutionPlies: number;
+#### B. `JoinRoomRequestSchema`
+```typescript
+export const JoinRoomRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  playerName: PlayerNameSchema,
+  avatar: AvatarEmojiSchema,
+});
+export type JoinRoomRequest = z.infer<typeof JoinRoomRequestSchema>;
+```
 
-  // --- PEDAGOGICAL METADATA ---
-  /**
-   * Explicit tactical goal displayed in the HUD before and during play.
-   * e.g. "Fork the King and Rook on c7 to win decisive material!"
-   */
-  readonly tacticalGoal: string;
+#### C. `ReconnectRequestSchema`
+```typescript
+export const ReconnectRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  playerId: z.string().uuid("Player ID must be a valid UUID"),
+  sessionToken: z.string().min(1, "Session token is required").max(128),
+});
+export type ReconnectRequest = z.infer<typeof ReconnectRequestSchema>;
+```
 
-  /**
-   * The expected concrete payoff achieved by solving the puzzle.
-   */
-  readonly tacticalReward: TacticalReward;
+#### D. `LeaveRoomRequestSchema`
+```typescript
+export const LeaveRoomRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+});
+export type LeaveRoomRequest = z.infer<typeof LeaveRoomRequestSchema>;
+```
 
-  /**
-   * Human-readable material / positional advantage descriptor.
-   * e.g. "+5 Rook ♜", "+9 Queen ♛", "Checkmate 👑"
-   */
-  readonly outcomeAdvantage: string;
+#### E. `MakeMoveRequestSchema` & `MovePayloadSchema`
+```typescript
+export const MovePayloadSchema = z.object({
+  from: ChessSquareSchema,
+  to: ChessSquareSchema,
+  promotion: PromotionPieceSchema.optional(),
+});
+export type MovePayload = z.infer<typeof MovePayloadSchema>;
 
-  /**
-   * Post-solve coaching debrief explaining WHY the sequence won.
-   * e.g. "1. Nb5 threatened c7. When Black's King moved, 2. Nxc7+ forked King and Rook, winning the undefended Rook!"
-   */
-  readonly learningSummary: string;
+export const MakeMoveRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  move: MovePayloadSchema,
+});
+export type MakeMoveRequest = z.infer<typeof MakeMoveRequestSchema>;
+```
 
-  /**
-   * Coach rule of thumb or memorable guideline for young learners.
-   * e.g. "Knights are master forkers because they can leap over defenders!"
-   */
-  readonly keyTakeaway: string;
+#### F. Game Control Requests (`Resign`, `Draw`, `Rematch`)
+```typescript
+export const ResignRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+});
+export type ResignRequest = z.infer<typeof ResignRequestSchema>;
 
-  /**
-   * Optional step-by-step breakdown for each move in the solution line.
-   */
-  readonly stepExplanations?: readonly PuzzleStepExplanation[];
+export const OfferDrawRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+});
+export type OfferDrawRequest = z.infer<typeof OfferDrawRequestSchema>;
 
-  /**
-   * Optional context describing the opponent's previous blunder that created this tactic.
-   * e.g. "Black just moved their Knight to a5, leaving the c7 pawn unguarded."
-   */
-  readonly blunderContext?: string;
+export const RespondDrawRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  accept: z.boolean(),
+});
+export type RespondDrawRequest = z.infer<typeof RespondDrawRequestSchema>;
 
-  /**
-   * Key target squares involved in the tactic (e.g. ['c7', 'a8'] for fork and target rook).
-   */
-  readonly targetSquares?: readonly Square[];
+export const RequestRematchRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+});
+export type RequestRematchRequest = z.infer<typeof RequestRematchRequestSchema>;
 
-  /**
-   * Key pieces under threat or involved in the tactical motif.
-   */
-  readonly keySquares?: readonly Square[];
-}
+export const RespondRematchRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  accept: z.boolean(),
+});
+export type RespondRematchRequest = z.infer<typeof RespondRematchRequestSchema>;
+```
 
-/**
- * Offline puzzle pack metadata header.
- */
-export interface PuzzlePackMetadata {
-  readonly version: string;
-  readonly generatedAt: string;
-  readonly totalPuzzles: number;
-  readonly themeDistribution: Record<string, number>;
-  readonly ratingDistribution: {
-    readonly novice: number;
-    readonly easy: number;
-    readonly medium: number;
-    readonly hard: number;
-    readonly expert: number;
-  };
-}
+### 3.3 HTTP Endpoints Response Schemas
 
-/**
- * Complete offline bundle format loaded client-side.
- */
-export interface PuzzleBundle {
-  readonly metadata: PuzzlePackMetadata;
-  readonly puzzles: readonly Puzzle[];
-}
+#### A. `/api/lan-info` Response Schema
+```typescript
+export const LanInfoResponseSchema = z.object({
+  lanIp: z.string(),
+  port: z.number().int().positive(),
+  localUrl: z.string().url(),
+  joinUrl: z.string().url(),
+  interfaces: z.array(z.string()),
+  relayMode: z.enum(["cloud", "lan"]).optional(),
+  isCloudRelay: z.boolean().optional(),
+  publicUrl: z.string().url().optional(),
+});
+export type LanInfoResponse = z.infer<typeof LanInfoResponseSchema>;
+```
 
-/**
- * Three progressive tiers of assistance designed for zero-frustration learning.
- */
-export type HintLevel = 0 | 1 | 2 | 3;
+#### B. `/health` & `/api/health` Response Schema
+```typescript
+export const HealthCheckResponseSchema = z.object({
+  status: z.enum(["ok", "degraded"]),
+  uptimeSeconds: z.number().nonnegative(),
+  timestamp: z.string().datetime(),
+  activeRooms: z.number().int().nonnegative(),
+  activeSockets: z.number().int().nonnegative(),
+  memoryUsageMb: z.object({
+    rss: z.number(),
+    heapTotal: z.number(),
+    heapUsed: z.number(),
+  }),
+  relay: z
+    .object({
+      mode: z.enum(["cloud", "lan"]),
+      publicUrl: z.string().url().optional(),
+    })
+    .optional(),
+});
+export type HealthCheckResponse = z.infer<typeof HealthCheckResponseSchema>;
+```
 
-export type HintTierName =
-  | "none"
-  | "piece_nudge"
-  | "target_glow"
-  | "full_solution";
+#### C. Server Environment Configuration Schema (`apps/server/src/platform/config/env.ts`)
+```typescript
+export const ServerEnvSchema = z.object({
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  PORT: z.coerce.number().int().min(1024).max(65535).default(3000),
+  HOST: z.string().default("0.0.0.0"),
+  CORS_ORIGIN: z.string().optional(),
+  PUBLIC_URL: z.string().url().optional(),
+  LAN_IP: z.string().ip().optional(),
+  HOST_IP: z.string().ip().optional(),
+  LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
+});
+export type ServerEnv = z.infer<typeof ServerEnvSchema>;
+```
 
-/**
- * Extended HintData supporting pedagogical context and vector visual overlays.
- */
-export interface ExtendedHintData {
-  /** Current active hint level (1, 2, or 3) */
-  readonly level: HintLevel;
-  /** Friendly tier name */
-  readonly tier: HintTierName;
-  /** Source square of the piece that should move (revealed in Tier 1+) */
-  readonly sourceSquare?: Square;
-  /** Destination target square (revealed in Tier 2+) */
-  readonly targetSquare?: Square;
-  /** Kid-friendly hint message explaining the concept */
+---
+
+## 4. Standardized Error Contracts & Status Codes
+
+### 4.1 Error Payload Interface (`shared/src/contracts/errors.ts`)
+```typescript
+export type ErrorCode =
+  | "ERR_ROOM_NOT_FOUND"
+  | "ERR_ROOM_FULL"
+  | "ERR_ROOM_ALREADY_EXISTS"
+  | "ERR_INVALID_ROOM_CODE"
+  | "ERR_INVALID_MOVE"
+  | "ERR_NOT_YOUR_TURN"
+  | "ERR_GAME_NOT_ACTIVE"
+  | "ERR_PLAYER_NOT_IN_ROOM"
+  | "ERR_UNAUTHORIZED"
+  | "ERR_INVALID_PAYLOAD"
+  | "ERR_RATE_LIMITED"
+  | "ERR_SOCKET_TIMEOUT"
+  | "ERR_INTERNAL_SERVER";
+
+export interface SocketErrorPayload {
+  readonly code: ErrorCode;
   readonly message: string;
-  /** Explicit tactical objective clue (e.g. "Look for a double attack on King and Rook") */
-  readonly tacticalObjective?: string;
-  /** Primary theme icon */
-  readonly themeIcon?: string;
-  /** Full algebraic move string (e.g. "Nf7#", revealed in Tier 3) */
-  readonly solutionSan?: string;
-  /** UCI move format (e.g. "d5f7", revealed in Tier 3) */
-  readonly solutionUci?: string;
-  /** Mascot dialogue accompanying the hint */
-  readonly mascotDialogue?: string;
-  /** Visual highlight vector arrow (from -> to) */
-  readonly highlightArrow?: { readonly from: Square; readonly to: Square };
-  /** Threat squares to highlight (e.g. attacked opponent pieces) */
-  readonly threatSquares?: readonly Square[];
-  /** Target squares to highlight (e.g. outpost or fork square) */
-  readonly targetSquares?: readonly Square[];
+  readonly roomCode?: string;
+  readonly correlationId: string;
+  readonly details?: Record<string, unknown>;
 }
+```
 
-/**
- * Game modes available within the Puzzle Hub.
- */
-export type PuzzleMode =
-  | "themed_drills" // Untimed targeted practice by motif/theme
-  | "adaptive_ladder" // Adaptive Elo rating climb with dynamic difficulty
-  | "puzzle_rush" // 3-minute timed rapid-fire challenge
-  | "streak_survivor"; // 3-strike survival mode (how far can you go?)
+### 4.2 Error Classification, Status Codes & Log Level Matrix
+| Error Code | HTTP Status | Log Level | Error Message Strategy |
+|---|---|---|---|
+| `ERR_INVALID_PAYLOAD` | 400 | `WARN` | Safe Zod validation summary (e.g. `"playerName: Player name cannot be empty"`) |
+| `ERR_INVALID_ROOM_CODE` | 400 | `WARN` | Safe message: `"Room code must be 4 alphanumeric characters"` |
+| `ERR_UNAUTHORIZED` | 401 | `WARN` | Safe message: `"Invalid or expired session credentials"` |
+| `ERR_NOT_YOUR_TURN` | 403 | `WARN` | Safe message: `"It is not your turn to move"` |
+| `ERR_PLAYER_NOT_IN_ROOM` | 403 | `WARN` | Safe message: `"Player is not an active participant in room"` |
+| `ERR_ROOM_NOT_FOUND` | 404 | `WARN` | Safe message: `"Room with code 'ABCD' does not exist"` |
+| `ERR_ROOM_FULL` | 409 | `WARN` | Safe message: `"Room 'ABCD' already has 2 active players"` |
+| `ERR_ROOM_ALREADY_EXISTS` | 409 | `WARN` | Safe message: `"Room 'ABCD' already exists"` |
+| `ERR_GAME_NOT_ACTIVE` | 409 | `WARN` | Safe message: `"Game is not in active playing state"` |
+| `ERR_INVALID_MOVE` | 422 | `WARN` | Safe chess engine reason: `"Illegal move: e2 to e5"` |
+| `ERR_RATE_LIMITED` | 429 | `WARN` | Safe rate message: `"Rate limit exceeded. Please wait before retrying."` |
+| `ERR_SOCKET_TIMEOUT` | 408 | `WARN` | Safe timeout message: `"Request timed out"` |
+| `ERR_INTERNAL_SERVER` | 500 | `ERROR` | **Sanitized**: `"An internal server error occurred"`. NEVER leak runtime stack or SQL/system exceptions. |
 
-/**
- * Result state for a single puzzle attempt within a session.
- */
-export type PuzzleAttemptResult =
-  | "unsolved"
-  | "solved_first_try"
-  | "solved_with_hints"
-  | "solved_with_retries"
-  | "failed";
+### 4.3 Dual-Channel Socket Error Dispatch Pattern (CRIT-005)
+All incoming socket handlers wrapped by `wrapSocketHandler` must handle errors consistently according to whether the client provided an acknowledgement callback:
 
-/**
- * Base state for any active puzzle session.
- */
-export interface BasePuzzleSessionState {
-  readonly mode: PuzzleMode;
-  readonly currentPuzzle: Puzzle | null;
-  readonly currentFen: string;
-  readonly currentMoveIndex: number; // Current ply index in puzzle.moves
-  readonly isPlayerTurn: boolean;
-  readonly isCompleted: boolean;
-  readonly isSolvedSuccessfully: boolean;
-  readonly attemptResult: PuzzleAttemptResult;
-  readonly currentHintLevel: HintLevel;
-  readonly activeHint: ExtendedHintData | null;
-  readonly mistakesCount: number;
-  readonly selectedSquare: Square | null;
-  readonly legalMoves: readonly Square[];
-  readonly lastMove: { readonly from: Square; readonly to: Square } | null;
-  readonly isShaking: boolean;
-  readonly feedbackMessage: string | null;
-  readonly analysis: PuzzleAnalysisResult | null;
-  readonly lastMistakeRefutation: PlayerMistakeRefutation | null;
-}
+```typescript
+// apps/server/src/platform/socket/socket_logging_middleware.ts
+export function wrapSocketHandler<TReq, TRes>(
+  logger: Logger,
+  operationName: string,
+  socket: Socket,
+  schema: z.ZodSchema<TReq>,
+  handler: (validatedReq: TReq, context: SocketOperationContext) => Promise<TRes>
+) {
+  return async (rawReq: unknown, callback?: (res: SocketResponse<TRes>) => void): Promise<void> => {
+    const correlationId = randomUUID();
+    const startTime = performance.now();
+    const clientIp = extractClientIp(socket);
 
-/**
- * Themed Drills Session State (Untimed practice).
- */
-export interface ThemedDrillsSessionState extends BasePuzzleSessionState {
-  readonly mode: "themed_drills";
-  readonly activeTheme: PuzzleTheme;
-  readonly puzzlesSolvedInSession: number;
-  readonly totalPuzzlesInTheme: number;
-  readonly sessionAccuracyPercent: number;
-}
+    // 1. Ingress Schema Validation
+    const validationResult = schema.safeParse(rawReq);
+    if (!validationResult.success) {
+      const duration = Math.round(performance.now() - startTime);
+      const errorMessage = validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      const errorPayload: SocketErrorPayload = {
+        code: "ERR_INVALID_PAYLOAD",
+        message: errorMessage,
+        correlationId,
+      };
 
-/**
- * Adaptive Ladder Session State.
- */
-export interface AdaptiveLadderSessionState extends BasePuzzleSessionState {
-  readonly mode: "adaptive_ladder";
-  readonly currentRating: number;
-  readonly initialSessionRating: number;
-  readonly ratingDelta: number;
-  readonly ratingConfidence: number; // RD
-  readonly streakCount: number;
-  readonly bestStreakSession: number;
-  readonly targetPuzzleRating: number;
-}
+      logger.warn(`Operation validation failed: ${operationName}`, {
+        operation: operationName,
+        correlationId,
+        socketId: socket.id,
+        clientIp,
+        duration,
+        error: { code: "ERR_INVALID_PAYLOAD", message: errorMessage },
+      });
 
-/**
- * Puzzle Rush Session State (3-minute blitz sprint).
- */
-export interface PuzzleRushSessionState extends BasePuzzleSessionState {
-  readonly mode: "puzzle_rush";
-  readonly timeRemainingSeconds: number;
-  readonly initialTimeSeconds: number; // default: 180s (3 min)
-  readonly score: number; // Total puzzles solved correctly
-  readonly strikes: number; // Strikes accumulated (max: 3)
-  readonly maxStrikes: number; // default: 3
-  readonly comboMultiplier: number; // 1x, 2x, 3x on consecutive correct solves
-  readonly currentStreak: number;
-  readonly isTimerRunning: boolean;
-  readonly isGameOver: boolean;
-  readonly timeBonusEarnedSeconds: number; // +5s bonus on fast streak solves
-}
+      if (typeof callback === "function") {
+        callback({ success: false, error: errorPayload });
+      } else {
+        socket.emit("error", errorPayload);
+      }
+      return;
+    }
 
-/**
- * Streak Survivor Session State (Untimed 3-strike survival).
- */
-export interface StreakSurvivorSessionState extends BasePuzzleSessionState {
-  readonly mode: "streak_survivor";
-  readonly livesRemaining: number; // default: 3
-  readonly maxLives: number;
-  readonly currentStreak: number;
-  readonly bestStreakAllTime: number;
-  readonly score: number;
-  readonly isGameOver: boolean;
-}
+    // 2. Execution & Error Handling
+    try {
+      const result = await handler(validationResult.data, { correlationId, socketId: socket.id, clientIp });
+      const duration = Math.round(performance.now() - startTime);
 
-/**
- * Union type for all active session states.
- */
-export type PuzzleSessionState =
-  | ThemedDrillsSessionState
-  | AdaptiveLadderSessionState
-  | PuzzleRushSessionState
-  | StreakSurvivorSessionState;
+      logger.info(`Operation succeeded: ${operationName}`, {
+        operation: operationName,
+        correlationId,
+        socketId: socket.id,
+        duration,
+        status: "success",
+      });
 
-/**
- * Historical rating adjustment point for charting.
- */
-export interface RatingHistoryPoint {
-  readonly timestamp: number;
-  readonly rating: number;
-  readonly puzzleId: string;
-  readonly delta: number;
-}
+      if (typeof callback === "function") {
+        callback({ success: true, ...result });
+      }
+    } catch (err: unknown) {
+      const duration = Math.round(performance.now() - startTime);
+      const isAppError = err instanceof AppError;
+      const statusCode = isAppError ? err.statusCode : 500;
+      const code: ErrorCode = isAppError ? err.code : "ERR_INTERNAL_SERVER";
 
-/**
- * Adaptive Elo Rating State for a young learner.
- */
-export interface AdaptiveRatingState {
-  readonly rating: number;
-  readonly ratingDeviation: number;
-  readonly peakRating: number;
-  readonly totalAttempted: number;
-  readonly totalSolved: number;
-  readonly bestStreak: number;
-  readonly ratingHistory: readonly RatingHistoryPoint[];
-}
+      // Sanitization: Never expose 500 runtime errors
+      const clientMessage = (isAppError && statusCode < 500)
+        ? err.message
+        : "An internal server error occurred";
 
-/**
- * Performance summary for a single puzzle theme.
- */
-export interface ThemeMasteryProgress {
-  readonly theme: PuzzleTheme;
-  readonly attempted: number;
-  readonly solved: number;
-  readonly starsEarned: number;
-  readonly masteryLevel: "novice" | "apprentice" | "master";
-  readonly lastPracticedAt: number;
-}
+      const errorPayload: SocketErrorPayload = {
+        code,
+        message: clientMessage,
+        correlationId,
+        ...(isAppError && err.details ? { details: err.details } : {}),
+      };
 
-/**
- * High scores record for arcade modes.
- */
-export interface PuzzleArcadeStats {
-  readonly puzzleRushHighScore: number;
-  readonly puzzleRushBestStreak: number;
-  readonly streakSurvivorHighScore: number;
-  readonly totalRushRuns: number;
-}
+      if (statusCode < 500) {
+        logger.warn(`Operation rejected: ${operationName}`, {
+          operation: operationName,
+          correlationId,
+          socketId: socket.id,
+          clientIp,
+          duration,
+          status: "rejected",
+          error: { code, message: err instanceof Error ? err.message : String(err) },
+        });
+      } else {
+        logger.error(`Operation failed: ${operationName}`, {
+          operation: operationName,
+          correlationId,
+          socketId: socket.id,
+          clientIp,
+          duration,
+          status: "failed",
+          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
+        });
+      }
 
-/**
- * Record of solved puzzle completion.
- */
-export interface SolvedPuzzleRecord {
-  readonly stars: StarRating;
-  readonly solvedAt: number;
-}
-
-/**
- * Overall persistent user progress across the entire Puzzle Hub.
- */
-export interface PuzzleProgress {
-  readonly ratingProfile: AdaptiveRatingState;
-  readonly themeMastery: Record<string, ThemeMasteryProgress>;
-  readonly arcadeStats: PuzzleArcadeStats;
-  readonly solvedPuzzles: Record<string, SolvedPuzzleRecord>;
-  readonly createdAt: number;
-  readonly lastActiveAt: number;
-}
-
-/**
- * Storage abstraction for persisting Puzzle Hub progress.
- * Adheres to Rule 1 (I/O Isolation).
- */
-export interface PuzzleProgressStore {
-  getProgress(): Promise<PuzzleProgress>;
-  updateRating(newRatingState: AdaptiveRatingState): Promise<void>;
-  recordPuzzleAttempt(
-    puzzleId: string,
-    theme: PuzzleTheme,
-    result: PuzzleAttemptResult,
-    stars: StarRating,
-  ): Promise<PuzzleProgress>;
-  saveArcadeResult(
-    mode: "puzzle_rush" | "streak_survivor",
-    score: number,
-    streak: number,
-  ): Promise<PuzzleProgress>;
-  resetAll(): Promise<void>;
-}
-
-/**
- * Player move input action in puzzle engine.
- */
-export interface PlayerMoveAction {
-  readonly from: Square;
-  readonly to: Square;
-  readonly promotion?: "q" | "r" | "b" | "n";
-}
-
-/**
- * Result of validating a player's move against expected solution.
- */
-export interface MoveValidationOutcome {
-  readonly isCorrect: boolean;
-  readonly isPuzzleComplete: boolean;
-  readonly intermediateFen?: string;
-  readonly nextFen: string;
-  readonly botReplyMove?: {
-    readonly from: Square;
-    readonly to: Square;
-    readonly promotion?: "q" | "r" | "b" | "n";
-    readonly san: string;
-    readonly uci: string;
+      // CONTRACT DISPATCH: Callback if present, else contracted 'error' event
+      if (typeof callback === "function") {
+        callback({ success: false, error: errorPayload });
+      } else {
+        socket.emit("error", errorPayload);
+      }
+    }
   };
-  readonly nextMoveIndex: number;
-  readonly feedback: string;
-  /** Pedagogical explanation for the move that was just played */
-  readonly stepExplanation?: PuzzleStepExplanation;
-  /** Refutation payload if player made an incorrect move */
-  readonly refutation?: PlayerMistakeRefutation;
-  /** Full analysis payload when puzzle completes */
-  readonly analysis?: PuzzleAnalysisResult;
 }
-
-/**
- * Re-export error contracts for convenience
- */
-export type { PuzzleErrorCode, PuzzleErrorPayload };
 ```
 
 ---
 
-## 3. Shared Puzzle Engine Contracts (`shared/src/contracts/puzzle_engine.ts`)
+## 5. Security Headers & CORS Configuration
 
-<!-- contract
-  id: CT-PUZ-ENGINE-SERVICE-001
-  type: service-contract
-  title: Puzzle Engine & Analysis Service Contracts
-  stack_category: shared-contract
-  implements_requirements: [REQ-PUZ-ENGINE-002]
--->
+### 5.1 HTTP Security Headers Specification
+Applied to every HTTP response in `apps/server/src/platform/http/http_server.ts`:
 
 ```typescript
-import type {
-  Puzzle,
-  PlayerMoveAction,
-  MoveValidationOutcome,
-  ExtendedHintData,
-  HintLevel,
-  PuzzleAnalysisResult,
-  MaterialAdvantageSummary,
-  PlayerMistakeRefutation,
-  PuzzleStepExplanation,
-  PuzzleTheme,
-} from "./puzzle.js";
-import type { StarRating } from "./scenario.js";
-import type { PieceColor } from "./models.js";
+export const SECURITY_HEADERS: Record<string, string> = {
+  // Content-Security-Policy: restrict origins, allow inline styles for Vue animations, allow websockets
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
+    "connect-src 'self' ws: wss:",
+    "font-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; "),
 
-/**
- * Pure engine interface for calculating material swings, detecting tactical motifs,
- * generating refutations on mistakes, and producing pedagogical explanations.
- * Adheres to Rule 2 (Pure Business Logic — zero I/O, zero framework).
- */
-export interface PuzzleAnalysisEngineService {
-  /**
-   * Generates a complete pedagogical analysis of a puzzle from initial FEN to final solution ply.
-   */
-  analyzePuzzleSolution(puzzle: Puzzle): PuzzleAnalysisResult;
+  // Strict-Transport-Security (1 year, include subdomains, preload)
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
 
-  /**
-   * Evaluates the net material advantage gained between initial and final position.
-   * Delta is calculated from the perspective of playerColor:
-   * Delta = Material_final - Material_initial
-   */
-  calculateMaterialDelta(
-    initialFen: string,
-    finalFen: string,
-    playerColor: PieceColor,
-  ): MaterialAdvantageSummary;
+  // Frame Protection
+  "X-Frame-Options": "DENY",
 
-  /**
-   * Classifies the primary tactical motif executed in a move or sequence.
-   */
-  classifyTacticalMotif(
-    fenBefore: string,
-    moveUci: string,
-    fenAfter: string,
-  ): {
-    readonly theme: PuzzleTheme;
-    readonly confidence: number;
-    readonly explanation: string;
-  };
+  // MIME type sniffing protection
+  "X-Content-Type-Options": "nosniff",
 
-  /**
-   * Generates a constructive refutation when a player attempts an incorrect move.
-   * Evaluates opponent's punishing response in <15ms using local search.
-   */
-  generateMistakeRefutation(
-    fen: string,
-    playerMove: PlayerMoveAction,
-    depth?: number,
-  ): PlayerMistakeRefutation | null;
+  // Referrer disclosure restriction
+  "Referrer-Policy": "strict-origin-when-cross-origin",
 
-  /**
-   * Synthesizes kid-friendly 1-2 sentence explanation of why a tactic worked.
-   */
-  generateKidExplanation(
-    puzzle: Puzzle,
-    analysis: PuzzleAnalysisResult,
-  ): string;
-
-  /**
-   * Generates turn-by-turn explanations for every ply in the solution.
-   */
-  generateStepBreakdowns(
-    puzzle: Puzzle,
-  ): readonly PuzzleStepExplanation[];
-}
-
-/**
- * Core validation and hint service orchestrator.
- */
-export interface PuzzleEngineService {
-  validateMove(
-    puzzle: Puzzle,
-    currentMoveIndex: number,
-    currentFen: string,
-    playerMove: PlayerMoveAction,
-  ): MoveValidationOutcome;
-
-  generateHint(
-    puzzle: Puzzle,
-    currentMoveIndex: number,
-    currentFen: string,
-    requestedLevel: HintLevel,
-  ): ExtendedHintData;
-
-  calculatePuzzleStars(hintsUsed: number, mistakesCount: number): StarRating;
-
-  analyzePuzzle(puzzle: Puzzle): PuzzleAnalysisResult;
-
-  explainPlayerMistake(
-    puzzle: Puzzle,
-    currentMoveIndex: number,
-    currentFen: string,
-    playerMove: PlayerMoveAction,
-  ): string;
-}
-
-export type {
-  PlayerMoveAction,
-  MoveValidationOutcome,
-  ExtendedHintData,
-  PuzzleAnalysisResult,
-  MaterialAdvantageSummary,
-  PlayerMistakeRefutation,
-  PuzzleStepExplanation,
+  // Browser feature permissions
+  "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=()",
 };
 ```
 
----
+### 5.2 CORS Origin Allowlist Configuration
+Wildcard `*` is strictly forbidden when `NODE_ENV === "production"`.
 
-## 4. Architectural Specification: `PuzzleAnalysisEngine` Implementation
+```typescript
+export function resolveAllowedOrigins(env: ServerEnv): string[] {
+  if (env.CORS_ORIGIN) {
+    return env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean);
+  }
+  if (env.PUBLIC_URL) {
+    const parsed = new URL(env.PUBLIC_URL);
+    return [parsed.origin];
+  }
+  if (env.NODE_ENV === "production") {
+    throw new Error("FATAL: CORS_ORIGIN or PUBLIC_URL must be configured in production mode.");
+  }
+  // Safe development fallbacks
+  return ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"];
+}
 
-### 4.1 Location & Module Boundary
-- **File**: `apps/client/src/features/puzzles/engine/puzzle_analysis_engine.ts`
-- **Exports**: Pure functions implementing `PuzzleAnalysisEngineService`
-- **Dependencies**: `chess.js` (for board simulation & legal moves), `PIECE_VALUES` (from `pst_evaluator.ts` or constants), `@fun-chess/shared` contracts.
-- **Purity**: Zero Vue reactivity imports (`ref`, `computed`), zero LocalStorage I/O, zero network calls.
-
-### 4.2 Algorithm 1: Material Delta Calculation ($\Delta \text{Material}$)
-
-Piece Values in Centipawns:
-- Pawn (`p`): 100 cp (1 pt)
-- Knight (`n`): 320 cp (3 pts)
-- Bishop (`b`): 330 cp (3 pts)
-- Rook (`r`): 500 cp (5 pts)
-- Queen (`q`): 900 cp (9 pts)
-- King (`k`): 0 cp (infinite)
-
-Calculation Formula:
-$$\text{Material}(color, fen) = \sum_{p \in \text{Pieces}(color)} \text{Value}(p)$$
-$$\Delta \text{Material} = \left(\text{Material}(\text{playerColor}, fen_{\text{final}}) - \text{Material}(\text{oppColor}, fen_{\text{final}})\right) - \left(\text{Material}(\text{playerColor}, fen_{\text{initial}}) - \text{Material}(\text{oppColor}, fen_{\text{initial}})\right)$$
-
-Formatting Rules for `formattedAdvantage`:
-| $\Delta \text{Centipawns}$ | Net Points | Default Label | Decisive? |
-|---|---|---|---|
-| Checkmate | $\infty$ | `"Checkmate 👑"` | `true` |
-| $\ge +850$ | $+9$ | `"+9 Queen ♛"` | `true` |
-| $+450 \dots +550$ | $+5$ | `"+5 Rook ♜"` | `true` |
-| $+270 \dots +350$ | $+3$ | `"+3 Piece (Bishop/Knight) ⚔️"` | `true` |
-| $+150 \dots +220$ | $+2$ | `"+2 The Exchange 🔄"` | `false` |
-| $+90 \dots +120$ | $+1$ | `"+1 Pawn ♟️"` | `false` |
-| $\le 0$ | $0$ | `"Positional Advantage ⚡"` | `false` |
-
-### 4.3 Algorithm 2: Tactical Motif Classification
-
-Given a move from `fenBefore` to `fenAfter`:
-1. **Checkmate**: If `chessAfter.isCheckmate()`, classify as `mate_in_1` (or puzzle's specific mate theme like `back_rank_mate`, `smothered_mate`, `anastasia_mate`).
-2. **Double Attack / Fork**:
-   - Check destination piece $P$ placed on square $D$.
-   - Find all opponent pieces attacked by $P$ on $D$ using ray/knight delta scans.
-   - If count of attacked pieces $\ge 2$ (and at least one is high-value or King is checked), classify as `fork`.
-3. **Pin**:
-   - If a piece moves and an opponent piece behind another piece cannot move without exposing a higher-value piece or King.
-4. **Skewer**:
-   - Linear attack where a higher-value piece (King/Queen) is in front and must move, exposing a piece behind it to capture.
-5. **Discovered Check / Attack**:
-   - If `chessAfter.inCheck()`, but the checking piece is NOT the piece that moved.
-6. **Deflection / Decoy**:
-   - An opponent piece is forced to vacate a key defending square or capture a sacrificed piece.
-7. **Pawn Promotion**:
-   - Move promotes pawn to Queen/Rook (`move.promotion`).
-
-### 4.4 Algorithm 3: Refutation Generator for Player Mistakes
-
-When player executes an incorrect move $M$:
-1. Apply $M$ to temporary `Chess(currentFen)`.
-2. Scan legal opponent responses:
-   - Priority 1: Can opponent deliver checkmate? $\rightarrow$ Blunder explanation: *"That move allows Black to checkmate your King!"*
-   - Priority 2: Can opponent capture a hanging piece (especially Queen/Rook)? $\rightarrow$ Blunder explanation: *"Look out! That leaves your [Piece] on [Square] unprotected to [OpponentMoveSan]."*
-   - Priority 3: Opponent escapes the tactical fork/pin. $\rightarrow$ Blunder explanation: *"That allows the opponent's piece to escape to safety."*
-3. Return `PlayerMistakeRefutation` with target `threatSquare` for gold/red alert ring on UI board.
-
----
-
-## 5. UI Integration Contracts
-
-### 5.1 `PuzzleArena.vue` In-Game HUD Contract
-- Props / Composable Bindings:
-  - `puzzle.tacticalGoal` $\rightarrow$ Rendered in top `arena-guide-slot` as a prominent `🎯 Tactical Goal` chip.
-  - `puzzle.primaryTheme` $\rightarrow$ Rendered as Theme Badge with icon.
-  - `activeHint` $\rightarrow$ Passes `ExtendedHintData` to `ProgressiveHintLayer.vue`.
-
-### 5.2 `ProgressiveHintLayer.vue` Contract
-- Level 1: Renders soft pulsing ring on `sourceSquare` + displays `message` and `tacticalObjective`.
-- Level 2: Renders pulsing target box on `targetSquare` + displays `message` and `threatSquares`.
-- Level 3: Renders SVG Gold Arrow from `sourceSquare` to `targetSquare` + reveals `solutionSan` and mascot dialogue.
-
-### 5.3 `PuzzleCompletionModal.vue` Contract
-- Post-Solve Tactical Breakdown Display:
-  - **Banner**: `puzzle.outcomeAdvantage` pill (e.g. `+5 Rook ♜`).
-  - **Tactical Card**:
-    - Title: `puzzle.title`
-    - Motif: `puzzle.primaryTheme`
-    - Explanation: `puzzle.learningSummary`
-    - Sparky Coach Takeaway: `puzzle.keyTakeaway`
-  - **Inspect Board Toggle**: Allows minimizing / toggling modal opacity so the learner can see the final board state.
-  - **Move Replay Slider**: Mini-controller `[⏮ Start] [◀ Prev] [▶ Next] [⏭ End]` to step through solution plies with `stepExplanations`.
-
----
-
-## 6. Acceptance Tests & Traceability
-
-<!-- test
-  id: TC-PUZ-PEDAGOGY-001
-  type: unit-test
-  title: Verify every curated puzzle has valid pedagogical metadata
-  verifies_requirements: [REQ-PUZ-PEDAGOGY-001]
--->
-
-```gherkin
-Scenario: Curated Puzzle Pack Pedagogical Integrity
-  Given the complete set of 11 puzzle packs loaded in puzzle_catalog
-  When each puzzle record is inspected
-  Then every puzzle must have a non-empty tacticalGoal
-  And every puzzle must have a valid tacticalReward
-  And every puzzle must have a non-empty learningSummary
-  And every puzzle must have a non-empty keyTakeaway
-  And every non-checkmate puzzle must yield net positive material gain (Delta > 0)
-  And zero puzzles should terminate on an equal trade or hanging blunder
+export function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
+  if (!origin) return true; // Same-origin or server-to-server
+  return allowedOrigins.includes("*") || allowedOrigins.includes(origin);
+}
 ```
 
-<!-- test
-  id: TC-PUZ-ENGINE-002
-  type: unit-test
-  title: Verify PuzzleAnalysisEngine calculates exact material swings and motif explanations
-  verifies_requirements: [REQ-PUZ-ENGINE-002]
--->
+### 5.3 Static Asset Ingress & Path Traversal Prevention (CRIT-008)
+Static file resolver must enforce canonical boundary validation and correct MIME 404 behavior:
 
-```gherkin
-Scenario: Material Delta and Motif Analysis on Royal Fork
-  Given a puzzle starting with FEN "r3k2r/ppp2ppp/2n1pn2/3p4/3P4/2N2N2/PPP2PPP/R1BQK2R w KQkq - 0 1"
-  And solution sequence ["c3b5", "e8d8", "b5c7", "d8e7", "c7a8"]
-  When analyzePuzzleSolution is executed
-  Then materialDeltaCentipawns must equal 500
-  And formattedAdvantage must equal "+5 Rook ♜"
-  And detectedTheme must equal "fork"
-  And kidFriendlyExplanation must explain the double attack on King and Rook
+```typescript
+import path from "node:path";
+import fs from "node:fs/promises";
+
+export async function serveStaticFile(
+  reqPath: string,
+  staticRoot: string,
+  acceptHeader: string = ""
+): Promise<{ status: number; filePath?: string; contentType?: string }> {
+  // Normalize and resolve canonical path
+  const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, "");
+  const targetPath = path.join(staticRoot, safePath === "/" ? "index.html" : safePath);
+  const relative = path.relative(staticRoot, targetPath);
+
+  // Path Traversal Guard: target must reside inside staticRoot
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return { status: 403 }; // Forbidden
+  }
+
+  try {
+    const stat = await fs.stat(targetPath);
+    if (stat.isFile()) {
+      return { status: 200, filePath: targetPath, contentType: getMimeType(targetPath) };
+    }
+  } catch {
+    // Missing asset handling
+    const ext = path.extname(targetPath);
+    // If request is for a missing concrete asset (.js, .css, .png), NEVER return index.html
+    if (ext) {
+      return { status: 404 };
+    }
+    // SPA Fallback: Only rewrite to index.html if caller accepts text/html
+    if (acceptHeader.includes("text/html")) {
+      const indexPath = path.join(staticRoot, "index.html");
+      return { status: 200, filePath: indexPath, contentType: "text/html; charset=utf-8" };
+    }
+  }
+
+  return { status: 404 };
+}
 ```
 
 ---
 
-## 7. Migration & Backward Compatibility Strategy
+## 6. Client HTTP API Client Interface (`IApiClient`)
 
-1. **Zero Database Breaking Changes**: All puzzle data is stored as immutable static JSON bundles. User local progress stores (`PuzzleProgressStore`) key off `puzzle.id` and star ratings. Adding new optional/required fields to `Puzzle` does not invalidate existing user progress or ladder Elo ratings.
-2. **Schema Field Defaults**: For any dynamic or legacy puzzle loader, fallback helpers ensure `tacticalGoal ?? puzzle.title`, `outcomeAdvantage ?? "Solved!"`, and `learningSummary ?? "Great tactical vision!"` prevent runtime undefined crashes.
-3. **Build-Time Verification**: `tsc --noEmit` and `vitest run` validate complete type safety across `shared` and `client`.
+### 6.1 Interface Definition (`apps/client/src/platform/api/api_client.interface.ts`)
+```typescript
+import type { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
+
+export interface ApiRequestOptions {
+  /** Request timeout in milliseconds. Defaults to 3000ms. */
+  timeoutMs?: number;
+  /** Optional custom AbortSignal to cancel requests from callers */
+  signal?: AbortSignal;
+  /** Custom request headers */
+  headers?: Record<string, string>;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  status: number;
+  ok: boolean;
+}
+
+export interface IApiClient {
+  /** Performs GET request with timeout and error handling */
+  get<T>(url: string, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
+
+  /** Performs POST request with JSON body and timeout */
+  post<T>(url: string, body?: unknown, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
+
+  /** Discovers LAN networking information from server */
+  getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse>;
+
+  /** Queries operational health telemetry */
+  checkHealth(options?: ApiRequestOptions): Promise<HealthCheckResponse>;
+
+  /** Verifies network connectivity via light probe HEAD request */
+  checkConnectivity(probeUrl?: string, options?: ApiRequestOptions): Promise<boolean>;
+}
+```
+
+### 6.2 Production Implementation (`apps/client/src/platform/api/fetch_api_client.ts`)
+```typescript
+import type { IApiClient, ApiRequestOptions, ApiResponse } from "./api_client.interface.js";
+import { LanInfoResponseSchema, HealthCheckResponseSchema, type LanInfoResponse, type HealthCheckResponse } from "@fun-chess/shared";
+
+export class FetchApiClient implements IApiClient {
+  constructor(private readonly baseUrl: string = "") {}
+
+  private createTimeoutSignal(timeoutMs: number = 3000, callerSignal?: AbortSignal): { signal: AbortSignal; cleanup: () => void } {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
+
+    if (callerSignal) {
+      callerSignal.addEventListener("abort", () => controller.abort(callerSignal.reason), { once: true });
+    }
+
+    return {
+      signal: controller.signal,
+      cleanup: () => clearTimeout(timeoutId),
+    };
+  }
+
+  async get<T>(url: string, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
+    const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 3000, options.signal);
+    try {
+      const response = await fetch(`${this.baseUrl}${url}`, {
+        method: "GET",
+        headers: { Accept: "application/json", ...options.headers },
+        signal,
+      });
+      const data = response.status === 204 ? (null as T) : await response.json();
+      return { data, status: response.status, ok: response.ok };
+    } finally {
+      cleanup();
+    }
+  }
+
+  async post<T>(url: string, body?: unknown, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
+    const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 3000, options.signal);
+    try {
+      const response = await fetch(`${this.baseUrl}${url}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...options.headers },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal,
+      });
+      const data = await response.json();
+      return { data, status: response.status, ok: response.ok };
+    } finally {
+      cleanup();
+    }
+  }
+
+  async getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse> {
+    const res = await this.get<unknown>("/api/lan-info", options);
+    if (!res.ok) throw new Error(`Failed to fetch LAN info: HTTP ${res.status}`);
+    return LanInfoResponseSchema.parse(res.data);
+  }
+
+  async checkHealth(options?: ApiRequestOptions): Promise<HealthCheckResponse> {
+    const res = await this.get<unknown>("/health", options);
+    if (!res.ok) throw new Error(`Health check failed: HTTP ${res.status}`);
+    return HealthCheckResponseSchema.parse(res.data);
+  }
+
+  async checkConnectivity(probeUrl: string = "/favicon.svg", options: ApiRequestOptions = {}): Promise<boolean> {
+    const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 2000, options.signal);
+    try {
+      const res = await fetch(`${probeUrl}?_t=${Date.now()}`, {
+        method: "HEAD",
+        cache: "no-store",
+        signal,
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      cleanup();
+    }
+  }
+}
+```
+
+### 6.3 Test Double (`apps/client/src/platform/api/mock_api_client.ts`)
+```typescript
+import type { IApiClient, ApiRequestOptions, ApiResponse } from "./api_client.interface.js";
+import type { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
+
+export class MockApiClient implements IApiClient {
+  public lanInfoResult: LanInfoResponse = {
+    lanIp: "192.168.1.50",
+    port: 3000,
+    localUrl: "http://localhost:3000",
+    joinUrl: "http://192.168.1.50:3000",
+    interfaces: ["192.168.1.50"],
+    relayMode: "lan",
+    isCloudRelay: false,
+  };
+  public isHealthy: boolean = true;
+  public isOnline: boolean = true;
+
+  async get<T>(_url: string, _options?: ApiRequestOptions): Promise<ApiResponse<T>> {
+    return { data: {} as T, status: 200, ok: true };
+  }
+
+  async post<T>(_url: string, _body?: unknown, _options?: ApiRequestOptions): Promise<ApiResponse<T>> {
+    return { data: {} as T, status: 200, ok: true };
+  }
+
+  async getLanInfo(_options?: ApiRequestOptions): Promise<LanInfoResponse> {
+    return this.lanInfoResult;
+  }
+
+  async checkHealth(_options?: ApiRequestOptions): Promise<HealthCheckResponse> {
+    return {
+      status: this.isHealthy ? "ok" : "degraded",
+      uptimeSeconds: 120,
+      timestamp: new Date().toISOString(),
+      activeRooms: 1,
+      activeSockets: 2,
+      memoryUsageMb: { rss: 40, heapTotal: 30, heapUsed: 20 },
+    };
+  }
+
+  async checkConnectivity(_probeUrl?: string, _options?: ApiRequestOptions): Promise<boolean> {
+    return this.isOnline;
+  }
+}
+```
+
+---
+
+## 7. Verification & Conformance Checklist
+
+| Requirement | Implementation Target | Verification Method |
+|---|---|---|
+| `sessionToken` removed from `Player` and `RoomState` | `shared/src/contracts/models.ts` | Typecheck `tsc -b` + Unit test asserting `sessionToken` does not exist on broadcast payloads |
+| Private session registry | `apps/server/src/features/rooms/` | Unit test proving `sessionToken` is stored in registry and returned ONLY in acknowledgement callback |
+| Ingress Zod schemas | `shared/src/contracts/schemas.ts` | Unit tests rejecting empty names, illegal squares, out-of-range strings, and malformed room codes |
+| 4xx to WARN / 500 to ERROR | `socket_logging_middleware.ts` | Test inspecting logger mock verifying log level on `InvalidMoveError` vs unhandled `Error` |
+| 500 error sanitization | `socket_logging_middleware.ts` | Test checking `res.error.message` equals `"An internal server error occurred"` on thrown TypeError |
+| Dual error routing | `socket_logging_middleware.ts` | Test verifying callback receives error when present, and `socket.emit('error')` fires when callback is missing |
+| Security headers (CSP, HSTS) | `apps/server/src/platform/http/` | Contract test asserting all 6 security headers are returned on GET / |
+| Production CORS allowlist | `http_server.ts`, `cloud_run.tf` | Unit test ensuring wildcard `*` throws or is blocked when `NODE_ENV === 'production'` |
+| Client `IApiClient` timeout | `apps/client/src/platform/api/` | Unit test with fake timers asserting fetch aborts after 3000ms |

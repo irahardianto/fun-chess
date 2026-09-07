@@ -1,10 +1,10 @@
 # Google Cloud Run Architecture: Multiplayer Networking & Ephemeral Relay
 
-**Status:** ARCHITECTURAL SPECIFICATION & DEPLOYMENT GUIDE  
-**Version:** 1.0.0  
-**Target Platform:** Google Cloud Run (Fully Managed Serverless Container Platform)  
-**Target Services:** Fun Chess Monorepo (`apps/server`, `apps/client`, `@fun-chess/shared`)  
-**Date:** 2026-08-27  
+**Status:** ARCHITECTURAL SPECIFICATION & DEPLOYMENT GUIDE
+**Version:** 1.0.0
+**Target Platform:** Google Cloud Run (Fully Managed Serverless Container Platform)
+**Target Services:** Fun Chess Monorepo (`apps/server`, `apps/client`, `@fun-chess/shared`)
+**Date:** 2026-08-27
 
 ---
 
@@ -24,7 +24,7 @@ flowchart TD
     subgraph GoogleCloud["Google Cloud Platform"]
         subgraph CloudRun["Cloud Run Service (fun-chess)"]
             LoadBalancer["Cloud Run Load Balancer / Proxy<br/>(TLS Termination, Session Affinity)"]
-            
+
             subgraph ContainerInstance["Container Instance (Node.js 22 LTS)"]
                 HttpServer["Native HTTP Server (port 8080)"]
                 SocketServer["Socket.io v4 Engine (WebSockets + Polling)"]

@@ -36,6 +36,11 @@ resource "google_cloud_run_v2_service" "default" {
         value = var.public_url
       }
 
+      env {
+        name  = "CORS_ORIGIN"
+        value = var.cors_origin
+      }
+
       startup_probe {
         http_get {
           path = "/healthz"

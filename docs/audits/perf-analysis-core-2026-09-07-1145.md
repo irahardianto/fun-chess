@@ -9,7 +9,7 @@ Profiling Tool: Vitest Tinybench Benchmark Suite & Code-level Static Profile
 - **Dimensions skipped:** None
 - **Hot paths analyzed:** 5 (Client AI Minimax Engine, Server Move Validation & Threefold Repetition, Server Session Registry, Shared Progress Codec, Client Bundle & Assets)
 - **Findings:** 56 raw findings synthesized into 16 deduplicated priority items (5 Critical, 6 High, 3 Medium, 2 Low)
-- **Estimated cumulative impact:** 
+- **Estimated cumulative impact:**
   - AI Depth 3 search latency reduced from **57,562 ms to < 2,500 ms (> 95% latency reduction)**.
   - UI main thread event loop freeze eliminated entirely (0 ms main thread blocking).
   - Server move validation latency reduced by **~83%** (from 1.13 ms to < 0.20 ms, > 5.6x throughput increase).

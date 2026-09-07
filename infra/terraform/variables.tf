@@ -50,3 +50,8 @@ variable "public_url" {
   default     = ""
 }
 
+variable "cors_origin" {
+  type        = string
+  description = "Allowed CORS origins for Cloud Run (comma-separated list of origins, e.g. https://fun-chess.example.com)"
+  default     = ""
+}
