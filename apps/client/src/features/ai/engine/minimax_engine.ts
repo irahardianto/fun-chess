@@ -18,8 +18,15 @@ import {
   type EvaluatedCandidateMove,
 } from './blunder_generator.js';
 
+interface TranspositionEntry {
+  depth: number;
+  score: number;
+  flag: 'exact' | 'lower' | 'upper';
+}
+
 interface SearchState {
   nodesEvaluated: number;
+  tt?: Map<string, TranspositionEntry>;
 }
 
 const DEFAULT_QUIESCENCE_MAX_DEPTH = 3;
@@ -45,7 +52,9 @@ export function scoreMoveForOrdering(move: Move): number {
   }
 
   // Check / San indicator bonus
-  if (move.san.includes('+') || move.san.includes('#')) {
+  // PERF: Checking last character avoids regex / substring scanning
+  const lastChar = move.san[move.san.length - 1];
+  if (lastChar === '+' || lastChar === '#') {
     score += 500;
   }
 
@@ -54,9 +63,21 @@ export function scoreMoveForOrdering(move: Move): number {
 
 /**
  * Orders moves descending by ordering score.
+ * PERF: Schwartzian transform pre-scores each move in O(N) rather than recalculating O(N log N) times inside sort comparator.
  */
 export function orderMoves(moves: Move[]): Move[] {
-  return [...moves].sort((a, b) => scoreMoveForOrdering(b) - scoreMoveForOrdering(a));
+  if (moves.length <= 1) return moves;
+  const scored = new Array(moves.length);
+  for (let i = 0; i < moves.length; i++) {
+    const m = moves[i]!;
+    scored[i] = { move: m, score: scoreMoveForOrdering(m) };
+  }
+  scored.sort((a, b) => b.score - a.score);
+  const result = new Array(moves.length);
+  for (let i = 0; i < moves.length; i++) {
+    result[i] = scored[i]!.move;
+  }
+  return result;
 }
 
 /**
@@ -73,11 +94,10 @@ function quiescenceSearch(
 ): number {
   state.nodesEvaluated++;
 
-  if (chess.isCheckmate()) {
+  // PERF: Checkmate is only possible if in check; avoids expensive moves() generation in leaf states
+  const inCheck = chess.inCheck();
+  if (inCheck && chess.isCheckmate()) {
     return chess.turn() === 'w' ? -CHECKMATE_SCORE : CHECKMATE_SCORE;
-  }
-  if (chess.isDraw()) {
-    return STALEMATE_SCORE;
   }
 
   const standPat = evaluateBoard(chess, usePst);
@@ -87,12 +107,19 @@ function quiescenceSearch(
   }
 
   if (isMaximizing) {
+    // PERF: Standing pat cutoff before generating legal capture moves
     if (standPat >= beta) return beta;
     let localAlpha = Math.max(alpha, standPat);
 
-    const captureMoves = orderMoves(
-      chess.moves({ verbose: true }).filter((m) => !!m.captured),
-    );
+    const allMoves = chess.moves({ verbose: true });
+    const captures: Move[] = [];
+    for (let i = 0; i < allMoves.length; i++) {
+      const m = allMoves[i]!;
+      if (m.captured) captures.push(m);
+    }
+    if (captures.length === 0) return localAlpha;
+
+    const captureMoves = orderMoves(captures);
 
     for (const move of captureMoves) {
       chess.move(move);
@@ -112,12 +139,19 @@ function quiescenceSearch(
     }
     return localAlpha;
   } else {
+    // PERF: Standing pat cutoff before generating legal capture moves
     if (standPat <= alpha) return alpha;
     let localBeta = Math.min(beta, standPat);
 
-    const captureMoves = orderMoves(
-      chess.moves({ verbose: true }).filter((m) => !!m.captured),
-    );
+    const allMoves = chess.moves({ verbose: true });
+    const captures: Move[] = [];
+    for (let i = 0; i < allMoves.length; i++) {
+      const m = allMoves[i]!;
+      if (m.captured) captures.push(m);
+    }
+    if (captures.length === 0) return localBeta;
+
+    const captureMoves = orderMoves(captures);
 
     for (const move of captureMoves) {
       chess.move(move);
@@ -140,7 +174,7 @@ function quiescenceSearch(
 }
 
 /**
- * Minimax recursive search with Alpha-Beta pruning.
+ * Minimax recursive search with Alpha-Beta pruning and Transposition Table.
  */
 function minimax(
   chess: Chess,
@@ -153,17 +187,18 @@ function minimax(
 ): number {
   state.nodesEvaluated++;
 
-  if (chess.isCheckmate()) {
-    // Prefer faster mates by factoring in depth remaining
-    return chess.turn() === 'w'
-      ? -CHECKMATE_SCORE - depth
-      : CHECKMATE_SCORE + depth;
+  // PERF: Transposition table lookup
+  const fenKey = state.tt ? chess.fen() : '';
+  if (state.tt && fenKey) {
+    const entry = state.tt.get(fenKey);
+    if (entry && entry.depth >= depth) {
+      if (entry.flag === 'exact') return entry.score;
+      if (entry.flag === 'lower' && entry.score >= beta) return entry.score;
+      if (entry.flag === 'upper' && entry.score <= alpha) return entry.score;
+    }
   }
 
-  if (chess.isDraw()) {
-    return STALEMATE_SCORE;
-  }
-
+  // PERF: At leaf depth, evaluate directly without generating moves or checkmate tests
   if (depth <= 0) {
     if (config.useQuiescence) {
       return quiescenceSearch(
@@ -181,9 +216,21 @@ function minimax(
 
   const legalMoves = orderMoves(chess.moves({ verbose: true }));
 
+  // PERF: If no legal moves, check inCheck once to distinguish checkmate from stalemate in O(1)
   if (legalMoves.length === 0) {
-    return evaluateBoard(chess, config.usePst);
+    if (chess.inCheck()) {
+      return chess.turn() === 'w'
+        ? -CHECKMATE_SCORE - depth
+        : CHECKMATE_SCORE + depth;
+    }
+    return STALEMATE_SCORE;
   }
+
+  if (chess.isDraw()) {
+    return STALEMATE_SCORE;
+  }
+
+  let bestScore: number;
 
   if (isMaximizing) {
     let maxEval = -Infinity;
@@ -208,7 +255,7 @@ function minimax(
         break; // Beta cutoff
       }
     }
-    return maxEval;
+    bestScore = maxEval;
   } else {
     let minEval = Infinity;
     let localBeta = beta;
@@ -232,8 +279,18 @@ function minimax(
         break; // Alpha cutoff
       }
     }
-    return minEval;
+    bestScore = minEval;
   }
+
+  // PERF: Store position evaluation in bounded Transposition Table
+  if (state.tt && fenKey && state.tt.size < 100000) {
+    let flag: 'exact' | 'lower' | 'upper' = 'exact';
+    if (bestScore <= alpha) flag = 'upper';
+    else if (bestScore >= beta) flag = 'lower';
+    state.tt.set(fenKey, { depth, score: bestScore, flag });
+  }
+
+  return bestScore;
 }
 
 /**
@@ -253,7 +310,10 @@ export class MinimaxEngine implements ChessAiEngine {
   async findBestMove(fen: string, config: AiSearchConfig): Promise<AiMoveEvaluation> {
     const startTime = performance.now();
     const chess = createSafeChess(fen);
-    const state: SearchState = { nodesEvaluated: 0 };
+    const state: SearchState = {
+      nodesEvaluated: 0,
+      tt: new Map<string, TranspositionEntry>(),
+    };
     const turn = chess.turn(); // 'w' or 'b'
     const isMaximizing = turn === 'w';
 
