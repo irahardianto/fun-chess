@@ -299,12 +299,16 @@ export class RelayAddressService implements IRelayAddressService {
       const publicUrl = this.getPublicUrl()!;
       const joinUrl = publicUrl;
 
+      // In production cloud relay (no custom test interfaces injected), suppress internal network topology (MIN-004)
+      const cloudInterfaces =
+        customInterfaces !== undefined ? interfaces : [];
+
       return {
         lanIp,
         port: effectivePort,
         localUrl,
         joinUrl,
-        interfaces,
+        interfaces: cloudInterfaces,
         relayMode: "cloud",
         isCloudRelay: true,
         publicUrl,
@@ -406,28 +410,27 @@ export class MockRelayAddressService implements IRelayAddressService {
   }
 }
 
-// Default singleton instance and functional helpers
-const defaultRelayAddressService = new RelayAddressService();
+// Functional helpers creating instances on demand (MAJ-010: no global mutable singleton)
 
 /**
- * Singleton helper for resolving addressing info.
+ * Helper for resolving addressing info.
  */
 export function getRelayAddressingInfo(
   port?: number,
   customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
 ): LanInfoResponse {
-  return defaultRelayAddressService.getAddressingInfo(port, customInterfaces);
+  return new RelayAddressService().getAddressingInfo(port, customInterfaces);
 }
 
 /**
- * Singleton helper for generating room join URLs.
+ * Helper for generating room join URLs.
  */
 export function generateRelayJoinUrl(
   port: number,
   roomCode?: string,
   customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
 ): string {
-  return defaultRelayAddressService.generateJoinUrl(
+  return new RelayAddressService().generateJoinUrl(
     port,
     roomCode,
     customInterfaces,
@@ -435,28 +438,28 @@ export function generateRelayJoinUrl(
 }
 
 /**
- * Singleton helper for checking Cloud Relay mode.
+ * Helper for checking Cloud Relay mode.
  */
 export function isCloudRelay(): boolean {
-  return defaultRelayAddressService.isCloudRelay();
+  return new RelayAddressService().isCloudRelay();
 }
 
 /**
- * Singleton helper for retrieving primary local LAN IP.
+ * Helper for retrieving primary local LAN IP.
  */
 export function getRelayLocalLanIp(
   customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
 ): string {
-  return defaultRelayAddressService.getLocalLanIp(customInterfaces);
+  return new RelayAddressService().getLocalLanIp(customInterfaces);
 }
 
 /**
- * Singleton helper for retrieving all local LAN interfaces.
+ * Helper for retrieving all local LAN interfaces.
  */
 export function getAllRelayLanInterfaces(
   customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
 ): string[] {
-  return defaultRelayAddressService.getAllLanInterfaces(customInterfaces);
+  return new RelayAddressService().getAllLanInterfaces(customInterfaces);
 }
 
 /**
@@ -466,5 +469,5 @@ export function getAddressingInfo(
   port?: number,
   customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
 ): LanInfoResponse {
-  return defaultRelayAddressService.getAddressingInfo(port, customInterfaces);
+  return new RelayAddressService().getAddressingInfo(port, customInterfaces);
 }

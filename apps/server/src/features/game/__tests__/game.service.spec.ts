@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GameService } from "../game.service.js";
 import { MockRoomStore } from "../../rooms/mock_room.store.js";
 import { RoomState } from "@fun-chess/shared";
@@ -33,7 +33,6 @@ describe("GameService", () => {
         color: "w",
         isHost: true,
         isConnected: true,
-        sessionToken: "token_w",
         connectedAt: Date.now(),
       },
       blackPlayer: {
@@ -43,7 +42,6 @@ describe("GameService", () => {
         color: "b",
         isHost: false,
         isConnected: true,
-        sessionToken: "token_b",
         connectedAt: Date.now(),
       },
       spectators: [],
@@ -406,6 +404,61 @@ describe("GameService", () => {
       await expect(
         service.respondRematch("REMATCH", "sock_black", true),
       ).rejects.toThrow(GameNotActiveError);
+    });
+  });
+
+  describe("store.mutate Atomic Mutation & Terminal Invariants", () => {
+    it("delegates makeMove, resign, offerDraw, and respondDraw execution to store.mutate", async () => {
+      const room = createActiveGameRoom("MUTATE");
+      await store.save(room);
+
+      const mutateSpy = vi.spyOn(store, "mutate");
+
+      // 1. makeMove
+      await service.makeMove(
+        { roomCode: "MUTATE", move: { from: "e2", to: "e4" } },
+        "sock_white",
+      );
+      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+
+      // 2. offerDraw
+      await service.offerDraw("MUTATE", "sock_black");
+      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+
+      // 3. respondDraw
+      await service.respondDraw("MUTATE", "sock_white", false);
+      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+
+      // 4. resign
+      await service.resign("MUTATE", "sock_black");
+      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+
+      // 5. requestRematch
+      await service.requestRematch("MUTATE", "sock_white");
+      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+
+      // 6. respondRematch
+      await service.respondRematch("MUTATE", "sock_black", true);
+      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+    });
+
+    it("enforces terminal game_over invariant: rejects makeMove and offerDraw with GameNotActiveError once match ends", async () => {
+      const room = createActiveGameRoom("ENDED");
+      room.status = "game_over";
+      await store.save(room);
+
+      // Attempt makeMove on terminated match
+      await expect(
+        service.makeMove(
+          { roomCode: "ENDED", move: { from: "e2", to: "e4" } },
+          "sock_white",
+        ),
+      ).rejects.toBeInstanceOf(GameNotActiveError);
+
+      // Attempt offerDraw on terminated match
+      await expect(
+        service.offerDraw("ENDED", "sock_white"),
+      ).rejects.toBeInstanceOf(GameNotActiveError);
     });
   });
 });

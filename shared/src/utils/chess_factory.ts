@@ -7,6 +7,14 @@ export const DEFAULT_CHESS_FEN =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 /**
+ * Injectable logger interface for Chess factory and FEN loaders.
+ * Adheres to Architectural Patterns Rule 1: I/O Isolation.
+ */
+export interface ChessLogger {
+  warn(message: string, ...args: unknown[]): void;
+}
+
+/**
  * Validates whether a given value is a syntactically and structurally valid chess FEN.
  *
  * @param fen - Potential FEN string to validate
@@ -35,9 +43,13 @@ export function isValidFen(fen: unknown): fen is string {
  * - If fen is invalid or causes an error, falls back safely to standard starting position and logs a warning.
  *
  * @param fen - Optional FEN string to initialize
+ * @param logger - Optional injectable logger (defaults to console for backward compatibility; safe no-op if null/empty)
  * @returns A fully valid, initialized Chess instance
  */
-export function createSafeChess(fen?: string): Chess {
+export function createSafeChess(
+  fen?: string,
+  logger: ChessLogger = console,
+): Chess {
   if (!fen || typeof fen !== "string") {
     return new Chess();
   }
@@ -50,14 +62,14 @@ export function createSafeChess(fen?: string): Chess {
   try {
     const validation = validateFen(trimmed);
     if (!validation.ok) {
-      console.warn(
+      logger?.warn(
         `[createSafeChess] Invalid FEN "${trimmed}": ${validation.error ?? "Malformed position"}. Falling back to standard starting position.`,
       );
       return new Chess();
     }
     return new Chess(trimmed);
   } catch (err) {
-    console.warn(
+    logger?.warn(
       `[createSafeChess] Failed to initialize position "${trimmed}": ${err instanceof Error ? err.message : String(err)}. Falling back to standard starting position.`,
     );
     return new Chess();
@@ -71,10 +83,19 @@ export function createSafeChess(fen?: string): Chess {
  *
  * @param chess - The Chess instance to update
  * @param fen - The FEN string to load
+ * @param logger - Optional injectable logger (defaults to console for backward compatibility; safe no-op if null/empty)
  * @returns true if the FEN was successfully loaded, false otherwise
  */
-export function safeLoadFen(chess: Chess, fen: string): boolean {
-  if (!chess || !isValidFen(fen)) {
+export function safeLoadFen(
+  chess: Chess,
+  fen: string,
+  logger: ChessLogger = console,
+): boolean {
+  if (!chess) {
+    return false;
+  }
+  if (!isValidFen(fen)) {
+    logger?.warn(`[safeLoadFen] Invalid FEN "${fen}".`);
     return false;
   }
 
@@ -83,7 +104,7 @@ export function safeLoadFen(chess: Chess, fen: string): boolean {
     chess.load(fen.trim());
     return true;
   } catch (err) {
-    console.warn(
+    logger?.warn(
       `[safeLoadFen] Failed to load FEN "${fen}": ${err instanceof Error ? err.message : String(err)}.`,
     );
     // Restore previous state if possible

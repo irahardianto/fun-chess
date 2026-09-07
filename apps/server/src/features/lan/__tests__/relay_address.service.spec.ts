@@ -161,6 +161,17 @@ describe("RelayAddressService", () => {
       const info = service.getAddressingInfo(3000, {});
       expect(info.interfaces).toEqual(["fun-chess-xyz.a.run.app"]);
     });
+
+    it("suppresses internal network interfaces array in cloud relay mode to prevent topology disclosure (MIN-004)", () => {
+      const service = new RelayAddressService({
+        publicUrl: "https://fun-chess-xyz.a.run.app",
+        port: 8080,
+      });
+
+      const info = service.getAddressingInfo(8080);
+      expect(service.isCloudRelay()).toBe(true);
+      expect(info.interfaces).toEqual([]);
+    });
   });
 
   describe("Manual LAN IP Override (Priority 2)", () => {

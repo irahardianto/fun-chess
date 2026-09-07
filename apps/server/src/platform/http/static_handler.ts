@@ -32,6 +32,7 @@ export interface StaticFileHandlerOptions {
 
 /**
  * Handles static asset serving and SPA HTML5 history mode fallback.
+ * Hardened against directory traversal (CRIT-008) and 200 asset masking.
  */
 export async function serveStaticFile(
   req: IncomingMessage,
@@ -41,14 +42,51 @@ export async function serveStaticFile(
 ): Promise<boolean> {
   const isHead = req.method?.toUpperCase() === "HEAD";
   const urlPath = req.url?.split("?")[0] || "/";
-  const sanitizedPath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const rootDir = path.resolve(options.distPath);
 
-  // Target candidate path
-  let targetFilePath = path.join(rootDir, sanitizedPath);
+  const forwarded = req.headers?.["x-forwarded-for"];
+  const clientIp =
+    (typeof forwarded === "string"
+      ? forwarded.split(",")[0]?.trim()
+      : Array.isArray(forwarded)
+        ? forwarded[0]?.trim()
+        : undefined) ||
+    req.socket?.remoteAddress ||
+    "127.0.0.1";
 
-  // Prevent directory traversal outside rootDir
-  if (!targetFilePath.startsWith(rootDir)) {
+  // Pre-normalization Directory Traversal Inspection (SEC-HIGH-002, CRIT-008)
+  const lowerUrl = urlPath.toLowerCase();
+  let decodedPath = "";
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+    try {
+      decodedPath = decodeURIComponent(decodedPath);
+    } catch {
+      // ignore secondary decoding failure
+    }
+  } catch {
+    decodedPath = urlPath;
+  }
+
+  const normalizedPrefix = urlPath.startsWith("/") ? urlPath : "/" + urlPath;
+  const resolvedCandidate = path.resolve(rootDir, "." + normalizedPrefix);
+  const relativeCandidate = path.relative(rootDir, resolvedCandidate);
+  const escapesRoot =
+    relativeCandidate.startsWith("..") || path.isAbsolute(relativeCandidate);
+
+  const isTraversal =
+    urlPath.includes("..") ||
+    lowerUrl.includes("%2e%2e") ||
+    decodedPath.includes("..") ||
+    escapesRoot;
+
+  if (isTraversal) {
+    logger?.warn("Directory traversal attempt detected", {
+      operation: "security_violation",
+      path: urlPath,
+      clientIp,
+    });
+
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
     if (isHead) {
       res.end();
@@ -58,6 +96,32 @@ export async function serveStaticFile(
     return true;
   }
 
+  const sanitizedPath = path.normalize(urlPath);
+
+  // Target candidate path
+  let targetFilePath = path.join(rootDir, sanitizedPath === "/" ? "index.html" : sanitizedPath);
+  const relative = path.relative(rootDir, targetFilePath);
+
+  // Redundant defense-in-depth: target must reside inside rootDir (CRIT-008)
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    logger?.warn("Directory traversal attempt detected", {
+      operation: "security_violation",
+      path: urlPath,
+      clientIp,
+    });
+
+    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    if (isHead) {
+      res.end();
+    } else {
+      res.end("Forbidden");
+    }
+    return true;
+  }
+
+  const ext = path.extname(sanitizedPath).toLowerCase();
+  const acceptHeader = (req.headers?.["accept"] as string) || "";
+
   try {
     const fileStat = await stat(targetFilePath);
     if (fileStat.isDirectory()) {
@@ -65,14 +129,36 @@ export async function serveStaticFile(
       await stat(targetFilePath);
     }
   } catch {
-    // If specific file not found, fall back to root index.html for SPA client routing
-    targetFilePath = path.join(rootDir, "index.html");
+    // 2. Missing asset handling (CRIT-008):
+    // If request has a file extension (e.g. .js, .css, .png, .json), NEVER rewrite to index.html with 200!
+    if (ext) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      if (isHead) {
+        res.end();
+      } else {
+        res.end("Not Found");
+      }
+      return true;
+    }
+
+    // 3. SPA History Mode Fallback: Only rewrite to index.html if caller accepts HTML navigation
+    if (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader) {
+      targetFilePath = path.join(rootDir, "index.html");
+    } else {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      if (isHead) {
+        res.end();
+      } else {
+        res.end("Not Found");
+      }
+      return true;
+    }
   }
 
   try {
     const content = await readFile(targetFilePath);
-    const ext = path.extname(targetFilePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+    const resolvedExt = path.extname(targetFilePath).toLowerCase();
+    const contentType = MIME_TYPES[resolvedExt] || "application/octet-stream";
 
     // Cache immutable hashed assets, don't cache index.html
     const isIndex = targetFilePath.endsWith("index.html");
@@ -92,7 +178,8 @@ export async function serveStaticFile(
     }
     return true;
   } catch (err) {
-    if (options.fallbackHtml) {
+    // Fallback HTML if disk assets (index.html) don't exist in dev/container preview
+    if (options.fallbackHtml && !ext && (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader)) {
       const fbLength = Buffer.byteLength(options.fallbackHtml);
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
@@ -111,7 +198,7 @@ export async function serveStaticFile(
       targetFilePath,
       error: (err as Error).message,
     });
+
     return false;
   }
 }
-

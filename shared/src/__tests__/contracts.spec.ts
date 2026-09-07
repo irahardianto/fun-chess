@@ -13,6 +13,8 @@ import type {
   RematchState,
   RoomState,
   GameOverPayload,
+  SessionInfo,
+  SavedSession,
   // Errors
   ErrorCode,
   SocketErrorPayload,
@@ -69,11 +71,25 @@ import {
   PLAYER_AVATARS,
   DEFAULT_PLAYER_AVATAR,
   DEFAULT_OPPONENT_AVATAR,
+  // Error classes
+  AppError,
+  RoomNotFoundError,
+  RoomFullError,
+  InvalidMoveError,
+  RateLimitExceededError,
+  UnauthorizedError,
+  // Schemas
+  RoomCodeSchema,
+  PlayerNameSchema,
+  CreateRoomRequestSchema,
+  JoinRoomRequestSchema,
+  ReconnectRequestSchema,
+  MovePayloadSchema,
 } from "../index.js";
 
 describe("Shared Contracts & Data Model Specification", () => {
   describe("Chess Core & Multiplayer Models", () => {
-    it("validates Player and RoomState structure", () => {
+    it("validates Player and RoomState structure (without sessionToken per CRIT-001)", () => {
       const player: Player = {
         id: "player-uuid-1",
         socketId: "socket-abc-123",
@@ -81,9 +97,10 @@ describe("Shared Contracts & Data Model Specification", () => {
         color: "w",
         isHost: true,
         isConnected: true,
-        sessionToken: "token-secret-xyz",
         connectedAt: 1700000000000,
       };
+
+      expect("sessionToken" in player).toBe(false);
 
       const room: RoomState = {
         roomCode: "ABCD",
@@ -118,6 +135,32 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(room.status).toBe("playing");
       expect(room.game.turn).toBe("w");
       expect(room.whitePlayer?.name).toBe("Alex");
+    });
+
+    it("validates SessionInfo and SavedSession models (CRIT-001 private credentials)", () => {
+      const sessionInfo: SessionInfo = {
+        sessionToken: "session-secret-token-uuid-1234",
+        playerId: "player-uuid-1",
+        roomCode: "ABCD",
+        createdAt: 1700000000000,
+        lastSeenAt: 1700000005000,
+      };
+
+      const savedSession: SavedSession = {
+        roomCode: "ABCD",
+        playerId: "player-uuid-1",
+        sessionToken: "session-secret-token-uuid-1234",
+      };
+
+      expect(sessionInfo.sessionToken).toBe("session-secret-token-uuid-1234");
+      expect(sessionInfo.playerId).toBe("player-uuid-1");
+      expect(sessionInfo.roomCode).toBe("ABCD");
+      expect(sessionInfo.createdAt).toBe(1700000000000);
+      expect(sessionInfo.lastSeenAt).toBe(1700000005000);
+
+      expect(savedSession.roomCode).toBe("ABCD");
+      expect(savedSession.playerId).toBe("player-uuid-1");
+      expect(savedSession.sessionToken).toBe("session-secret-token-uuid-1234");
     });
 
     it("validates GameOverPayload and GameOverReason union values", () => {
@@ -161,6 +204,211 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(errorPayload.message).toContain("does not exist");
       expect(errorPayload.roomCode).toBe("ABCD");
       expect(errorPayload.correlationId).toBe("corr-1234-5678");
+    });
+
+    it("validates AppError and custom error classes with status codes, error codes, and isAppError flag", () => {
+      const notFound = new RoomNotFoundError("ABCD");
+      expect(notFound.isAppError).toBe(true);
+      expect(notFound.code).toBe("ERR_ROOM_NOT_FOUND");
+      expect(notFound.statusCode).toBe(404);
+      expect(notFound.message).toBe("Room with code 'ABCD' does not exist");
+      expect(notFound.details).toEqual({ roomCode: "ABCD" });
+      expect(notFound).toBeInstanceOf(AppError);
+      expect(notFound).toBeInstanceOf(Error);
+
+      const roomFull = new RoomFullError("WXYZ");
+      expect(roomFull.isAppError).toBe(true);
+      expect(roomFull.code).toBe("ERR_ROOM_FULL");
+      expect(roomFull.statusCode).toBe(409);
+      expect(roomFull.message).toBe("Room 'WXYZ' already has 2 active players");
+      expect(roomFull.details).toEqual({ roomCode: "WXYZ" });
+      expect(roomFull).toBeInstanceOf(AppError);
+
+      const invalidMove = new InvalidMoveError("illegal destination square", { from: "e2", to: "e5" });
+      expect(invalidMove.isAppError).toBe(true);
+      expect(invalidMove.code).toBe("ERR_INVALID_MOVE");
+      expect(invalidMove.statusCode).toBe(422);
+      expect(invalidMove.message).toBe("Illegal chess move: illegal destination square");
+      expect(invalidMove.details).toEqual({ from: "e2", to: "e5" });
+      expect(invalidMove).toBeInstanceOf(AppError);
+
+      const rateLimit = new RateLimitExceededError();
+      expect(rateLimit.isAppError).toBe(true);
+      expect(rateLimit.code).toBe("ERR_RATE_LIMITED");
+      expect(rateLimit.statusCode).toBe(429);
+      expect(rateLimit.message).toContain("Rate limit exceeded");
+      expect(rateLimit).toBeInstanceOf(AppError);
+
+      const unauthorized = new UnauthorizedError();
+      expect(unauthorized.isAppError).toBe(true);
+      expect(unauthorized.code).toBe("ERR_UNAUTHORIZED");
+      expect(unauthorized.statusCode).toBe(401);
+      expect(unauthorized.message).toContain("Unauthorized");
+      expect(unauthorized).toBeInstanceOf(AppError);
+    });
+  });
+
+  describe("Zod Ingress Schemas (schemas.ts)", () => {
+    describe("RoomCodeSchema", () => {
+      it("parses and normalizes valid 4-character alphanumeric room codes", () => {
+        expect(RoomCodeSchema.parse("abcd")).toBe("ABCD");
+        expect(RoomCodeSchema.parse("WXYZ")).toBe("WXYZ");
+        expect(RoomCodeSchema.parse("a1b2")).toBe("A1B2");
+        expect(RoomCodeSchema.parse("  k7m9  ")).toBe("K7M9");
+      });
+
+      it("fails validation for invalid room codes", () => {
+        expect(() => RoomCodeSchema.parse("abc")).toThrow();
+        expect(() => RoomCodeSchema.parse("abcde")).toThrow();
+        expect(() => RoomCodeSchema.parse("AB-C")).toThrow();
+        expect(() => RoomCodeSchema.parse("")).toThrow();
+        expect(() => RoomCodeSchema.parse(1234)).toThrow();
+      });
+    });
+
+    describe("PlayerNameSchema", () => {
+      it("parses and sanitizes valid player names", () => {
+        expect(PlayerNameSchema.parse("Alex")).toBe("Alex");
+        expect(PlayerNameSchema.parse("  Sam  ")).toBe("Sam");
+        expect(PlayerNameSchema.parse("<b>Sam</b>")).toBe("bSam/b");
+        expect(PlayerNameSchema.parse("Tom & Jerry")).toBe("Tom  Jerry");
+      });
+
+      it("fails validation for empty, whitespace-only, or overly long player names", () => {
+        expect(() => PlayerNameSchema.parse("")).toThrow();
+        expect(() => PlayerNameSchema.parse("   ")).toThrow();
+        expect(() => PlayerNameSchema.parse("A".repeat(21))).toThrow();
+      });
+    });
+
+    describe("CreateRoomRequestSchema", () => {
+      it("parses valid CreateRoom requests with explicit and default options", () => {
+        const parsed = CreateRoomRequestSchema.parse({
+          playerName: "Charlie",
+          preferredColor: "w",
+          avatar: "🦁",
+        });
+        expect(parsed.playerName).toBe("Charlie");
+        expect(parsed.preferredColor).toBe("w");
+        expect(parsed.avatar).toBe("🦁");
+
+        const defaultParsed = CreateRoomRequestSchema.parse({
+          playerName: "Dave",
+        });
+        expect(defaultParsed.preferredColor).toBe("random");
+        expect(defaultParsed.avatar).toBe("🦁");
+      });
+
+      it("fails validation for invalid CreateRoom requests", () => {
+        expect(() => CreateRoomRequestSchema.parse({ playerName: "" })).toThrow();
+        expect(() =>
+          CreateRoomRequestSchema.parse({
+            playerName: "Valid",
+            preferredColor: "purple",
+          }),
+        ).toThrow();
+      });
+    });
+
+    describe("JoinRoomRequestSchema", () => {
+      it("parses valid JoinRoom requests and normalizes roomCode", () => {
+        const parsed = JoinRoomRequestSchema.parse({
+          roomCode: "abcd",
+          playerName: "Eve",
+        });
+        expect(parsed.roomCode).toBe("ABCD");
+        expect(parsed.playerName).toBe("Eve");
+        expect(parsed.avatar).toBe("🦁");
+      });
+
+      it("fails validation for invalid JoinRoom requests", () => {
+        expect(() =>
+          JoinRoomRequestSchema.parse({
+            roomCode: "too-long",
+            playerName: "Eve",
+          }),
+        ).toThrow();
+        expect(() =>
+          JoinRoomRequestSchema.parse({
+            roomCode: "ABCD",
+            playerName: "",
+          }),
+        ).toThrow();
+      });
+    });
+
+    describe("ReconnectRequestSchema", () => {
+      it("parses valid Reconnect requests", () => {
+        const validUuid = "123e4567-e89b-12d3-a456-426614174000";
+        const parsed = ReconnectRequestSchema.parse({
+          roomCode: "abcd",
+          playerId: validUuid,
+          sessionToken: "session-secret-token-123",
+        });
+        expect(parsed.roomCode).toBe("ABCD");
+        expect(parsed.playerId).toBe(validUuid);
+        expect(parsed.sessionToken).toBe("session-secret-token-123");
+      });
+
+      it("fails validation when playerId is not a valid UUID or sessionToken is empty", () => {
+        expect(() =>
+          ReconnectRequestSchema.parse({
+            roomCode: "ABCD",
+            playerId: "not-a-valid-uuid",
+            sessionToken: "token",
+          }),
+        ).toThrow();
+
+        expect(() =>
+          ReconnectRequestSchema.parse({
+            roomCode: "ABCD",
+            playerId: "123e4567-e89b-12d3-a456-426614174000",
+            sessionToken: "",
+          }),
+        ).toThrow();
+      });
+    });
+
+    describe("MovePayloadSchema", () => {
+      it("parses valid standard and promotion moves", () => {
+        const standardMove = MovePayloadSchema.parse({
+          from: "e2",
+          to: "e4",
+        });
+        expect(standardMove.from).toBe("e2");
+        expect(standardMove.to).toBe("e4");
+        expect(standardMove.promotion).toBeUndefined();
+
+        const promoMove = MovePayloadSchema.parse({
+          from: "e7",
+          to: "e8",
+          promotion: "q",
+        });
+        expect(promoMove.promotion).toBe("q");
+      });
+
+      it("fails validation for invalid square coordinates or promotion pieces", () => {
+        // Invalid square ranks or files
+        expect(() => MovePayloadSchema.parse({ from: "e9", to: "e4" })).toThrow();
+        expect(() => MovePayloadSchema.parse({ from: "i1", to: "e4" })).toThrow();
+        expect(() => MovePayloadSchema.parse({ from: "e2", to: "invalid" })).toThrow();
+
+        // Invalid promotion piece (King or Pawn cannot be promotion targets)
+        expect(() =>
+          MovePayloadSchema.parse({
+            from: "e7",
+            to: "e8",
+            promotion: "k",
+          }),
+        ).toThrow();
+        expect(() =>
+          MovePayloadSchema.parse({
+            from: "e7",
+            to: "e8",
+            promotion: "p",
+          }),
+        ).toThrow();
+      });
     });
   });
 

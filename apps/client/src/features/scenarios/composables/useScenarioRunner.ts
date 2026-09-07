@@ -7,28 +7,29 @@ import type {
   ChessScenario,
   StarRating,
 } from '@fun-chess/shared';
-import { createSafeChess, safeLoadFen } from '@fun-chess/shared';
+import { createSafeChess, safeLoadFen, isPawnPromotion } from '@fun-chess/shared';
 import { validateStepMove } from '../engine/scenario_validator';
 import { calculateStars, calculateAccuracy } from '../engine/star_calculator';
-import { useAudio } from '../../../composables/useAudio';
+import { useBoardSelection } from '../../board/index';
+
+export interface ScenarioStepOutcomeEvent {
+  type: 'scenario_step_completed';
+  starsAwarded: number;
+  isLessonComplete: boolean;
+}
 
 export interface UseScenarioRunnerOptions {
   scenario?: ChessScenario | null;
-  autoPlayAudio?: boolean;
+  onStepOutcome?: (event: ScenarioStepOutcomeEvent) => void;
 }
 
 export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScenario) {
-  const initialScenario =
+  const optionsObj: UseScenarioRunnerOptions =
     options && 'steps' in options
-      ? options
-      : options?.scenario ?? null;
+      ? { scenario: options }
+      : options ?? {};
 
-  const autoAudio =
-    options && 'steps' in options
-      ? true
-      : options?.autoPlayAudio ?? true;
-
-  const audio = useAudio();
+  const initialScenario = optionsObj.scenario ?? null;
 
   // Reactive State
   const scenario = ref<ChessScenario | null>(initialScenario);
@@ -49,10 +50,8 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
   const isCompleted = ref<boolean>(false);
   const isShaking = ref<boolean>(false);
 
-  const selectedSquare = ref<Square | null>(null);
-  const legalMoves = ref<Square[]>([]);
   const lastMove = ref<{ from: string; to: string } | null>(null);
-  const pendingPromotion = ref<{ from: Square; to: Square } | null>(null);
+  const lastStepOutcome = ref<ScenarioStepOutcomeEvent | null>(null);
 
   // Internal chess.js engine instance
   const chess = createSafeChess(currentFen.value);
@@ -106,7 +105,8 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     try {
       safeLoadFen(chess, fenStr);
       currentFen.value = chess.fen();
-    } catch {
+    } catch (err) {
+      console.warn('[useScenarioRunner] safeLoadFen failed, using fallback string:', err);
       currentFen.value = fenStr;
     }
   }
@@ -128,20 +128,14 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
         verbose: true,
       });
       return moves.map((m) => m.to as Square);
-    } catch {
+    } catch (err) {
+      console.warn('[useScenarioRunner] chess.moves failed:', err);
       return [];
     }
   }
 
-  function isPromotionMove(from: Square, to: Square): boolean {
-    try {
-      const piece = chess.get(from as unknown as import('chess.js').Square);
-      if (!piece || piece.type !== 'p') return false;
-      const toRank = to.charAt(1);
-      return (piece.color === 'w' && toRank === '8') || (piece.color === 'b' && toRank === '1');
-    } catch {
-      return false;
-    }
+  function checkIsPromotionMove(from: Square, to: Square): boolean {
+    return isPawnPromotion(from, to, chess);
   }
 
   function loadStep(stepIdx: number): void {
@@ -161,10 +155,8 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     isStepSuccess.value = false;
     isWaitingForBotResponse.value = false;
     isShaking.value = false;
-    selectedSquare.value = null;
-    legalMoves.value = [];
     lastMove.value = null;
-    pendingPromotion.value = null;
+    boardSelection.clearSelection();
   }
 
   function loadScenario(newScenario: ChessScenario, initialStepIdx = 0): void {
@@ -174,44 +166,6 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     mistakesCurrentAttempt.value = 0;
     isCompleted.value = false;
     loadStep(initialStepIdx);
-  }
-
-  function selectSquare(sq: Square): void {
-    if (isWaitingForBotResponse.value || isCompleted.value) return;
-
-    // If square already selected and clicked square is in legal moves
-    if (selectedSquare.value && legalMoves.value.includes(sq)) {
-      const from = selectedSquare.value;
-      const to = sq;
-
-      if (isPromotionMove(from, to)) {
-        pendingPromotion.value = { from, to };
-        return;
-      }
-
-      applyPlayerMove({ from, to });
-      return;
-    }
-
-    // Check if clicked square has a piece belonging to player
-    try {
-      const piece = chess.get(sq as unknown as import('chess.js').Square);
-      const isPieceOfPlayer = piece && piece.color === playerColor.value;
-      const stepAllowedSource = currentStep.value?.allowedMoves?.some((c) => c.from === sq);
-
-      if (isPieceOfPlayer || stepAllowedSource) {
-        selectedSquare.value = sq;
-        legalMoves.value = getLegalMovesForSquare(sq);
-        if (autoAudio) audio.playPickup();
-        return;
-      }
-    } catch {
-      // Fallback
-    }
-
-    // Deselect if empty or invalid
-    selectedSquare.value = null;
-    legalMoves.value = [];
   }
 
   function applyPlayerMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }): boolean {
@@ -227,22 +181,20 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       mistakesCurrentAttempt.value++;
       isShaking.value = true;
       feedbackMessage.value = 'Not quite! Look for the goal square or tap 💡 Hint for a clue.';
-      if (autoAudio) audio.playError();
 
       if (shakeTimer) clearTimeout(shakeTimer);
       shakeTimer = setTimeout(() => {
         isShaking.value = false;
       }, 400);
 
-      selectedSquare.value = null;
-      legalMoves.value = [];
+      boardSelection.clearSelection();
       return false;
     }
 
     // Move is valid for this tutorial step! Execute move
     try {
       const promoChar = move.promotion ? (move.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n') : 'q';
-      const isPromo = isPromotionMove(move.from, move.to);
+      const isPromo = checkIsPromotionMove(move.from, move.to);
       let res: any = null;
 
       try {
@@ -251,7 +203,8 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
           to: move.to as unknown as import('chess.js').Square,
           promotion: isPromo ? promoChar : undefined,
         });
-      } catch {
+      } catch (err) {
+        console.warn('[useScenarioRunner] chess.move error, using fallback board mutation:', err);
         res = null;
       }
 
@@ -271,20 +224,7 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       lastMove.value = { from: move.from, to: move.to };
       isStepSuccess.value = true;
       feedbackMessage.value = step.explanationOnSuccess;
-      selectedSquare.value = null;
-      legalMoves.value = [];
-      pendingPromotion.value = null;
-
-      // Play audio
-      if (autoAudio) {
-        if (chess.isCheckmate() || chess.inCheck()) {
-          audio.playCheck();
-        } else if (res?.captured) {
-          audio.playCapture();
-        } else {
-          audio.playMove();
-        }
-      }
+      boardSelection.clearSelection();
 
       // Check if there is an automated opponent response
       if (step.opponentResponse) {
@@ -293,6 +233,7 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
         const delay = opp.delayMs ?? 500;
 
         botTimer = setTimeout(() => {
+          let oppMoveSuccess = false;
           try {
             const oppPromo = opp.promotion
               ? (opp.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n')
@@ -305,7 +246,8 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
                 to: opp.to as unknown as import('chess.js').Square,
                 promotion: oppPromo,
               });
-            } catch {
+            } catch (err) {
+              console.warn('[useScenarioRunner] Bot response chess.move error, using fallback mutation:', err);
               oppRes = null;
             }
 
@@ -317,20 +259,28 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
                   { type: (oppPromo as PieceType) ?? oppP.type, color: oppP.color },
                   opp.to as unknown as import('chess.js').Square
                 );
+                oppMoveSuccess = true;
+              } else {
+                console.warn('[useScenarioRunner] Opponent move failed: piece not found at', opp.from);
+                oppMoveSuccess = false;
               }
+            } else {
+              oppMoveSuccess = true;
             }
 
-            currentFen.value = chess.fen();
-            lastMove.value = { from: opp.from, to: opp.to };
-            if (autoAudio) {
-              if (oppRes?.captured) audio.playCapture();
-              else audio.playMove();
+            if (oppMoveSuccess) {
+              currentFen.value = chess.fen();
+              lastMove.value = { from: opp.from, to: opp.to };
             }
-          } catch {
-            // Ignore
+          } catch (err) {
+            console.warn('[useScenarioRunner] Bot response execution failed:', err);
+            oppMoveSuccess = false;
           } finally {
             isWaitingForBotResponse.value = false;
-            advanceOrCompleteStep();
+            // MAJ-025: Only advance step if move succeeded!
+            if (oppMoveSuccess) {
+              advanceOrCompleteStep();
+            }
           }
         }, delay);
       } else {
@@ -338,21 +288,63 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       }
 
       return true;
-    } catch {
+    } catch (err) {
+      console.warn('[useScenarioRunner] applyPlayerMove error:', err);
       return false;
     }
   }
 
+  // Unified Board Selection State Machine (MIN-010)
+  const boardSelection = useBoardSelection({
+    getPieceAt: (sq) => {
+      try {
+        const piece = chess.get(sq as unknown as import('chess.js').Square);
+        if (!piece) return null;
+        return { type: piece.type, color: piece.color as 'w' | 'b' };
+      } catch (err) {
+        console.warn('[useScenarioRunner] getPiece error:', err);
+        return null;
+      }
+    },
+    getLegalMovesForSquare: (sq) => getLegalMovesForSquare(sq),
+    currentTurn: computed(() => playerColor.value as 'w' | 'b'),
+    playerColor: computed(() => playerColor.value as 'w' | 'b'),
+    executeMove: (from, to, promotion) => applyPlayerMove({ from, to, promotion }),
+  });
+
+  function selectSquare(sq: Square): void {
+    if (isWaitingForBotResponse.value || isCompleted.value) return;
+
+    // If square already selected and clicked square is in legal moves
+    if (boardSelection.selectedSquare.value && boardSelection.isLegalTarget(sq)) {
+      boardSelection.handleSquareClick(sq);
+      return;
+    }
+
+    // Check if clicked square has a piece belonging to player or is allowed source for tutorial
+    try {
+      const piece = chess.get(sq as unknown as import('chess.js').Square);
+      const isPieceOfPlayer = piece && piece.color === playerColor.value;
+      const stepAllowedSource = currentStep.value?.allowedMoves?.some((c) => c.from === sq);
+
+      if (isPieceOfPlayer || stepAllowedSource) {
+        boardSelection.handleSquareClick(sq);
+        return;
+      }
+    } catch (err) {
+      console.warn('[useScenarioRunner] selectSquare piece check error:', err);
+    }
+
+    // Deselect if empty or invalid
+    boardSelection.clearSelection();
+  }
+
   function completePromotion(pieceType: 'q' | 'r' | 'b' | 'n'): boolean {
-    if (!pendingPromotion.value) return false;
-    const { from, to } = pendingPromotion.value;
-    return applyPlayerMove({ from, to, promotion: pieceType });
+    return boardSelection.completePromotion(pieceType);
   }
 
   function cancelPromotion(): void {
-    pendingPromotion.value = null;
-    selectedSquare.value = null;
-    legalMoves.value = [];
+    boardSelection.cancelPromotion();
   }
 
   function advanceOrCompleteStep(): void {
@@ -361,8 +353,21 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     nextStepTimer = setTimeout(() => {
       if (isLastStep) {
         isCompleted.value = true;
-        if (autoAudio) audio.playVictory();
+        const outcome: ScenarioStepOutcomeEvent = {
+          type: 'scenario_step_completed',
+          starsAwarded: calculatedStars.value,
+          isLessonComplete: true,
+        };
+        lastStepOutcome.value = outcome;
+        optionsObj.onStepOutcome?.(outcome);
       } else {
+        const outcome: ScenarioStepOutcomeEvent = {
+          type: 'scenario_step_completed',
+          starsAwarded: calculatedStars.value,
+          isLessonComplete: false,
+        };
+        lastStepOutcome.value = outcome;
+        optionsObj.onStepOutcome?.(outcome);
         loadStep(currentStepIndex.value + 1);
       }
     }, 700);
@@ -381,8 +386,6 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       hintGlowSquare.value = currentStep.value.highlightSquares[0];
       hintTargetSquare.value = currentStep.value.highlightSquares[1] ?? null;
     }
-
-    if (autoAudio) audio.playClick();
   }
 
   function resetCurrentStep(): void {
@@ -428,10 +431,11 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     isShaking: readonly(isShaking),
     calculatedStars,
     accuracy,
-    selectedSquare: readonly(selectedSquare),
-    legalMoves: readonly(legalMoves),
+    lastStepOutcome: readonly(lastStepOutcome),
+    selectedSquare: computed(() => boardSelection.selectedSquare.value),
+    legalMoves: computed(() => boardSelection.legalMovesForSelected.value),
     lastMove: readonly(lastMove),
-    pendingPromotion: readonly(pendingPromotion),
+    pendingPromotion: computed(() => boardSelection.pendingPromotion.value),
     loadScenario,
     loadStep,
     selectSquare,

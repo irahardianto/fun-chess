@@ -63,9 +63,13 @@ describe('useLanDiscovery composable', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
+        status: 200,
         json: async () => ({
           lanIp: '192.168.1.150',
           port: 3000,
+          localUrl: 'http://localhost:3000',
+          joinUrl: 'http://192.168.1.150:3000',
+          interfaces: ['192.168.1.150'],
           isCloudRelay: false,
         }),
       })

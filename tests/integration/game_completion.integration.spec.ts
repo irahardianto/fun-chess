@@ -55,6 +55,7 @@ describe("Game Completion Integration Tests", () => {
     >(whiteClient, "room:create", {
       playerName: "WhitePlayer",
       preferredColor: "w",
+      avatar: "🦁",
     });
     activeRoomCode = createRes.room.roomCode;
 
@@ -64,6 +65,7 @@ describe("Game Completion Integration Tests", () => {
     >(blackClient, "room:join", {
       roomCode: activeRoomCode,
       playerName: "BlackPlayer",
+      avatar: "🦁",
     });
   });
 
@@ -217,7 +219,7 @@ describe("Game Completion Integration Tests", () => {
     } as RespondDrawRequest);
 
     const err = await errorPromise;
-    expect(err.code).toBe("ERR_INVALID_PAYLOAD");
+    expect(err.code).toBe("ERR_GAME_NOT_ACTIVE");
 
     // Assert room is still playing
     const room = await serverInstance.roomStore.findByCode(activeRoomCode);

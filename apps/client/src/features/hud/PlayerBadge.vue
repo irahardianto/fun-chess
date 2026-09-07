@@ -173,8 +173,12 @@ const turnText = computed(() => {
 .self-tag {
   font-family: var(--font-body);
   font-size: var(--text-xs);
-  color: var(--color-primary);
+  color: var(--color-primary-text, #ffffff);
   font-weight: var(--weight-bold);
+}
+
+[data-theme='dark'] .self-tag {
+  color: var(--color-primary-text, #ffffff);
 }
 
 .host-tag {

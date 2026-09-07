@@ -5,12 +5,14 @@ import type {
   ProgressDiffPreview,
 } from "../types/progress_sync.js";
 import { UNIFIED_PROGRESS_SCHEMA_VERSION } from "../types/progress_sync.js";
-import type { StarRating } from "../contracts/scenario.js";
+import type { ScenarioProgressMap, StarRating } from "../contracts/scenario.js";
 import type {
   PuzzleTheme,
   ThemeMasteryProgress,
   SolvedPuzzleRecord,
   RatingHistoryPoint,
+  AdaptiveRatingState,
+  PuzzleArcadeStats,
 } from "../contracts/puzzle.js";
 
 /**
@@ -18,6 +20,9 @@ import type {
  * - master: >= 20 solved
  * - apprentice: >= 8 solved
  * - novice: < 8 solved
+ *
+ * @param solved - Total puzzles solved in this theme
+ * @returns Calculated mastery tier
  */
 function calculateMasteryLevel(
   solved: number,
@@ -28,41 +33,32 @@ function calculateMasteryLevel(
 }
 
 /**
- * Pure function performing deterministic smart merge of user progress.
- * Adheres to Rule 2 (Zero side effects, zero I/O).
+ * Merges scenario progress maps using smart star upgrade and timestamp merging.
  *
- * @param local - Current local progress state
- * @param incoming - Incoming progress package
- * @param strategy - Resolution strategy ('smart_merge' | 'replace_local' | 'keep_local')
- * @returns Combined UnifiedProgressPayload
+ * @param localScenarios - Local scenarios progress map
+ * @param incomingScenarios - Incoming scenarios progress map
+ * @returns Combined ScenarioProgressMap
  */
-export function mergeUnifiedProgress(
-  local: UnifiedProgressPayload,
-  incoming: UnifiedProgressPayload,
-  strategy: SyncMergeStrategy,
-): UnifiedProgressPayload {
-  if (strategy === "keep_local") {
-    return structuredClone(local);
-  }
-  if (strategy === "replace_local") {
-    return structuredClone(incoming);
-  }
-
-  // --- 1. Scenarios Union & Star Upgrades ---
-  const mergedScenarios: UnifiedProgressPayload["scenarios"] = {};
+export function mergeScenarios(
+  localScenarios?: ScenarioProgressMap | null,
+  incomingScenarios?: ScenarioProgressMap | null,
+): ScenarioProgressMap {
+  const merged: ScenarioProgressMap = {};
+  const local = localScenarios || {};
+  const incoming = incomingScenarios || {};
   const allScenarioIds = new Set([
-    ...Object.keys(local.scenarios || {}),
-    ...Object.keys(incoming.scenarios || {}),
+    ...Object.keys(local),
+    ...Object.keys(incoming),
   ]);
 
   for (const id of allScenarioIds) {
-    const loc = local.scenarios?.[id];
-    const inc = incoming.scenarios?.[id];
+    const loc = local[id];
+    const inc = incoming[id];
 
     if (loc && !inc) {
-      mergedScenarios[id] = structuredClone(loc);
+      merged[id] = structuredClone(loc);
     } else if (!loc && inc) {
-      mergedScenarios[id] = structuredClone(inc);
+      merged[id] = structuredClone(inc);
     } else if (loc && inc) {
       const starsEarned = Math.max(
         loc.starsEarned,
@@ -77,7 +73,7 @@ export function mergeUnifiedProgress(
         inc.lastCompletedAt || 0,
       );
 
-      mergedScenarios[id] = {
+      merged[id] = {
         scenarioId: id,
         starsEarned,
         attemptsCount: (loc.attemptsCount || 0) + (inc.attemptsCount || 0),
@@ -88,10 +84,20 @@ export function mergeUnifiedProgress(
     }
   }
 
-  // --- 2. Puzzle Ratings & Glicko Deviation ---
-  const locRp = local.puzzles?.ratingProfile;
-  const incRp = incoming.puzzles?.ratingProfile;
+  return merged;
+}
 
+/**
+ * Merges Glicko/Elo adaptive rating profiles favoring higher certainty (lower RD) and peak ratings.
+ *
+ * @param locRp - Local rating profile
+ * @param incRp - Incoming rating profile
+ * @returns Combined AdaptiveRatingState
+ */
+export function mergeRatingProfile(
+  locRp?: AdaptiveRatingState | null,
+  incRp?: AdaptiveRatingState | null,
+): AdaptiveRatingState {
   const locRating = locRp?.rating ?? 800;
   const incRating = incRp?.rating ?? 800;
   const mergedRating = Math.max(locRating, incRating);
@@ -125,21 +131,44 @@ export function mergeUnifiedProgress(
     .sort((a, b) => a.timestamp - b.timestamp)
     .slice(-50);
 
-  // --- 3. Theme Mastery Union ---
-  const mergedThemes: Record<string, ThemeMasteryProgress> = {};
+  return {
+    rating: mergedRating,
+    ratingDeviation: mergedRd,
+    peakRating: mergedPeak,
+    totalAttempted: mergedAttempted,
+    totalSolved: mergedSolved,
+    bestStreak: mergedStreak,
+    ratingHistory: mergedHistory,
+  };
+}
+
+/**
+ * Merges tactical theme mastery records and recalculates mastery tier.
+ *
+ * @param localThemes - Local theme mastery map
+ * @param incomingThemes - Incoming theme mastery map
+ * @returns Combined theme mastery map
+ */
+export function mergeThemeMastery(
+  localThemes?: Record<string, ThemeMasteryProgress> | null,
+  incomingThemes?: Record<string, ThemeMasteryProgress> | null,
+): Record<string, ThemeMasteryProgress> {
+  const merged: Record<string, ThemeMasteryProgress> = {};
+  const local = localThemes || {};
+  const incoming = incomingThemes || {};
   const allThemeKeys = new Set([
-    ...Object.keys(local.puzzles?.themeMastery || {}),
-    ...Object.keys(incoming.puzzles?.themeMastery || {}),
+    ...Object.keys(local),
+    ...Object.keys(incoming),
   ]);
 
   for (const themeKey of allThemeKeys) {
-    const locTm = local.puzzles?.themeMastery?.[themeKey];
-    const incTm = incoming.puzzles?.themeMastery?.[themeKey];
+    const locTm = local[themeKey];
+    const incTm = incoming[themeKey];
 
     if (locTm && !incTm) {
-      mergedThemes[themeKey] = structuredClone(locTm);
+      merged[themeKey] = structuredClone(locTm);
     } else if (!locTm && incTm) {
-      mergedThemes[themeKey] = structuredClone(incTm);
+      merged[themeKey] = structuredClone(incTm);
     } else if (locTm && incTm) {
       const solved = (locTm.solved || 0) + (incTm.solved || 0);
       const attempted = Math.max(
@@ -152,7 +181,7 @@ export function mergeUnifiedProgress(
         incTm.lastPracticedAt || 0,
       );
 
-      mergedThemes[themeKey] = {
+      merged[themeKey] = {
         theme: themeKey as PuzzleTheme,
         attempted,
         solved,
@@ -163,11 +192,21 @@ export function mergeUnifiedProgress(
     }
   }
 
-  // --- 4. Arcade High Scores ---
-  const locArc = local.puzzles?.arcadeStats;
-  const incArc = incoming.puzzles?.arcadeStats;
+  return merged;
+}
 
-  const mergedArcade = {
+/**
+ * Merges arcade mode high scores and runs.
+ *
+ * @param locArc - Local arcade stats
+ * @param incArc - Incoming arcade stats
+ * @returns Combined PuzzleArcadeStats
+ */
+export function mergeArcadeStats(
+  locArc?: PuzzleArcadeStats | null,
+  incArc?: PuzzleArcadeStats | null,
+): PuzzleArcadeStats {
+  return {
     puzzleRushHighScore: Math.max(
       locArc?.puzzleRushHighScore ?? 0,
       incArc?.puzzleRushHighScore ?? 0,
@@ -182,34 +221,90 @@ export function mergeUnifiedProgress(
     ),
     totalRushRuns: (locArc?.totalRushRuns ?? 0) + (incArc?.totalRushRuns ?? 0),
   };
+}
 
-  // --- 5. Solved Puzzles Union ---
-  const mergedSolvedPuzzles: Record<string, SolvedPuzzleRecord> = {};
+/**
+ * Merges solved puzzle history keeping highest stars and earliest completion timestamps.
+ *
+ * @param localSolved - Local solved puzzles map
+ * @param incomingSolved - Incoming solved puzzles map
+ * @returns Combined solved puzzles map
+ */
+export function mergeSolvedPuzzles(
+  localSolved?: Record<string, SolvedPuzzleRecord> | null,
+  incomingSolved?: Record<string, SolvedPuzzleRecord> | null,
+): Record<string, SolvedPuzzleRecord> {
+  const merged: Record<string, SolvedPuzzleRecord> = {};
+  const local = localSolved || {};
+  const incoming = incomingSolved || {};
   const allPuzzleIds = new Set([
-    ...Object.keys(local.puzzles?.solvedPuzzles || {}),
-    ...Object.keys(incoming.puzzles?.solvedPuzzles || {}),
+    ...Object.keys(local),
+    ...Object.keys(incoming),
   ]);
 
   for (const puzId of allPuzzleIds) {
-    const locPuz = local.puzzles?.solvedPuzzles?.[puzId];
-    const incPuz = incoming.puzzles?.solvedPuzzles?.[puzId];
+    const locPuz = local[puzId];
+    const incPuz = incoming[puzId];
 
     if (locPuz && !incPuz) {
-      mergedSolvedPuzzles[puzId] = structuredClone(locPuz);
+      merged[puzId] = structuredClone(locPuz);
     } else if (!locPuz && incPuz) {
-      mergedSolvedPuzzles[puzId] = structuredClone(incPuz);
+      merged[puzId] = structuredClone(incPuz);
     } else if (locPuz && incPuz) {
       const stars = Math.max(locPuz.stars, incPuz.stars) as StarRating;
       const solvedAt =
         locPuz.solvedAt && incPuz.solvedAt
           ? Math.min(locPuz.solvedAt, incPuz.solvedAt)
           : locPuz.solvedAt || incPuz.solvedAt || 0;
-      mergedSolvedPuzzles[puzId] = {
+      merged[puzId] = {
         stars,
         solvedAt,
       };
     }
   }
+
+  return merged;
+}
+
+/**
+ * Pure function performing deterministic smart merge of user progress.
+ * Adheres to Rule 2 (Zero side effects, zero I/O).
+ *
+ * @param local - Current local progress state
+ * @param incoming - Incoming progress package
+ * @param strategy - Resolution strategy ('smart_merge' | 'replace_local' | 'keep_local')
+ * @returns Combined UnifiedProgressPayload
+ */
+export function mergeUnifiedProgress(
+  local: UnifiedProgressPayload,
+  incoming: UnifiedProgressPayload,
+  strategy: SyncMergeStrategy,
+): UnifiedProgressPayload {
+  if (strategy === "keep_local") {
+    return structuredClone(local);
+  }
+  if (strategy === "replace_local") {
+    return structuredClone(incoming);
+  }
+
+  // Decomposed sub-domain merges (MIN-006)
+  const mergedScenarios = mergeScenarios(local.scenarios, incoming.scenarios);
+  const ratingProfile = mergeRatingProfile(
+    local.puzzles?.ratingProfile,
+    incoming.puzzles?.ratingProfile,
+  );
+  const themeMastery = mergeThemeMastery(
+    local.puzzles?.themeMastery,
+    incoming.puzzles?.themeMastery,
+  );
+  const arcadeStats = mergeArcadeStats(
+    local.puzzles?.arcadeStats,
+    incoming.puzzles?.arcadeStats,
+  );
+  const solvedPuzzles = mergeSolvedPuzzles(
+    local.puzzles?.solvedPuzzles,
+    incoming.puzzles?.solvedPuzzles,
+  );
 
   const createdAt =
     local.puzzles?.createdAt && incoming.puzzles?.createdAt
@@ -228,18 +323,10 @@ export function mergeUnifiedProgress(
     clientVersion: incoming.clientVersion || local.clientVersion,
     scenarios: mergedScenarios,
     puzzles: {
-      ratingProfile: {
-        rating: mergedRating,
-        ratingDeviation: mergedRd,
-        peakRating: mergedPeak,
-        totalAttempted: mergedAttempted,
-        totalSolved: mergedSolved,
-        bestStreak: mergedStreak,
-        ratingHistory: mergedHistory,
-      },
-      themeMastery: mergedThemes,
-      arcadeStats: mergedArcade,
-      solvedPuzzles: mergedSolvedPuzzles,
+      ratingProfile,
+      themeMastery,
+      arcadeStats,
+      solvedPuzzles,
       createdAt,
       lastActiveAt,
     },
@@ -414,6 +501,11 @@ export function calculateProgressDiff(
     hasUpgrades,
   };
 }
+
+/**
+ * Semantic alias for calculateProgressDiff to support alternative naming conventions.
+ */
+export const createProgressDiffPreview = calculateProgressDiff;
 
 /**
  * Default implementation of ProgressMergeEngine interface.

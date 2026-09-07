@@ -12,6 +12,7 @@ import {
   DEFAULT_ADAPTIVE_RATING,
   DEFAULT_PUZZLE_PROGRESS,
 } from './puzzle_progress.store';
+import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
 
 export { PUZZLE_PROGRESS_STORAGE_KEY };
 
@@ -21,6 +22,7 @@ export { PUZZLE_PROGRESS_STORAGE_KEY };
  * - Defensive JSON parsing with automatic recovery on corrupt storage
  * - Runtime type narrowing and sanitization of numerical and object properties
  * - Seamless fallback to in-memory state on quota errors or SSR environments
+ * - Storage quota detection and reactive user alert notification
  */
 export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
   private memoryCache: PuzzleProgress;
@@ -46,7 +48,10 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
       window.localStorage.setItem(testKey, '1');
       window.localStorage.removeItem(testKey);
       return true;
-    } catch {
+    } catch (err) {
+      if (isQuotaExceededError(err)) {
+        return true;
+      }
       return false;
     }
   }
@@ -275,6 +280,11 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
     return JSON.parse(JSON.stringify(updated));
   }
 
+  public async restoreProgress(progress: PuzzleProgress): Promise<void> {
+    const sanitized = this.sanitizeProgress(progress);
+    await this.persist(sanitized);
+  }
+
   public async resetAll(): Promise<void> {
     const now = Date.now();
     this.memoryCache = {
@@ -290,8 +300,8 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
     if (this.isStorageAvailable()) {
       try {
         window.localStorage.removeItem(this.storageKey);
-      } catch {
-        // Safe ignore
+      } catch (err) {
+        console.warn('[FC_PUZZLE_STORE] Failed to clear puzzle storage key', err);
       }
     }
   }
@@ -301,8 +311,19 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
     if (this.isStorageAvailable()) {
       try {
         window.localStorage.setItem(this.storageKey, JSON.stringify(data));
-      } catch {
-        // Fallback gracefully to memoryCache
+      } catch (err) {
+        if (isQuotaExceededError(err)) {
+          storageAlertDispatcher.notify({
+            type: 'STORAGE_QUOTA_EXCEEDED',
+            store: 'puzzles',
+            attemptedAction: 'save',
+            timestamp: Date.now(),
+            message: 'Storage quota exceeded while saving puzzle progress. Local state was preserved in memory.',
+            suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+          });
+          throw err;
+        }
+        console.warn('[FC_PUZZLE_STORE] Failed to persist puzzle progress to localStorage', err);
       }
     }
   }

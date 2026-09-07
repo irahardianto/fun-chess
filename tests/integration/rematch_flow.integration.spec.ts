@@ -51,6 +51,7 @@ describe("Rematch Flow Integration Tests", () => {
     >(player1Client, "room:create", {
       playerName: "Player1",
       preferredColor: "w",
+      avatar: "🦁",
     });
     activeRoomCode = createRes.room.roomCode;
 
@@ -61,6 +62,7 @@ describe("Rematch Flow Integration Tests", () => {
     >(player2Client, "room:join", {
       roomCode: activeRoomCode,
       playerName: "Player2",
+      avatar: "🦁",
     });
 
     // Conclude game to enter GAME_OVER state (Player 1 resigns)

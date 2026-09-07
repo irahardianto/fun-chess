@@ -2,15 +2,23 @@
  * Reactive sound hook with state and triggers.
  */
 import { ref } from 'vue';
-import { AudioSynthesizer, audioSynthesizer as defaultSynth } from '../platform/audio/audio_synthesizer';
+import {
+  type IAudioService,
+  AudioSynthesizer,
+  audioSynthesizer as defaultSynth,
+} from '../platform/audio/index.js';
 
-export function useAudio(injectedSynth?: AudioSynthesizer) {
-  const synth = injectedSynth || defaultSynth;
+export function useAudio(injectedSynth?: IAudioService | AudioSynthesizer) {
+  const synth = (injectedSynth || defaultSynth) as AudioSynthesizer;
   const isMuted = ref(synth.isMuted());
   const isSoundEnabled = ref(!synth.isMuted());
 
   function setMuted(muted: boolean): void {
-    synth.setMuted(muted);
+    if ('setMuted' in synth && typeof synth.setMuted === 'function') {
+      synth.setMuted(muted);
+    } else if (synth.isMuted() !== muted) {
+      synth.toggleMute();
+    }
     isMuted.value = muted;
     isSoundEnabled.value = !muted;
   }
@@ -34,8 +42,8 @@ export function useAudio(injectedSynth?: AudioSynthesizer) {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function') {
       try {
         navigator.vibrate(pattern);
-      } catch {
-        // Ignore environment vibration errors
+      } catch (err) {
+        console.warn('[useAudio] Haptic vibration failed:', err);
       }
     }
   }
@@ -63,30 +71,74 @@ export function useAudio(injectedSynth?: AudioSynthesizer) {
       synth.playVictory();
       triggerHaptic([50, 50, 100, 50, 150]);
     },
-    playDraw: () => synth.playDraw(),
+    playDraw: () => {
+      if ('playDraw' in synth && typeof synth.playDraw === 'function') {
+        synth.playDraw();
+      }
+    },
     playError: () => {
-      synth.playError();
+      if ('playError' in synth && typeof synth.playError === 'function') {
+        synth.playError();
+      }
       triggerHaptic(50);
     },
-    playClick: () => synth.playClick(),
-    playPickup: () => synth.playPickup(),
+    playClick: () => {
+      if ('playClick' in synth && typeof synth.playClick === 'function') {
+        synth.playClick();
+      }
+    },
+    playPickup: () => {
+      if ('playPickup' in synth && typeof synth.playPickup === 'function') {
+        synth.playPickup();
+      }
+    },
     playTurnNotification: () => {
-      synth.playTurnNotification();
+      if ('playTurnNotification' in synth && typeof synth.playTurnNotification === 'function') {
+        synth.playTurnNotification();
+      }
       triggerHaptic([30, 50, 30]);
     },
-    playStart: () => synth.playStart(),
-    playHint: () => synth.playHint(),
+    playStart: () => {
+      if ('playStart' in synth && typeof synth.playStart === 'function') {
+        synth.playStart();
+      }
+    },
+    playHint: () => {
+      if ('playHint' in synth && typeof synth.playHint === 'function') {
+        synth.playHint();
+      }
+    },
     playStarEarned: () => {
-      synth.playStarEarned();
+      if ('playStarEarned' in synth && typeof synth.playStarEarned === 'function') {
+        synth.playStarEarned();
+      }
       triggerHaptic([30, 40, 60]);
     },
-    playMascotHappy: () => synth.playMascotHappy(),
-    playMascotBlunder: () => synth.playMascotBlunder(),
+    playMascotHappy: () => {
+      if ('playMascotHappy' in synth && typeof synth.playMascotHappy === 'function') {
+        synth.playMascotHappy();
+      }
+    },
+    playMascotBlunder: () => {
+      if ('playMascotBlunder' in synth && typeof synth.playMascotBlunder === 'function') {
+        synth.playMascotBlunder();
+      }
+    },
     playStepComplete: () => {
-      synth.playStepComplete();
+      if ('playStepComplete' in synth && typeof synth.playStepComplete === 'function') {
+        synth.playStepComplete();
+      }
       triggerHaptic([25, 35, 50]);
     },
-    resumeAudio: () => synth.resumeContext(),
-    initAudio: () => synth.initContext(),
+    resumeAudio: () => {
+      if ('resumeContext' in synth && typeof synth.resumeContext === 'function') {
+        synth.resumeContext();
+      }
+    },
+    initAudio: () => {
+      if ('initContext' in synth && typeof synth.initContext === 'function') {
+        synth.initContext();
+      }
+    },
   };
 }

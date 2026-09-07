@@ -1,0 +1,59 @@
+/**
+ * Cross-browser detection for Web Storage quota exceeded errors.
+ * Covers WebKit, Blink, Gecko, and legacy Safari Private Browsing DOM exceptions.
+ */
+export function isQuotaExceededError(err: unknown): boolean {
+  if (!err) return false;
+  if (typeof DOMException !== 'undefined' && err instanceof DOMException) {
+    return (
+      // Standard W3C code & name
+      err.code === 22 ||
+      err.name === 'QuotaExceededError' ||
+      // Firefox Gecko legacy
+      err.code === 1014 ||
+      err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    );
+  }
+  // Generic error object inspection for non-standard runtimes / polyfills
+  if (typeof err === 'object' && 'name' in err) {
+    const name = String((err as { name: unknown }).name);
+    return name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED';
+  }
+  return false;
+}
+
+export interface StorageQuotaAlertEvent {
+  readonly type: 'STORAGE_QUOTA_EXCEEDED';
+  readonly store: 'scenarios' | 'puzzles' | 'unified';
+  readonly attemptedAction: 'overwrite' | 'save' | 'import';
+  readonly timestamp: number;
+  readonly message: string;
+  readonly suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR';
+}
+
+export type StorageAlertListener = (event: StorageQuotaAlertEvent) => void;
+
+export class StorageAlertDispatcher {
+  private readonly listeners = new Set<StorageAlertListener>();
+
+  public subscribe(listener: StorageAlertListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  public notify(event: StorageQuotaAlertEvent): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(event);
+      } catch (err) {
+        console.error('Error in storage alert listener:', err);
+      }
+    }
+  }
+
+  public clear(): void {
+    this.listeners.clear();
+  }
+}
+
+export const storageAlertDispatcher = new StorageAlertDispatcher();

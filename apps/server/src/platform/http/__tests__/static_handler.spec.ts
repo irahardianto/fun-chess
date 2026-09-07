@@ -170,37 +170,10 @@ describe("serveStaticFile", () => {
   });
 
 
-  describe("Directory Traversal Prevention", () => {
-    it("prevents directory traversal attacks outside rootDir", async () => {
-      let responseBody = "";
-
-      const mockRes = {
-        writeHead: () => mockRes,
-        end: (body?: string) => {
-          responseBody = body || "";
-          return mockRes;
-        },
-      } as unknown as ServerResponse;
-
-      const customReq = {
-        url: "/../../../etc/passwd",
-      } as IncomingMessage;
-
-      const handled = await serveStaticFile(customReq, mockRes, {
-        distPath: tempDir,
-      });
-
-      expect(handled).toBe(true);
-      expect(responseBody).not.toContain("root:");
-    });
-
-    it("returns 403 Forbidden if targetFilePath does not start with rootDir", async () => {
+  describe("Directory Traversal Prevention (SEC-HIGH-002, CRIT-008)", () => {
+    it("prevents directory traversal attacks outside rootDir and returns 403 Forbidden", async () => {
       let statusCode = 0;
       let responseBody = "";
-
-      const mockReq = {
-        url: "/test",
-      } as IncomingMessage;
 
       const mockRes = {
         writeHead: (status: number) => {
@@ -213,15 +186,130 @@ describe("serveStaticFile", () => {
         },
       } as unknown as ServerResponse;
 
-      const handled = await serveStaticFile(
-        mockReq,
-        mockRes,
-        {
-          distPath: tempDir,
+      const customReq = {
+        url: "/../../../etc/passwd",
+        headers: {},
+        socket: { remoteAddress: "192.168.1.100" },
+      } as unknown as IncomingMessage;
+
+      const loggedWarnings: { msg: string; meta: any }[] = [];
+      const mockLogger = {
+        info: () => {},
+        warn: (msg: string, meta: any) => {
+          loggedWarnings.push({ msg, meta });
         },
+        error: () => {},
+        debug: () => {},
+        child: () => mockLogger,
+      } as unknown as Logger;
+
+      const handled = await serveStaticFile(
+        customReq,
+        mockRes,
+        { distPath: tempDir },
+        mockLogger,
       );
 
       expect(handled).toBe(true);
+      expect(statusCode).toBe(403);
+      expect(responseBody).toBe("Forbidden");
+      expect(loggedWarnings).toHaveLength(1);
+      expect(loggedWarnings[0]?.msg).toBe("Directory traversal attempt detected");
+      expect(loggedWarnings[0]?.meta).toMatchObject({
+        operation: "security_violation",
+        path: "/../../../etc/passwd",
+        clientIp: "192.168.1.100",
+      });
+    });
+
+    it("detects /.. and /../ returning 403 rather than masking with 200 index.html", async () => {
+      for (const traversalUrl of ["/..", "/../", "/subdir/..", "/subdir/../../etc"]) {
+        let statusCode = 0;
+        let responseBody = "";
+
+        const mockRes = {
+          writeHead: (status: number) => {
+            statusCode = status;
+            return mockRes;
+          },
+          end: (body?: string) => {
+            responseBody = body || "";
+            return mockRes;
+          },
+        } as unknown as ServerResponse;
+
+        const customReq = {
+          url: traversalUrl,
+          headers: { "x-forwarded-for": "10.0.0.5" },
+        } as unknown as IncomingMessage;
+
+        let warned = false;
+        const mockLogger = {
+          info: () => {},
+          warn: (msg: string, meta: any) => {
+            if (meta?.operation === "security_violation") warned = true;
+          },
+          error: () => {},
+          debug: () => {},
+          child: () => mockLogger,
+        } as unknown as Logger;
+
+        const handled = await serveStaticFile(
+          customReq,
+          mockRes,
+          { distPath: tempDir },
+          mockLogger,
+        );
+
+        expect(handled).toBe(true);
+        expect(statusCode).toBe(403);
+        expect(responseBody).toBe("Forbidden");
+        expect(warned).toBe(true);
+      }
+    });
+
+    it("detects URL encoded traversal patterns (%2e%2e) returning 403 with audit log", async () => {
+      let statusCode = 0;
+      let responseBody = "";
+
+      const mockRes = {
+        writeHead: (status: number) => {
+          statusCode = status;
+          return mockRes;
+        },
+        end: (body?: string) => {
+          responseBody = body || "";
+          return mockRes;
+        },
+      } as unknown as ServerResponse;
+
+      const customReq = {
+        url: "/%2e%2e/%2e%2e/etc/passwd",
+        headers: { "x-forwarded-for": "172.16.0.22" },
+      } as unknown as IncomingMessage;
+
+      const loggedWarnings: any[] = [];
+      const mockLogger = {
+        info: () => {},
+        warn: (msg: string, meta: any) => loggedWarnings.push({ msg, meta }),
+        error: () => {},
+        debug: () => {},
+        child: () => mockLogger,
+      } as unknown as Logger;
+
+      const handled = await serveStaticFile(
+        customReq,
+        mockRes,
+        { distPath: tempDir },
+        mockLogger,
+      );
+
+      expect(handled).toBe(true);
+      expect(statusCode).toBe(403);
+      expect(responseBody).toBe("Forbidden");
+      expect(loggedWarnings.length).toBeGreaterThan(0);
+      expect(loggedWarnings[0].meta.operation).toBe("security_violation");
+      expect(loggedWarnings[0].meta.clientIp).toBe("172.16.0.22");
     });
   });
 

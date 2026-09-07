@@ -57,9 +57,9 @@ export const ALL_PUZZLES: readonly Puzzle[] = [
 ];
 
 /**
- * Index map by puzzle ID for O(1) lookups.
+ * Index map by puzzle ID for O(1) lookups (internal per MIN-014).
  */
-export const PUZZLES_BY_ID: ReadonlyMap<string, Puzzle> = new Map(
+const PUZZLES_BY_ID: ReadonlyMap<string, Puzzle> = new Map(
   ALL_PUZZLES.map((p) => [p.id, p]),
 );
 
@@ -95,6 +95,36 @@ export const THEME_ALIASES: Readonly<
   fried_liver: ["fork", "greek_gift"],
   legals_trap: ["deflection", "greek_gift", "smothered_mate"],
 };
+
+/**
+ * Static dictionary lookups for thematic classification (MIN-008).
+ * Eliminates fragile numeric ID regex slicing.
+ */
+const ANASTASIA_MATE_PUZZLE_IDS: ReadonlySet<string> = new Set([
+  "puz_ah_001", "puz_ah_002", "puz_ah_003", "puz_ah_004", "puz_ah_005",
+  "puz_ah_006", "puz_ah_007", "puz_ah_008", "puz_ah_009", "puz_ah_010",
+  "puz_ah_011", "puz_ah_012", "puz_ah_013", "puz_ah_014", "puz_ah_015",
+]);
+
+const HOOK_MATE_PUZZLE_IDS: ReadonlySet<string> = new Set([
+  "puz_ah_016", "puz_ah_017", "puz_ah_018", "puz_ah_019", "puz_ah_020",
+  "puz_ah_021", "puz_ah_022", "puz_ah_023", "puz_ah_024", "puz_ah_025",
+  "puz_ah_026", "puz_ah_027", "puz_ah_028", "puz_ah_029", "puz_ah_030",
+]);
+
+const PAWN_ENDGAME_PUZZLE_IDS: ReadonlySet<string> = new Set([
+  "puz_eg_001", "puz_eg_002", "puz_eg_003", "puz_eg_004", "puz_eg_005",
+  "puz_eg_006", "puz_eg_007", "puz_eg_008", "puz_eg_009", "puz_eg_010",
+  "puz_eg_011", "puz_eg_012", "puz_eg_013", "puz_eg_014", "puz_eg_015",
+  "puz_eg_016", "puz_eg_017", "puz_eg_018", "puz_eg_019", "puz_eg_020",
+  "puz_eg_021", "puz_eg_022", "puz_eg_023", "puz_eg_024",
+]);
+
+const ROOK_ENDGAME_PUZZLE_IDS: ReadonlySet<string> = new Set([
+  "puz_eg_001", "puz_eg_002", "puz_eg_003", "puz_eg_004", "puz_eg_005",
+  "puz_eg_006", "puz_eg_007", "puz_eg_008", "puz_eg_009", "puz_eg_010",
+  "puz_eg_025", "puz_eg_026", "puz_eg_027", "puz_eg_028", "puz_eg_029", "puz_eg_030",
+]);
 
 /**
  * Extracts and enriches tactical themes for a puzzle to ensure bidirectional mapping.
@@ -149,14 +179,14 @@ function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
     if (
       title.includes("anastasia") ||
       themes.has("anastasia_mate") ||
-      parseInt(id.replace(/\D/g, ""), 10) <= 15
+      ANASTASIA_MATE_PUZZLE_IDS.has(id)
     ) {
       themes.add("anastasia_mate");
     }
     if (
       title.includes("hook") ||
       themes.has("hook_mate") ||
-      parseInt(id.replace(/\D/g, ""), 10) > 15
+      HOOK_MATE_PUZZLE_IDS.has(id)
     ) {
       themes.add("hook_mate");
     }
@@ -182,7 +212,7 @@ function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
       p.primaryTheme === "pawn_endgame" ||
       primaryThemeStr === "pawn_breakthrough" ||
       primaryThemeStr === "king_opposition" ||
-      parseInt(id.replace(/\D/g, ""), 10) <= 24
+      PAWN_ENDGAME_PUZZLE_IDS.has(id)
     ) {
       themes.add("pawn_endgame");
       themes.add("promotion");
@@ -193,8 +223,7 @@ function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
       title.includes("endgame") ||
       p.primaryTheme === "rook_endgame" ||
       p.primaryTheme === "lucena_position" ||
-      parseInt(id.replace(/\D/g, ""), 10) > 24 ||
-      parseInt(id.replace(/\D/g, ""), 10) <= 10
+      ROOK_ENDGAME_PUZZLE_IDS.has(id)
     ) {
       themes.add("rook_endgame");
       themes.add("queen_endgame");
@@ -244,7 +273,7 @@ function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
 }
 
 /**
- * Index map grouping puzzles by primary and secondary themes.
+ * Index map grouping puzzles by primary and secondary themes (internal).
  */
 const _puzzlesByTheme = new Map<PuzzleTheme, Puzzle[]>();
 
@@ -280,11 +309,11 @@ for (const [theme, aliases] of Object.entries(THEME_ALIASES)) {
   }
 }
 
-export const PUZZLES_BY_THEME: ReadonlyMap<PuzzleTheme, readonly Puzzle[]> =
+const PUZZLES_BY_THEME: ReadonlyMap<PuzzleTheme, readonly Puzzle[]> =
   _puzzlesByTheme;
 
 /**
- * Index map grouping puzzles by difficulty tier.
+ * Index map grouping puzzles by difficulty tier (internal).
  */
 const _puzzlesByDiff = new Map<PuzzleDifficultyTier, Puzzle[]>();
 for (const p of ALL_PUZZLES) {
@@ -292,7 +321,8 @@ for (const p of ALL_PUZZLES) {
   list.push(p);
   _puzzlesByDiff.set(p.difficulty, list);
 }
-export const PUZZLES_BY_DIFFICULTY: ReadonlyMap<
+
+const PUZZLES_BY_DIFFICULTY: ReadonlyMap<
   PuzzleDifficultyTier,
   readonly Puzzle[]
 > = _puzzlesByDiff;

@@ -11,7 +11,6 @@ describe('GameHud.vue', () => {
     color: 'w',
     isConnected: true,
     isHost: true,
-    sessionToken: 'token-white',
     connectedAt: Date.now(),
   };
 
@@ -22,7 +21,6 @@ describe('GameHud.vue', () => {
     color: 'b',
     isConnected: true,
     isHost: false,
-    sessionToken: 'token-black',
     connectedAt: Date.now(),
   };
 

@@ -119,6 +119,15 @@ export class LanService {
   }
 
   /**
+   * Checks whether the current instance is configured as a public Cloud relay.
+   */
+  public isCloudRelay(): boolean {
+    return Boolean(
+      process.env.PUBLIC_URL && process.env.PUBLIC_URL.trim().length > 0,
+    );
+  }
+
+  /**
    * Generates comprehensive LAN info response structure.
    */
   public getLanInfo(port: number): LanInfoResponse {
@@ -135,19 +144,38 @@ export class LanService {
       interfaces: interfaces.length > 0 ? interfaces : [lanIp],
     };
   }
+
+  /**
+   * Compatibility alias matching IRelayAddressService.getAddressingInfo.
+   */
+  public getAddressingInfo(
+    port: number = 3000,
+    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
+  ): LanInfoResponse {
+    const lanIp = this.getLocalLanIp(customInterfaces);
+    const interfaces = this.getAllLanInterfaces(customInterfaces);
+    const localUrl = `http://localhost:${port}`;
+    const joinUrl = `http://${lanIp}:${port}`;
+
+    return {
+      lanIp,
+      port,
+      localUrl,
+      joinUrl,
+      interfaces: interfaces.length > 0 ? interfaces : [lanIp],
+    };
+  }
 }
 
-// Singleton helper functions for direct functional imports
-const defaultLanService = new LanService();
-
+// Functional helper exports creating instances on-demand (MAJ-010: no global mutable singleton)
 export function getLocalLanIp(): string {
-  return defaultLanService.getLocalLanIp();
+  return new LanService().getLocalLanIp();
 }
 
 export function getAllLanInterfaces(): string[] {
-  return defaultLanService.getAllLanInterfaces();
+  return new LanService().getAllLanInterfaces();
 }
 
 export function generateJoinUrl(port: number, roomCode?: string): string {
-  return defaultLanService.generateJoinUrl(port, roomCode);
+  return new LanService().generateJoinUrl(port, roomCode);
 }

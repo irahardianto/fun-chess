@@ -5,9 +5,23 @@ export interface PinoLoggerOptions extends LoggerOptions {
   isDev?: boolean;
 }
 
+const DEFAULT_REDACT_PATHS = [
+  "sessionToken",
+  "*.sessionToken",
+  "*.*.sessionToken",
+  "password",
+  "*.password",
+  "token",
+  "*.token",
+  "authorization",
+  "headers.authorization",
+  "headers.cookie",
+  "cookie",
+];
+
 /**
  * Production-ready Pino logger implementing the application Logger interface.
- * Serializes structured context fields including correlationId, durationMs, and error objects.
+ * Serializes structured context fields including correlationId, duration, and error objects.
  */
 export class PinoLogger implements Logger {
   private readonly logger: PinoInstance;
@@ -18,10 +32,31 @@ export class PinoLogger implements Logger {
     } else {
       const opts = (options as PinoLoggerOptions) || {};
       const level = opts.level || (process.env.LOG_LEVEL ?? "info");
-      this.logger = pino({
+      const pinoFn: any = (pino as any).default || pino;
+      this.logger = pinoFn({
         level,
+        redact: {
+          paths: DEFAULT_REDACT_PATHS,
+          censor: "[REDACTED]",
+        },
         ...opts,
       });
+    }
+  }
+
+  public trace(message: string, context?: Record<string, unknown>): void {
+    if (context) {
+      this.logger.trace(context, message);
+    } else {
+      this.logger.trace(message);
+    }
+  }
+
+  public debug(message: string, context?: Record<string, unknown>): void {
+    if (context) {
+      this.logger.debug(context, message);
+    } else {
+      this.logger.debug(message);
     }
   }
 
@@ -49,11 +84,11 @@ export class PinoLogger implements Logger {
     }
   }
 
-  public debug(message: string, context?: Record<string, unknown>): void {
+  public fatal(message: string, context?: Record<string, unknown>): void {
     if (context) {
-      this.logger.debug(context, message);
+      this.logger.fatal(context, message);
     } else {
-      this.logger.debug(message);
+      this.logger.fatal(message);
     }
   }
 

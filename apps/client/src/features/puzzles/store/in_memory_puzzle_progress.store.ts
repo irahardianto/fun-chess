@@ -141,6 +141,26 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
     return this.getProgress();
   }
 
+  public async restoreProgress(progress: PuzzleProgress): Promise<void> {
+    const now = Date.now();
+    this.progress = {
+      ...DEFAULT_PUZZLE_PROGRESS,
+      ...progress,
+      ratingProfile: {
+        ...DEFAULT_ADAPTIVE_RATING,
+        ...(progress?.ratingProfile || {}),
+      },
+      themeMastery: { ...(progress?.themeMastery || {}) },
+      arcadeStats: {
+        ...DEFAULT_PUZZLE_PROGRESS.arcadeStats,
+        ...(progress?.arcadeStats || {}),
+      },
+      solvedPuzzles: { ...(progress?.solvedPuzzles || {}) },
+      createdAt: typeof progress?.createdAt === 'number' ? progress.createdAt : now,
+      lastActiveAt: typeof progress?.lastActiveAt === 'number' ? progress.lastActiveAt : now,
+    };
+  }
+
   public async resetAll(): Promise<void> {
     const now = Date.now();
     this.progress = {

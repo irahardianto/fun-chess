@@ -1,7 +1,7 @@
 import { Logger } from "./logger.interface.js";
 
 export interface LogEntry {
-  level: "info" | "warn" | "error" | "debug";
+  level: "trace" | "debug" | "info" | "warn" | "error" | "fatal";
   message: string;
   context?: Record<string, unknown>;
   timestamp: number;
@@ -13,12 +13,36 @@ export interface LogEntry {
  */
 export class NullLogger implements Logger {
   public logs: LogEntry[] = [];
+  public traceLogs: LogEntry[] = [];
+  public debugLogs: LogEntry[] = [];
   public infoLogs: LogEntry[] = [];
   public warnLogs: LogEntry[] = [];
   public errorLogs: LogEntry[] = [];
-  public debugLogs: LogEntry[] = [];
+  public fatalLogs: LogEntry[] = [];
 
   constructor(private readonly bindings: Record<string, unknown> = {}) {}
+
+  public trace(message: string, context?: Record<string, unknown>): void {
+    const entry: LogEntry = {
+      level: "trace",
+      message,
+      context: { ...this.bindings, ...context },
+      timestamp: Date.now(),
+    };
+    this.logs.push(entry);
+    this.traceLogs.push(entry);
+  }
+
+  public debug(message: string, context?: Record<string, unknown>): void {
+    const entry: LogEntry = {
+      level: "debug",
+      message,
+      context: { ...this.bindings, ...context },
+      timestamp: Date.now(),
+    };
+    this.logs.push(entry);
+    this.debugLogs.push(entry);
+  }
 
   public info(message: string, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
@@ -53,15 +77,15 @@ export class NullLogger implements Logger {
     this.errorLogs.push(entry);
   }
 
-  public debug(message: string, context?: Record<string, unknown>): void {
+  public fatal(message: string, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
-      level: "debug",
+      level: "fatal",
       message,
       context: { ...this.bindings, ...context },
       timestamp: Date.now(),
     };
     this.logs.push(entry);
-    this.debugLogs.push(entry);
+    this.fatalLogs.push(entry);
   }
 
   public child(bindings: Record<string, unknown>): Logger {
@@ -71,9 +95,11 @@ export class NullLogger implements Logger {
 
   public clear(): void {
     this.logs = [];
+    this.traceLogs = [];
+    this.debugLogs = [];
     this.infoLogs = [];
     this.warnLogs = [];
     this.errorLogs = [];
-    this.debugLogs = [];
+    this.fatalLogs = [];
   }
 }

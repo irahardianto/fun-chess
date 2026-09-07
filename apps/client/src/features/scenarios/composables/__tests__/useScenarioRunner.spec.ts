@@ -308,4 +308,65 @@ describe('useScenarioRunner', () => {
       expect(runner.completePromotion('q')).toBe(false);
     });
   });
+
+  describe('MAJ-025: Bot Move Error Handling & Step Advance Guard', () => {
+    it('does not advance step and logs structured warning when opponent move fails', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const buggyScenario: ChessScenario = {
+        id: 'buggy-bot-scenario',
+        title: 'Buggy Bot Scenario',
+        subtitle: 'Test error handling',
+        category: 'tactical_patterns',
+        difficulty: 'beginner',
+        targetAgeGroup: '7-10',
+        icon: '⚠️',
+        description: 'Test step advance prevention',
+        estimatedMinutes: 1,
+        steps: [
+          {
+            id: 'step-1',
+            stepNumber: 1,
+            instruction: 'Make move',
+            hint: 'Move pawn',
+            setupFen: '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1',
+            allowedMoves: [{ from: 'e2', to: 'e3' }],
+            opponentResponse: {
+              // Invalid illegal square for empty board
+              from: 'a8',
+              to: 'h1',
+              delayMs: 100,
+            },
+            explanationOnSuccess: 'Good move!',
+          },
+          {
+            id: 'step-2',
+            stepNumber: 2,
+            instruction: 'Step 2',
+            hint: 'Next',
+            setupFen: '8/8/8/8/8/8/8/4K3 w - - 0 1',
+            explanationOnSuccess: 'Done!',
+          },
+        ],
+      };
+
+      const runner = useScenarioRunner(buggyScenario);
+      runner.applyPlayerMove({ from: 'e2', to: 'e3' });
+
+      // Fast-forward bot delay
+      vi.advanceTimersByTime(150);
+
+      // Bot move failed because a8 has no piece
+      expect(consoleWarnSpy).toHaveBeenCalled();
+      expect(runner.isWaitingForBotResponse.value).toBe(false);
+
+      // Fast-forward step advance delay (700ms)
+      vi.advanceTimersByTime(800);
+
+      // Must NOT advance to step 2 because bot move failed!
+      expect(runner.currentStepIndex.value).toBe(0);
+      expect(runner.currentStep.value?.id).toBe('step-1');
+      expect(runner.isCompleted.value).toBe(false);
+    });
+  });
 });

@@ -11,6 +11,7 @@ import {
   UNIFIED_PROGRESS_SCHEMA_VERSION,
 } from "../types/progress_sync.js";
 import { crc32Checksum } from "./checksum_crc32.js";
+import { canonicalJsonStringify } from "./canonical_json.js";
 import { defaultDictionaryMapper } from "./dictionary_mapper.js";
 import { defaultSchemaValidator } from "./schema_validator.js";
 
@@ -248,8 +249,10 @@ export class DefaultProgressCodec implements ProgressCodec {
    */
   public encodeToEnvelopeJson(payload: UnifiedProgressPayload): string {
     const sanitized = defaultSchemaValidator.assertValid(payload);
-    const payloadJson = JSON.stringify(sanitized);
-    const checksum = crc32Checksum.toHex(crc32Checksum.calculate(payloadJson));
+    const canonicalPayload = canonicalJsonStringify(sanitized);
+    const checksum = crc32Checksum.toHex(
+      crc32Checksum.calculate(canonicalPayload),
+    );
 
     const envelope: UnifiedProgressEnvelope = {
       magic: "FC_PROGRESS_V1",
@@ -297,10 +300,10 @@ export class DefaultProgressCodec implements ProgressCodec {
       throw new Error("Invalid envelope JSON: missing payload object");
     }
 
-    // Verify CRC-32 checksum
-    const payloadJson = JSON.stringify(parsed.payload);
+    // Verify CRC-32 checksum against canonical representation
+    const canonicalPayload = canonicalJsonStringify(parsed.payload);
     const calculatedChecksum = crc32Checksum.toHex(
-      crc32Checksum.calculate(payloadJson),
+      crc32Checksum.calculate(canonicalPayload),
     );
     if (
       !parsed.checksum ||

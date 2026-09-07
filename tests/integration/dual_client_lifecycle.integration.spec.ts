@@ -61,6 +61,7 @@ describe("Dual-Client Full Game Lifecycle Integration Suite", () => {
     >(player1, "room:create", {
       playerName: "Leo (Host)",
       preferredColor: "w",
+      avatar: "🦁",
     });
 
     expect(createRes.success).toBe(true);
@@ -82,7 +83,7 @@ describe("Dual-Client Full Game Lifecycle Integration Suite", () => {
     const joinRes = await emitAck<
       JoinRoomRequest,
       { success: true; room: RoomState; player: Player; sessionToken: string }
-    >(player2, "room:join", { roomCode, playerName: "Maya (Joiner)" });
+    >(player2, "room:join", { roomCode, playerName: "Maya (Joiner)", avatar: "🦁" });
 
     expect(joinRes.success).toBe(true);
     expect(joinRes.player.color).toBe("b");
@@ -168,13 +169,13 @@ describe("Dual-Client Full Game Lifecycle Integration Suite", () => {
     const createRes = await emitAck<
       CreateRoomRequest,
       { success: true; room: RoomState; sessionToken: string }
-    >(player1, "room:create", { playerName: "Player A", preferredColor: "w" });
+    >(player1, "room:create", { playerName: "Player A", preferredColor: "w", avatar: "🦁" });
     const roomCode = createRes.room.roomCode;
 
     await emitAck<
       JoinRoomRequest,
       { success: true; room: RoomState; player: Player; sessionToken: string }
-    >(player2, "room:join", { roomCode, playerName: "Player B" });
+    >(player2, "room:join", { roomCode, playerName: "Player B", avatar: "🦁" });
 
     // 2. Player 1 offers draw
     const drawOfferedPromise = waitForEvent<{
@@ -206,13 +207,13 @@ describe("Dual-Client Full Game Lifecycle Integration Suite", () => {
     const createRes = await emitAck<
       CreateRoomRequest,
       { success: true; room: RoomState; sessionToken: string }
-    >(player1, "room:create", { playerName: "Alice", preferredColor: "w" });
+    >(player1, "room:create", { playerName: "Alice", preferredColor: "w", avatar: "🦁" });
     const roomCode = createRes.room.roomCode;
 
     await emitAck<
       JoinRoomRequest,
       { success: true; room: RoomState; player: Player; sessionToken: string }
-    >(player2, "room:join", { roomCode, playerName: "Bob" });
+    >(player2, "room:join", { roomCode, playerName: "Bob", avatar: "🦁" });
 
     // 2. Resign to conclude game
     const gameOverPromise = waitForEvent<GameOverPayload>(player1, "game:over");

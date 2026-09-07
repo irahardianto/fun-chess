@@ -20,6 +20,7 @@ export interface UseQrScannerReturn {
 /**
  * Composable for camera acquisition and real-time QR code frame scanning via jsQR.
  * Handles lifecycle cleanup, permission errors, and frame analysis loops.
+ * Remediates CRIT-007: Unconditionally stops all MediaStream tracks and nullifies video.srcObject.
  */
 export function useQrScanner(options: UseQrScannerOptions = {}): UseQrScannerReturn {
   const isScanning = ref(false);
@@ -31,6 +32,23 @@ export function useQrScanner(options: UseQrScannerOptions = {}): UseQrScannerRet
   let mediaStream: MediaStream | null = null;
   let animationFrameId: number | null = null;
   let internalCanvas: HTMLCanvasElement | null = null;
+  let activeVideoElement: HTMLVideoElement | null = null;
+
+  function stopMediaStream(stream: MediaStream | null): void {
+    if (!stream) return;
+    try {
+      const tracks = stream.getTracks();
+      for (const track of tracks) {
+        try {
+          track.stop();
+        } catch (err) {
+          console.warn('[FC_PROGRESS_SYNC] Failed to stop media track', err);
+        }
+      }
+    } catch (err) {
+      console.warn('[FC_PROGRESS_SYNC] Failed to get tracks from stream', err);
+    }
+  }
 
   function stopScanner(): void {
     if (animationFrameId !== null) {
@@ -39,14 +57,17 @@ export function useQrScanner(options: UseQrScannerOptions = {}): UseQrScannerRet
     }
 
     if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => {
-        try {
-          track.stop();
-        } catch {
-          // ignore
-        }
-      });
+      stopMediaStream(mediaStream);
       mediaStream = null;
+    }
+
+    if (activeVideoElement) {
+      try {
+        activeVideoElement.srcObject = null;
+      } catch (err) {
+        console.warn('[FC_PROGRESS_SYNC] Failed to clear activeVideoElement.srcObject', err);
+      }
+      activeVideoElement = null;
     }
 
     isScanning.value = false;
@@ -118,6 +139,9 @@ export function useQrScanner(options: UseQrScannerOptions = {}): UseQrScannerRet
       return;
     }
 
+    let acquiredStream: MediaStream | null = null;
+    activeVideoElement = videoElement;
+
     try {
       const facingMode = options.facingMode || 'environment';
       const constraints: MediaStreamConstraints = {
@@ -129,9 +153,8 @@ export function useQrScanner(options: UseQrScannerOptions = {}): UseQrScannerRet
         audio: false,
       };
 
-      let stream: MediaStream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        acquiredStream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (firstErr: any) {
         if (
           firstErr?.name === 'NotAllowedError' ||
@@ -140,14 +163,13 @@ export function useQrScanner(options: UseQrScannerOptions = {}): UseQrScannerRet
         ) {
           throw firstErr;
         }
-        // Fallback to basic video constraint if ideal facingMode fails
         console.warn('[FC_PROGRESS_SYNC] Exact camera constraint failed, trying basic video fallback', firstErr);
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        acquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
 
-      mediaStream = stream;
-      videoElement.srcObject = stream;
-      videoElement.setAttribute('playsinline', 'true'); // Required for iOS Safari
+      mediaStream = acquiredStream;
+      videoElement.srcObject = acquiredStream;
+      videoElement.setAttribute('playsinline', 'true');
       await videoElement.play();
 
       if (!canvasElement) {
@@ -163,6 +185,23 @@ export function useQrScanner(options: UseQrScannerOptions = {}): UseQrScannerRet
 
       animationFrameId = requestAnimationFrame(() => scanFrame(videoElement, canvasElement!));
     } catch (err: any) {
+      // CRIT-007: Unconditionally stop all tracks on stream and nullify video.srcObject
+      if (acquiredStream) {
+        stopMediaStream(acquiredStream);
+      }
+      if (mediaStream) {
+        stopMediaStream(mediaStream);
+        mediaStream = null;
+      }
+      if (videoElement) {
+        try {
+          videoElement.srcObject = null;
+        } catch (clearErr) {
+          console.warn('[FC_PROGRESS_SYNC] Failed to clear videoElement.srcObject in catch', clearErr);
+        }
+      }
+      activeVideoElement = null;
+
       hasCamera.value = false;
       isScanning.value = false;
 

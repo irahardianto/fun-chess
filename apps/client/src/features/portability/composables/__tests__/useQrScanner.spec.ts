@@ -52,9 +52,10 @@ describe('useQrScanner', () => {
     expect(isScanning.value).toBe(true);
     expect(hasCamera.value).toBe(true);
     expect(mockVideo.play).toHaveBeenCalled();
+    expect(mockVideo.srcObject).toBe(mockStream);
   });
 
-  it('handles camera permission errors gracefully', async () => {
+  it('handles camera permission errors gracefully and stops tracks', async () => {
     const permError = new Error('Permission denied');
     permError.name = 'NotAllowedError';
     vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(permError);
@@ -65,18 +66,33 @@ describe('useQrScanner', () => {
 
     expect(isScanning.value).toBe(false);
     expect(cameraError.value).toContain('Camera permission was denied');
+    expect(mockVideo.srcObject).toBeNull();
   });
 
-  it('stops video tracks on stopScanner', async () => {
+  it('stops video tracks and nullifies video.srcObject on stopScanner (CRIT-007)', async () => {
     const { startScanner, stopScanner, isScanning } = useQrScanner();
 
     await startScanner(mockVideo);
     expect(isScanning.value).toBe(true);
+    expect(mockVideo.srcObject).toBe(mockStream);
 
     stopScanner();
     expect(isScanning.value).toBe(false);
     expect(mockTrack.stop).toHaveBeenCalled();
+    expect(mockVideo.srcObject).toBeNull();
     expect(cancelAnimationFrame).toHaveBeenCalledWith(123);
+  });
+
+  it('unconditionally stops tracks and clears video.srcObject when play() rejects in startScanner (CRIT-007)', async () => {
+    vi.mocked(mockVideo.play).mockRejectedValueOnce(new Error('AbortError: play interrupted'));
+
+    const { startScanner, isScanning } = useQrScanner();
+
+    await startScanner(mockVideo);
+
+    expect(isScanning.value).toBe(false);
+    expect(mockTrack.stop).toHaveBeenCalled();
+    expect(mockVideo.srcObject).toBeNull();
   });
 
   it('resets scanner state with resetScanner', () => {

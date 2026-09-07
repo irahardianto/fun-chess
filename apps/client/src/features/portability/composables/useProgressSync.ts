@@ -21,7 +21,6 @@ import {
   ProgressFileService,
   defaultProgressFileService,
 } from '../services/progress_file.service';
-import { useConfetti } from '@/composables/useConfetti';
 
 export interface UseProgressSyncOptions {
   storage?: ProgressStorage;
@@ -29,6 +28,8 @@ export interface UseProgressSyncOptions {
   mergeEngine?: ProgressMergeEngine;
   schemaValidator?: SchemaValidator;
   fileService?: ProgressFileService;
+  onMergeCelebration?: () => void;
+  confetti?: { celebrateVictory: () => void };
 }
 
 export interface UseProgressSyncReturn {
@@ -54,7 +55,8 @@ export interface UseProgressSyncReturn {
 function unwrapPayload(val: UnifiedProgressPayload): UnifiedProgressPayload {
   try {
     return JSON.parse(JSON.stringify(toRaw(val)));
-  } catch {
+  } catch (err) {
+    console.warn('[FC_PROGRESS_SYNC] Failed to deep-clone payload', err);
     return val;
   }
 }
@@ -70,7 +72,6 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
   const mergeEngine = options.mergeEngine || defaultProgressMergeEngine;
   const validator = options.schemaValidator || defaultSchemaValidator;
   const fileService = options.fileService || defaultProgressFileService;
-  const confetti = useConfetti();
 
   const isLoading = ref(false);
   const syncError = ref<string | null>(null);
@@ -88,7 +89,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
     isSyncModalOpen.value = true;
     clearError();
     loadCurrentProgress().catch((err) => {
-      console.error('[FC_PROGRESS_SYNC] Failed to refresh current progress on open', err);
+      console.warn('[FC_PROGRESS_SYNC] Failed to refresh current progress on open', err);
     });
   }
 
@@ -192,7 +193,8 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
         try {
           const parsed = JSON.parse(trimmed);
           decoded = validator.assertValid(parsed);
-        } catch {
+        } catch (parseErr) {
+          console.warn('[FC_PROGRESS_SYNC] JSON parse failed on import payload', parseErr);
           throw new Error('Invalid JSON format in save data.');
         }
       } else {
@@ -257,12 +259,16 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       diffPreview.value = null;
       isConflictModalOpen.value = false;
 
-      // Celebrate successful sync!
+      // Celebrate successful sync if celebration handler provided
       if (strategy !== 'keep_local') {
         try {
-          confetti.celebrateVictory();
-        } catch {
-          // ignore if canvas unavailable
+          if (options.onMergeCelebration) {
+            options.onMergeCelebration();
+          } else if (options.confetti) {
+            options.confetti.celebrateVictory();
+          }
+        } catch (celebrationErr) {
+          console.warn('[FC_PROGRESS_SYNC] Celebration trigger failed', celebrationErr);
         }
       }
 

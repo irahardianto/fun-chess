@@ -5,6 +5,7 @@ import {
   isValidFen,
   createSafeChess,
   safeLoadFen,
+  type ChessLogger,
 } from "../chess_factory.js";
 
 describe("Safe Chess Factory & FEN Validator", () => {
@@ -116,6 +117,25 @@ describe("Safe Chess Factory & FEN Validator", () => {
 
       expect(console.warn).toHaveBeenCalled();
     });
+
+    it("invokes injectable mockLogger.warn when provided an invalid FEN", () => {
+      const mockLogger: ChessLogger = {
+        warn: vi.fn(),
+      };
+      const badFen = "invalid-fen-string";
+      const chess = createSafeChess(badFen, mockLogger);
+
+      expect(chess).toBeInstanceOf(Chess);
+      expect(chess.fen()).toBe(DEFAULT_CHESS_FEN);
+      expect(mockLogger.warn).toHaveBeenCalled();
+    });
+
+    it("safely operates without crashing when no logger is passed", () => {
+      expect(() => createSafeChess("bad-fen")).not.toThrow();
+      const chess = createSafeChess("bad-fen");
+      expect(chess).toBeInstanceOf(Chess);
+      expect(chess.fen()).toBe(DEFAULT_CHESS_FEN);
+    });
   });
 
   describe("safeLoadFen()", () => {
@@ -136,6 +156,25 @@ describe("Safe Chess Factory & FEN Validator", () => {
       const result = safeLoadFen(chess, "corrupted-fen-text");
       expect(result).toBe(false);
       expect(chess.fen()).toBe(initialFen);
+    });
+
+    it("invokes injectable mockLogger.warn when loading an invalid FEN", () => {
+      const chess = new Chess();
+      const mockLogger: ChessLogger = {
+        warn: vi.fn(),
+      };
+      const badFen = "corrupted-fen-text";
+
+      const result = safeLoadFen(chess, badFen, mockLogger);
+      expect(result).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalled();
+    });
+
+    it("safely operates without crashing when no logger is passed", () => {
+      const chess = new Chess();
+      expect(() => safeLoadFen(chess, "corrupted-fen-text")).not.toThrow();
+      const result = safeLoadFen(chess, "corrupted-fen-text");
+      expect(result).toBe(false);
     });
 
     it("returns false gracefully if chess instance is null or undefined", () => {

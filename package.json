@@ -5,19 +5,39 @@
   "workspaces": [
     "shared",
     "apps/server",
-    "apps/client"
+    "apps/client",
+    "apps/e2e"
   ],
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
     "start": "pnpm --filter @fun-chess/server start",
     "build": "pnpm -r --if-present run build",
     "test": "pnpm -r --if-present run test && pnpm run test:integration",
+    "test:coverage": "pnpm -r --if-present run test:coverage",
     "test:integration": "vitest run --config vitest.config.ts",
     "test:contracts": "vitest run tests/contracts",
+    "test:e2e": "pnpm --filter @fun-chess/e2e test",
     "dev": "pnpm --filter @fun-chess/shared build && (pnpm --filter @fun-chess/server dev & pnpm --filter @fun-chess/client dev)",
     "dev:client": "pnpm --filter @fun-chess/client dev",
     "dev:server": "pnpm --filter @fun-chess/server dev"
   },
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
   "devDependencies": {
-    "typescript": "^5.8.0"
+    "@vitest/coverage-v8": "3.2.7",
+    "chess.js": "1.4.0",
+    "socket.io": "4.8.1",
+    "socket.io-client": "4.8.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": ">=6.4.3",
+      "vitest": ">=3.2.7"
+    }
   }
 }

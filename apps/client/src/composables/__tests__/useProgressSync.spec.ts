@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { effectScope } from 'vue';
-import { useProgressSync } from '../useProgressSync';
+import { useProgressSync } from '@/features/portability/composables/useProgressSync';
 import {
   DefaultProgressCodec,
   DefaultProgressMergeEngine,

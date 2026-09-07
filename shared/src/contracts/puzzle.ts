@@ -555,6 +555,11 @@ export interface PuzzleProgressStore {
     score: number,
     streak: number,
   ): Promise<PuzzleProgress>;
+  /**
+   * Complete lossless restoration of full Puzzle Hub progress.
+   * Atomically sets ratingProfile, themeMastery, arcadeStats, and solvedPuzzles.
+   */
+  restoreProgress(progress: PuzzleProgress): Promise<void>;
   resetAll(): Promise<void>;
 }
 

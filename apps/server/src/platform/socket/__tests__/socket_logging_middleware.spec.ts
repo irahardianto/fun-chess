@@ -62,10 +62,65 @@ describe("wrapSocketHandler", () => {
     expect(callbackResult.error.correlationId).toBeDefined();
     expect(callbackResult.error.details).toEqual({ square: "e4" });
 
-    expect(logger.errorLogs).toHaveLength(1);
-    expect(logger.errorLogs[0]?.message).toContain(
-      "Operation failed: test:fail",
+    expect(logger.warnLogs).toHaveLength(1);
+    expect(logger.warnLogs[0]?.message).toContain(
+      "Operation rejected: test:fail",
     );
+  });
+
+  it("sanitizes 500 internal errors and logs to error level (MIN-015)", async () => {
+    const logger = new NullLogger();
+    const handler = async () => {
+      throw new Error("Internal secret db connection timeout");
+    };
+
+    const wrapped = wrapSocketHandler(logger, "test:crash", "sock_1", handler);
+
+    let callbackResult: any;
+    await wrapped({}, (res) => {
+      callbackResult = res;
+    });
+
+    expect(callbackResult).toBeDefined();
+    expect(callbackResult.success).toBe(false);
+    expect(callbackResult.error.code).toBe("ERR_INTERNAL_SERVER");
+    expect(callbackResult.error.message).toBe("An internal server error occurred");
+
+    expect(logger.errorLogs).toHaveLength(1);
+    expect(logger.errorLogs[0]?.message).toContain("Operation failed: test:crash");
+    expect(logger.errorLogs[0]?.context?.["duration"]).toBeTypeOf("number");
+  });
+
+  it("emits socket error event when no ack callback is provided (CRIT-005)", async () => {
+    const logger = new NullLogger();
+    const handler = async () => {
+      throw new CustomTestError();
+    };
+
+    let emittedEvent = "";
+    let emittedPayload: any;
+    const mockSocket = {
+      id: "sock_test",
+      emit: (event: string, payload: any) => {
+        emittedEvent = event;
+        emittedPayload = payload;
+      },
+    };
+
+    const wrapped = wrapSocketHandler(
+      logger,
+      "test:unacked",
+      mockSocket as any,
+      handler,
+    );
+
+    // Call without callback
+    await wrapped({ foo: "bar" });
+
+    expect(emittedEvent).toBe("error");
+    expect(emittedPayload).toBeDefined();
+    expect(emittedPayload.code).toBe("ERR_INVALID_MOVE");
+    expect(emittedPayload.message).toBe("Test move error");
   });
 
   it("redacts sessionToken from logged request payloads (SEC-03)", async () => {

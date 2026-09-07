@@ -9,9 +9,11 @@ import { RoomState } from "@fun-chess/shared";
 import { ChessEngine } from "../chess_engine.js";
 import { Chess } from "chess.js";
 import { clearAllDisconnectTimers } from "../../rooms/room.socket_handler.js";
+import { SocketRateLimiter } from "../../../platform/socket/socket_rate_limiter.js";
 
 class TestSocket {
   public id: string;
+  public handshake = { address: "127.0.0.1" };
   public rooms = new Set<string>();
   public handlers = new Map<
     string,
@@ -91,7 +93,6 @@ describe("Game Socket Handlers", () => {
         color: "w",
         isHost: true,
         isConnected: true,
-        sessionToken: "token_w",
         connectedAt: Date.now(),
       },
       blackPlayer: {
@@ -101,7 +102,6 @@ describe("Game Socket Handlers", () => {
         color: "b",
         isHost: false,
         isConnected: true,
-        sessionToken: "token_b",
         connectedAt: Date.now(),
       },
       spectators: [],
@@ -223,6 +223,47 @@ describe("Game Socket Handlers", () => {
       expect(ackResponse.success).toBe(false);
       expect(ackResponse.error.code).toBe("ERR_INVALID_MOVE");
       expect(ackResponse.error.correlationId).toBeDefined();
+    });
+
+    it("rejects game:move with ERR_RATE_LIMITED when rate limit is exceeded (SEC-HIGH-001)", async () => {
+      await setupActiveRoom("FLOOD_MOVE");
+      const floodSocket = new TestSocket("sock_flood");
+      floodSocket.handshake.address = "192.168.5.55";
+      const limiter = new SocketRateLimiter({ maxRequests: 5, windowMs: 10_000 });
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        floodSocket as unknown as Socket,
+        service,
+        logger,
+        limiter,
+      );
+
+      // Consume 5 requests
+      for (let i = 0; i < 5; i++) {
+        let ack: any;
+        await floodSocket.trigger(
+          "game:move",
+          { roomCode: "FLOOD_MOVE", move: { from: "e2", to: "e4" } },
+          (res) => {
+            ack = res;
+          },
+        );
+      }
+
+      // 6th request must be rejected
+      let rateLimitAck: any;
+      await floodSocket.trigger(
+        "game:move",
+        { roomCode: "FLOOD_MOVE", move: { from: "e2", to: "e4" } },
+        (res) => {
+          rateLimitAck = res;
+        },
+      );
+
+      expect(rateLimitAck.success).toBe(false);
+      expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
+      expect(rateLimitAck.error.message).toContain("Rate limit exceeded for game moves");
     });
   });
 
@@ -487,6 +528,84 @@ describe("Game Socket Handlers", () => {
 
       expect(ackResponse.success).toBe(false);
       expect(ackResponse.error.code).toBe("ERR_ROOM_NOT_FOUND");
+    });
+
+    it("rejects malformed move payload with ERR_INVALID_PAYLOAD when coordinates are invalid", async () => {
+      let ackResponse: any;
+      await whiteSocket.trigger(
+        "game:move",
+        { roomCode: "GAME", move: { from: "zz", to: "e4" } },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
+    it("rejects malformed move payload with ERR_INVALID_PAYLOAD when move object is missing", async () => {
+      let ackResponse: any;
+      await whiteSocket.trigger(
+        "game:move",
+        { roomCode: "GAME" },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
+    it("emits error event for unacknowledged malformed move", async () => {
+      await whiteSocket.trigger("game:move", { roomCode: "GAME", move: {} });
+
+      const errorEvent = whiteSocket.emittedEvents.find((e) => e.event === "error");
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent?.payload as any).code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
+    it("rejects malformed game:respond_draw with ERR_INVALID_PAYLOAD when accept is not boolean", async () => {
+      let ackResponse: any;
+      await blackSocket.trigger(
+        "game:respond_draw",
+        { roomCode: "DRAW", accept: "not_a_boolean" },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
+    it("rejects malformed game:respond_rematch with ERR_INVALID_PAYLOAD when accept is not boolean", async () => {
+      let ackResponse: any;
+      await blackSocket.trigger(
+        "game:respond_rematch",
+        { roomCode: "REMATCH", accept: 42 },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
+    it("rejects malformed empty roomCode in game:resign with ERR_INVALID_PAYLOAD", async () => {
+      let ackResponse: any;
+      await whiteSocket.trigger(
+        "game:resign",
+        { roomCode: "" },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
     });
   });
 });

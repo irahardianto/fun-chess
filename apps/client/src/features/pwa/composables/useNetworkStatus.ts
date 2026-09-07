@@ -1,4 +1,5 @@
 import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
+import { apiClient, type IApiClient } from '@/platform/api';
 
 const isOnlineState = ref<boolean>(
   typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -43,8 +44,9 @@ function removeNetworkListeners() {
 
 /**
  * Composable to observe network status with kid-friendly reassurance messages.
+ * Uses centralized IApiClient for connectivity probing per MAJ-007.
  */
-export function useNetworkStatus() {
+export function useNetworkStatus(client: IApiClient = apiClient) {
   setupNetworkListeners();
   listenerCount++;
 
@@ -81,14 +83,11 @@ export function useNetworkStatus() {
     }
 
     try {
-      const response = await fetch(`${probeUrl}?_t=${Date.now()}`, {
-        method: 'HEAD',
-        cache: 'no-store',
-      });
-      const online = response.ok;
+      const online = await client.checkConnectivity(probeUrl);
       isOnlineState.value = online;
       return online;
-    } catch {
+    } catch (err) {
+      console.warn('[FC_PWA] Connectivity probe failed', err);
       isOnlineState.value = false;
       return false;
     }
@@ -110,7 +109,9 @@ export function useNetworkStatus() {
             configurable: true,
             writable: true,
           });
-        } catch {}
+        } catch (err) {
+          console.warn('[FC_PWA] Could not redefine navigator.onLine', err);
+        }
       }
       isOnlineState.value = status;
       if (typeof window !== 'undefined') {

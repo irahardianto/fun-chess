@@ -1,16 +1,19 @@
 /**
  * Web Audio API synthesizer for zero-asset sound synthesis.
  * All sound effects are generated dynamically via oscillators and gain envelopes.
+ * Adheres to Rule 1 (I/O Isolation) and MAJ-008 (DOM side-effect elimination).
  */
+import type { IAudioService } from './audio.interface';
 
 export interface AudioSynthesizerOptions {
   muted?: boolean;
 }
 
-export class AudioSynthesizer {
+export class AudioSynthesizer implements IAudioService {
   private ctx: AudioContext | null = null;
   private _isMuted: boolean = false;
   private masterGain: GainNode | null = null;
+  private bootstrapped: boolean = false;
 
   constructor(options?: AudioSynthesizerOptions) {
     if (options?.muted !== undefined) {
@@ -31,15 +34,16 @@ export class AudioSynthesizer {
           this.masterGain = this.ctx.createGain();
           this.masterGain.gain.setValueAtTime(this._isMuted ? 0 : 0.4, this.ctx.currentTime);
           this.masterGain.connect(this.ctx.destination);
-        } catch {
+        } catch (err) {
+          console.warn('[FC_AUDIO] Failed to initialize AudioContext', err);
           return null;
         }
       }
     }
 
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {
-        // Autoplay policy fallback
+      this.ctx.resume().catch((err) => {
+        console.warn('[FC_AUDIO] Autoplay policy suspended AudioContext', err);
       });
     }
 
@@ -52,7 +56,9 @@ export class AudioSynthesizer {
 
   public resumeContext(): void {
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
+      this.ctx.resume().catch((err) => {
+        console.warn('[FC_AUDIO] Failed to resume suspended AudioContext', err);
+      });
     }
   }
 
@@ -71,6 +77,43 @@ export class AudioSynthesizer {
     const newState = !this._isMuted;
     this.setMuted(newState);
     return newState;
+  }
+
+  /**
+   * Explicit lifecycle bootstrap for user gesture unlock and visibility changes.
+   * Eliminates module-import-level DOM side effects per MAJ-008.
+   */
+  public bootstrap(): void {
+    if (this.bootstrapped || typeof window === 'undefined') return;
+    this.bootstrapped = true;
+
+    const unlockEvents = ['pointerdown', 'touchstart', 'keydown', 'click'];
+    const unlockHandler = () => {
+      this.initContext();
+      unlockEvents.forEach((evt) => {
+        try {
+          window.removeEventListener(evt, unlockHandler, true);
+        } catch (err) {
+          console.warn('[FC_AUDIO] Failed to remove unlock listener', err);
+        }
+      });
+    };
+
+    unlockEvents.forEach((evt) => {
+      try {
+        window.addEventListener(evt, unlockHandler, { once: true, capture: true, passive: true });
+      } catch (err) {
+        console.warn('[FC_AUDIO] Failed to attach unlock listener', err);
+      }
+    });
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.resumeContext();
+        }
+      });
+    }
   }
 
   /**
@@ -97,8 +140,8 @@ export class AudioSynthesizer {
 
       osc.start(now);
       osc.stop(now + 0.035);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play click sound', err);
     }
   }
 
@@ -131,8 +174,8 @@ export class AudioSynthesizer {
 
       osc.start(now);
       osc.stop(now + 0.08);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play move sound', err);
     }
   }
 
@@ -173,8 +216,8 @@ export class AudioSynthesizer {
       osc2.start(now);
       osc1.stop(now + 0.12);
       osc2.stop(now + 0.12);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play capture sound', err);
     }
   }
 
@@ -214,8 +257,8 @@ export class AudioSynthesizer {
       osc1.stop(now + 0.095);
       osc2.start(now + 0.08);
       osc2.stop(now + 0.23);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play check sound', err);
     }
   }
 
@@ -230,10 +273,10 @@ export class AudioSynthesizer {
     try {
       const now = ctx.currentTime;
       const notes = [
-        { freq: 523.25, time: 0.00, duration: 0.12 }, // C5
+        { freq: 523.25, time: 0.0, duration: 0.12 }, // C5
         { freq: 659.25, time: 0.11, duration: 0.12 }, // E5
         { freq: 783.99, time: 0.22, duration: 0.12 }, // G5
-        { freq: 1046.50, time: 0.33, duration: 0.28 }, // C6
+        { freq: 1046.5, time: 0.33, duration: 0.28 }, // C6
       ];
 
       notes.forEach(({ freq, time, duration }) => {
@@ -252,8 +295,45 @@ export class AudioSynthesizer {
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
       });
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play victory sound', err);
+    }
+  }
+
+  /**
+   * Defeat Sound: Descending minor arpeggio (G4 -> Eb4 -> C4), 380ms gentle melancholic chime.
+   */
+  public playDefeat(): void {
+    if (this._isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx || !this.masterGain) return;
+
+    try {
+      const now = ctx.currentTime;
+      const notes = [
+        { freq: 392.0, time: 0.0, duration: 0.12 }, // G4
+        { freq: 311.13, time: 0.1, duration: 0.14 }, // Eb4
+        { freq: 261.63, time: 0.22, duration: 0.22 }, // C4
+      ];
+
+      notes.forEach(({ freq, time, duration }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + time);
+
+        gain.gain.setValueAtTime(0, now + time);
+        gain.gain.linearRampToValueAtTime(0.35, now + time + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + time + duration);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain!);
+
+        osc.start(now + time);
+        osc.stop(now + time + duration + 0.02);
+      });
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play defeat sound', err);
     }
   }
 
@@ -282,8 +362,8 @@ export class AudioSynthesizer {
 
       osc.start(now);
       osc.stop(now + 0.33);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play draw sound', err);
     }
   }
 
@@ -312,8 +392,8 @@ export class AudioSynthesizer {
 
       osc.start(now);
       osc.stop(now + 0.15);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play error sound', err);
     }
   }
 
@@ -341,8 +421,8 @@ export class AudioSynthesizer {
 
       osc.start(now);
       osc.stop(now + 0.2);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play turn notification sound', err);
     }
   }
 
@@ -356,7 +436,7 @@ export class AudioSynthesizer {
 
     try {
       const now = ctx.currentTime;
-      const freqs = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+      const freqs = [261.63, 329.63, 392.0, 523.25]; // C4, E4, G4, C5
 
       freqs.forEach((freq) => {
         const osc = ctx.createOscillator();
@@ -370,11 +450,11 @@ export class AudioSynthesizer {
         osc.connect(gain);
         gain.connect(this.masterGain!);
 
-        osc.start(now + timeOffset(freq));
+        osc.start(now);
         osc.stop(now + 0.36);
       });
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play start sound', err);
     }
   }
 
@@ -390,7 +470,7 @@ export class AudioSynthesizer {
       const now = ctx.currentTime;
       const notes = [
         { freq: 587.33, time: 0.0, duration: 0.12 },
-        { freq: 880.00, time: 0.08, duration: 0.14 },
+        { freq: 880.0, time: 0.08, duration: 0.14 },
         { freq: 1174.66, time: 0.16, duration: 0.22 },
       ];
 
@@ -410,8 +490,8 @@ export class AudioSynthesizer {
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
       });
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play hint sound', err);
     }
   }
 
@@ -447,8 +527,8 @@ export class AudioSynthesizer {
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
       });
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play star earned sound', err);
     }
   }
 
@@ -478,8 +558,8 @@ export class AudioSynthesizer {
 
       osc.start(now);
       osc.stop(now + 0.24);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play mascot happy sound', err);
     }
   }
 
@@ -508,8 +588,8 @@ export class AudioSynthesizer {
 
       osc.start(now);
       osc.stop(now + 0.36);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play mascot blunder sound', err);
     }
   }
 
@@ -545,42 +625,10 @@ export class AudioSynthesizer {
       osc2.start(now);
       osc1.stop(now + 0.26);
       osc2.stop(now + 0.26);
-    } catch {
-      // Audio play failure ignored safely
+    } catch (err) {
+      console.warn('[FC_AUDIO] Failed to play step complete sound', err);
     }
   }
 }
 
-function timeOffset(_freq: number): number {
-  return 0;
-}
-
 export const audioSynthesizer = new AudioSynthesizer();
-
-// Proactive user gesture unlock & mobile sleep/resume lifecycle handling
-if (typeof window !== 'undefined') {
-  const unlockEvents = ['pointerdown', 'touchstart', 'keydown', 'click'];
-  const unlockHandler = () => {
-    audioSynthesizer.initContext();
-    unlockEvents.forEach((evt) => {
-      try {
-        window.removeEventListener(evt, unlockHandler, true);
-      } catch {}
-    });
-  };
-
-  unlockEvents.forEach((evt) => {
-    try {
-      window.addEventListener(evt, unlockHandler, { once: true, capture: true, passive: true });
-    } catch {}
-  });
-
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        audioSynthesizer.resumeContext();
-      }
-    });
-  }
-}
-

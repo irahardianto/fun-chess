@@ -8,12 +8,14 @@ import {
 import { SocketRateLimiter } from "../../../platform/socket/socket_rate_limiter.js";
 import { RoomService } from "../room.service.js";
 import { MockRoomStore } from "../mock_room.store.js";
+import { InMemorySessionRegistry } from "../in_memory_session_registry.js";
 import { NullLogger } from "../../../platform/logger/null_logger.js";
 import { TypedSocketServer } from "../../../platform/socket/socket_server.js";
 import { Socket } from "socket.io";
 
 class TestSocket {
   public id: string;
+  public handshake = { address: "127.0.0.1" };
   public rooms = new Set<string>();
   public handlers = new Map<
     string,
@@ -79,6 +81,7 @@ class TestIo {
 
 describe("Room Socket Handlers", () => {
   let store: MockRoomStore;
+  let sessionRegistry: InMemorySessionRegistry;
   let service: RoomService;
   let logger: NullLogger;
   let io: TestIo;
@@ -87,7 +90,8 @@ describe("Room Socket Handlers", () => {
 
   beforeEach(() => {
     store = new MockRoomStore();
-    service = new RoomService(store);
+    sessionRegistry = new InMemorySessionRegistry();
+    service = new RoomService(store, sessionRegistry);
     logger = new NullLogger();
     io = new TestIo();
     socket = new TestSocket("sock_host");
@@ -160,6 +164,60 @@ describe("Room Socket Handlers", () => {
       expect(rateLimitAck.success).toBe(false);
       expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
       expect(rateLimitAck.error.message).toContain("Rate limit exceeded");
+    });
+
+    it("ensures sessionToken is returned in ack but never leaked in room:created event or room state", async () => {
+      let ackResponse: any;
+      await socket.trigger(
+        "room:create",
+        { playerName: "Alice", preferredColor: "w" },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(true);
+      expect(ackResponse.sessionToken).toBeDefined();
+      expect(typeof ackResponse.sessionToken).toBe("string");
+
+      // Verify sessionToken is NOT in room state or player objects
+      expect((ackResponse.room as any).sessionToken).toBeUndefined();
+      const hostPlayer = ackResponse.room.whitePlayer ?? ackResponse.room.blackPlayer;
+      expect(hostPlayer).toBeDefined();
+      expect((hostPlayer as any).sessionToken).toBeUndefined();
+
+      const createdEvent = socket.emittedEvents.find(
+        (e) => e.event === "room:created",
+      );
+      expect(createdEvent).toBeDefined();
+      expect((createdEvent?.payload as any).sessionToken).toBeUndefined();
+      const eventPlayer = (createdEvent?.payload as any).whitePlayer ?? (createdEvent?.payload as any).blackPlayer;
+      expect((eventPlayer as any).sessionToken).toBeUndefined();
+    });
+
+    it("rejects malformed room:create payload with ERR_INVALID_PAYLOAD via ack", async () => {
+      let ackResponse: any;
+      await socket.trigger(
+        "room:create",
+        { playerName: "", preferredColor: "w" },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+      expect(ackResponse.error.message).toBeDefined();
+      expect(ackResponse.error.correlationId).toBeDefined();
+    });
+
+    it("emits contracted error event when unacknowledged room:create fails schema validation", async () => {
+      await socket.trigger("room:create", { playerName: "A".repeat(25) });
+
+      const errorEvent = socket.emittedEvents.find((e) => e.event === "error");
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent?.payload as any).code).toBe("ERR_INVALID_PAYLOAD");
+      expect((errorEvent?.payload as any).correlationId).toBeDefined();
     });
   });
 
@@ -247,10 +305,130 @@ describe("Room Socket Handlers", () => {
       expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
       expect(rateLimitAck.error.message).toContain("Rate limit exceeded");
     });
+
+    it("ensures sessionToken is returned to joiner in ack but never leaked in room:player_joined broadcast", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "Alice", preferredColor: "w" },
+        "sock_host",
+      );
+
+      const joinerSocket = new TestSocket("sock_joiner_secret");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        joinerSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let ackResponse: any;
+      await joinerSocket.trigger(
+        "room:join",
+        { roomCode: created.roomCode, playerName: "Bob" },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(true);
+      expect(ackResponse.sessionToken).toBeDefined();
+      expect(typeof ackResponse.sessionToken).toBe("string");
+      expect((ackResponse.player as any).sessionToken).toBeUndefined();
+
+      const broadcastJoined = joinerSocket.toEmits.find(
+        (e) => e.event === "room:player_joined",
+      );
+      expect(broadcastJoined).toBeDefined();
+      expect(
+        ((broadcastJoined?.payload as any).player as any).sessionToken,
+      ).toBeUndefined();
+    });
+
+    it("rejects malformed room:join payload with ERR_INVALID_PAYLOAD via ack", async () => {
+      const joinerSocket = new TestSocket("sock_join_invalid");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        joinerSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let ackResponse: any;
+      await joinerSocket.trigger(
+        "room:join",
+        { roomCode: "INVALID_LENGTH_CODE", playerName: "Bob" },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+      expect(ackResponse.error.message).toBeDefined();
+    });
+
+    it("emits error event when unacknowledged room:join fails schema validation", async () => {
+      const joinerSocket = new TestSocket("sock_join_unack");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        joinerSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      await joinerSocket.trigger("room:join", { roomCode: "1234", playerName: "" });
+
+      const errorEvent = joinerSocket.emittedEvents.find((e) => e.event === "error");
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent?.payload as any).code).toBe("ERR_INVALID_PAYLOAD");
+    });
   });
 
-
   describe("room:reconnect", () => {
+    it("rejects malformed room:reconnect payload with ERR_INVALID_PAYLOAD via ack", async () => {
+      const reconnSocket = new TestSocket("sock_reconn_invalid");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        reconnSocket as unknown as Socket,
+        service,
+        logger,
+      );
+
+      let ackResponse: any;
+      await reconnSocket.trigger(
+        "room:reconnect",
+        {
+          roomCode: "ABCD",
+          playerId: "not-a-valid-uuid",
+          sessionToken: "",
+        },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
+    it("emits error event when unacknowledged room:reconnect fails schema validation", async () => {
+      const reconnSocket = new TestSocket("sock_reconn_unack");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        reconnSocket as unknown as Socket,
+        service,
+        logger,
+      );
+
+      await reconnSocket.trigger("room:reconnect", { roomCode: "ABCD" });
+
+      const errorEvent = reconnSocket.emittedEvents.find((e) => e.event === "error");
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent?.payload as any).code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
     it("reconnects dropped player, joins socket, cancels disconnect timer, and broadcasts room:player_reconnected", async () => {
       const { room: created, sessionToken } = await service.createRoom(
         { playerName: "Alice", preferredColor: "w" },
@@ -300,9 +478,138 @@ describe("Room Socket Handlers", () => {
       expect(reconnectedEmit).toBeDefined();
       expect((reconnectedEmit?.payload as any).playerId).toBe(created.hostId);
     });
+
+    it("rejects room:reconnect with ERR_RATE_LIMITED when rate limit is exceeded (SEC-HIGH-001)", async () => {
+      const reconnLimiter = new SocketRateLimiter({ maxRequests: 5, windowMs: 10_000 });
+      const reconnSocket = new TestSocket("sock_reconn_flood");
+      reconnSocket.handshake.address = "192.168.10.99";
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        reconnSocket as unknown as Socket,
+        service,
+        logger,
+        reconnLimiter,
+      );
+
+      // Consume 5 requests
+      for (let i = 0; i < 5; i++) {
+        let ack: any;
+        await reconnSocket.trigger(
+          "room:reconnect",
+          { roomCode: "ABCD", playerId: "not-a-valid-uuid", sessionToken: "" },
+          (res) => {
+            ack = res;
+          },
+        );
+        expect(ack.success).toBe(false);
+        // Payload validation fails, but permit was consumed
+        expect(ack.error.code).toBe("ERR_INVALID_PAYLOAD");
+      }
+
+      // 6th attempt must be rejected by rate limiter
+      let rateLimitAck: any;
+      await reconnSocket.trigger(
+        "room:reconnect",
+        { roomCode: "ABCD", playerId: "not-a-valid-uuid", sessionToken: "" },
+        (res) => {
+          rateLimitAck = res;
+        },
+      );
+
+      expect(rateLimitAck.success).toBe(false);
+      expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
+      expect(rateLimitAck.error.message).toContain("Rate limit exceeded for room reconnection");
+    });
+
+    it("enforces rate limit across socket disconnections keyed by client IP (SEC-HIGH-001, MAJ-001)", async () => {
+      const sharedLimiter = new SocketRateLimiter({ maxRequests: 5, windowMs: 10_000 });
+      const ip = "10.200.1.42";
+
+      const socket1 = new TestSocket("sock_ephemeral_1");
+      socket1.handshake.address = ip;
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        socket1 as unknown as Socket,
+        service,
+        logger,
+        sharedLimiter,
+      );
+
+      // Consume 5 requests with socket1
+      for (let i = 0; i < 5; i++) {
+        let ack: any;
+        await socket1.trigger(
+          "room:create",
+          { playerName: `User${i}`, preferredColor: "w" },
+          (res) => {
+            ack = res;
+          },
+        );
+        expect(ack.success).toBe(true);
+      }
+
+      // Socket1 disconnects
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        socket1.id,
+        service,
+        logger,
+        60_000,
+        sharedLimiter,
+      );
+
+      // Socket2 connects with NEW socket ID but SAME client IP
+      const socket2 = new TestSocket("sock_ephemeral_2");
+      socket2.handshake.address = ip;
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        socket2 as unknown as Socket,
+        service,
+        logger,
+        sharedLimiter,
+      );
+
+      // Attempt on socket2 must STILL be rate limited because IP is blocked
+      let rateLimitAck: any;
+      await socket2.trigger(
+        "room:create",
+        { playerName: "AttackerNewSocket", preferredColor: "w" },
+        (res) => {
+          rateLimitAck = res;
+        },
+      );
+
+      expect(rateLimitAck.success).toBe(false);
+      expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
+    });
   });
 
   describe("room:leave", () => {
+    it("rejects malformed room:leave payload with ERR_INVALID_PAYLOAD via ack", async () => {
+      let ackResponse: any;
+      await socket.trigger(
+        "room:leave",
+        { roomCode: "INVALID_LENGTH" },
+        (res) => {
+          ackResponse = res;
+        },
+      );
+
+      expect(ackResponse.success).toBe(false);
+      expect(ackResponse.error.code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
+    it("emits error event when unacknowledged room:leave fails schema validation", async () => {
+      await socket.trigger("room:leave", {});
+
+      const errorEvent = socket.emittedEvents.find((e) => e.event === "error");
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent?.payload as any).code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
     it("leaves room channel, cancels disconnect timers, and emits game:over with abandonment reason when active player leaves", async () => {
       const { room: created } = await service.createRoom(
         { playerName: "Alice", preferredColor: "w" },
@@ -358,7 +665,6 @@ describe("Room Socket Handlers", () => {
         color: "w" as const,
         isHost: false,
         isConnected: true,
-        sessionToken: "token_spec",
         connectedAt: Date.now(),
       };
       roomWithPlayers.spectators.push(specPlayer);

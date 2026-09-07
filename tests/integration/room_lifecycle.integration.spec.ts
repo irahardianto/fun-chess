@@ -21,6 +21,7 @@ import {
   LeaveRoomRequest,
   Player,
   ReconnectRequest,
+  ResignRequest,
   RoomState,
   SocketErrorPayload,
 } from "@fun-chess/shared";
@@ -57,6 +58,7 @@ describe("Room Lifecycle Integration Tests", () => {
     >(hostClient, "room:create", {
       playerName: "Sam",
       preferredColor: "random",
+      avatar: "🦁",
     });
 
     // Assert
@@ -80,20 +82,21 @@ describe("Room Lifecycle Integration Tests", () => {
     >(hostClient, "room:create", {
       playerName: "Player 1",
       preferredColor: "w",
+      avatar: "🦁",
     });
     const roomCode = createRes.room.roomCode;
 
     await emitAck<
       JoinRoomRequest,
       { success: true; room: RoomState; player: Player; sessionToken: string }
-    >(joinerClient, "room:join", { roomCode, playerName: "Player 2" });
+    >(joinerClient, "room:join", { roomCode, playerName: "Player 2", avatar: "🦁" });
 
     // Act: Third player attempts to join
     const thirdJoinRes = await emitAck<
       JoinRoomRequest,
       | { success: true; room: RoomState; player: Player; sessionToken: string }
       | { success: false; error: SocketErrorPayload }
-    >(spectatorClient, "room:join", { roomCode, playerName: "Player 3" });
+    >(spectatorClient, "room:join", { roomCode, playerName: "Player 3", avatar: "🦁" });
 
     // Assert
     expect(thirdJoinRes.success).toBe(false);
@@ -109,13 +112,19 @@ describe("Room Lifecycle Integration Tests", () => {
     >(hostClient, "room:create", {
       playerName: "Player 1",
       preferredColor: "w",
+      avatar: "🦁",
     });
     const roomCode = createRes.room.roomCode;
 
     await emitAck<
       JoinRoomRequest,
       { success: true; room: RoomState; player: Player; sessionToken: string }
-    >(joinerClient, "room:join", { roomCode, playerName: "Player 2" });
+    >(joinerClient, "room:join", { roomCode, playerName: "Player 2", avatar: "🦁" });
+
+    // Conclude match first (host resigns so status becomes game_over)
+    const gameOverPromise = waitForEvent(joinerClient, "game:over");
+    hostClient.emit("game:resign", { roomCode } as ResignRequest);
+    await gameOverPromise;
 
     // Act: Player 2 leaves, Player 1 listens
     const playerLeftPromise = waitForEvent<{
@@ -140,6 +149,7 @@ describe("Room Lifecycle Integration Tests", () => {
     >(hostClient, "room:create", {
       playerName: "Reconnector",
       preferredColor: "w",
+      avatar: "🦁",
     });
     const roomCode = createRes.room.roomCode;
     const playerId = createRes.room.whitePlayer!.id;
@@ -173,7 +183,7 @@ describe("Room Lifecycle Integration Tests", () => {
     const createRes = await emitAck<
       CreateRoomRequest,
       { success: true; room: RoomState; sessionToken: string }
-    >(hostClient, "room:create", { playerName: "Host", preferredColor: "w" });
+    >(hostClient, "room:create", { playerName: "Host", preferredColor: "w", avatar: "🦁" });
     const roomCode = createRes.room.roomCode;
     const playerId = createRes.room.whitePlayer!.id;
 

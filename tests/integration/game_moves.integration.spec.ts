@@ -52,6 +52,7 @@ describe("Game Moves & Rules Integration Tests", () => {
     >(whiteClient, "room:create", {
       playerName: "WhitePlayer",
       preferredColor: "w",
+      avatar: "🦁",
     });
     activeRoomCode = createRes.room.roomCode;
 
@@ -61,6 +62,7 @@ describe("Game Moves & Rules Integration Tests", () => {
     >(blackClient, "room:join", {
       roomCode: activeRoomCode,
       playerName: "BlackPlayer",
+      avatar: "🦁",
     });
   });
 

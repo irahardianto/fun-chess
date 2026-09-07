@@ -1,5 +1,9 @@
 import { RoomState } from "@fun-chess/shared";
-import { RoomStore } from "./room.store.js";
+import { RoomStore, RoomMutator } from "./room.store.js";
+import {
+  RoomNotFoundError,
+  OptimisticLockConflictError,
+} from "./room.errors.js";
 
 /**
  * Unit test double for RoomStore.
@@ -10,10 +14,72 @@ export class MockRoomStore implements RoomStore {
   public saveCalls: RoomState[] = [];
   public deleteCalls: string[] = [];
 
-  public async save(room: RoomState): Promise<void> {
+  public async save(room: RoomState, expectedVersion?: number): Promise<void> {
     const code = room.roomCode.toUpperCase();
-    this.saveCalls.push(structuredClone(room));
-    this.rooms.set(code, structuredClone(room));
+    const existing = this.rooms.get(code);
+
+    if (existing && expectedVersion !== undefined) {
+      const currentVer = existing.version || 1;
+      if (currentVer !== expectedVersion) {
+        throw new OptimisticLockConflictError(
+          code,
+          expectedVersion,
+          currentVer,
+        );
+      }
+    }
+
+    const nextVersion = existing ? (existing.version || 1) + 1 : (room.version || 1);
+    const roomToSave: RoomState = {
+      ...structuredClone(room),
+      version: nextVersion,
+      lastActivityAt: room.lastActivityAt ?? Date.now(),
+    };
+
+    this.saveCalls.push(structuredClone(roomToSave));
+    this.rooms.set(code, roomToSave);
+  }
+
+  public async mutate<T>(
+    roomCode: string,
+    mutator: RoomMutator<T>,
+  ): Promise<T> {
+    return this.withLock(roomCode, async () => {
+      const code = roomCode.toUpperCase();
+      const existing = this.rooms.get(code);
+      if (!existing) {
+        throw new RoomNotFoundError(code);
+      }
+
+      const clone = structuredClone(existing);
+      const expectedVersion = clone.version || 1;
+
+      const { updatedRoom, result } = await mutator(clone);
+
+      if (updatedRoom.roomCode.toUpperCase() !== code) {
+        throw new Error(
+          `Mutation cannot alter roomCode: expected ${code}, received ${updatedRoom.roomCode}`,
+        );
+      }
+
+      const nextVersion = expectedVersion + 1;
+      const roomToSave: RoomState = {
+        ...structuredClone(updatedRoom),
+        version: nextVersion,
+        lastActivityAt: updatedRoom.lastActivityAt ?? Date.now(),
+      };
+
+      this.saveCalls.push(structuredClone(roomToSave));
+      this.rooms.set(code, roomToSave);
+      return result;
+    });
+  }
+
+  public async withLock<T>(
+    _roomCode: string,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    return await action();
   }
 
   public async findByCode(roomCode: string): Promise<RoomState | null> {
@@ -54,7 +120,7 @@ export class MockRoomStore implements RoomStore {
     return this.rooms.size;
   }
 
-  public clear(): void {
+  public async clear(): Promise<void> {
     this.rooms.clear();
     this.saveCalls = [];
     this.deleteCalls = [];

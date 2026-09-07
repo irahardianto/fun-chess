@@ -8,6 +8,8 @@ import { PlayerBadge, CapturedTray, MoveHistoryList } from '../hud/index.js';
 import { PromotionModal } from '../modals/index.js';
 import BaseButton from '../../components/base/BaseButton.vue';
 import { useAudio } from '../../composables/useAudio.js';
+import { useConfetti } from '../../composables/useConfetti.js';
+import type { MoveOutcomeEvent, GameCompletionOutcomeEvent } from './composables/useAiGame.js';
 
 interface Props {
   initialMascotId?: MascotId;
@@ -29,12 +31,35 @@ const emit = defineEmits<{
   changeOpponent: [];
 }>();
 
-const { isMuted, toggleMute } = useAudio();
+const audio = useAudio();
+const { isMuted, toggleMute } = audio;
+const { celebrate } = useConfetti();
+
+function handleMoveOutcome(event: MoveOutcomeEvent) {
+  if (event.isCheck) {
+    audio.playCheck();
+  } else if (event.isCapture) {
+    audio.playCapture();
+  } else {
+    audio.playMove();
+  }
+}
+
+function handleGameCompletion(event: GameCompletionOutcomeEvent) {
+  if (event.isLocalPlayerWinner) {
+    audio.playVictory();
+    celebrate();
+  } else if (event.winner === 'draw') {
+    audio.playDraw();
+  }
+}
 
 // Solo AI Game State Machine
 const aiGame = useAiGame({
   mascotId: props.initialMascotId,
   playerColor: props.initialPlayerColor,
+  onMoveOutcome: handleMoveOutcome,
+  onGameCompletion: handleGameCompletion,
 });
 
 const {
@@ -102,6 +127,7 @@ function handleResign() {
 }
 
 function handleRematch() {
+  audio.playStart();
   startNewGame();
 }
 
@@ -142,7 +168,7 @@ function handleExit() {
           size="sm"
           data-testid="arena-mute-btn"
           :aria-label="isMuted ? 'Unmute audio' : 'Mute audio'"
-          class="nav-icon-btn"
+          class="nav-icon-btn btn-icon-solo-audio"
           @click="toggleMute"
         >
           <template #icon>{{ isMuted ? '🔇' : '🔊' }}</template>
@@ -152,7 +178,7 @@ function handleExit() {
           variant="ghost"
           size="sm"
           data-testid="change-mascot-btn"
-          class="nav-icon-btn"
+          class="nav-icon-btn btn-icon-solo-mascot"
           aria-label="Change Mascot Opponent"
           @click="handleChangeOpponent"
         >
@@ -347,8 +373,12 @@ function handleExit() {
   font-family: var(--font-display);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  color: var(--color-primary);
+  color: var(--color-primary-text, #ffffff);
   letter-spacing: var(--tracking-wide);
+}
+
+[data-theme='dark'] .match-mode-pill {
+  color: var(--color-primary-text, #ffffff);
 }
 
 .opponent-name-tag {
@@ -365,9 +395,16 @@ function handleExit() {
 }
 
 .nav-icon-btn {
-  min-width: 34px;
-  height: 34px;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
   padding: 4px;
+}
+
+.btn-icon-solo-audio,
+.btn-icon-solo-mascot {
+  min-width: 44px;
+  min-height: 44px;
 }
 
 /* Arena Playfield */

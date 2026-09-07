@@ -1,27 +1,14 @@
-export interface LanInfoResponse {
-  lanIp: string;
-  port: number;
-  localUrl: string;
-  joinUrl: string;
-  interfaces: string[];
-  relayMode?: "cloud" | "lan";
-  isCloudRelay?: boolean;
-  publicUrl?: string;
-}
+import type {
+  LanInfoResponse,
+  HealthCheckResponse,
+} from "./schemas.js";
 
-export interface HealthCheckResponse {
-  status: "ok" | "degraded";
-  uptimeSeconds: number;
-  timestamp: string;
-  activeRooms: number;
-  activeSockets: number;
-  memoryUsageMb: {
-    rss: number;
-    heapTotal: number;
-    heapUsed: number;
-  };
-  relay?: {
-    mode: "cloud" | "lan";
-    publicUrl?: string;
-  };
-}
+/**
+ * Re-exporting validated network discovery response type inferred from LanInfoResponseSchema.
+ */
+export type { LanInfoResponse };
+
+/**
+ * Re-exporting validated health check telemetry response type inferred from HealthCheckResponseSchema.
+ */
+export type { HealthCheckResponse };

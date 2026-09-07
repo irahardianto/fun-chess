@@ -54,6 +54,7 @@ describe("Socket.io Lifecycle Contracts", () => {
       const createPayload: CreateRoomRequest = {
         playerName: "Alice",
         preferredColor: "w",
+        avatar: "🦁",
       };
 
       // Act: Wait for both callback response and server event
@@ -123,6 +124,7 @@ describe("Socket.io Lifecycle Contracts", () => {
       >(hostClient, "room:create", {
         playerName: "Alice",
         preferredColor: "w",
+        avatar: "🦁",
       });
       expect(createRes.success).toBe(true);
       const roomCode = createRes.room.roomCode;
@@ -150,7 +152,7 @@ describe("Socket.io Lifecycle Contracts", () => {
             sessionToken: string;
           }
         | { success: false; error: SocketErrorPayload }
-      >(joinerClient, "room:join", { roomCode, playerName: "Bob" });
+      >(joinerClient, "room:join", { roomCode, playerName: "Bob", avatar: "🦁" });
 
       const hostGameState = await hostGameStartPromise;
       const joinerGameState = await joinerGameStartPromise;
@@ -185,7 +187,7 @@ describe("Socket.io Lifecycle Contracts", () => {
             sessionToken: string;
           }
         | { success: false; error: SocketErrorPayload }
-      >(joinerClient, "room:join", { roomCode: "ZZZZ", playerName: "Bob" });
+      >(joinerClient, "room:join", { roomCode: "ZZZZ", playerName: "Bob", avatar: "🦁" });
 
       // Assert
       expect(response.success).toBe(false);
@@ -204,6 +206,7 @@ describe("Socket.io Lifecycle Contracts", () => {
       >(hostClient, "room:create", {
         playerName: "Alice",
         preferredColor: "w",
+        avatar: "🦁",
       });
       activeRoomCode = createRes.room.roomCode;
 
@@ -213,6 +216,7 @@ describe("Socket.io Lifecycle Contracts", () => {
       >(joinerClient, "room:join", {
         roomCode: activeRoomCode,
         playerName: "Bob",
+        avatar: "🦁",
       });
     });
 

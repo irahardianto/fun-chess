@@ -11,6 +11,7 @@ import {
   IRelayAddressService,
 } from "../../features/lan/relay_address.service.js";
 import { HealthCheckResponse } from "@fun-chess/shared";
+import { isOriginAllowed, resolveAllowedOrigins } from "../config/index.js";
 
 export interface HttpServerConfig {
   roomStore: RoomStore;
@@ -19,10 +20,21 @@ export interface HttpServerConfig {
   logger: Logger;
   port?: number;
   distPath?: string;
+  allowedOrigins?: string[];
   getActiveSocketCount?: () => number;
 }
 
 const START_TIME = Date.now();
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=()",
+};
 
 /**
  * Creates the HTTP request listener for Fun Chess API endpoints and static SPA hosting.
@@ -35,6 +47,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     logger,
     port = Number(process.env.PORT) || 3000,
     distPath = path.resolve(process.cwd(), "../client/dist"),
+    allowedOrigins: configuredAllowedOrigins,
     getActiveSocketCount = () => 0,
   } = config;
 
@@ -78,23 +91,55 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     const url = req.url || "/";
     const [pathname] = url.split("?");
 
-    // CORS Headers
-    const corsOrigin = process.env.CORS_ORIGIN || "*";
-    res.setHeader("Access-Control-Allow-Origin", corsOrigin);
+    // Security Headers (SEC-02, ENH-004)
+    for (const [headerKey, headerVal] of Object.entries(SECURITY_HEADERS)) {
+      res.setHeader(headerKey, headerVal);
+    }
+    res.setHeader("X-Correlation-ID", correlationId);
+
+    // Dynamic origin resolution if not passed statically in config
+    const effectiveAllowedOrigins =
+      configuredAllowedOrigins ?? resolveAllowedOrigins();
+    const origin = req.headers["origin"] as string | undefined;
+
+    let isOriginPermitted = false;
+    if (origin) {
+      isOriginPermitted = isOriginAllowed(origin, effectiveAllowedOrigins);
+      if (isOriginPermitted) {
+        if (effectiveAllowedOrigins.includes("*")) {
+          res.setHeader("Access-Control-Allow-Origin", "*");
+        } else {
+          res.setHeader("Access-Control-Allow-Origin", origin); // nosemgrep: javascript.express.security.cors-misconfiguration.cors-misconfiguration
+          res.setHeader("Vary", "Origin");
+          res.setHeader("Access-Control-Allow-Credentials", "true");
+        }
+      }
+    } else {
+      // Direct / server-to-server / curl request without Origin header
+      if (effectiveAllowedOrigins.includes("*")) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      } else if (process.env.CORS_ORIGIN) {
+        res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN);
+      } else if (effectiveAllowedOrigins.length === 1) {
+        res.setHeader("Access-Control-Allow-Origin", effectiveAllowedOrigins[0]);
+      } else if (process.env.NODE_ENV !== "production") {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      }
+    }
+
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
     res.setHeader(
       "Access-Control-Allow-Headers",
       "Content-Type, Authorization, X-Correlation-ID",
     );
-    res.setHeader("X-Correlation-ID", correlationId);
-
-    // Security Headers (SEC-02)
-    res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
     // Handle preflight OPTIONS
     if (method === "OPTIONS") {
+      if (origin && !isOriginPermitted && !effectiveAllowedOrigins.includes("*")) {
+        res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("CORS origin not allowed");
+        return;
+      }
       res.writeHead(204);
       res.end();
       return;
@@ -120,14 +165,15 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         res.end(body);
       }
 
-      const durationMs = Math.round(performance.now() - startTime);
+      const duration = Math.round(performance.now() - startTime);
       logger.info(`HTTP Response: ${method} ${pathname} [${statusCode}]`, {
         operation: "http_response",
         correlationId,
         method,
         path: pathname,
         statusCode,
-        durationMs,
+        duration,
+        durationMs: duration,
       });
     };
 
@@ -142,14 +188,15 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         res.end(text);
       }
 
-      const durationMs = Math.round(performance.now() - startTime);
+      const duration = Math.round(performance.now() - startTime);
       logger.info(`HTTP Response: ${method} ${pathname} [${statusCode}]`, {
         operation: "http_response",
         correlationId,
         method,
         path: pathname,
         statusCode,
-        durationMs,
+        duration,
+        durationMs: duration,
       });
     };
 
@@ -210,17 +257,17 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         );
 
         if (served) {
-          const durationMs = Math.round(performance.now() - startTime);
+          const duration = Math.round(performance.now() - startTime);
           logger.debug(`HTTP Static served: ${pathname}`, {
             operation: "http_static",
             correlationId,
             path: pathname,
-            durationMs,
+            duration,
+            durationMs: duration,
           });
           return;
         }
       }
-
 
       // 5. Unhandled 404
       sendJsonResponse(404, {
@@ -231,7 +278,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         },
       });
     } catch (err) {
-      const durationMs = Math.round(performance.now() - startTime);
+      const duration = Math.round(performance.now() - startTime);
       const errorObj =
         err instanceof Error
           ? { message: err.message, stack: err.stack }
@@ -242,17 +289,20 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         correlationId,
         method,
         path: pathname,
-        durationMs,
+        duration,
+        durationMs: duration,
         error: errorObj,
       });
 
-      sendJsonResponse(500, {
-        error: {
-          code: "ERR_INTERNAL_SERVER",
-          message: "Internal server error",
-          correlationId,
-        },
-      });
+      if (!res.headersSent) {
+        sendJsonResponse(500, {
+          error: {
+            code: "ERR_INTERNAL_SERVER",
+            message: "Internal server error",
+            correlationId,
+          },
+        });
+      }
     }
   };
 }

@@ -7,9 +7,10 @@ import BaseButton from '../../components/base/BaseButton.vue';
 import ScenarioGuideOverlay from './components/ScenarioGuideOverlay.vue';
 import ScenarioCompletionModal from './components/ScenarioCompletionModal.vue';
 import ProgressiveHintLayer from '../puzzles/components/ProgressiveHintLayer.vue';
-import { useScenarioRunner } from './composables/useScenarioRunner';
+import { useScenarioRunner, type ScenarioStepOutcomeEvent } from './composables/useScenarioRunner';
 import { useScenarioProgress } from './composables/useScenarioProgress';
 import { getNextScenario } from './data';
+import { useAudio } from '../../composables/useAudio';
 
 interface Props {
   scenario: ChessScenario;
@@ -26,7 +27,20 @@ const emit = defineEmits<{
   nextLesson: [scenario: ChessScenario];
 }>();
 
-const runner = useScenarioRunner({ scenario: props.scenario });
+const audio = useAudio();
+
+function handleStepOutcome(event: ScenarioStepOutcomeEvent) {
+  if (event.isLessonComplete) {
+    audio.playVictory();
+  } else {
+    audio.playStepComplete();
+  }
+}
+
+const runner = useScenarioRunner({
+  scenario: props.scenario,
+  onStepOutcome: handleStepOutcome,
+});
 const progress = useScenarioProgress();
 
 const isPromotionModalOpen = ref<boolean>(false);

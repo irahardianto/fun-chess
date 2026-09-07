@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LocalStorageUnifiedStore } from '../local_storage_unified.store';
+import { LocalStorageProgressStore } from '@/features/scenarios/store/local_storage_progress.store';
+import { LocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_store';
 import { InMemoryUnifiedStoreMock, createEmptyUnifiedProgress } from '../in_memory_unified.store.mock';
 import type { UnifiedProgressPayload } from '@fun-chess/shared';
 
@@ -22,8 +24,15 @@ describe('LocalStorageUnifiedStore & InMemoryUnifiedStoreMock', () => {
     });
   });
 
+  function createStore(): LocalStorageUnifiedStore {
+    return new LocalStorageUnifiedStore(
+      new LocalStorageProgressStore(),
+      new LocalStoragePuzzleProgressStore()
+    );
+  }
+
   it('reads progress from both scenario and puzzle stores', async () => {
-    const store = new LocalStorageUnifiedStore();
+    const store = createStore();
     const progress = await store.getUnifiedProgress();
 
     expect(progress.version).toBe(1);
@@ -33,7 +42,7 @@ describe('LocalStorageUnifiedStore & InMemoryUnifiedStoreMock', () => {
   });
 
   it('saves unified progress to local storage and updates underlying stores', async () => {
-    const store = new LocalStorageUnifiedStore();
+    const store = createStore();
     const payload: UnifiedProgressPayload = {
       version: 1,
       exportedAt: 123456789,

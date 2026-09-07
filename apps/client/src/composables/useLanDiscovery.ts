@@ -1,5 +1,7 @@
 import { ref, onMounted, getCurrentInstance } from 'vue';
 import type { LanInfoResponse } from '@fun-chess/shared';
+import { safeLocalStorage, createSafeStorage, type KeyValueStorage } from '../platform/storage';
+import { apiClient, type IApiClient } from '../platform/api';
 
 const STORAGE_KEY = 'fun_chess_lan_ip';
 
@@ -19,15 +21,18 @@ export async function detectWebRtcLanIp(): Promise<string | null> {
       pc.createDataChannel('');
       pc.createOffer()
         .then((offer) => pc.setLocalDescription(offer))
-        .catch(() => resolve(null));
+        .catch((err) => {
+          console.warn('[useLanDiscovery] Failed to set WebRTC local description:', err);
+          resolve(null);
+        });
 
       const timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           try {
             pc.close();
-          } catch {
-            // ignore
+          } catch (err) {
+            console.warn('[useLanDiscovery] Failed to close RTCPeerConnection on timeout:', err);
           }
           resolve(null);
         }
@@ -49,14 +54,15 @@ export async function detectWebRtcLanIp(): Promise<string | null> {
             clearTimeout(timer);
             try {
               pc.close();
-            } catch {
-              // ignore
+            } catch (err) {
+              console.warn('[useLanDiscovery] Failed to close RTCPeerConnection on candidate found:', err);
             }
             resolve(match[0]);
           }
         }
       };
-    } catch {
+    } catch (err) {
+      console.warn('[useLanDiscovery] Failed to initialize WebRTC LAN discovery:', err);
       resolve(null);
     }
   });
@@ -72,7 +78,17 @@ export function isValidIPv4(ip: string): boolean {
   });
 }
 
-export function useLanDiscovery() {
+export interface LanDiscoveryOptions {
+  storage?: KeyValueStorage;
+  apiClient?: IApiClient;
+}
+
+export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
+  const storage =
+    options.storage ??
+    (safeLocalStorage.isAvailable() ? safeLocalStorage : createSafeStorage('localStorage'));
+  const client = options.apiClient ?? apiClient;
+
   const serverLanInfo = ref<LanInfoResponse | null>(null);
   const activeLanIp = ref<string>('');
   const detectedWebRtcIp = ref<string>('');
@@ -80,33 +96,30 @@ export function useLanDiscovery() {
 
   // Initialize from storage or fetch from server / WebRTC
   async function init() {
-    // 1. Check localStorage first
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY);
+    // 1. Check storage first
+    try {
+      const saved = storage.getItem(STORAGE_KEY);
       if (saved && isValidIPv4(saved) && saved !== '127.0.0.1') {
         activeLanIp.value = saved;
       }
+    } catch (err) {
+      console.warn('[useLanDiscovery] Failed to read saved LAN IP from storage:', err);
     }
 
     // 2. Fetch server LAN discovery
-    if (typeof fetch !== 'undefined') {
-      try {
-        const res = await fetch('/api/lan-info');
-        if (res.ok) {
-          const data: LanInfoResponse = await res.json();
-          serverLanInfo.value = data;
-          if (
-            !activeLanIp.value &&
-            data.lanIp &&
-            data.lanIp !== '127.0.0.1' &&
-            data.lanIp !== 'localhost'
-          ) {
-            activeLanIp.value = data.lanIp;
-          }
-        }
-      } catch {
-        // Offline mode
+    try {
+      const data = await client.getLanInfo();
+      serverLanInfo.value = data;
+      if (
+        !activeLanIp.value &&
+        data.lanIp &&
+        data.lanIp !== '127.0.0.1' &&
+        data.lanIp !== 'localhost'
+      ) {
+        activeLanIp.value = data.lanIp;
       }
+    } catch (err) {
+      console.warn('[useLanDiscovery] Failed to fetch server LAN info (offline mode):', err);
     }
 
     // 3. If still localhost/empty, attempt WebRTC client discovery
@@ -115,8 +128,10 @@ export function useLanDiscovery() {
       if (webrtcIp) {
         detectedWebRtcIp.value = webrtcIp;
         activeLanIp.value = webrtcIp;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(STORAGE_KEY, webrtcIp);
+        try {
+          storage.setItem(STORAGE_KEY, webrtcIp);
+        } catch (err) {
+          console.warn('[useLanDiscovery] Failed to cache WebRTC LAN IP to storage:', err);
         }
       }
     }
@@ -127,12 +142,14 @@ export function useLanDiscovery() {
   function setLanIp(ip: string) {
     const trimmed = ip.trim();
     activeLanIp.value = trimmed;
-    if (typeof localStorage !== 'undefined') {
+    try {
       if (trimmed && isValidIPv4(trimmed) && trimmed !== '127.0.0.1') {
-        localStorage.setItem(STORAGE_KEY, trimmed);
+        storage.setItem(STORAGE_KEY, trimmed);
       } else if (!trimmed) {
-        localStorage.removeItem(STORAGE_KEY);
+        storage.removeItem(STORAGE_KEY);
       }
+    } catch (err) {
+      console.warn('[useLanDiscovery] Failed to persist LAN IP in storage:', err);
     }
   }
 

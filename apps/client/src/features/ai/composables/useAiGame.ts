@@ -10,30 +10,43 @@ import type {
   GameOverPayload,
   MoveResult,
 } from '@fun-chess/shared';
-import { createSafeChess, safeLoadFen } from '@fun-chess/shared';
+import {
+  createSafeChess,
+  safeLoadFen,
+  calculateMaterialAndCaptures,
+} from '@fun-chess/shared';
 import {
   getMascotPersona,
   getAiConfigForMascot,
 } from '../data/index.js';
 import { minimaxEngine, hintEngine } from '../engine/index.js';
 import { useMascotBanter } from './useMascotBanter.js';
-import { useAudio } from '../../../composables/useAudio.js';
-import { useConfetti } from '../../../composables/useConfetti.js';
+import { useBoardSelection, type SelectionMoveResult } from '../../board/index.js';
 
-const PIECE_VALUES: Record<PieceType, number> = {
-  p: 1,
-  n: 3,
-  b: 3,
-  r: 5,
-  q: 9,
-  k: 0,
-};
+export interface MoveOutcomeEvent {
+  type: 'move';
+  from: Square;
+  to: Square;
+  isCapture: boolean;
+  isCheck: boolean;
+  isCheckmate: boolean;
+  isDraw: boolean;
+}
+
+export interface GameCompletionOutcomeEvent {
+  type: 'game_over';
+  winner: 'w' | 'b' | 'draw';
+  reason: 'checkmate' | 'stalemate' | 'resignation' | 'timeout' | 'agreement';
+  isLocalPlayerWinner: boolean;
+}
 
 export interface UseAiGameOptions {
   mascotId?: MascotId;
   playerColor?: PieceColor | 'random';
   initialFen?: string;
   autoStart?: boolean;
+  onMoveOutcome?: (event: MoveOutcomeEvent) => void;
+  onGameCompletion?: (event: GameCompletionOutcomeEvent) => void;
 }
 
 export function useAiGame(options: UseAiGameOptions = {}) {
@@ -43,19 +56,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     initialFen,
     autoStart = true,
   } = options;
-
-  // Audio & Celebrations
-  const {
-    playMove,
-    playCapture,
-    playCheck,
-    playVictory,
-    playDraw,
-    playError,
-    playClick,
-    playStart,
-  } = useAudio();
-  const { celebrate } = useConfetti();
 
   // Mascot Persona & Reactive Banter
   const mascot = ref<MascotPersona>(getMascotPersona(initialMascotId));
@@ -82,18 +82,16 @@ export function useAiGame(options: UseAiGameOptions = {}) {
   const lastMove = ref<{ from: string; to: string } | null>(null);
   const lastGameOver = ref<GameOverPayload | null>(null);
 
+  // Outcome Events (Decoupled multimedia side effects)
+  const lastMoveOutcome = ref<MoveOutcomeEvent | null>(null);
+  const lastGameCompletion = ref<GameCompletionOutcomeEvent | null>(null);
+
   // AI State & Async Operation Control
   const isAiThinking = ref<boolean>(false);
   let activeAiOperationId = 0;
   let matchStartTime = Date.now();
 
-  // Selection & Moves
-  const selectedSquare = ref<Square | null>(null);
-  const legalMovesForSelected = ref<Square[]>([]);
-  const legalMoves = computed<Square[]>(() => legalMovesForSelected.value);
-  const pendingPromotion = ref<{ from: Square; to: Square } | null>(null);
-
-  // Captured Pieces & Material
+  // Captured Pieces & Material (MIN-009)
   const capturedWhite = ref<PieceType[]>([]);
   const capturedBlack = ref<PieceType[]>([]);
   const materialAdvantage = ref<{ white: number; black: number }>({ white: 0, black: 0 });
@@ -126,60 +124,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     return null;
   });
 
-  // Calculate Material & Captured Pieces
-  function calculateCapturedAndMaterial(): void {
-    const startingCounts: Record<PieceColor, Record<PieceType, number>> = {
-      w: { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 },
-      b: { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 },
-    };
-
-    const board = chess.board();
-    const currentCounts: Record<PieceColor, Record<PieceType, number>> = {
-      w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
-      b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
-    };
-
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const piece = board[r]?.[c];
-        if (piece) {
-          currentCounts[piece.color][piece.type]++;
-        }
-      }
-    }
-
-    const whiteCap: PieceType[] = [];
-    const blackCap: PieceType[] = [];
-    let whiteScore = 0;
-    let blackScore = 0;
-
-    (['p', 'n', 'b', 'r', 'q'] as PieceType[]).forEach((type) => {
-      const whiteLost = Math.max(0, startingCounts.w[type] - currentCounts.w[type]);
-      for (let i = 0; i < whiteLost; i++) {
-        whiteCap.push(type);
-      }
-
-      const blackLost = Math.max(0, startingCounts.b[type] - currentCounts.b[type]);
-      for (let i = 0; i < blackLost; i++) {
-        blackCap.push(type);
-      }
-
-      whiteScore += currentCounts.w[type] * PIECE_VALUES[type];
-      blackScore += currentCounts.b[type] * PIECE_VALUES[type];
-    });
-
-    capturedWhite.value = whiteCap;
-    capturedBlack.value = blackCap;
-
-    if (whiteScore > blackScore) {
-      materialAdvantage.value = { white: whiteScore - blackScore, black: 0 };
-    } else if (blackScore > whiteScore) {
-      materialAdvantage.value = { white: 0, black: blackScore - whiteScore };
-    } else {
-      materialAdvantage.value = { white: 0, black: 0 };
-    }
-  }
-
   function updateLocalState(): void {
     fen.value = chess.fen();
     turn.value = chess.turn() as PieceColor;
@@ -188,7 +132,13 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     isDraw.value = chess.isDraw();
     isStalemate.value = chess.isStalemate();
     isGameOver.value = chess.isGameOver();
-    calculateCapturedAndMaterial();
+
+    // Use shared pure evaluation utility (MIN-009)
+    const { capturedWhite: cW, capturedBlack: cB, materialAdvantage: mA } =
+      calculateMaterialAndCaptures(chess);
+    capturedWhite.value = cW;
+    capturedBlack.value = cB;
+    materialAdvantage.value = mA;
   }
 
   function captureTakebackSnapshot(): TakebackSnapshot {
@@ -236,8 +186,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
 
       if (isPlayerWin) {
         banter.triggerBanter('player_win');
-        playVictory();
-        celebrate();
       } else {
         banter.triggerBanter('ai_win');
       }
@@ -257,10 +205,19 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       };
 
       banter.triggerBanter('draw');
-      playDraw();
     }
 
     lastGameOver.value = payload;
+
+    const completionOutcome: GameCompletionOutcomeEvent = {
+      type: 'game_over',
+      winner: payload.winner,
+      reason: payload.reason === 'draw_agreement' ? 'agreement' : (payload.reason as GameCompletionOutcomeEvent['reason']),
+      isLocalPlayerWinner: payload.winner === playerColor.value,
+    };
+    lastGameCompletion.value = completionOutcome;
+    options.onGameCompletion?.(completionOutcome);
+
     return true;
   }
 
@@ -284,12 +241,17 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     moveHistory.value.push(moveRes);
     updateLocalState();
 
-    // Trigger SFX
-    if (result.captured) {
-      playCapture();
-    } else {
-      playMove();
-    }
+    const moveOutcome: MoveOutcomeEvent = {
+      type: 'move',
+      from: result.from as Square,
+      to: result.to as Square,
+      isCapture: Boolean(result.captured),
+      isCheck: chess.inCheck(),
+      isCheckmate: chess.isCheckmate(),
+      isDraw: chess.isDraw(),
+    };
+    lastMoveOutcome.value = moveOutcome;
+    options.onMoveOutcome?.(moveOutcome);
 
     // Check for Game Over after AI move
     if (checkAndHandleGameOver()) {
@@ -298,7 +260,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
 
     // Contextual Dialogue Triggers for AI move
     if (chess.inCheck()) {
-      playCheck();
       banter.triggerBanter('ai_check');
     } else if (isBlunder) {
       banter.triggerBanter('ai_blunder');
@@ -344,7 +305,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
         return;
       }
       console.error('[useAiGame] AI calculation failed, executing emergency fallback move:', err);
-      playError();
 
       // Emergency fallback legal move (random or first valid move) so game never freezes
       const legalMovesList = chess.moves({ verbose: true });
@@ -367,32 +327,30 @@ export function useAiGame(options: UseAiGameOptions = {}) {
   }
 
   function getSquarePiece(square: Square): { type: PieceType; color: PieceColor } | null {
-    const piece = chess.get(square as unknown as import('chess.js').Square);
-    if (!piece) return null;
-    return {
-      type: piece.type as PieceType,
-      color: piece.color as PieceColor,
-    };
+    try {
+      const piece = chess.get(square as unknown as import('chess.js').Square);
+      if (!piece) return null;
+      return {
+        type: piece.type as PieceType,
+        color: piece.color as PieceColor,
+      };
+    } catch (err) {
+      console.warn('[useAiGame] getSquarePiece error:', err);
+      return null;
+    }
   }
 
   function getLegalMoves(square: Square): Square[] {
-    const moves = chess.moves({
-      square: square as unknown as import('chess.js').Square,
-      verbose: true,
-    });
-    return moves.map((m) => m.to as Square);
-  }
-
-  function isPromotionMove(from: Square, to: Square): boolean {
-    const piece = getSquarePiece(from);
-    if (!piece || piece.type !== 'p') return false;
-    const toRank = to.charAt(1);
-    return (piece.color === 'w' && toRank === '8') || (piece.color === 'b' && toRank === '1');
-  }
-
-  function clearSelection(): void {
-    selectedSquare.value = null;
-    legalMovesForSelected.value = [];
+    try {
+      const moves = chess.moves({
+        square: square as unknown as import('chess.js').Square,
+        verbose: true,
+      });
+      return moves.map((m) => m.to as Square);
+    } catch (err) {
+      console.warn('[useAiGame] getLegalMoves error:', err);
+      return [];
+    }
   }
 
   /**
@@ -416,7 +374,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       });
 
       if (!result) {
-        playError();
+        console.warn('[useAiGame] Invalid player move:', { from, to, promotion });
         return false;
       }
 
@@ -424,7 +382,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       takebackStack.value.push(snapshot);
 
       lastMove.value = { from: result.from, to: result.to };
-      pendingPromotion.value = null;
       activeHint.value = null; // Clear active hint on move
 
       const moveRes: MoveResult = {
@@ -442,15 +399,20 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       };
 
       moveHistory.value.push(moveRes);
-      clearSelection();
+      boardSelection.clearSelection();
       updateLocalState();
 
-      // Sound Effects
-      if (result.captured) {
-        playCapture();
-      } else {
-        playMove();
-      }
+      const outcomeEvent: MoveOutcomeEvent = {
+        type: 'move',
+        from: result.from as Square,
+        to: result.to as Square,
+        isCapture: Boolean(result.captured),
+        isCheck: chess.inCheck(),
+        isCheckmate: chess.isCheckmate(),
+        isDraw: chess.isDraw(),
+      };
+      lastMoveOutcome.value = outcomeEvent;
+      options.onMoveOutcome?.(outcomeEvent);
 
       // Check Game Over after player move
       if (checkAndHandleGameOver()) {
@@ -459,7 +421,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
 
       // Mascot banter reaction
       if (chess.inCheck()) {
-        playCheck();
         banter.triggerBanter('player_check');
       } else if (result.captured) {
         banter.triggerBanter('player_move');
@@ -468,55 +429,26 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       // Schedule AI opponent response
       dispatchAiMove();
       return true;
-    } catch {
-      playError();
+    } catch (err) {
+      console.warn('[useAiGame] applyPlayerMove error:', err);
       return false;
     }
   }
 
-  function selectSquare(square: Square): { moved: boolean; requiresPromotion: boolean } {
+  // Unified Board Selection State Machine (MIN-010)
+  const boardSelection = useBoardSelection({
+    getPieceAt: (sq) => getSquarePiece(sq),
+    getLegalMovesForSquare: (sq) => getLegalMoves(sq),
+    currentTurn: turn,
+    playerColor,
+    executeMove: (from, to, promotion) => applyPlayerMove(from, to, promotion),
+  });
+
+  function selectSquare(square: Square): SelectionMoveResult {
     if (!isPlayerTurn.value) {
       return { moved: false, requiresPromotion: false };
     }
-
-    // If destination square is clicked while a piece is selected
-    if (selectedSquare.value && legalMovesForSelected.value.includes(square)) {
-      const from = selectedSquare.value;
-      const to = square;
-
-      if (isPromotionMove(from, to)) {
-        pendingPromotion.value = { from, to };
-        return { moved: false, requiresPromotion: true };
-      }
-
-      const moved = applyPlayerMove(from, to);
-      return { moved, requiresPromotion: false };
-    }
-
-    // Otherwise select the piece on the square if owned by player
-    const piece = getSquarePiece(square);
-    if (piece && piece.color === playerColor.value) {
-      playClick();
-      selectedSquare.value = square;
-      legalMovesForSelected.value = getLegalMoves(square);
-      return { moved: false, requiresPromotion: false };
-    }
-
-    clearSelection();
-    return { moved: false, requiresPromotion: false };
-  }
-
-  function completePromotion(pieceType: 'q' | 'r' | 'b' | 'n'): boolean {
-    if (!pendingPromotion.value) return false;
-    const { from, to } = pendingPromotion.value;
-    const success = applyPlayerMove(from, to, pieceType);
-    pendingPromotion.value = null;
-    return success;
-  }
-
-  function cancelPromotion(): void {
-    pendingPromotion.value = null;
-    clearSelection();
+    return boardSelection.handleSquareClick(square);
   }
 
   /**
@@ -540,19 +472,18 @@ export function useAiGame(options: UseAiGameOptions = {}) {
         ? { from: moveHistory.value[moveHistory.value.length - 1]!.from, to: moveHistory.value[moveHistory.value.length - 1]!.to }
         : null;
 
-      pendingPromotion.value = null;
+      boardSelection.clearSelection();
       activeHint.value = null;
-      clearSelection();
       updateLocalState();
       isGameOver.value = false;
       lastGameOver.value = null;
 
       takebackCount.value++;
-      playClick();
       banter.triggerBanter('takeback_used');
 
       return true;
-    } catch {
+    } catch (err) {
+      console.warn('[useAiGame] takeback failed:', err);
       return false;
     }
   }
@@ -566,7 +497,6 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     }
 
     try {
-      playClick();
       const hint = await hintEngine.calculateHint(chess.fen(), playerColor.value);
       if (hint) {
         activeHint.value = hint;
@@ -574,7 +504,8 @@ export function useAiGame(options: UseAiGameOptions = {}) {
         banter.triggerBanter('hint_requested', hint.explanation);
       }
       return hint;
-    } catch {
+    } catch (err) {
+      console.warn('[useAiGame] askForHint failed:', err);
       return null;
     }
   }
@@ -607,6 +538,15 @@ export function useAiGame(options: UseAiGameOptions = {}) {
 
     lastGameOver.value = payload;
     banter.triggerBanter('ai_win');
+
+    const completionOutcome: GameCompletionOutcomeEvent = {
+      type: 'game_over',
+      winner: aiColor.value,
+      reason: 'resignation',
+      isLocalPlayerWinner: false,
+    };
+    lastGameCompletion.value = completionOutcome;
+    options.onGameCompletion?.(completionOutcome);
   }
 
   /**
@@ -642,16 +582,16 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     takebackCount.value = 0;
     hintsCount.value = 0;
     lastMove.value = null;
-    pendingPromotion.value = null;
     activeHint.value = null;
     isGameOver.value = false;
     lastGameOver.value = null;
+    lastMoveOutcome.value = null;
+    lastGameCompletion.value = null;
     matchStartTime = Date.now();
 
-    clearSelection();
+    boardSelection.clearSelection();
     updateLocalState();
 
-    playStart();
     banter.triggerBanter('game_start');
 
     // If player is Black, AI moves first as White
@@ -705,17 +645,22 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     lastMove: computed(() => lastMove.value),
     kingInCheckSquare,
 
-    // Selection & Moves
-    selectedSquare: computed(() => selectedSquare.value),
-    legalMoves,
-    pendingPromotion: computed(() => pendingPromotion.value),
+    // Decoupled Outcome Events (MAJ-009)
+    lastMoveOutcome: computed(() => lastMoveOutcome.value),
+    lastGameCompletion: computed(() => lastGameCompletion.value),
+
+    // Selection & Moves (MIN-010 via useBoardSelection)
+    selectedSquare: computed(() => boardSelection.selectedSquare.value),
+    legalMoves: computed(() => boardSelection.legalMovesForSelected.value),
+    legalMovesForSelected: computed(() => boardSelection.legalMovesForSelected.value),
+    pendingPromotion: computed(() => boardSelection.pendingPromotion.value),
     selectSquare,
     applyPlayerMove,
-    completePromotion,
-    cancelPromotion,
-    clearSelection,
+    completePromotion: (piece: 'q' | 'r' | 'b' | 'n') => boardSelection.completePromotion(piece),
+    cancelPromotion: () => boardSelection.cancelPromotion(),
+    clearSelection: () => boardSelection.clearSelection(),
 
-    // Material & Captured
+    // Material & Captured (MIN-009)
     capturedWhite: computed(() => capturedWhite.value),
     capturedBlack: computed(() => capturedBlack.value),
     materialAdvantage: computed(() => materialAdvantage.value),

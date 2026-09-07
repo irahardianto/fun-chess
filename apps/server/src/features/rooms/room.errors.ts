@@ -1,111 +1,43 @@
-import { ErrorCode } from "@fun-chess/shared";
+import { AppError } from "@fun-chess/shared";
+
+export {
+  AppError,
+  RoomNotFoundError,
+  RoomFullError,
+  InvalidRoomCodeError,
+  InvalidMoveError,
+  NotYourTurnError,
+  GameNotActiveError,
+  PlayerNotInRoomError,
+  UnauthorizedError,
+  InvalidPayloadError,
+  RateLimitExceededError,
+} from "@fun-chess/shared";
 
 /**
- * Base domain exception class with explicit ErrorCode, HTTP status, and metadata details.
+ * Thrown when an optimistic concurrency control version check fails during a room mutation.
  */
-export abstract class AppError extends Error {
-  constructor(
-    public readonly code: ErrorCode,
-    message: string,
-    public readonly statusCode: number = 400,
-    public readonly details?: Record<string, unknown>,
-  ) {
-    super(message);
-    this.name = this.constructor.name;
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
-
-export class RoomNotFoundError extends AppError {
-  constructor(roomCode: string) {
+export class OptimisticLockConflictError extends AppError {
+  constructor(roomCode: string, expectedVersion: number, actualVersion: number) {
     super(
-      "ERR_ROOM_NOT_FOUND",
-      `Room with code '${roomCode}' does not exist`,
-      404,
-      { roomCode },
-    );
-  }
-}
-
-export class RoomFullError extends AppError {
-  constructor(roomCode: string) {
-    super(
-      "ERR_ROOM_FULL",
-      `Room '${roomCode}' already has 2 active players`,
+      "ERR_INTERNAL_SERVER",
+      `Optimistic lock conflict for room '${roomCode}': expected version ${expectedVersion}, found ${actualVersion}`,
       409,
-      { roomCode },
+      { roomCode, expectedVersion, actualVersion },
     );
   }
 }
 
-export class InvalidRoomCodeError extends AppError {
-  constructor(roomCode: string) {
+/**
+ * Thrown when an operation times out waiting to acquire a room's exclusive lock.
+ */
+export class LockTimeoutError extends AppError {
+  constructor(roomCode: string, timeoutMs: number) {
     super(
-      "ERR_INVALID_ROOM_CODE",
-      `Invalid room code '${roomCode}'. Code must be 4 uppercase characters`,
-      400,
-      { roomCode },
+      "ERR_SOCKET_TIMEOUT",
+      `Timed out waiting for lock on room '${roomCode}' after ${timeoutMs}ms`,
+      408,
+      { roomCode, timeoutMs },
     );
   }
 }
-
-export class InvalidMoveError extends AppError {
-  constructor(reason: string, details?: Record<string, unknown>) {
-    super("ERR_INVALID_MOVE", `Illegal chess move: ${reason}`, 422, details);
-  }
-}
-
-export class NotYourTurnError extends AppError {
-  constructor() {
-    super("ERR_NOT_YOUR_TURN", "It is not your turn to move", 403);
-  }
-}
-
-export class GameNotActiveError extends AppError {
-  constructor(status: string) {
-    super(
-      "ERR_GAME_NOT_ACTIVE",
-      `Game is not currently active (current status: ${status})`,
-      400,
-      { status },
-    );
-  }
-}
-
-export class PlayerNotInRoomError extends AppError {
-  constructor(socketId?: string) {
-    super(
-      "ERR_PLAYER_NOT_IN_ROOM",
-      "Socket does not belong to an active player in this room",
-      403,
-      { socketId },
-    );
-  }
-}
-
-export class UnauthorizedError extends AppError {
-  constructor(
-    message = "Unauthorized session token or invalid player credentials",
-  ) {
-    super("ERR_UNAUTHORIZED", message, 401);
-  }
-}
-
-export class InvalidPayloadError extends AppError {
-  constructor(field: string, reason: string) {
-    super("ERR_INVALID_PAYLOAD", `Invalid payload: ${field} - ${reason}`, 400, {
-      field,
-      reason,
-    });
-  }
-}
-
-export class RateLimitExceededError extends AppError {
-  constructor(
-    message = "Rate limit exceeded. Please wait before retrying.",
-    details?: Record<string, unknown>,
-  ) {
-    super("ERR_RATE_LIMITED", message, 429, details);
-  }
-}
-

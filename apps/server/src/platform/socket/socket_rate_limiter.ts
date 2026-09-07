@@ -9,24 +9,79 @@ export interface SocketRateLimiterOptions {
    * Default: 10,000ms (10 seconds).
    */
   windowMs?: number;
+  /**
+   * Interval in milliseconds for background pruning of expired keys.
+   * Default: 60,000ms (1 minute). Set to 0 to disable automatic timer.
+   */
+  pruneIntervalMs?: number;
+}
+
+/**
+ * Extracts a reliable client IP address from a Socket.io socket instance.
+ * Checks x-forwarded-for header (proxies/Cloud Run) before falling back to socket address.
+ */
+export function extractClientIp(socket: unknown): string {
+  if (!socket || typeof socket !== "object") return "127.0.0.1";
+  const s = socket as {
+    handshake?: {
+      headers?: Record<string, string | string[] | undefined>;
+      address?: string;
+    };
+    conn?: {
+      remoteAddress?: string;
+    };
+  };
+
+  const forwarded = s.handshake?.headers?.["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0]?.trim() || "127.0.0.1";
+  }
+  if (Array.isArray(forwarded) && forwarded[0]) {
+    return String(forwarded[0]).trim();
+  }
+  return s.handshake?.address || s.conn?.remoteAddress || "127.0.0.1";
+}
+
+/**
+ * Creates a configured SocketRateLimiter instance.
+ */
+export function createSocketRateLimiter(
+  options?: SocketRateLimiterOptions,
+): SocketRateLimiter {
+  return new SocketRateLimiter({
+    maxRequests: 5,
+    windowMs: 10_000,
+    ...options,
+  });
 }
 
 /**
  * In-memory sliding window rate limiter for Socket.io events.
- * Tracks per-socket event timestamps to prevent flooding and resource exhaustion.
+ * Keyed by client IP to prevent disconnect evasion (MAJ-001) with bounded memory cleanup (MIN-005).
  */
 export class SocketRateLimiter {
   private readonly maxRequests: number;
   private readonly windowMs: number;
   private readonly timestamps = new Map<string, number[]>();
+  private pruneTimer?: NodeJS.Timeout;
 
   constructor(options?: SocketRateLimiterOptions) {
     this.maxRequests = options?.maxRequests ?? 5;
     this.windowMs = options?.windowMs ?? 10_000;
+    const pruneIntervalMs = options?.pruneIntervalMs ?? 60_000;
+
+    if (pruneIntervalMs > 0) {
+      this.pruneTimer = setInterval(() => {
+        this.prune();
+      }, pruneIntervalMs);
+      if (typeof this.pruneTimer.unref === "function") {
+        this.pruneTimer.unref();
+      }
+    }
   }
 
   /**
-   * Attempts to consume 1 request permit for the given key (e.g. socket ID).
+   * Attempts to consume 1 request permit for the given key (e.g. client IP).
    * Returns true if allowed, or false if the rate limit has been exceeded.
    */
   public consume(key: string, now = Date.now()): boolean {
@@ -58,8 +113,13 @@ export class SocketRateLimiter {
     const cutoff = now - this.windowMs;
     const existing = this.timestamps.get(key);
     if (!existing) return true;
-    const validCount = existing.filter((t) => t > cutoff).length;
-    return validCount < this.maxRequests;
+    const valid = existing.filter((t) => t > cutoff);
+    if (valid.length === 0) {
+      this.timestamps.delete(key);
+      return true;
+    }
+    this.timestamps.set(key, valid);
+    return valid.length < this.maxRequests;
   }
 
   /**
@@ -69,12 +129,38 @@ export class SocketRateLimiter {
     const cutoff = now - this.windowMs;
     const existing = this.timestamps.get(key);
     if (!existing) return this.maxRequests;
-    const validCount = existing.filter((t) => t > cutoff).length;
-    return Math.max(0, this.maxRequests - validCount);
+    const valid = existing.filter((t) => t > cutoff);
+    if (valid.length === 0) {
+      this.timestamps.delete(key);
+      return this.maxRequests;
+    }
+    this.timestamps.set(key, valid);
+    return Math.max(0, this.maxRequests - valid.length);
   }
 
   /**
-   * Resets rate limit history for a specific key (e.g., when a socket disconnects).
+   * Prunes all expired timestamps and removes empty keys from memory.
+   * Returns the count of deleted keys.
+   */
+  public prune(now = Date.now()): number {
+    const cutoff = now - this.windowMs;
+    let deletedCount = 0;
+
+    for (const [key, list] of this.timestamps.entries()) {
+      const valid = list.filter((t) => t > cutoff);
+      if (valid.length === 0) {
+        this.timestamps.delete(key);
+        deletedCount++;
+      } else if (valid.length < list.length) {
+        this.timestamps.set(key, valid);
+      }
+    }
+
+    return deletedCount;
+  }
+
+  /**
+   * Resets rate limit history for a specific key.
    */
   public reset(key: string): void {
     this.timestamps.delete(key);
@@ -85,5 +171,16 @@ export class SocketRateLimiter {
    */
   public clear(): void {
     this.timestamps.clear();
+  }
+
+  /**
+   * Stops any background pruning timer and clears all state.
+   */
+  public destroy(): void {
+    if (this.pruneTimer) {
+      clearInterval(this.pruneTimer);
+      this.pruneTimer = undefined;
+    }
+    this.clear();
   }
 }

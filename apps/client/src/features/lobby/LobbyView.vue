@@ -13,13 +13,11 @@ import { PLAYER_AVATARS, DEFAULT_PLAYER_AVATAR } from '@fun-chess/shared';
 import HostCard from './HostCard.vue';
 import JoinCard from './JoinCard.vue';
 import LobbyModeSelector from './LobbyModeSelector.vue';
-import { AiOpponentSelect } from '../ai/components';
-import { ScenarioCategoryList } from '../scenarios/components';
-import { PuzzleHubView } from '../puzzles/components';
+import { AiOpponentSelect } from '../ai';
+import { ScenarioCategoryList, useScenarioProgress } from '../scenarios';
+import { PuzzleHubView } from '../puzzles';
 import { useLanDiscovery } from '../../composables/useLanDiscovery';
-import { useScenarioProgress } from '../scenarios/composables/useScenarioProgress';
-import { useNetworkStatus } from '../pwa/composables/useNetworkStatus';
-import { usePwaInstall } from '../pwa/composables/usePwaInstall';
+import { useNetworkStatus, usePwaInstall } from '../pwa';
 import type { PuzzleTheme } from '@fun-chess/shared';
 
 interface Props {

@@ -1,11 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AudioSynthesizer } from '../audio_synthesizer';
+import { NullAudioService } from '../null_audio_service';
+import type { IAudioService } from '../audio.interface';
 
 describe('AudioSynthesizer', () => {
   let synth: AudioSynthesizer;
 
   beforeEach(() => {
     synth = new AudioSynthesizer({ muted: false });
+  });
+
+  it('implements IAudioService contract', () => {
+    const audioService: IAudioService = synth;
+    expect(audioService).toBeDefined();
+    expect(typeof audioService.playMove).toBe('function');
+    expect(typeof audioService.playCapture).toBe('function');
+    expect(typeof audioService.playCheck).toBe('function');
+    expect(typeof audioService.playVictory).toBe('function');
+    expect(typeof audioService.playDefeat).toBe('function');
+    expect(typeof audioService.toggleMute).toBe('function');
+    expect(typeof audioService.isMuted).toBe('function');
   });
 
   it('should initialize with provided muted option', () => {
@@ -33,6 +47,7 @@ describe('AudioSynthesizer', () => {
       synth.playCapture();
       synth.playCheck();
       synth.playVictory();
+      synth.playDefeat();
       synth.playDraw();
       synth.playError();
       synth.playClick();
@@ -98,23 +113,26 @@ describe('AudioSynthesizer', () => {
     audioSynth.playVictory(); // 4 notes (total 5 + 4 = 9)
     expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(9);
 
-    audioSynth.playDraw(); // 1 oscillator (total 9 + 1 = 10)
-    audioSynth.playError(); // 1 oscillator (total 10 + 1 = 11)
-    audioSynth.playClick(); // 1 oscillator (total 11 + 1 = 12)
-    audioSynth.playTurnNotification(); // 1 oscillator (total 12 + 1 = 13)
-    audioSynth.playStart(); // 4 oscillators (total 13 + 4 = 17)
-    expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(17);
+    audioSynth.playDefeat(); // 3 notes (total 9 + 3 = 12)
+    expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(12);
 
-    audioSynth.playHint(); // 3 oscillators (total 17 + 3 = 20)
+    audioSynth.playDraw(); // 1 oscillator (total 12 + 1 = 13)
+    audioSynth.playError(); // 1 oscillator (total 13 + 1 = 14)
+    audioSynth.playClick(); // 1 oscillator (total 14 + 1 = 15)
+    audioSynth.playTurnNotification(); // 1 oscillator (total 15 + 1 = 16)
+    audioSynth.playStart(); // 4 oscillators (total 16 + 4 = 20)
     expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(20);
 
-    audioSynth.playStarEarned(); // 3 oscillators (total 20 + 3 = 23)
+    audioSynth.playHint(); // 3 oscillators (total 20 + 3 = 23)
     expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(23);
 
-    audioSynth.playMascotHappy(); // 1 oscillator (total 23 + 1 = 24)
-    audioSynth.playMascotBlunder(); // 1 oscillator (total 24 + 1 = 25)
-    audioSynth.playStepComplete(); // 2 oscillators (total 25 + 2 = 27)
-    expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(27);
+    audioSynth.playStarEarned(); // 3 oscillators (total 23 + 3 = 26)
+    expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(26);
+
+    audioSynth.playMascotHappy(); // 1 oscillator (total 26 + 1 = 27)
+    audioSynth.playMascotBlunder(); // 1 oscillator (total 27 + 1 = 28)
+    audioSynth.playStepComplete(); // 2 oscillators (total 28 + 2 = 30)
+    expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(30);
 
     // When muted, no audio nodes should be created
     const callCountBeforeMute = mockAudioContext.createOscillator.mock.calls.length;
@@ -125,7 +143,7 @@ describe('AudioSynthesizer', () => {
     vi.unstubAllGlobals();
   });
 
-  it('supports initContext and resumeContext lifecycle methods', () => {
+  it('supports initContext, resumeContext, and explicit bootstrap methods without DOM side-effects', () => {
     const mockAudioContext = {
       currentTime: 0,
       state: 'suspended',
@@ -147,6 +165,24 @@ describe('AudioSynthesizer', () => {
     audioSynth.resumeContext();
     expect(mockAudioContext.resume).toHaveBeenCalledTimes(2);
 
+    expect(() => audioSynth.bootstrap()).not.toThrow();
+
     vi.unstubAllGlobals();
+  });
+});
+
+describe('NullAudioService', () => {
+  it('conforms to IAudioService as a no-op test double', () => {
+    const nullAudio: IAudioService = new NullAudioService();
+    expect(nullAudio.isMuted()).toBe(true);
+    expect(nullAudio.toggleMute()).toBe(false);
+
+    expect(() => {
+      nullAudio.playMove();
+      nullAudio.playCapture();
+      nullAudio.playCheck();
+      nullAudio.playVictory();
+      nullAudio.playDefeat();
+    }).not.toThrow();
   });
 });

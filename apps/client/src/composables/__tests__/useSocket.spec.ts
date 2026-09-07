@@ -58,7 +58,6 @@ describe('useSocket composable', () => {
         color: 'w',
         isHost: true,
         isConnected: true,
-        sessionToken: 'token_1',
         connectedAt: Date.now(),
       },
       blackPlayer: null,
@@ -102,7 +101,6 @@ describe('useSocket composable', () => {
       color: 'b',
       isHost: false,
       isConnected: true,
-      sessionToken: 'token_2',
       connectedAt: Date.now(),
     };
 
@@ -155,7 +153,6 @@ describe('useSocket composable', () => {
       color: 'w',
       isHost: true,
       isConnected: true,
-      sessionToken: 'token_recon_1',
       connectedAt: Date.now(),
     };
 
@@ -398,8 +395,10 @@ describe('useSocket composable', () => {
   });
 
   it('should handle game:rematch_started with room object payload, updating room and swapping player color', () => {
-    const { currentRoom, currentPlayer, rematchRequestedBy, drawOfferedBy, lastGameOver, kingInCheck } =
+    const { currentRoom, currentPlayer, rematchRequestedBy, drawOfferedBy, lastGameOver, kingInCheck, sessionToken } =
       useSocket(mockSocket);
+
+    sessionToken.value = 'token_1';
 
     const initialWhitePlayer: Player = {
       id: 'p1',
@@ -408,7 +407,6 @@ describe('useSocket composable', () => {
       color: 'w',
       isHost: true,
       isConnected: true,
-      sessionToken: 'token_1',
       connectedAt: Date.now(),
     };
 
@@ -419,7 +417,6 @@ describe('useSocket composable', () => {
       color: 'b',
       isHost: false,
       isConnected: true,
-      sessionToken: 'token_2',
       connectedAt: Date.now(),
     };
 
@@ -511,7 +508,6 @@ describe('useSocket composable', () => {
         isHost: true,
         isConnected: true,
         socketId: 'old_sock_1',
-        sessionToken: 'sync_token',
         connectedAt: Date.now(),
       },
       blackPlayer: null,
@@ -521,7 +517,7 @@ describe('useSocket composable', () => {
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
     };
-    currentPlayer.value = currentRoom.value.whitePlayer;
+    currentPlayer.value = currentRoom.value!.whitePlayer;
 
     // Simulate socket reconnecting with a new socket ID
     mockSocket.id = 'new_sock_2';
@@ -586,7 +582,6 @@ describe('useSocket composable', () => {
       color: 'w',
       isHost: true,
       isConnected: true,
-      sessionToken: 'token_1',
       connectedAt: Date.now(),
     };
 
