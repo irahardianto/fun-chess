@@ -45,7 +45,11 @@ describe('Minimax Chess AI Engine Benchmark', () => {
     await engine.findBestMove(startFen, fastConfigDepth2);
   });
 
-  bench('findBestMove - Complex Middlegame (Depth 3)', async () => {
-    await engine.findBestMove(complexMiddlegameFen, fastConfigDepth3);
-  });
+  bench(
+    'findBestMove - Complex Middlegame (Depth 3)',
+    async () => {
+      await engine.findBestMove(complexMiddlegameFen, fastConfigDepth3);
+    },
+    { iterations: 1, warmupIterations: 0 },
+  );
 });
