@@ -37,6 +37,7 @@ import type {
   PuzzleErrorPayload,
   StarRating,
 } from "../index.js";
+import { calculateMasteryLevel } from "../index.js";
 
 describe("Gamified Puzzle Hub Contracts & Models", () => {
   describe("Taxonomy & Union Types", () => {
@@ -882,6 +883,30 @@ describe("Gamified Puzzle Hub Contracts & Models", () => {
       expect(errorPayload.code).toBe("ERR_MALFORMED_SOLUTION_LINE");
       expect(errorPayload.puzzleId).toBe("puz_corrupt_999");
       expect(errorPayload.details?.invalidMove).toBe("xyz99");
+    });
+  });
+
+  describe("Centralized Mastery Level Calculation (calculateMasteryLevel)", () => {
+    it("returns 'master' when solved count is >= 20", () => {
+      expect(calculateMasteryLevel(20)).toBe("master");
+      expect(calculateMasteryLevel(21)).toBe("master");
+      expect(calculateMasteryLevel(50)).toBe("master");
+      expect(calculateMasteryLevel(100)).toBe("master");
+    });
+
+    it("returns 'apprentice' when solved count is >= 8 and < 20", () => {
+      expect(calculateMasteryLevel(8)).toBe("apprentice");
+      expect(calculateMasteryLevel(9)).toBe("apprentice");
+      expect(calculateMasteryLevel(15)).toBe("apprentice");
+      expect(calculateMasteryLevel(19)).toBe("apprentice");
+    });
+
+    it("returns 'novice' when solved count is < 8", () => {
+      expect(calculateMasteryLevel(7)).toBe("novice");
+      expect(calculateMasteryLevel(5)).toBe("novice");
+      expect(calculateMasteryLevel(1)).toBe("novice");
+      expect(calculateMasteryLevel(0)).toBe("novice");
+      expect(calculateMasteryLevel(-1)).toBe("novice");
     });
   });
 });

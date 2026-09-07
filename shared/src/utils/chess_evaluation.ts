@@ -2,7 +2,7 @@ import { Chess } from "chess.js";
 import type { PieceType, PieceColor, GameState, Square } from "../contracts/models.js";
 import { createSafeChess } from "./chess_factory.js";
 
-const PIECE_VALUES: Record<PieceType, number> = {
+export const STANDARD_PIECE_POINTS: Record<PieceType, number> = {
   p: 1,
   n: 3,
   b: 3,
@@ -63,10 +63,10 @@ export function calculateMaterialAndCaptures(chess: Chess): {
       const pType = piece.type as PieceType;
       if (piece.color === "w") {
         whiteCounts[pType]++;
-        whiteMaterial += PIECE_VALUES[pType];
+        whiteMaterial += STANDARD_PIECE_POINTS[pType];
       } else {
         blackCounts[pType]++;
-        blackMaterial += PIECE_VALUES[pType];
+        blackMaterial += STANDARD_PIECE_POINTS[pType];
       }
     }
   }

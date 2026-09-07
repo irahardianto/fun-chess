@@ -66,7 +66,7 @@ export abstract class AppError extends Error {
     message: string,
     public readonly statusCode: number = 400,
     public readonly details?: Record<string, unknown>,
-    public readonly cause?: Error,
+    public override readonly cause?: Error,
   ) {
     super(message);
     this.name = this.constructor.name;

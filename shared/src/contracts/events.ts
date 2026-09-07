@@ -49,15 +49,25 @@ export interface ServerToClientEvents {
     playerName: string;
     reason: string;
   }) => void;
-  /** Broadcast when a player disconnects, specifying the reconnection grace period */
+  /** Broadcast when a player disconnects, specifying the reconnection grace period and authoritative room status */
   "room:player_disconnected": (data: {
-    playerId: string;
-    gracePeriodMs: number;
+    playerId?: string;
+    player?: Player;
+    gracePeriodMs?: number;
+    roomStatus?: string;
+    disconnectedAt?: number;
   }) => void;
   /** Broadcast when a previously disconnected player successfully re-establishes connection */
   "room:player_reconnected": (data: {
     playerId: string;
     playerName: string;
+    roomStatus?: string;
+  }) => void;
+  /** Emitted to the reconnecting client upon successful reconnection */
+  "room:reconnected": (data: {
+    room: RoomState;
+    player: Player;
+    roomStatus?: string;
   }) => void;
   /** Broadcast when a match begins */
   "game:started": (gameState: GameState) => void;

@@ -26,9 +26,11 @@ export const PlayerNameSchema = z
 
 /**
  * Player avatar emoji schema (max 16 characters, defaults to 🦁).
+ * Rejects ASCII control characters and non-printable sequences.
  */
 export const AvatarEmojiSchema = z
   .string()
+  .regex(/^[^\x00-\x1F\x7F-\x9F]*$/, "Avatar emoji cannot contain control characters")
   .trim()
   .max(16, "Avatar emoji must be 16 characters or fewer")
   .optional()

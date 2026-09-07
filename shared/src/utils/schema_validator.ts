@@ -9,34 +9,49 @@ import type {
   ScenarioProgressMap,
   StarRating,
 } from "../contracts/scenario.js";
-import type {
-  PuzzleProgress,
-  PuzzleTheme,
-  ThemeMasteryProgress,
-  SolvedPuzzleRecord,
-  RatingHistoryPoint,
+import {
+  type PuzzleProgress,
+  type PuzzleTheme,
+  type ThemeMasteryProgress,
+  type SolvedPuzzleRecord,
+  type RatingHistoryPoint,
+  calculateMasteryLevel,
 } from "../contracts/puzzle.js";
 
 /**
  * Strips non-printable and ASCII control characters from strings.
+ * Rejects dangerous prototype property names to prevent prototype pollution.
  *
  * @param str - Input value
- * @returns Sanitized trimmed string
+ * @returns Sanitized trimmed string, or empty string if invalid/forbidden
  */
 function sanitizeString(str: unknown): string {
   if (typeof str !== "string") return "";
-  return str.replace(/[\x00-\x1F\x7F-\x9F]/g, "").trim();
+  const sanitized = str.replace(/[\x00-\x1F\x7F-\x9F]/g, "").trim();
+  if (
+    sanitized === "__proto__" ||
+    sanitized === "constructor" ||
+    sanitized === "prototype"
+  ) {
+    return "";
+  }
+  return sanitized;
 }
 
 /**
- * Clamps numeric timestamps to [0, Date.now() + 86400000].
+ * Clamps numeric timestamps to [0, referenceNow + 86400000].
  *
  * @param val - Input value
  * @param fallback - Fallback value if missing or invalid
+ * @param referenceNowMs - Optional reference time for clock skew tolerance
  * @returns Clamped timestamp in epoch ms
  */
-function clampTimestamp(val: unknown, fallback?: number): number {
-  const maxTimestamp = Date.now() + 86400000; // 24 hours buffer for clock skew
+function clampTimestamp(
+  val: unknown,
+  fallback?: number,
+  referenceNowMs?: number,
+): number {
+  const maxTimestamp = (referenceNowMs ?? Date.now()) + 86400000; // 24 hours buffer for clock skew
   if (val === undefined || val === null) {
     return fallback !== undefined ? fallback : 0;
   }
@@ -61,20 +76,6 @@ function clampStarRating(val: unknown): StarRating {
   return 1;
 }
 
-/**
- * Recalculates theme mastery level based on solved count.
- *
- * @param solved - Solved count
- * @returns Calculated mastery tier
- */
-function calculateMasteryLevel(
-  solved: number,
-): "novice" | "apprentice" | "master" {
-  if (solved >= 20) return "master";
-  if (solved >= 8) return "apprentice";
-  return "novice";
-}
-
 // --- Declarative Zod Transform Primitives ---
 
 const NonNegativeIntSchema = z.unknown().transform((val) => {
@@ -83,7 +84,10 @@ const NonNegativeIntSchema = z.unknown().transform((val) => {
   return Math.max(0, Math.floor(num));
 });
 
-const createRatingHistoryPointSchema = (exportedAt: number) =>
+const createRatingHistoryPointSchema = (
+  exportedAt: number,
+  referenceNowMs?: number,
+) =>
   z.object({
     puzzleId: z.unknown().transform(sanitizeString),
     rating: z.unknown().transform((val) => {
@@ -91,10 +95,15 @@ const createRatingHistoryPointSchema = (exportedAt: number) =>
       return Math.min(3000, Math.max(500, num));
     }),
     delta: z.unknown().transform((val) => Math.round(Number(val) || 0)),
-    timestamp: z.unknown().transform((val) => clampTimestamp(val, exportedAt)),
+    timestamp: z
+      .unknown()
+      .transform((val) => clampTimestamp(val, exportedAt, referenceNowMs)),
   });
 
-const createRatingProfileSchema = (exportedAt: number) =>
+const createRatingProfileSchema = (
+  exportedAt: number,
+  referenceNowMs?: number,
+) =>
   z
     .object({
       rating: z.unknown().optional(),
@@ -136,7 +145,10 @@ const createRatingProfileSchema = (exportedAt: number) =>
 
       const ratingHistory: RatingHistoryPoint[] = [];
       if (Array.isArray(rawRp.ratingHistory)) {
-        const itemSchema = createRatingHistoryPointSchema(exportedAt);
+        const itemSchema = createRatingHistoryPointSchema(
+          exportedAt,
+          referenceNowMs,
+        );
         for (const pt of rawRp.ratingHistory) {
           if (!pt || typeof pt !== "object") continue;
           const parsed = itemSchema.safeParse(pt);
@@ -157,7 +169,10 @@ const createRatingProfileSchema = (exportedAt: number) =>
       };
     });
 
-const createThemeMasterySchema = (exportedAt: number) =>
+const createThemeMasterySchema = (
+  exportedAt: number,
+  referenceNowMs?: number,
+) =>
   z.record(z.unknown()).transform((rawThemes) => {
     const themeMastery: Record<string, ThemeMasteryProgress> = {};
     for (const [tKey, tVal] of Object.entries(rawThemes)) {
@@ -181,6 +196,7 @@ const createThemeMasterySchema = (exportedAt: number) =>
       const lastPracticedAt = clampTimestamp(
         tmObj["lastPracticedAt"],
         exportedAt,
+        referenceNowMs,
       );
 
       themeMastery[theme] = {
@@ -209,7 +225,10 @@ const ArcadeStatsSchema = z
     totalRushRuns: rawArcade.totalRushRuns ?? 0,
   }));
 
-const createSolvedPuzzlesSchema = (exportedAt: number) =>
+const createSolvedPuzzlesSchema = (
+  exportedAt: number,
+  referenceNowMs?: number,
+) =>
   z.record(z.unknown()).transform((rawSolved) => {
     const solvedPuzzles: Record<string, SolvedPuzzleRecord> = {};
     for (const [pKey, pVal] of Object.entries(rawSolved)) {
@@ -219,7 +238,11 @@ const createSolvedPuzzlesSchema = (exportedAt: number) =>
       if (!puzzleId) continue;
 
       const stars = clampStarRating(spObj["stars"]);
-      const solvedAt = clampTimestamp(spObj["solvedAt"], exportedAt);
+      const solvedAt = clampTimestamp(
+        spObj["solvedAt"],
+        exportedAt,
+        referenceNowMs,
+      );
       solvedPuzzles[puzzleId] = {
         stars,
         solvedAt,
@@ -228,7 +251,10 @@ const createSolvedPuzzlesSchema = (exportedAt: number) =>
     return solvedPuzzles;
   });
 
-const createScenariosMapSchema = (exportedAt: number) =>
+const createScenariosMapSchema = (
+  exportedAt: number,
+  referenceNowMs?: number,
+) =>
   z.record(z.unknown()).transform((rawScenarios) => {
     const scenarios: ScenarioProgressMap = {};
     for (const [key, rawSc] of Object.entries(rawScenarios)) {
@@ -249,10 +275,12 @@ const createScenariosMapSchema = (exportedAt: number) =>
       const firstCompletedAt = clampTimestamp(
         scObj["firstCompletedAt"],
         exportedAt,
+        referenceNowMs,
       );
       const lastCompletedAt = clampTimestamp(
         scObj["lastCompletedAt"],
         firstCompletedAt,
+        referenceNowMs,
       );
 
       scenarios[scenarioId] = {
@@ -267,7 +295,10 @@ const createScenariosMapSchema = (exportedAt: number) =>
     return scenarios;
   });
 
-const createPuzzlesSchema = (exportedAt: number) =>
+const createPuzzlesSchema = (
+  exportedAt: number,
+  referenceNowMs?: number,
+) =>
   z
     .object({
       ratingProfile: z.unknown().optional(),
@@ -284,7 +315,10 @@ const createPuzzlesSchema = (exportedAt: number) =>
         !Array.isArray(rawPuzzles.ratingProfile)
           ? rawPuzzles.ratingProfile
           : {};
-      const ratingProfile = createRatingProfileSchema(exportedAt).parse(rpInput);
+      const ratingProfile = createRatingProfileSchema(
+        exportedAt,
+        referenceNowMs,
+      ).parse(rpInput);
 
       const tmInput =
         rawPuzzles.themeMastery &&
@@ -292,7 +326,10 @@ const createPuzzlesSchema = (exportedAt: number) =>
         !Array.isArray(rawPuzzles.themeMastery)
           ? (rawPuzzles.themeMastery as Record<string, unknown>)
           : {};
-      const themeMastery = createThemeMasterySchema(exportedAt).parse(tmInput);
+      const themeMastery = createThemeMasterySchema(
+        exportedAt,
+        referenceNowMs,
+      ).parse(tmInput);
 
       const arcInput =
         rawPuzzles.arcadeStats &&
@@ -308,10 +345,21 @@ const createPuzzlesSchema = (exportedAt: number) =>
         !Array.isArray(rawPuzzles.solvedPuzzles)
           ? (rawPuzzles.solvedPuzzles as Record<string, unknown>)
           : {};
-      const solvedPuzzles = createSolvedPuzzlesSchema(exportedAt).parse(spInput);
+      const solvedPuzzles = createSolvedPuzzlesSchema(
+        exportedAt,
+        referenceNowMs,
+      ).parse(spInput);
 
-      const createdAt = clampTimestamp(rawPuzzles.createdAt, exportedAt);
-      const lastActiveAt = clampTimestamp(rawPuzzles.lastActiveAt, exportedAt);
+      const createdAt = clampTimestamp(
+        rawPuzzles.createdAt,
+        exportedAt,
+        referenceNowMs,
+      );
+      const lastActiveAt = clampTimestamp(
+        rawPuzzles.lastActiveAt,
+        exportedAt,
+        referenceNowMs,
+      );
 
       return {
         ratingProfile,
@@ -332,10 +380,12 @@ export class DefaultSchemaValidator implements SchemaValidator {
    * Validates and defensively sanitizes unknown input into a valid UnifiedProgressPayload.
    *
    * @param raw - Unknown input value
+   * @param referenceNowMs - Optional reference time for clock skew tolerance and timestamp clamping
    * @returns ValidationResult with sanitized data or descriptive errors
    */
   public sanitizeAndValidate(
     raw: unknown,
+    referenceNowMs?: number,
   ): ValidationResult<UnifiedProgressPayload> {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
       return {
@@ -355,8 +405,8 @@ export class DefaultSchemaValidator implements SchemaValidator {
         : UNIFIED_PROGRESS_SCHEMA_VERSION;
 
     // Exported timestamp
-    const now = Date.now();
-    const exportedAt = clampTimestamp(obj["exportedAt"], now);
+    const now = referenceNowMs ?? Date.now();
+    const exportedAt = clampTimestamp(obj["exportedAt"], now, referenceNowMs);
 
     // Client version
     const rawClientVersion = obj["clientVersion"];
@@ -372,7 +422,10 @@ export class DefaultSchemaValidator implements SchemaValidator {
       !Array.isArray(obj["scenarios"])
         ? (obj["scenarios"] as Record<string, unknown>)
         : {};
-    const scenarios = createScenariosMapSchema(exportedAt).parse(rawScenarios);
+    const scenarios = createScenariosMapSchema(
+      exportedAt,
+      referenceNowMs,
+    ).parse(rawScenarios);
 
     // Puzzles
     const rawPuzzles =
@@ -381,7 +434,9 @@ export class DefaultSchemaValidator implements SchemaValidator {
       !Array.isArray(obj["puzzles"])
         ? (obj["puzzles"] as Record<string, unknown>)
         : {};
-    const puzzles = createPuzzlesSchema(exportedAt).parse(rawPuzzles);
+    const puzzles = createPuzzlesSchema(exportedAt, referenceNowMs).parse(
+      rawPuzzles,
+    );
 
     const sanitizedPayload: UnifiedProgressPayload = {
       version,
@@ -401,11 +456,15 @@ export class DefaultSchemaValidator implements SchemaValidator {
    * Fast assertion that returns sanitized UnifiedProgressPayload or throws Error.
    *
    * @param raw - Unknown input value
+   * @param referenceNowMs - Optional reference time for clock skew tolerance
    * @returns Sanitized valid payload
    * @throws Error if input is completely invalid
    */
-  public assertValid(raw: unknown): UnifiedProgressPayload {
-    const result = this.sanitizeAndValidate(raw);
+  public assertValid(
+    raw: unknown,
+    referenceNowMs?: number,
+  ): UnifiedProgressPayload {
+    const result = this.sanitizeAndValidate(raw, referenceNowMs);
     if (!result.success || !result.data) {
       const errorMsg =
         result.errors?.join(", ") || "Invalid progress payload structure";
@@ -425,21 +484,27 @@ export const schemaValidator = defaultSchemaValidator;
  * Convenience helper to validate and sanitize progress payload.
  *
  * @param raw - Unknown input value
+ * @param referenceNowMs - Optional reference time for clock skew tolerance
  * @returns ValidationResult with sanitized data or descriptive errors
  */
 export function sanitizeAndValidateProgress(
   raw: unknown,
+  referenceNowMs?: number,
 ): ValidationResult<UnifiedProgressPayload> {
-  return defaultSchemaValidator.sanitizeAndValidate(raw);
+  return defaultSchemaValidator.sanitizeAndValidate(raw, referenceNowMs);
 }
 
 /**
  * Convenience helper to assert valid progress payload.
  *
  * @param raw - Unknown input value
+ * @param referenceNowMs - Optional reference time for clock skew tolerance
  * @returns Sanitized valid payload
  * @throws Error if input is invalid
  */
-export function assertValidProgress(raw: unknown): UnifiedProgressPayload {
-  return defaultSchemaValidator.assertValid(raw);
+export function assertValidProgress(
+  raw: unknown,
+  referenceNowMs?: number,
+): UnifiedProgressPayload {
+  return defaultSchemaValidator.assertValid(raw, referenceNowMs);
 }

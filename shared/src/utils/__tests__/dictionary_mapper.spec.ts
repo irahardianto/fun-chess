@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import type { UnifiedProgressPayload } from "../../types/progress_sync.js";
+import type {
+  UnifiedProgressPayload,
+  CompactProgressDto,
+} from "../../types/progress_sync.js";
 import {
   DefaultDictionaryMapper,
   defaultDictionaryMapper,
@@ -363,6 +366,176 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
       // Assert
       expect(compact.v).toBe(1);
       expect(restored.version).toBe(1);
+    });
+  });
+
+  describe("Decomposed Sub-Mappers & Robust fromCompact Handling (MIN-025)", () => {
+    it("preserves 100% fidelity across all decomposed sub-mappers with a full valid CompactProgressDto", () => {
+      const compactDto: CompactProgressDto = {
+        v: 1,
+        t: 1700000000,
+        c: "1.2.0",
+        sc: [
+          ["tactics-fork-1", 3, 2, 0, 1699990000, 1700000000],
+          ["mate-in-one", 2, 4, 1, 1699991000, 1699995000],
+        ],
+        pz: {
+          r: [1450, 95, 1500, 50, 42, 15],
+          tm: [
+            ["fork", 30, 25, 50, 1700000000],
+            ["pin", 15, 10, 20, 1699999000],
+          ],
+          ac: [28, 10, 15, 20],
+          sp: [
+            ["puz_101", 3, 1699990000],
+            ["puz_102", 2, 1699991000],
+          ],
+          ca: 1699000000,
+          la: 1700000000,
+        },
+      };
+
+      const restored = mapper.fromCompact(compactDto);
+
+      // Verify header fields
+      expect(restored.version).toBe(1);
+      expect(restored.exportedAt).toBe(1700000000000);
+      expect(restored.clientVersion).toBe("1.2.0");
+
+      // Verify restoreScenarios sub-mapper
+      expect(Object.keys(restored.scenarios)).toHaveLength(2);
+      expect(restored.scenarios["tactics-fork-1"]).toEqual({
+        scenarioId: "tactics-fork-1",
+        starsEarned: 3,
+        attemptsCount: 2,
+        hintsUsedTotal: 0,
+        firstCompletedAt: 1699990000000,
+        lastCompletedAt: 1700000000000,
+      });
+
+      // Verify restoreRatingProfile sub-mapper
+      expect(restored.puzzles.ratingProfile).toEqual({
+        rating: 1450,
+        ratingDeviation: 95,
+        peakRating: 1500,
+        totalAttempted: 50,
+        totalSolved: 42,
+        bestStreak: 15,
+        ratingHistory: [],
+      });
+
+      // Verify restoreThemeMastery sub-mapper
+      expect(restored.puzzles.themeMastery["fork"]).toEqual({
+        theme: "fork",
+        attempted: 30,
+        solved: 25,
+        starsEarned: 50,
+        masteryLevel: "master",
+        lastPracticedAt: 1700000000000,
+      });
+      expect(restored.puzzles.themeMastery["pin"]?.masteryLevel).toBe("apprentice");
+
+      // Verify restoreArcadeStats sub-mapper
+      expect(restored.puzzles.arcadeStats).toEqual({
+        puzzleRushHighScore: 28,
+        puzzleRushBestStreak: 10,
+        streakSurvivorHighScore: 15,
+        totalRushRuns: 20,
+      });
+
+      // Verify restoreSolvedPuzzles sub-mapper
+      expect(restored.puzzles.solvedPuzzles["puz_101"]).toEqual({
+        stars: 3,
+        solvedAt: 1699990000000,
+      });
+      expect(restored.puzzles.solvedPuzzles["puz_102"]).toEqual({
+        stars: 2,
+        solvedAt: 1699991000000,
+      });
+    });
+
+    it("handles partial CompactProgressDto inputs with missing or sparse sub-trees", () => {
+      // Partial payload: missing sc and missing pz
+      const partialNoScOrPz = {
+        v: 1,
+        t: 1700000000,
+        c: "1.0.0",
+      } as unknown as CompactProgressDto;
+
+      const restored1 = mapper.fromCompact(partialNoScOrPz);
+      expect(restored1.scenarios).toEqual({});
+      expect(restored1.puzzles.ratingProfile.rating).toBe(800);
+      expect(restored1.puzzles.ratingProfile.ratingDeviation).toBe(350);
+      expect(restored1.puzzles.themeMastery).toEqual({});
+      expect(restored1.puzzles.arcadeStats.puzzleRushHighScore).toBe(0);
+      expect(restored1.puzzles.solvedPuzzles).toEqual({});
+
+      // Partial payload: pz present but all inner sub-arrays undefined
+      const partialEmptyPz = {
+        v: 1,
+        t: 1700000000,
+        pz: {},
+      } as unknown as CompactProgressDto;
+
+      const restored2 = mapper.fromCompact(partialEmptyPz);
+      expect(restored2.scenarios).toEqual({});
+      expect(restored2.puzzles.ratingProfile.rating).toBe(800);
+      expect(restored2.puzzles.themeMastery).toEqual({});
+      expect(restored2.puzzles.arcadeStats.totalRushRuns).toBe(0);
+      expect(restored2.puzzles.solvedPuzzles).toEqual({});
+    });
+
+    it("handles empty CompactProgressDto inputs gracefully reconstructing safe defaults", () => {
+      const emptyDto = {} as unknown as CompactProgressDto;
+      const restored = mapper.fromCompact(emptyDto);
+
+      expect(restored.version).toBe(1);
+      expect(restored.exportedAt).toBeGreaterThan(0);
+      expect(restored.scenarios).toEqual({});
+      expect(restored.puzzles.ratingProfile.rating).toBe(800);
+      expect(restored.puzzles.ratingProfile.ratingDeviation).toBe(350);
+      expect(restored.puzzles.ratingProfile.peakRating).toBe(800);
+      expect(restored.puzzles.themeMastery).toEqual({});
+      expect(restored.puzzles.arcadeStats).toEqual({
+        puzzleRushHighScore: 0,
+        puzzleRushBestStreak: 0,
+        streakSurvivorHighScore: 0,
+        totalRushRuns: 0,
+      });
+      expect(restored.puzzles.solvedPuzzles).toEqual({});
+    });
+
+    it("defensively discards malformed and truncated tuples within sub-mappers", () => {
+      const corruptedDto = {
+        v: 1,
+        t: 1700000000,
+        sc: [
+          ["too-short", 3], // invalid tuple length < 6
+          [null, 3, 1, 0, 1700000000, 1700000000], // invalid id
+          ["valid-sc", 3, 1, 0, 1700000000, 1700000000], // valid
+        ],
+        pz: {
+          r: [1200, 100, 1250, 10, 8, 3],
+          tm: [
+            ["too-short"], // invalid tuple length < 5
+            ["", 10, 8, 10, 1700000000], // empty theme name
+            ["fork", 10, 8, 10, 1700000000], // valid
+          ],
+          ac: [10, 5, 8, 3],
+          sp: [
+            ["too-short"], // invalid tuple length < 3
+            ["", 3, 1700000000], // empty puzzle id
+            ["puz_valid", 3, 1700000000], // valid
+          ],
+          ca: 1700000000,
+          la: 1700000000,
+        },
+      } as unknown as CompactProgressDto;
+
+      const restored = mapper.fromCompact(corruptedDto);
+      expect(Object.keys(restored.scenarios)).toEqual(["valid-sc"]);
+      expect(Object.keys(restored.puzzles.themeMastery)).toEqual(["fork"]);
+      expect(Object.keys(restored.puzzles.solvedPuzzles)).toEqual(["puz_valid"]);
     });
   });
 });

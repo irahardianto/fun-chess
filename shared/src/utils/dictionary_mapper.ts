@@ -13,26 +13,15 @@ import type {
   ScenarioProgressMap,
   StarRating,
 } from "../contracts/scenario.js";
-import type {
-  PuzzleProgress,
-  PuzzleTheme,
-  ThemeMasteryProgress,
-  SolvedPuzzleRecord,
+import {
+  type PuzzleProgress,
+  type PuzzleTheme,
+  type ThemeMasteryProgress,
+  type SolvedPuzzleRecord,
+  type AdaptiveRatingState,
+  type PuzzleArcadeStats,
+  calculateMasteryLevel,
 } from "../contracts/puzzle.js";
-
-/**
- * Calculates theme mastery tier from solve count.
- * - master: >= 20 solved
- * - apprentice: >= 8 solved
- * - novice: < 8 solved
- */
-function calculateMasteryLevel(
-  solved: number,
-): "novice" | "apprentice" | "master" {
-  if (solved >= 20) return "master";
-  if (solved >= 8) return "apprentice";
-  return "novice";
-}
 
 /**
  * Default implementation of DictionaryMapper for bidirectional transformation between
@@ -149,6 +138,150 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
   }
 
   /**
+   * Restores scenario progress map from compact scenario tuples.
+   */
+  private restoreScenarios(
+    compactScenarios: readonly CompactScenarioTuple[] | undefined,
+  ): ScenarioProgressMap {
+    const scenarios: ScenarioProgressMap = {};
+    if (!Array.isArray(compactScenarios)) {
+      return scenarios;
+    }
+    for (const tuple of compactScenarios) {
+      if (!Array.isArray(tuple) || tuple.length < 6) continue;
+      const [id, stars, attempts, hints, firstSec, lastSec] = tuple;
+      if (!id || typeof id !== "string") continue;
+
+      const starsEarned: StarRating = stars === 3 ? 3 : stars === 2 ? 2 : 1;
+      const firstCompletedAt = Math.max(0, Math.floor((firstSec ?? 0) * 1000));
+      const lastCompletedAt = Math.max(0, Math.floor((lastSec ?? 0) * 1000));
+
+      const scRecord: ScenarioProgress = {
+        scenarioId: id.trim(),
+        starsEarned,
+        attemptsCount: Math.max(0, Math.floor(attempts ?? 0)),
+        hintsUsedTotal: Math.max(0, Math.floor(hints ?? 0)),
+        firstCompletedAt,
+        lastCompletedAt: Math.max(firstCompletedAt, lastCompletedAt),
+      };
+      scenarios[id.trim()] = scRecord;
+    }
+    return scenarios;
+  }
+
+  /**
+   * Restores adaptive rating state from compact rating profile tuple.
+   */
+  private restoreRatingProfile(
+    rTuple: CompactRatingProfileTuple | undefined,
+  ): AdaptiveRatingState {
+    const tuple = rTuple ?? [800, 350, 800, 0, 0, 0];
+    const rating = Math.min(3000, Math.max(500, Math.round(tuple[0] ?? 800)));
+    const ratingDeviation = Math.min(
+      500,
+      Math.max(50, Math.round(tuple[1] ?? 350)),
+    );
+    const peakRating = Math.min(
+      3000,
+      Math.max(500, Math.round(tuple[2] ?? rating)),
+    );
+    const totalAttempted = Math.max(0, Math.floor(tuple[3] ?? 0));
+    const totalSolved = Math.max(
+      0,
+      Math.min(totalAttempted, Math.floor(tuple[4] ?? 0)),
+    );
+    const bestStreak = Math.max(0, Math.floor(tuple[5] ?? 0));
+
+    return {
+      rating,
+      ratingDeviation,
+      peakRating: Math.max(rating, peakRating),
+      totalAttempted,
+      totalSolved,
+      bestStreak,
+      ratingHistory: [],
+    };
+  }
+
+  /**
+   * Restores theme mastery dictionary from compact theme mastery tuples.
+   */
+  private restoreThemeMastery(
+    tmTuples: readonly CompactThemeMasteryTuple[] | undefined,
+  ): Record<string, ThemeMasteryProgress> {
+    const themeMastery: Record<string, ThemeMasteryProgress> = {};
+    if (!Array.isArray(tmTuples)) {
+      return themeMastery;
+    }
+    for (const tuple of tmTuples) {
+      if (!Array.isArray(tuple) || tuple.length < 5) continue;
+      const [themeKey, attempted, solved, starsEarned, lastPracticedSec] =
+        tuple;
+      if (!themeKey || typeof themeKey !== "string") continue;
+
+      const safeAttempted = Math.max(0, Math.floor(attempted ?? 0));
+      const safeSolved = Math.max(
+        0,
+        Math.min(safeAttempted, Math.floor(solved ?? 0)),
+      );
+      const safeStars = Math.max(0, Math.floor(starsEarned ?? 0));
+      const lastPracticedAt = Math.max(
+        0,
+        Math.floor((lastPracticedSec ?? 0) * 1000),
+      );
+
+      themeMastery[themeKey] = {
+        theme: themeKey as PuzzleTheme,
+        attempted: safeAttempted,
+        solved: safeSolved,
+        starsEarned: safeStars,
+        masteryLevel: calculateMasteryLevel(safeSolved),
+        lastPracticedAt,
+      };
+    }
+    return themeMastery;
+  }
+
+  /**
+   * Restores puzzle arcade statistics from compact arcade stats tuple.
+   */
+  private restoreArcadeStats(
+    acTuple: CompactArcadeStatsTuple | undefined,
+  ): PuzzleArcadeStats {
+    const tuple = acTuple ?? [0, 0, 0, 0];
+    return {
+      puzzleRushHighScore: Math.max(0, Math.floor(tuple[0] ?? 0)),
+      puzzleRushBestStreak: Math.max(0, Math.floor(tuple[1] ?? 0)),
+      streakSurvivorHighScore: Math.max(0, Math.floor(tuple[2] ?? 0)),
+      totalRushRuns: Math.max(0, Math.floor(tuple[3] ?? 0)),
+    };
+  }
+
+  /**
+   * Restores solved puzzle records from compact solved puzzle tuples.
+   */
+  private restoreSolvedPuzzles(
+    spTuples: readonly CompactSolvedPuzzleTuple[] | undefined,
+  ): Record<string, SolvedPuzzleRecord> {
+    const solvedPuzzles: Record<string, SolvedPuzzleRecord> = {};
+    if (!Array.isArray(spTuples)) {
+      return solvedPuzzles;
+    }
+    for (const tuple of spTuples) {
+      if (!Array.isArray(tuple) || tuple.length < 3) continue;
+      const [puzId, stars, solvedSec] = tuple;
+      if (!puzId || typeof puzId !== "string") continue;
+
+      const starRating: StarRating = stars === 3 ? 3 : stars === 2 ? 2 : 1;
+      solvedPuzzles[puzId.trim()] = {
+        stars: starRating,
+        solvedAt: Math.max(0, Math.floor((solvedSec ?? 0) * 1000)),
+      };
+    }
+    return solvedPuzzles;
+  }
+
+  /**
    * Expands compact tokenized CompactProgressDto into full domain UnifiedProgressPayload.
    * Multiplies second timestamps back to millisecond scale and restores model structures.
    *
@@ -160,106 +293,11 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
     const exportedAt = (compact.t || Math.floor(Date.now() / 1000)) * 1000;
     const clientVersion = compact.c;
 
-    // Restore scenarios
-    const scenarios: ScenarioProgressMap = {};
-    if (Array.isArray(compact.sc)) {
-      for (const tuple of compact.sc) {
-        if (!Array.isArray(tuple) || tuple.length < 6) continue;
-        const [id, stars, attempts, hints, firstSec, lastSec] = tuple;
-        if (!id || typeof id !== "string") continue;
-
-        const starsEarned: StarRating = stars === 3 ? 3 : stars === 2 ? 2 : 1;
-        const firstCompletedAt = Math.max(
-          0,
-          Math.floor((firstSec ?? 0) * 1000),
-        );
-        const lastCompletedAt = Math.max(0, Math.floor((lastSec ?? 0) * 1000));
-
-        const scRecord: ScenarioProgress = {
-          scenarioId: id.trim(),
-          starsEarned,
-          attemptsCount: Math.max(0, Math.floor(attempts ?? 0)),
-          hintsUsedTotal: Math.max(0, Math.floor(hints ?? 0)),
-          firstCompletedAt,
-          lastCompletedAt: Math.max(firstCompletedAt, lastCompletedAt),
-        };
-        scenarios[id.trim()] = scRecord;
-      }
-    }
-
-    // Restore rating profile
-    const rTuple = compact.pz?.r ?? [800, 350, 800, 0, 0, 0];
-    const rating = Math.min(3000, Math.max(500, Math.round(rTuple[0] ?? 800)));
-    const ratingDeviation = Math.min(
-      500,
-      Math.max(50, Math.round(rTuple[1] ?? 350)),
-    );
-    const peakRating = Math.min(
-      3000,
-      Math.max(500, Math.round(rTuple[2] ?? rating)),
-    );
-    const totalAttempted = Math.max(0, Math.floor(rTuple[3] ?? 0));
-    const totalSolved = Math.max(
-      0,
-      Math.min(totalAttempted, Math.floor(rTuple[4] ?? 0)),
-    );
-    const bestStreak = Math.max(0, Math.floor(rTuple[5] ?? 0));
-
-    // Restore theme mastery
-    const themeMastery: Record<string, ThemeMasteryProgress> = {};
-    if (Array.isArray(compact.pz?.tm)) {
-      for (const tuple of compact.pz.tm) {
-        if (!Array.isArray(tuple) || tuple.length < 5) continue;
-        const [themeKey, attempted, solved, starsEarned, lastPracticedSec] =
-          tuple;
-        if (!themeKey || typeof themeKey !== "string") continue;
-
-        const safeAttempted = Math.max(0, Math.floor(attempted ?? 0));
-        const safeSolved = Math.max(
-          0,
-          Math.min(safeAttempted, Math.floor(solved ?? 0)),
-        );
-        const safeStars = Math.max(0, Math.floor(starsEarned ?? 0));
-        const lastPracticedAt = Math.max(
-          0,
-          Math.floor((lastPracticedSec ?? 0) * 1000),
-        );
-
-        themeMastery[themeKey] = {
-          theme: themeKey as PuzzleTheme,
-          attempted: safeAttempted,
-          solved: safeSolved,
-          starsEarned: safeStars,
-          masteryLevel: calculateMasteryLevel(safeSolved),
-          lastPracticedAt,
-        };
-      }
-    }
-
-    // Restore arcade stats
-    const acTuple = compact.pz?.ac ?? [0, 0, 0, 0];
-    const arcadeStats = {
-      puzzleRushHighScore: Math.max(0, Math.floor(acTuple[0] ?? 0)),
-      puzzleRushBestStreak: Math.max(0, Math.floor(acTuple[1] ?? 0)),
-      streakSurvivorHighScore: Math.max(0, Math.floor(acTuple[2] ?? 0)),
-      totalRushRuns: Math.max(0, Math.floor(acTuple[3] ?? 0)),
-    };
-
-    // Restore solved puzzles
-    const solvedPuzzles: Record<string, SolvedPuzzleRecord> = {};
-    if (Array.isArray(compact.pz?.sp)) {
-      for (const tuple of compact.pz.sp) {
-        if (!Array.isArray(tuple) || tuple.length < 3) continue;
-        const [puzId, stars, solvedSec] = tuple;
-        if (!puzId || typeof puzId !== "string") continue;
-
-        const starRating: StarRating = stars === 3 ? 3 : stars === 2 ? 2 : 1;
-        solvedPuzzles[puzId.trim()] = {
-          stars: starRating,
-          solvedAt: Math.max(0, Math.floor((solvedSec ?? 0) * 1000)),
-        };
-      }
-    }
+    const scenarios = this.restoreScenarios(compact.sc);
+    const ratingProfile = this.restoreRatingProfile(compact.pz?.r);
+    const themeMastery = this.restoreThemeMastery(compact.pz?.tm);
+    const arcadeStats = this.restoreArcadeStats(compact.pz?.ac);
+    const solvedPuzzles = this.restoreSolvedPuzzles(compact.pz?.sp);
 
     const createdAt =
       (compact.pz?.ca ?? compact.t ?? Math.floor(Date.now() / 1000)) * 1000;
@@ -267,15 +305,7 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
       (compact.pz?.la ?? compact.t ?? Math.floor(Date.now() / 1000)) * 1000;
 
     const puzzles: PuzzleProgress = {
-      ratingProfile: {
-        rating,
-        ratingDeviation,
-        peakRating: Math.max(rating, peakRating),
-        totalAttempted,
-        totalSolved,
-        bestStreak,
-        ratingHistory: [],
-      },
+      ratingProfile,
       themeMastery,
       arcadeStats,
       solvedPuzzles,

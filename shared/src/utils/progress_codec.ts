@@ -41,10 +41,10 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
     const b1 = bytes[i + 1]!;
     const b2 = bytes[i + 2]!;
     result +=
-      B64_CHARS[(b0 >> 2) & 0x3f] +
-      B64_CHARS[((b0 & 0x03) << 4) | ((b1 >> 4) & 0x0f)] +
-      B64_CHARS[((b1 & 0x0f) << 2) | ((b2 >> 6) & 0x03)] +
-      B64_CHARS[b2 & 0x3f];
+      B64_CHARS.charAt((b0 >> 2) & 0x3f) +
+      B64_CHARS.charAt(((b0 & 0x03) << 4) | ((b1 >> 4) & 0x0f)) +
+      B64_CHARS.charAt(((b1 & 0x0f) << 2) | ((b2 >> 6) & 0x03)) +
+      B64_CHARS.charAt(b2 & 0x3f);
   }
 
   if (i < len) {
@@ -52,11 +52,13 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
     if (i + 1 < len) {
       const b1 = bytes[i + 1]!;
       result +=
-        B64_CHARS[(b0 >> 2) & 0x3f] +
-        B64_CHARS[((b0 & 0x03) << 4) | ((b1 >> 4) & 0x0f)] +
-        B64_CHARS[(b1 & 0x0f) << 2];
+        B64_CHARS.charAt((b0 >> 2) & 0x3f) +
+        B64_CHARS.charAt(((b0 & 0x03) << 4) | ((b1 >> 4) & 0x0f)) +
+        B64_CHARS.charAt((b1 & 0x0f) << 2);
     } else {
-      result += B64_CHARS[(b0 >> 2) & 0x3f] + B64_CHARS[(b0 & 0x03) << 4];
+      result +=
+        B64_CHARS.charAt((b0 >> 2) & 0x3f) +
+        B64_CHARS.charAt((b0 & 0x03) << 4);
     }
   }
 

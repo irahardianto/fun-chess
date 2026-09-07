@@ -267,12 +267,15 @@ export interface SchemaValidator {
   /**
    * Validates and defensively sanitizes an unknown object into a clean UnifiedProgressPayload.
    */
-  sanitizeAndValidate(raw: unknown): ValidationResult<UnifiedProgressPayload>;
+  sanitizeAndValidate(
+    raw: unknown,
+    referenceNowMs?: number,
+  ): ValidationResult<UnifiedProgressPayload>;
 
   /**
    * Fast assertion that returns sanitized payload or throws descriptive ValidationError.
    */
-  assertValid(raw: unknown): UnifiedProgressPayload;
+  assertValid(raw: unknown, referenceNowMs?: number): UnifiedProgressPayload;
 }
 
 /**
@@ -295,6 +298,7 @@ export interface ProgressMergeEngine {
   calculateDiff(
     local: UnifiedProgressPayload,
     incoming: UnifiedProgressPayload,
+    clockSkewToleranceMs?: number,
   ): ProgressDiffPreview;
 }
 

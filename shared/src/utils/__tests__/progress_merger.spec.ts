@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import type { UnifiedProgressPayload } from "../../types/progress_sync.js";
 import {
   DefaultProgressMergeEngine,
-  progressMergeEngine,
+  defaultProgressMergeEngine,
   mergeUnifiedProgress,
   calculateProgressDiff,
 } from "../progress_merger.js";
 
 describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => {
-  const merger = progressMergeEngine ?? new DefaultProgressMergeEngine();
+  const merger = defaultProgressMergeEngine ?? new DefaultProgressMergeEngine();
 
   const createLocalPayload = (): UnifiedProgressPayload => ({
     version: 1,
@@ -348,6 +348,45 @@ describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => 
       expect(diff.academy.starUpgrades).toHaveLength(0);
       expect(diff.puzzles.newPuzzlesSolvedCount).toBe(0);
     });
+
+    it("applies clock skew tolerance buffer when determining isIncomingNewer (ENH-015)", () => {
+      const local = createLocalPayload();
+      const localExportedAt = 1700000000000;
+      const localLastActiveAt = 1700000000000;
+
+      const baseLocal = {
+        ...local,
+        exportedAt: localExportedAt,
+        puzzles: {
+          ...local.puzzles,
+          lastActiveAt: localLastActiveAt,
+        },
+      };
+
+      // 1. When incoming is 30s ahead of local: within 60s tolerance buffer -> isIncomingNewer is false
+      const incoming30sAhead = {
+        ...createIncomingPayload(),
+        exportedAt: localExportedAt + 30_000,
+        puzzles: {
+          ...createIncomingPayload().puzzles,
+          lastActiveAt: localLastActiveAt + 30_000,
+        },
+      };
+      const diff30s = calculateProgressDiff(baseLocal, incoming30sAhead);
+      expect(diff30s.metadata.isIncomingNewer).toBe(false);
+
+      // 2. When incoming is 120s ahead of local: exceeds 60s tolerance buffer -> isIncomingNewer is true
+      const incoming120sAhead = {
+        ...createIncomingPayload(),
+        exportedAt: localExportedAt + 120_000,
+        puzzles: {
+          ...createIncomingPayload().puzzles,
+          lastActiveAt: localLastActiveAt + 120_000,
+        },
+      };
+      const diff120s = calculateProgressDiff(baseLocal, incoming120sAhead);
+      expect(diff120s.metadata.isIncomingNewer).toBe(true);
+    });
   });
 
   describe("Partial Progress Payloads & Missing Puzzles", () => {
@@ -515,6 +554,91 @@ describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => 
 
       expect(merged.exportedAt).toBe(explicitTimestamp);
       expect(merged.puzzles.lastActiveAt).toBe(explicitTimestamp);
+    });
+  });
+
+  describe("Dictionary Lookups & Prototype Safety (MAJ-003)", () => {
+    it("uses Object.create(null) so prototype keys like toString or __proto__ do not collide with Object.prototype", () => {
+      const localWithProtoKeys = {
+        ...createLocalPayload(),
+        scenarios: {
+          toString: {
+            scenarioId: "toString",
+            starsEarned: 2,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 1700000000000,
+            lastCompletedAt: 1700000000000,
+          },
+        },
+        puzzles: {
+          ...createLocalPayload().puzzles,
+          themeMastery: {
+            toString: {
+              theme: "fork" as any,
+              attempted: 5,
+              solved: 3,
+              starsEarned: 5,
+              masteryLevel: "novice" as const,
+              lastPracticedAt: 1700000000000,
+            },
+          },
+          solvedPuzzles: {
+            toString: {
+              stars: 2 as const,
+              solvedAt: 1700000000000,
+            },
+          },
+        },
+      };
+
+      const incomingWithProtoKeys = {
+        ...createIncomingPayload(),
+        scenarios: {
+          toString: {
+            scenarioId: "toString",
+            starsEarned: 3,
+            attemptsCount: 2,
+            hintsUsedTotal: 1,
+            firstCompletedAt: 1699999000000,
+            lastCompletedAt: 1700001000000,
+          },
+        },
+        puzzles: {
+          ...createIncomingPayload().puzzles,
+          themeMastery: {
+            toString: {
+              theme: "fork" as any,
+              attempted: 10,
+              solved: 8,
+              starsEarned: 15,
+              masteryLevel: "apprentice" as const,
+              lastPracticedAt: 1700001000000,
+            },
+          },
+          solvedPuzzles: {
+            toString: {
+              stars: 3 as const,
+              solvedAt: 1700001000000,
+            },
+          },
+        },
+      };
+
+      const merged = merger.merge(
+        localWithProtoKeys,
+        incomingWithProtoKeys,
+        "smart_merge",
+      );
+
+      // Verify Object.prototype is unpolluted
+      expect(Object.prototype.hasOwnProperty("scenarioId")).toBe(false);
+      expect(Object.prototype.hasOwnProperty("starsEarned")).toBe(false);
+
+      // Verify merged dictionary lookup works properly for prototype key names
+      expect(merged.scenarios["toString"]?.starsEarned).toBe(3);
+      expect(merged.puzzles.themeMastery["toString"]?.solved).toBe(11);
+      expect(merged.puzzles.solvedPuzzles["toString"]?.stars).toBe(3);
     });
   });
 });

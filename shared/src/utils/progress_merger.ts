@@ -6,31 +6,15 @@ import type {
 } from "../types/progress_sync.js";
 import { UNIFIED_PROGRESS_SCHEMA_VERSION } from "../types/progress_sync.js";
 import type { ScenarioProgressMap, StarRating } from "../contracts/scenario.js";
-import type {
-  PuzzleTheme,
-  ThemeMasteryProgress,
-  SolvedPuzzleRecord,
-  RatingHistoryPoint,
-  AdaptiveRatingState,
-  PuzzleArcadeStats,
+import {
+  type PuzzleTheme,
+  type ThemeMasteryProgress,
+  type SolvedPuzzleRecord,
+  type RatingHistoryPoint,
+  type AdaptiveRatingState,
+  type PuzzleArcadeStats,
+  calculateMasteryLevel,
 } from "../contracts/puzzle.js";
-
-/**
- * Calculates theme mastery tier from solve count.
- * - master: >= 20 solved
- * - apprentice: >= 8 solved
- * - novice: < 8 solved
- *
- * @param solved - Total puzzles solved in this theme
- * @returns Calculated mastery tier
- */
-function calculateMasteryLevel(
-  solved: number,
-): "novice" | "apprentice" | "master" {
-  if (solved >= 20) return "master";
-  if (solved >= 8) return "apprentice";
-  return "novice";
-}
 
 /**
  * Merges scenario progress maps using smart star upgrade and timestamp merging.
@@ -43,7 +27,7 @@ export function mergeScenarios(
   localScenarios?: ScenarioProgressMap | null,
   incomingScenarios?: ScenarioProgressMap | null,
 ): ScenarioProgressMap {
-  const merged: ScenarioProgressMap = {};
+  const merged: ScenarioProgressMap = Object.create(null);
   const local = localScenarios || {};
   const incoming = incomingScenarios || {};
   const allScenarioIds = new Set([
@@ -153,7 +137,7 @@ export function mergeThemeMastery(
   localThemes?: Record<string, ThemeMasteryProgress> | null,
   incomingThemes?: Record<string, ThemeMasteryProgress> | null,
 ): Record<string, ThemeMasteryProgress> {
-  const merged: Record<string, ThemeMasteryProgress> = {};
+  const merged: Record<string, ThemeMasteryProgress> = Object.create(null);
   const local = localThemes || {};
   const incoming = incomingThemes || {};
   const allThemeKeys = new Set([
@@ -234,7 +218,7 @@ export function mergeSolvedPuzzles(
   localSolved?: Record<string, SolvedPuzzleRecord> | null,
   incomingSolved?: Record<string, SolvedPuzzleRecord> | null,
 ): Record<string, SolvedPuzzleRecord> {
-  const merged: Record<string, SolvedPuzzleRecord> = {};
+  const merged: Record<string, SolvedPuzzleRecord> = Object.create(null);
   const local = localSolved || {};
   const incoming = incomingSolved || {};
   const allPuzzleIds = new Set([
@@ -340,11 +324,13 @@ export function mergeUnifiedProgress(
  *
  * @param local - Current local progress state
  * @param incoming - Incoming progress package
+ * @param clockSkewToleranceMs - Tolerance buffer for clock skew comparison (default: 60,000ms)
  * @returns ProgressDiffPreview summary
  */
 export function calculateProgressDiff(
   local: UnifiedProgressPayload,
   incoming: UnifiedProgressPayload,
+  clockSkewToleranceMs: number = 60_000,
 ): ProgressDiffPreview {
   const localScenarios = local.scenarios || {};
   const incomingScenarios = incoming.scenarios || {};
@@ -434,8 +420,8 @@ export function calculateProgressDiff(
   const incomingLastActiveAt = incoming.puzzles?.lastActiveAt || 0;
   const incomingExportedAt = incoming.exportedAt || 0;
   const isIncomingNewer =
-    incomingExportedAt > (local.exportedAt || 0) ||
-    incomingLastActiveAt > localLastActiveAt;
+    incomingExportedAt > (local.exportedAt || 0) + clockSkewToleranceMs ||
+    incomingLastActiveAt > localLastActiveAt + clockSkewToleranceMs;
 
   // Upgrades detection
   const hasUpgrades =
@@ -504,11 +490,6 @@ export function calculateProgressDiff(
 }
 
 /**
- * Semantic alias for calculateProgressDiff to support alternative naming conventions.
- */
-export const createProgressDiffPreview = calculateProgressDiff;
-
-/**
  * Default implementation of ProgressMergeEngine interface.
  */
 export class DefaultProgressMergeEngine implements ProgressMergeEngine {
@@ -524,8 +505,9 @@ export class DefaultProgressMergeEngine implements ProgressMergeEngine {
   public calculateDiff(
     local: UnifiedProgressPayload,
     incoming: UnifiedProgressPayload,
+    clockSkewToleranceMs?: number,
   ): ProgressDiffPreview {
-    return calculateProgressDiff(local, incoming);
+    return calculateProgressDiff(local, incoming, clockSkewToleranceMs);
   }
 }
 
@@ -533,4 +515,3 @@ export class DefaultProgressMergeEngine implements ProgressMergeEngine {
  * Singleton instance of DefaultProgressMergeEngine.
  */
 export const defaultProgressMergeEngine = new DefaultProgressMergeEngine();
-export const progressMergeEngine = defaultProgressMergeEngine;

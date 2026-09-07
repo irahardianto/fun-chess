@@ -508,6 +508,20 @@ export interface ThemeMasteryProgress {
 }
 
 /**
+ * Calculates user mastery level from total solved puzzles.
+ * - master: >= 20 solved
+ * - apprentice: >= 8 solved
+ * - novice: < 8 solved
+ */
+export function calculateMasteryLevel(
+  solved: number,
+): "novice" | "apprentice" | "master" {
+  if (solved >= 20) return "master";
+  if (solved >= 8) return "apprentice";
+  return "novice";
+}
+
+/**
  * High scores record for arcade modes.
  */
 export interface PuzzleArcadeStats {

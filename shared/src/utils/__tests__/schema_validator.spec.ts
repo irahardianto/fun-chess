@@ -359,4 +359,150 @@ describe("Schema Validator (Defensive Validation, Sanitization & Clamping)", () 
       expect(() => assertValidProgress(null)).toThrow();
     });
   });
+
+  describe("Prototype Pollution Prevention (MAJ-003)", () => {
+    it("sanitizes/rejects forbidden prototype property names in scenarioId, theme, puzzleId, and clientVersion without polluting Object.prototype", () => {
+      const maliciousPayload = {
+        version: 1,
+        exportedAt: 1700000000000,
+        clientVersion: "__proto__",
+        scenarios: {
+          __proto__: {
+            scenarioId: "__proto__",
+            starsEarned: 3,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 1700000000000,
+            lastCompletedAt: 1700000000000,
+          },
+          constructor: {
+            scenarioId: "constructor",
+            starsEarned: 2,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 1700000000000,
+            lastCompletedAt: 1700000000000,
+          },
+          prototype: {
+            scenarioId: "prototype",
+            starsEarned: 1,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 1700000000000,
+            lastCompletedAt: 1700000000000,
+          },
+        },
+        puzzles: {
+          themeMastery: {
+            __proto__: {
+              theme: "__proto__",
+              attempted: 10,
+              solved: 5,
+              starsEarned: 10,
+              lastPracticedAt: 1700000000000,
+            },
+            constructor: {
+              theme: "constructor",
+              attempted: 10,
+              solved: 5,
+              starsEarned: 10,
+              lastPracticedAt: 1700000000000,
+            },
+            prototype: {
+              theme: "prototype",
+              attempted: 10,
+              solved: 5,
+              starsEarned: 10,
+              lastPracticedAt: 1700000000000,
+            },
+          },
+          solvedPuzzles: {
+            __proto__: { stars: 3, solvedAt: 1700000000000 },
+            constructor: { stars: 2, solvedAt: 1700000000000 },
+            prototype: { stars: 1, solvedAt: 1700000000000 },
+          },
+        },
+      };
+
+      const result = validator.sanitizeAndValidate(maliciousPayload);
+      expect(result.success).toBe(true);
+
+      // Verify Object.prototype is unpolluted
+      expect((Object.prototype as Record<string, unknown>)["polluted"]).toBeUndefined();
+      expect(Object.prototype.hasOwnProperty("scenarioId")).toBe(false);
+      expect(Object.prototype.hasOwnProperty("starsEarned")).toBe(false);
+
+      // Verify clientVersion with forbidden name is omitted
+      expect(result.data?.clientVersion).toBeUndefined();
+
+      // Verify scenarios with forbidden names are filtered out
+      expect(Object.keys(result.data?.scenarios ?? {})).toHaveLength(0);
+
+      // Verify themeMastery and solvedPuzzles with forbidden names are filtered out
+      expect(Object.keys(result.data?.puzzles.themeMastery ?? {})).toHaveLength(0);
+      expect(Object.keys(result.data?.puzzles.solvedPuzzles ?? {})).toHaveLength(0);
+    });
+  });
+
+  describe("Parameterization of System Clock (ENH-007)", () => {
+    it("deterministically clamps future timestamps to referenceNowMs + 86400000", () => {
+      const referenceNowMs = 1700000000000;
+      const maxAllowed = referenceNowMs + 86400000;
+      const farFutureTimestamp = referenceNowMs + 86400000 + 5000000; // Far beyond buffer
+
+      const futurePayload = {
+        ...createCleanPayload(),
+        exportedAt: farFutureTimestamp,
+        scenarios: {
+          "lesson-1": {
+            scenarioId: "lesson-1",
+            starsEarned: 3,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: referenceNowMs + 10000, // Valid (within buffer)
+            lastCompletedAt: farFutureTimestamp, // Beyond buffer
+          },
+        },
+        puzzles: {
+          ...createCleanPayload().puzzles,
+          lastActiveAt: farFutureTimestamp,
+          solvedPuzzles: {
+            puz_001: {
+              stars: 3,
+              solvedAt: farFutureTimestamp,
+            },
+          },
+          themeMastery: {
+            fork: {
+              theme: "fork",
+              attempted: 10,
+              solved: 8,
+              starsEarned: 15,
+              masteryLevel: "apprentice",
+              lastPracticedAt: farFutureTimestamp,
+            },
+          },
+        },
+      };
+
+      const result = validator.sanitizeAndValidate(futurePayload, referenceNowMs);
+      expect(result.success).toBe(true);
+      expect(result.data?.exportedAt).toBe(maxAllowed);
+      expect(result.data?.scenarios["lesson-1"]?.lastCompletedAt).toBe(maxAllowed);
+      expect(result.data?.scenarios["lesson-1"]?.firstCompletedAt).toBe(referenceNowMs + 10000);
+      expect(result.data?.puzzles.lastActiveAt).toBe(maxAllowed);
+      expect(result.data?.puzzles.solvedPuzzles["puz_001"]?.solvedAt).toBe(maxAllowed);
+      expect(result.data?.puzzles.themeMastery["fork"]?.lastPracticedAt).toBe(maxAllowed);
+
+      // Verify assertValid with referenceNowMs
+      const asserted = validator.assertValid(futurePayload, referenceNowMs);
+      expect(asserted.exportedAt).toBe(maxAllowed);
+
+      // Verify functional helpers with referenceNowMs
+      const fnResult = sanitizeAndValidateProgress(futurePayload, referenceNowMs);
+      expect(fnResult.data?.exportedAt).toBe(maxAllowed);
+      const fnAsserted = assertValidProgress(futurePayload, referenceNowMs);
+      expect(fnAsserted.exportedAt).toBe(maxAllowed);
+    });
+  });
 });

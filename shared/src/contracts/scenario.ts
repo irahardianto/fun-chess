@@ -171,6 +171,11 @@ export interface ScenarioProgressStore {
   ): Promise<ScenarioProgress>;
   /** Clears all progress records (reset progress) */
   resetAllProgress(): Promise<void>;
+  /**
+   * Restores full scenario progress map in bulk.
+   * Used during backup restoration and unified storage two-phase commit.
+   */
+  restoreProgressMap?(map: ScenarioProgressMap): Promise<void>;
 }
 
 /**

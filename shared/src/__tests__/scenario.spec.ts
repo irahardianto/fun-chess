@@ -346,6 +346,9 @@ describe("Expanded Academy & Scenario Curriculum Contracts", () => {
         async resetAllProgress(): Promise<void> {
           storeMap = {};
         },
+        async restoreProgressMap(map: ScenarioProgressMap): Promise<void> {
+          storeMap = { ...map };
+        },
       };
 
       const initialMap = await testStore.getProgressMap();
@@ -358,6 +361,24 @@ describe("Expanded Academy & Scenario Curriculum Contracts", () => {
 
       const retrieved = await testStore.getProgress("anastasia-mate-01");
       expect(retrieved?.starsEarned).toBe(3);
+
+      // Verify restoreProgressMap restores full progress map in bulk
+      const bulkMap: ScenarioProgressMap = {
+        "restored-lesson-1": {
+          scenarioId: "restored-lesson-1",
+          starsEarned: 3,
+          attemptsCount: 5,
+          hintsUsedTotal: 2,
+          firstCompletedAt: 1699990000000,
+          lastCompletedAt: 1700000000000,
+        },
+      };
+      await testStore.restoreProgressMap(bulkMap);
+      const restored = await testStore.getProgressMap();
+      expect(restored["restored-lesson-1"]?.attemptsCount).toBe(5);
+      expect(restored["restored-lesson-1"]?.starsEarned).toBe(3);
+      expect(restored["restored-lesson-1"]?.firstCompletedAt).toBe(1699990000000);
+      expect(restored["anastasia-mate-01"]).toBeUndefined();
 
       await testStore.resetAllProgress();
       const resetMap = await testStore.getProgressMap();

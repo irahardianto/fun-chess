@@ -4,10 +4,24 @@ import {
   calculateMaterialAndCaptures,
   isPawnPromotion,
   createInitialGameState,
+  STANDARD_PIECE_POINTS,
 } from "../chess_evaluation.js";
 import { DEFAULT_CHESS_FEN } from "../chess_factory.js";
 
 describe("chess_evaluation utils", () => {
+  describe("STANDARD_PIECE_POINTS", () => {
+    it("exports standard chess piece point values: { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 }", () => {
+      expect(STANDARD_PIECE_POINTS).toEqual({
+        p: 1,
+        n: 3,
+        b: 3,
+        r: 5,
+        q: 9,
+        k: 0,
+      });
+    });
+  });
+
   describe("calculateMaterialAndCaptures", () => {
     it("returns empty captures and zero material advantage for starting position", () => {
       const chess = new Chess();

@@ -81,6 +81,7 @@ import {
   // Schemas
   RoomCodeSchema,
   PlayerNameSchema,
+  AvatarEmojiSchema,
   CreateRoomRequestSchema,
   JoinRoomRequestSchema,
   ReconnectRequestSchema,
@@ -282,6 +283,34 @@ describe("Shared Contracts & Data Model Specification", () => {
         expect(() => PlayerNameSchema.parse("")).toThrow();
         expect(() => PlayerNameSchema.parse("   ")).toThrow();
         expect(() => PlayerNameSchema.parse("A".repeat(21))).toThrow();
+      });
+    });
+
+    describe("AvatarEmojiSchema", () => {
+      it("accepts valid emoji characters", () => {
+        const validEmojis = ["🦁", "🚀", "🦄", "⚡", "👑", "🐼"];
+        for (const emoji of validEmojis) {
+          expect(AvatarEmojiSchema.parse(emoji)).toBe(emoji);
+        }
+      });
+
+      it("accepts undefined and defaults to 🦁", () => {
+        expect(AvatarEmojiSchema.parse(undefined)).toBe("🦁");
+      });
+
+      it("rejects ASCII control characters and non-printable sequences", () => {
+        const invalidInputs = [
+          "🦁\x00",
+          "\x1F",
+          "🚀\x7F",
+          "test\n",
+          "\t",
+          "avatar\x08",
+          "\x9F",
+        ];
+        for (const input of invalidInputs) {
+          expect(() => AvatarEmojiSchema.parse(input)).toThrow();
+        }
       });
     });
 
