@@ -106,6 +106,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // PERF: Partition stable framework dependencies to maximize long-term browser cache hit rates (HIGH-004)
+          if (id.includes('node_modules/vue') || id.includes('node_modules/@vue/')) {
+            return 'vendor-vue';
+          }
+          if (id.includes('node_modules/zod')) {
+            return 'vendor-zod';
+          }
           if (id.includes('node_modules/chess.js')) {
             return 'vendor-chess';
           }

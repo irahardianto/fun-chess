@@ -1,0 +1,29 @@
+# Node dependencies and artifacts
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+
+# Testing and coverage
+coverage
+**/coverage
+test-results
+**/test-results
+playwright-report
+**/playwright-report
+
+# Git and agents
+.git
+.github
+.agentwork
+.agents
+.system_generated
+
+# Local logs and environment
+*.log
+.env
+.env.local
+.env.*.local
+.DS_Store

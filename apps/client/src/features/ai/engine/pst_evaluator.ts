@@ -4,9 +4,7 @@ import { createSafeChess } from '@fun-chess/shared';
 import {
   PIECE_VALUES,
   DEFAULT_PST_TABLES,
-  getPieceSquareValue,
   getPieceSquareValueByIndex,
-  indexToSquare,
 } from './piece_square_tables.js';
 
 export const CHECKMATE_SCORE = 100000;
