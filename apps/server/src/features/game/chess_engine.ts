@@ -59,7 +59,7 @@ export class ChessEngine {
     let chess: Chess;
     try {
       chess = new Chess(currentFen);
-    } catch {
+    } catch (err: unknown) {
       return { success: false, error: "Invalid board FEN string" };
     }
 
@@ -99,6 +99,7 @@ export class ChessEngine {
         chess,
         { from: result.from, to: result.to },
         updatedHistory,
+        currentHistory.length === 0 ? currentFen : undefined,
       );
 
       return { success: true, nextState, moveResult };
@@ -117,15 +118,18 @@ export class ChessEngine {
     chess: Chess,
     lastMove: { from: string; to: string } | null,
     moveHistory: MoveResult[] = [],
+    initialFen?: string,
   ): GameState {
     const fen = chess.fen();
     const turn = chess.turn() as PieceColor;
     const isCheck = chess.inCheck();
-    const isCheckmate = chess.isGameOver() && isCheck;
-    const isStalemate = chess.isStalemate();
+    // PERF: Checkmate requires check; Stalemate requires NO check. Avoids redundant legal move generation.
+    const isCheckmate = isCheck && chess.isGameOver();
+    const isStalemate = !isCheck && chess.isStalemate();
     const isThreefoldRepetition = this.isThreefoldRepetition(
       chess,
       moveHistory,
+      initialFen,
     );
     const isInsufficientMaterial = chess.isInsufficientMaterial();
 
@@ -251,13 +255,28 @@ export class ChessEngine {
     };
   }
 
+  // PERF: Standard starting position normalized signature constant. Avoids replaying all moves on new Chess().
+  private static readonly STANDARD_START_NORMALIZED_FEN =
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -";
+
   /**
    * Normalizes a FEN string to its position signature:
    * piece placement + active color + castling availability + en passant target square
    * (the first 4 whitespace-separated tokens of the FEN string).
    */
   public static normalizeFen(fen: string): string {
-    return fen.trim().split(/\s+/).slice(0, 4).join(" ");
+    // PERF: Fast linear scan to find 4th space delimiter, avoiding regex split(/\s+/) array allocations.
+    let spaces = 0;
+    const trimmed = fen.trim();
+    for (let i = 0; i < trimmed.length; i++) {
+      if (trimmed[i] === " ") {
+        spaces++;
+        if (spaces === 4) {
+          return trimmed.slice(0, i);
+        }
+      }
+    }
+    return trimmed;
   }
 
   /**
@@ -267,6 +286,7 @@ export class ChessEngine {
   public static isThreefoldRepetition(
     chess: Chess,
     moveHistory: MoveResult[] = [],
+    initialFen?: string,
   ): boolean {
     if (chess.isThreefoldRepetition()) {
       return true;
@@ -276,36 +296,16 @@ export class ChessEngine {
       return false;
     }
 
-    const positions: string[] = [];
-
-    // Attempt to reconstruct the initial starting position if moveHistory is from standard start
-    try {
-      const replay = new Chess();
-      let replayValid = true;
-      for (const m of moveHistory) {
-        const res = replay.move({
-          from: m.from as ChessJsSquare,
-          to: m.to as ChessJsSquare,
-          promotion: m.promotion,
-        });
-        if (!res) {
-          replayValid = false;
-          break;
-        }
-      }
-      if (replayValid) {
-        positions.push(this.normalizeFen(new Chess().fen()));
-      }
-    } catch {
-      // Replay failed or non-standard start
-    }
-
-    for (const m of moveHistory) {
-      positions.push(this.normalizeFen(m.fen));
-    }
+    // PERF: O(1) starting position signature instead of replaying the entire history on new Chess()
+    const startPos = initialFen
+      ? this.normalizeFen(initialFen)
+      : this.STANDARD_START_NORMALIZED_FEN;
 
     const counts = new Map<string, number>();
-    for (const pos of positions) {
+    counts.set(startPos, 1);
+
+    for (let i = 0; i < moveHistory.length; i++) {
+      const pos = this.normalizeFen(moveHistory[i]!.fen);
       const count = (counts.get(pos) || 0) + 1;
       if (count >= 3) {
         return true;
