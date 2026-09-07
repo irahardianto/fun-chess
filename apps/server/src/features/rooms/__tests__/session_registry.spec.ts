@@ -336,4 +336,55 @@ describe("InMemorySessionRegistry", () => {
       ).toBeNull();
     });
   });
+
+  describe("updateSessionColor", () => {
+    it("updates player session color and refreshes lastSeenAt", async () => {
+      const created = await registry.createSession({
+        playerId: "p-color-test",
+        roomCode: "COLR",
+        color: "w",
+        isHost: true,
+        socketId: "sock-1",
+      });
+
+      expect(created.color).toBe("w");
+
+      await registry.updateSessionColor("colr", "p-color-test", "b");
+
+      const validated = await registry.validateSession(
+        created.sessionToken,
+        "COLR",
+        "p-color-test",
+      );
+      expect(validated).not.toBeNull();
+      expect(validated?.color).toBe("b");
+    });
+
+    it("no-ops safely if player or room is not found in playerIndex", async () => {
+      await expect(
+        registry.updateSessionColor("NONE", "p-unknown", "b"),
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe("Clock and IdGenerator injection (MAJ-012)", () => {
+    it("uses injected IClock and IIdGenerator", async () => {
+      const fixedTime = 1700000000000;
+      const mockClock = { now: () => fixedTime };
+      const mockIdGen = { generateId: () => "mocked-uuid-token" };
+
+      const customRegistry = new InMemorySessionRegistry(mockClock, mockIdGen);
+      const record = await customRegistry.createSession({
+        playerId: "p-custom",
+        roomCode: "CUST",
+        color: "w",
+        isHost: true,
+        socketId: "sock-c",
+      });
+
+      expect(record.sessionToken).toBe("mocked-uuid-token");
+      expect(record.createdAt).toBe(fixedTime);
+      expect(record.lastSeenAt).toBe(fixedTime);
+    });
+  });
 });

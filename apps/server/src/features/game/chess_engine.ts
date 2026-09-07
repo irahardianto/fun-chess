@@ -1,4 +1,4 @@
-import { Chess, Square as ChessJsSquare } from "chess.js";
+import { Chess, Move, Square as ChessJsSquare } from "chess.js";
 import {
   GameState,
   MovePayload,
@@ -25,25 +25,37 @@ export interface ValidationFailure {
 
 export type MoveValidationOutcome = ValidationSuccess | ValidationFailure;
 
+export type MoveValidationResult =
+  | { success: true; chess: Chess; moveResultObj: Move }
+  | { success: false; error: string };
+
+export interface MoveApplicationOutcome {
+  nextState: GameState;
+  moveResult: MoveResult;
+}
+
 /**
  * Server-authoritative pure chess engine wrapper around chess.js.
  * Encapsulates rule validation, state extraction, check detection, and material balance calculations.
  */
 export class ChessEngine {
   /**
-   * Validates and applies a move to the current FEN board state.
+   * Pure move validation verifying legality, turn matching, and FEN integrity.
+   *
+   * @param currentFen - Current FEN board state string
+   * @param move - Proposed move coordinates and optional promotion piece
+   * @param expectedTurn - Active player piece color ('w' or 'b')
+   * @returns MoveValidationResult containing hydrated Chess instance and Move object on success, or error reason on failure
    */
-  public static validateAndApplyMove(
+  public static validateMove(
     currentFen: string,
     move: MovePayload,
     expectedTurn: PieceColor,
-    currentHistory: MoveResult[] = [],
-    timestamp: number = Date.now(),
-  ): MoveValidationOutcome {
+  ): MoveValidationResult {
     let chess: Chess;
     try {
       chess = new Chess(currentFen);
-    } catch (err: unknown) {
+    } catch {
       return { success: false, error: "Invalid board FEN string" };
     }
 
@@ -62,37 +74,86 @@ export class ChessEngine {
         return { success: false, error: "Illegal move" };
       }
 
-      const moveResult: MoveResult = {
-        from: result.from,
-        to: result.to,
-        san: result.san,
-        piece: result.piece as PieceType,
-        color: result.color as PieceColor,
-        captured: result.captured ? (result.captured as PieceType) : undefined,
-        promotion: result.promotion
-          ? (result.promotion as PieceType)
-          : undefined,
-        flags: result.flags,
-        fen: chess.fen(),
-        moveNumber: currentHistory.length + 1,
-        timestamp,
-      };
-
-      const updatedHistory = [...currentHistory, moveResult];
-      const nextState = this.extractGameState(
-        chess,
-        { from: result.from, to: result.to },
-        updatedHistory,
-        currentHistory.length === 0 ? currentFen : undefined,
-      );
-
-      return { success: true, nextState, moveResult };
+      return { success: true, chess, moveResultObj: result };
     } catch (err: unknown) {
       return {
         success: false,
         error: (err as Error).message || "Invalid move coordinates",
       };
     }
+  }
+
+  /**
+   * Pure state application transforming a validated Chess instance and Move object into GameState and MoveResult.
+   *
+   * @param chess - Mutated Chess instance after move execution
+   * @param moveResultObj - Move metadata object returned by chess.js move()
+   * @param currentHistory - Existing move history records
+   * @param timestamp - Timestamp ms when move was accepted
+   * @param initialFen - Optional initial FEN for repetition tracking
+   * @returns MoveApplicationOutcome containing nextState and moveResult
+   */
+  public static applyMove(
+    chess: Chess,
+    moveResultObj: Move,
+    currentHistory: MoveResult[] = [],
+    timestamp: number = Date.now(),
+    initialFen?: string,
+  ): MoveApplicationOutcome {
+    const moveResult: MoveResult = {
+      from: moveResultObj.from,
+      to: moveResultObj.to,
+      san: moveResultObj.san,
+      piece: moveResultObj.piece as PieceType,
+      color: moveResultObj.color as PieceColor,
+      captured: moveResultObj.captured
+        ? (moveResultObj.captured as PieceType)
+        : undefined,
+      promotion: moveResultObj.promotion
+        ? (moveResultObj.promotion as PieceType)
+        : undefined,
+      flags: moveResultObj.flags,
+      fen: chess.fen(),
+      moveNumber: currentHistory.length + 1,
+      timestamp,
+    };
+
+    const updatedHistory = [...currentHistory, moveResult];
+    const nextState = this.extractGameState(
+      chess,
+      { from: moveResultObj.from, to: moveResultObj.to },
+      updatedHistory,
+      initialFen ?? (currentHistory.length === 0 ? moveResultObj.before : undefined),
+    );
+
+    return { nextState, moveResult };
+  }
+
+  /**
+   * Validates and applies a move to the current FEN board state.
+   * Delegates to pure validateMove and applyMove methods to preserve backwards compatibility.
+   */
+  public static validateAndApplyMove(
+    currentFen: string,
+    move: MovePayload,
+    expectedTurn: PieceColor,
+    currentHistory: MoveResult[] = [],
+    timestamp: number = Date.now(),
+  ): MoveValidationOutcome {
+    const validation = this.validateMove(currentFen, move, expectedTurn);
+    if (!validation.success) {
+      return validation;
+    }
+
+    const { nextState, moveResult } = this.applyMove(
+      validation.chess,
+      validation.moveResultObj,
+      currentHistory,
+      timestamp,
+      currentHistory.length === 0 ? currentFen : undefined,
+    );
+
+    return { success: true, nextState, moveResult };
   }
 
   /**

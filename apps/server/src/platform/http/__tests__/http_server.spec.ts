@@ -105,7 +105,7 @@ describe("createHttpServer", () => {
     expect(data.isCloudRelay).toBe(false);
   });
 
-  it("handles CORS OPTIONS preflight with 204 No Content for allowed origin", async () => {
+  it("handles CORS OPTIONS preflight with 204 No Content for allowed origin and logs success (MAJ-014)", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
       method: "OPTIONS",
       headers: { Origin: "http://localhost:5173" },
@@ -113,14 +113,29 @@ describe("createHttpServer", () => {
     expect(res.status).toBe(204);
     expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
     expect(res.headers.get("access-control-allow-methods")).toContain("GET");
+
+    const preflightLog = logger.infoLogs.find(
+      (l) => l.context?.["operation"] === "http_options_preflight" && l.context?.["status"] === "success",
+    );
+    expect(preflightLog).toBeDefined();
+    expect(preflightLog?.context?.["origin"]).toBe("http://localhost:5173");
+    expect(preflightLog?.context?.["correlationId"]).toBeDefined();
+    expect(preflightLog?.context?.["duration"]).toBeTypeOf("number");
   });
 
-  it("blocks CORS OPTIONS preflight with 403 for disallowed origin", async () => {
+  it("blocks CORS OPTIONS preflight with 403 for disallowed origin and logs rejection (MAJ-014)", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
       method: "OPTIONS",
       headers: { Origin: "https://evil-hacker.com" },
     });
     expect(res.status).toBe(403);
+
+    const rejectLog = logger.warnLogs.find(
+      (l) => l.context?.["operation"] === "http_options_preflight" && l.context?.["status"] === "rejected",
+    );
+    expect(rejectLog).toBeDefined();
+    expect(rejectLog?.context?.["origin"]).toBe("https://evil-hacker.com");
+    expect(rejectLog?.context?.["correlationId"]).toBeDefined();
   });
 
   it("does not emit Access-Control-Allow-Origin when Origin header is missing (MAJ-005)", async () => {
@@ -257,7 +272,19 @@ describe("createHttpServer", () => {
     expect(staticLog?.context?.["duration"]).toBeTypeOf("number");
   });
 
-  it("responds with 404 JSON for unsupported API / non-existent endpoints", async () => {
+  it("logs client IP in HTTP request entry log (ENH-008)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+    expect(res.status).toBe(200);
+
+    const entryLog = logger.infoLogs.find(
+      (l) => l.context?.["operation"] === "http_request" && l.context?.["path"] === "/healthz",
+    );
+    expect(entryLog).toBeDefined();
+    expect(entryLog?.context?.["clientIp"]).toBeDefined();
+    expect(typeof entryLog?.context?.["clientIp"]).toBe("string");
+  });
+
+  it("responds with 404 JSON with standardized error envelope (MIN-032)", async () => {
     const res = await fetch(
       `http://127.0.0.1:${port}/api/non-existent-endpoint`,
       {
@@ -266,9 +293,94 @@ describe("createHttpServer", () => {
     );
     expect(res.status).toBe(404);
     const json = (await res.json()) as {
+      status: string;
       error: { code: string; message: string };
+      correlationId: string;
     };
+    expect(json.status).toBe("error");
     expect(json.error.code).toBe("ERR_NOT_FOUND");
+    expect(json.error.message).toContain("Cannot POST /api/non-existent-endpoint");
+    expect(json.correlationId).toBeDefined();
+  });
+
+  it("enforces rate limiting on native HTTP endpoints (MIN-002)", async () => {
+    const { HttpRateLimiter } = await import("../http_rate_limiter.js");
+    const rateLimitedHandler = createHttpServer({
+      roomStore: store,
+      logger: new NullLogger(),
+      rateLimiter: new HttpRateLimiter({
+        maxRequests: 2,
+        windowMs: 10_000,
+      }),
+      allowedOrigins: ["*"],
+    });
+
+    const rlServer = http.createServer(rateLimitedHandler);
+    let rlPort = 0;
+    await new Promise<void>((resolve) =>
+      rlServer.listen(0, "127.0.0.1", () => {
+        rlPort = (rlServer.address() as any).port;
+        resolve();
+      }),
+    );
+
+    try {
+      // 1st request succeeds
+      const res1 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
+      expect(res1.status).toBe(200);
+
+      // 2nd request succeeds
+      const res2 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
+      expect(res2.status).toBe(200);
+
+      // 3rd request rate limited (429)
+      const res3 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
+      expect(res3.status).toBe(429);
+      const data = (await res3.json()) as any;
+      expect(data.status).toBe("error");
+      expect(data.error?.code).toBe("ERR_RATE_LIMITED");
+    } finally {
+      await new Promise<void>((resolve) => rlServer.close(() => resolve()));
+    }
+  });
+
+  it("redacts process memory telemetry on /health in production mode (MIN-001)", async () => {
+    const prodHandler = createHttpServer({
+      roomStore: store,
+      logger: new NullLogger(),
+      env: {
+        NODE_ENV: "production",
+        PORT: 3000,
+        HOST: "0.0.0.0",
+        LOG_LEVEL: "info",
+        CORS_ORIGIN: "https://fun-chess.com",
+      },
+      allowedOrigins: ["https://fun-chess.com"],
+    });
+
+    const prodServer = http.createServer(prodHandler);
+    let prodPort = 0;
+    await new Promise<void>((resolve) =>
+      prodServer.listen(0, "127.0.0.1", () => {
+        prodPort = (prodServer.address() as any).port;
+        resolve();
+      }),
+    );
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${prodPort}/health`);
+      expect(res.status).toBe(200);
+      const data = (await res.json()) as HealthCheckResponse;
+      expect(data.status).toBe("ok");
+      // Memory telemetry must be redacted in production
+      expect(data.memoryUsageMb).toEqual({
+        rss: 0,
+        heapTotal: 0,
+        heapUsed: 0,
+      });
+    } finally {
+      await new Promise<void>((resolve) => prodServer.close(() => resolve()));
+    }
   });
 
   describe("Cloud Relay Mode", () => {

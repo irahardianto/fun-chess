@@ -11,6 +11,7 @@ import {
   createGameOverPayload,
 } from "@fun-chess/shared";
 import { RoomStore } from "./room.store.js";
+import { IRoomService } from "./room.interface.js";
 import { SessionRegistry } from "./session_registry.js";
 import { InMemorySessionRegistry } from "./in_memory_session_registry.js";
 import {
@@ -20,10 +21,10 @@ import {
   UuidGenerator,
 } from "./clock.js";
 import {
-  IDisconnectTimerRegistry,
+  type IDisconnectTimerRegistry,
   defaultDisconnectTimerRegistry,
   cancelAllDisconnectTimersForRoom,
-} from "./room.socket_handler.js";
+} from "./disconnect_timer_registry.js";
 import {
   RoomNotFoundError,
   RoomFullError,
@@ -39,7 +40,7 @@ const ROOM_CODE_LENGTH = 4;
 /**
  * Service coordinating room creation, player joining, reconnection, and session lifecycle.
  */
-export class RoomService {
+export class RoomService implements IRoomService {
   constructor(
     private readonly store: RoomStore,
     private readonly sessionRegistry: SessionRegistry = new InMemorySessionRegistry(),
@@ -94,6 +95,7 @@ export class RoomService {
 
     const newRoom: RoomState = {
       roomCode,
+      version: 1,
       status: "lobby",
       hostId: playerId,
       whitePlayer: hostColor === "w" ? hostPlayer : null,
@@ -326,8 +328,7 @@ export class RoomService {
 
       const shouldDelete =
         leavingPlayer.isHost ||
-        (!room.whitePlayer && !room.blackPlayer) ||
-        room.status === "lobby";
+        (!room.whitePlayer && !room.blackPlayer);
 
       if (shouldDelete) {
         await this.store.delete(normalizedCode);
@@ -359,6 +360,7 @@ export class RoomService {
       if (!room) return null;
 
       let droppedPlayer: Player | null = null;
+      let isSpectator = false;
 
       if (room.whitePlayer?.id === playerId) {
         room.whitePlayer.isConnected = false;
@@ -371,13 +373,20 @@ export class RoomService {
         if (spectator) {
           spectator.isConnected = false;
           droppedPlayer = spectator;
+          isSpectator = true;
         }
       }
 
       if (!droppedPlayer) return null;
 
-      const wasActiveGame = room.status === "playing";
-      if (wasActiveGame) {
+      const isActivePlayer = !isSpectator;
+      let wasActiveGame = false;
+
+      if (
+        isActivePlayer &&
+        (room.status === "playing" || room.status === "paused_disconnect")
+      ) {
+        wasActiveGame = true;
         room.status = "paused_disconnect";
       }
 

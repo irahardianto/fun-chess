@@ -12,7 +12,7 @@ export interface SessionRecord {
   /** Normalized 4-letter uppercase room code */
   readonly roomCode: string;
   /** Assigned player piece color */
-  readonly color: PieceColor;
+  color: PieceColor;
   /** Indicates whether player is the room creator */
   readonly isHost: boolean;
   /** Current active socket connection ID */
@@ -72,6 +72,15 @@ export interface SessionRegistry {
    * Purges all expired sessions past their expiresAt threshold.
    */
   cleanupExpiredSessions(): Promise<number>;
+
+  /**
+   * Updates the assigned piece color for a player's session (e.g. on rematch color inversion).
+   */
+  updateSessionColor(
+    roomCode: string,
+    playerId: string,
+    newColor: PieceColor,
+  ): Promise<void>;
 
   /**
    * Completely clears all sessions (for graceful shutdown and test isolation).

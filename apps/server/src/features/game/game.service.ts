@@ -17,7 +17,7 @@ import {
   InvalidMoveError,
   InvalidPayloadError,
 } from "@fun-chess/shared";
-import { RoomStore } from "../rooms/index.js";
+import { RoomStore, type SessionRegistry } from "../rooms/index.js";
 import { ChessEngine } from "./chess_engine.js";
 import {
   IClock,
@@ -25,24 +25,37 @@ import {
   IIdGenerator,
   UuidGenerator,
 } from "./clock.js";
+import {
+  IGameService,
+  MoveApplicationResult,
+} from "./game.interface.js";
 
-export interface MoveApplicationResult {
-  room: RoomState;
-  moveResult: MoveResult;
-  gameState: GameState;
-  checkInfo?: { inCheck: PieceColor; kingSquare: string };
-  gameOverPayload?: GameOverPayload;
-}
+export type { MoveApplicationResult };
 
 /**
  * Service orchestrating chess game actions (moves, resignations, draws, and rematches).
  */
-export class GameService {
+export class GameService implements IGameService {
+  private readonly clock: IClock;
+  private readonly idGenerator: IIdGenerator;
+  private readonly sessionRegistry?: SessionRegistry;
+
   constructor(
     private readonly store: RoomStore,
-    private readonly clock: IClock = new SystemClock(),
-    private readonly idGenerator: IIdGenerator = new UuidGenerator(),
-  ) {}
+    clock?: IClock | SessionRegistry,
+    idGenerator?: IIdGenerator,
+    sessionRegistry?: SessionRegistry,
+  ) {
+    if (clock && ("createSession" in clock || "validateSession" in clock)) {
+      this.sessionRegistry = clock as SessionRegistry;
+      this.clock = new SystemClock();
+      this.idGenerator = new UuidGenerator();
+    } else {
+      this.clock = (clock as IClock) ?? new SystemClock();
+      this.idGenerator = idGenerator ?? new UuidGenerator();
+      this.sessionRegistry = sessionRegistry;
+    }
+  }
 
   /**
    * Validates and applies a move from a player socket.
@@ -208,7 +221,7 @@ export class GameService {
       const opponent =
         player.color === "w" ? room.blackPlayer : room.whitePlayer;
 
-      room.drawOffer = { offeredBy: socketId, offeredAt: this.clock.now() };
+      room.drawOffer = { offeredBy: player.id, offeredAt: this.clock.now() };
       room.lastActivityAt = this.clock.now();
 
       return {
@@ -251,7 +264,7 @@ export class GameService {
         throw new GameNotActiveError("No draw offer is currently pending");
       }
 
-      if (room.drawOffer.offeredBy === socketId) {
+      if (room.drawOffer.offeredBy === player.id) {
         throw new InvalidPayloadError(
           "draw",
           "Cannot accept or decline your own draw offer",
@@ -391,6 +404,11 @@ export class GameService {
 
       room.whitePlayer = blackPlayer;
       room.blackPlayer = whitePlayer;
+
+      if (this.sessionRegistry?.updateSessionColor) {
+        await this.sessionRegistry.updateSessionColor(code, whitePlayer.id, "b");
+        await this.sessionRegistry.updateSessionColor(code, blackPlayer.id, "w");
+      }
 
       // Reset board using shared helper
       room.game = createInitialGameState();

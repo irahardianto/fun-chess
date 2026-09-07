@@ -290,4 +290,228 @@ describe("ChessEngine", () => {
       }
     });
   });
+
+  describe("validateMove (MIN-026)", () => {
+    it("validates a legal move and returns hydrated Chess instance and Move object", () => {
+      const initialFen = new Chess().fen();
+      const result = ChessEngine.validateMove(
+        initialFen,
+        { from: "e2", to: "e4" },
+        "w",
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.chess).toBeInstanceOf(Chess);
+        expect(result.chess.fen()).toContain("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -");
+        expect(result.moveResultObj).toBeDefined();
+        expect(result.moveResultObj.from).toBe("e2");
+        expect(result.moveResultObj.to).toBe("e4");
+        expect(result.moveResultObj.san).toBe("e4");
+        expect(result.moveResultObj.color).toBe("w");
+        expect(result.moveResultObj.piece).toBe("p");
+      }
+    });
+
+    it("rejects move when turn does not match expectedTurn", () => {
+      const initialFen = new Chess().fen();
+      const result = ChessEngine.validateMove(
+        initialFen,
+        { from: "e7", to: "e5" },
+        "b",
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe("Not your turn");
+      }
+    });
+
+    it("rejects an illegal move for valid turn", () => {
+      const initialFen = new Chess().fen();
+      const result = ChessEngine.validateMove(
+        initialFen,
+        { from: "e2", to: "e5" },
+        "w",
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain("Invalid move");
+      }
+    });
+
+    it("returns error on malformed FEN string", () => {
+      const result = ChessEngine.validateMove(
+        "totally-invalid-fen-string",
+        { from: "e2", to: "e4" },
+        "w",
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe("Invalid board FEN string");
+      }
+    });
+
+    it("returns error on invalid square coordinates", () => {
+      const initialFen = new Chess().fen();
+      const result = ChessEngine.validateMove(
+        initialFen,
+        { from: "z9" as any, to: "e4" },
+        "w",
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBeDefined();
+      }
+    });
+  });
+
+  describe("applyMove (MIN-026)", () => {
+    it("transforms chess.js move output into GameState and MoveResult with history", () => {
+      const chess = new Chess();
+      const moveObj = chess.move({ from: "e2", to: "e4" });
+      expect(moveObj).toBeDefined();
+
+      const fixedTimestamp = 1750000000000;
+      const { nextState, moveResult } = ChessEngine.applyMove(
+        chess,
+        moveObj!,
+        [],
+        fixedTimestamp,
+      );
+
+      expect(moveResult.from).toBe("e2");
+      expect(moveResult.to).toBe("e4");
+      expect(moveResult.san).toBe("e4");
+      expect(moveResult.color).toBe("w");
+      expect(moveResult.piece).toBe("p");
+      expect(moveResult.moveNumber).toBe(1);
+      expect(moveResult.timestamp).toBe(fixedTimestamp);
+
+      expect(nextState.turn).toBe("b");
+      expect(nextState.lastMove).toEqual({ from: "e2", to: "e4" });
+      expect(nextState.moveCount).toBe(1);
+      expect(nextState.moveHistory).toHaveLength(1);
+      expect(nextState.moveHistory[0]).toEqual(moveResult);
+    });
+
+    it("correctly handles captures and pawn promotions in applyMove", () => {
+      // White pawn on e7 captures black rook on d8 promoting to queen
+      const promoCaptureFen = "3r4/4P3/8/8/8/8/8/K6k w - - 0 1";
+      const chess = new Chess(promoCaptureFen);
+      const moveObj = chess.move({ from: "e7", to: "d8", promotion: "q" });
+      expect(moveObj).toBeDefined();
+
+      const { nextState, moveResult } = ChessEngine.applyMove(
+        chess,
+        moveObj!,
+        [],
+      );
+
+      expect(moveResult.captured).toBe("r");
+      expect(moveResult.promotion).toBe("q");
+      expect(moveResult.san).toContain("exd8=Q");
+      expect(nextState.capturedWhite).toContain("r");
+    });
+  });
+
+  describe("Stalemate, Insufficient Material, and 50-Move Rule (MAJ-033)", () => {
+    it("detects stalemate and extracts GameState correctly", () => {
+      // Black king on a8, White queen on b1, White king on a6 (Black is stalemated)
+      const stalemateFen = "k7/8/K7/8/8/8/8/1Q6 b - - 1 1";
+      const chess = new Chess(stalemateFen);
+      const state = ChessEngine.extractGameState(chess, { from: "b6", to: "a6" });
+
+      expect(state.isStalemate).toBe(true);
+      expect(state.isDraw).toBe(true);
+      expect(state.isCheck).toBe(false);
+      expect(state.isCheckmate).toBe(false);
+    });
+
+    it("applies move resulting in stalemate through validateAndApplyMove", () => {
+      // White king on b6, Queen on b1, Black king on a8 -> White plays Ka6 causing stalemate
+      const preStalemateFen = "k7/8/1K6/8/8/8/8/1Q6 w - - 0 1";
+      const outcome = ChessEngine.validateAndApplyMove(
+        preStalemateFen,
+        { from: "b6", to: "a6" },
+        "w",
+      );
+
+      expect(outcome.success).toBe(true);
+      if (outcome.success) {
+        expect(outcome.nextState.isStalemate).toBe(true);
+        expect(outcome.nextState.isDraw).toBe(true);
+        expect(outcome.nextState.isCheck).toBe(false);
+        expect(outcome.nextState.isCheckmate).toBe(false);
+      }
+    });
+
+    it("detects insufficient material for King and Bishop vs King", () => {
+      const bishopOnlyFen = "8/8/3k4/8/3KB3/8/8/8 b - - 0 1";
+      const chess = new Chess(bishopOnlyFen);
+      const state = ChessEngine.extractGameState(chess, null);
+
+      expect(state.isInsufficientMaterial).toBe(true);
+      expect(state.isDraw).toBe(true);
+    });
+
+    it("detects insufficient material for King and Knight vs King", () => {
+      const knightOnlyFen = "8/8/3k4/8/3KN3/8/8/8 b - - 0 1";
+      const chess = new Chess(knightOnlyFen);
+      const state = ChessEngine.extractGameState(chess, null);
+
+      expect(state.isInsufficientMaterial).toBe(true);
+      expect(state.isDraw).toBe(true);
+    });
+
+    it("applies capture that reduces board to insufficient material", () => {
+      // White bishop captures black's last pawn on d5 leaving King+Bishop vs King
+      const preInsufficientFen = "8/8/3k4/3p4/3KB3/8/8/8 w - - 0 1";
+      const outcome = ChessEngine.validateAndApplyMove(
+        preInsufficientFen,
+        { from: "e4", to: "d5" },
+        "w",
+      );
+
+      expect(outcome.success).toBe(true);
+      if (outcome.success) {
+        expect(outcome.nextState.isInsufficientMaterial).toBe(true);
+        expect(outcome.nextState.isDraw).toBe(true);
+        expect(outcome.moveResult.captured).toBe("p");
+      }
+    });
+
+    it("detects 50-move rule from FEN halfmove clock at 100", () => {
+      // Halfmove clock token is 100 with material remaining on board
+      const fiftyMoveFen = "r6k/7p/8/8/8/8/P7/R5K1 b - - 100 50";
+      const chess = new Chess(fiftyMoveFen);
+      const state = ChessEngine.extractGameState(chess, null);
+
+      expect(state.isFiftyMoveRule).toBe(true);
+      expect(state.isDraw).toBe(true);
+      expect(state.isInsufficientMaterial).toBe(false);
+      expect(state.isStalemate).toBe(false);
+    });
+
+    it("applies move that reaches 100 halfmove clock triggering 50-move rule draw", () => {
+      // Move 50: halfmove clock at 99, White plays non-pawn, non-capturing move Kg1 (h1 to g1)
+      const preFiftyMoveFen = "r6k/7p/8/8/8/8/P7/R6K w - - 99 50";
+      const outcome = ChessEngine.validateAndApplyMove(
+        preFiftyMoveFen,
+        { from: "h1", to: "g1" },
+        "w",
+      );
+
+      expect(outcome.success).toBe(true);
+      if (outcome.success) {
+        expect(outcome.nextState.isFiftyMoveRule).toBe(true);
+        expect(outcome.nextState.isDraw).toBe(true);
+        expect(outcome.nextState.isInsufficientMaterial).toBe(false);
+        expect(outcome.nextState.isStalemate).toBe(false);
+      }
+    });
+  });
 });

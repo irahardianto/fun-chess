@@ -1,4 +1,5 @@
 import { Server as HttpServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { TypedSocketServer } from "../socket/socket_server.js";
 import { Logger } from "../logger/logger.interface.js";
@@ -17,7 +18,7 @@ export interface ShutdownCoordinatorOptions {
  * Coordinates graceful shutdown, timer disposal, socket draining,
  * and process crash guarding for the Fun Chess server.
  * Ensures active sockets are disconnected and idle connections closed (MAJ-010).
- * Measures and logs shutdown duration (MIN-013).
+ * Measures and logs shutdown duration (MIN-013) with correlation IDs (MAJ-016).
  */
 export class ShutdownCoordinator {
   private isShuttingDown = false;
@@ -58,16 +59,19 @@ export class ShutdownCoordinator {
 
   /**
    * Initiates graceful shutdown sequence.
+   * Accepts optional correlationId, defaulting to randomUUID() (MAJ-016).
    */
-  public async shutdown(signal: string): Promise<void> {
+  public async shutdown(signal: string, correlationId?: string): Promise<void> {
     if (this.isShuttingDown) {
       return;
     }
     this.isShuttingDown = true;
+    const corrId = correlationId ?? randomUUID();
     const startTime = performance.now();
 
     this.logger.info(`Received ${signal}. Shutting down gracefully...`, {
       operation: "server_shutdown",
+      correlationId: corrId,
       signal,
     });
 
@@ -84,6 +88,7 @@ export class ShutdownCoordinator {
       } catch (err) {
         this.logger.error("Error during shutdown cleanup task", {
           operation: "shutdown_cleanup_error",
+          correlationId: corrId,
           error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
         });
       }
@@ -95,6 +100,7 @@ export class ShutdownCoordinator {
         const duration = Math.round(performance.now() - startTime);
         this.logFatal("Forced shutdown due to timeout waiting for connections to close.", {
           operation: "server_shutdown_timeout",
+          correlationId: corrId,
           timeoutMs: this.timeoutMs,
           duration,
           durationMs: duration,
@@ -140,6 +146,7 @@ export class ShutdownCoordinator {
         const duration = Math.round(performance.now() - startTime);
         this.logger.info("Fun Chess server closed successfully.", {
           operation: "server_shutdown_complete",
+          correlationId: corrId,
           duration,
           durationMs: duration,
         });
@@ -153,6 +160,7 @@ export class ShutdownCoordinator {
       const duration = Math.round(performance.now() - startTime);
       this.logFatal("Error closing server during shutdown", {
         operation: "server_shutdown_error",
+        correlationId: corrId,
         duration,
         durationMs: duration,
         error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
@@ -177,6 +185,7 @@ export class ShutdownCoordinator {
     process.on("unhandledRejection", (reason: unknown) => {
       this.logger.error("Unhandled promise rejection", {
         operation: "unhandled_rejection",
+        correlationId: randomUUID(),
         error: reason instanceof Error
           ? { name: reason.name, message: reason.message, stack: reason.stack }
           : { raw: reason },
@@ -184,16 +193,20 @@ export class ShutdownCoordinator {
     });
 
     process.on("uncaughtException", (err: Error) => {
+      const correlationId = randomUUID();
       this.logFatal("Uncaught exception, initiating emergency shutdown", {
         operation: "uncaught_exception",
+        correlationId,
         error: { name: err.name, message: err.message, stack: err.stack },
       });
       void this.shutdown("uncaughtException");
     });
 
     this.server.on("error", (err: Error) => {
+      const correlationId = randomUUID();
       this.logFatal("HTTP server fatal socket error", {
         operation: "server_error",
+        correlationId,
         error: { name: err.name, message: err.message, stack: err.stack },
       });
       void this.shutdown("serverError");

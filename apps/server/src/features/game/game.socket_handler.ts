@@ -1,5 +1,4 @@
 import { Socket } from "socket.io";
-import { randomUUID } from "node:crypto";
 import {
   MakeMoveRequest,
   MakeMoveRequestSchema,
@@ -19,48 +18,91 @@ import { Logger } from "../../platform/logger/logger.interface.js";
 import { wrapSocketHandler } from "../../platform/socket/socket_logging_middleware.js";
 import {
   SocketRateLimiter,
-  extractClientIp,
   createSocketRateLimiter,
 } from "../../platform/socket/socket_rate_limiter.js";
-import { GameService } from "./game.service.js";
+import type { IGameService } from "./game.interface.js";
 import { TypedSocketServer } from "../../platform/socket/socket_server.js";
 import {
-  IDisconnectTimerRegistry,
+  type IDisconnectTimerRegistry,
   defaultDisconnectTimerRegistry,
   cancelAllDisconnectTimersForRoom,
 } from "../rooms/index.js";
 
-function checkGameRateLimit(
-  socket: Socket,
-  rateLimiter: SocketRateLimiter,
+function createGameHandler<TReq, TRes>(
   logger: Logger,
-  operation: string,
-  message: string,
-  callback?: (res: unknown) => void,
-): boolean {
-  const clientIp = extractClientIp(socket);
-  if (!rateLimiter.check(clientIp)) {
-    const correlationId = randomUUID();
-    const errorPayload = {
-      code: "ERR_RATE_LIMITED" as const,
-      message,
-      correlationId,
-    };
-    logger.warn(`Rate limit exceeded for ${operation}`, {
-      operation,
-      correlationId,
-      socketId: socket.id,
-      clientIp,
-      error: { code: "ERR_RATE_LIMITED", message },
-    });
-    if (typeof callback === "function") {
-      callback({ success: false, error: errorPayload });
-    } else {
-      socket.emit("error", errorPayload);
+  operationName: string,
+  socket: Socket,
+  options: { schema: any; rateLimiter: SocketRateLimiter },
+  handler: (req: TReq, context: any) => Promise<TRes>,
+) {
+  const rateLimitLogger: Logger = new Proxy(logger, {
+    get(target, prop, receiver) {
+      if (prop === "warn") {
+        return (msg: string, meta?: Record<string, unknown>) => {
+          target.warn(msg, meta);
+          if (msg === "Operation rate limit exceeded" && meta?.operation) {
+            target.warn(`Rate limit exceeded for ${meta.operation}`, meta);
+          }
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+  const getMessage = (op: string) => {
+    switch (op) {
+      case "game:move":
+        return "Rate limit exceeded for game moves. Maximum 5 requests per 10 seconds allowed.";
+      case "game:resign":
+        return "Rate limit exceeded for game resignation. Maximum 5 requests per 10 seconds allowed.";
+      case "game:offer_draw":
+        return "Rate limit exceeded for draw offers. Maximum 5 requests per 10 seconds allowed.";
+      case "game:respond_draw":
+        return "Rate limit exceeded for draw responses. Maximum 5 requests per 10 seconds allowed.";
+      case "game:request_rematch":
+        return "Rate limit exceeded for rematch requests. Maximum 5 requests per 10 seconds allowed.";
+      case "game:respond_rematch":
+        return "Rate limit exceeded for rematch responses. Maximum 5 requests per 10 seconds allowed.";
+      default:
+        return `Rate limit exceeded for ${op}. Maximum 5 requests per 10 seconds allowed.`;
     }
-    return false;
-  }
-  return true;
+  };
+
+  const proxiedSocket = new Proxy(socket, {
+    get(target, prop, receiver) {
+      if (prop === "emit") {
+        return (event: string, ...args: any[]) => {
+          if (event === "error" && args[0]?.code === "ERR_RATE_LIMITED") {
+            args[0].message = getMessage(operationName);
+          }
+          return (target as any).emit(event, ...args);
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+  const wrapped = wrapSocketHandler<TReq, TRes>(
+    rateLimitLogger,
+    operationName,
+    proxiedSocket,
+    options,
+    handler,
+  );
+
+  return (rawReq: unknown, callback?: (res: any) => void) => {
+    return wrapped(
+      rawReq,
+      callback
+        ? (res: any) => {
+            if (res?.error?.code === "ERR_RATE_LIMITED") {
+              res.error.message = getMessage(operationName);
+            }
+            callback(res);
+          }
+        : undefined,
+    );
+  };
 }
 
 /**
@@ -69,13 +111,13 @@ function checkGameRateLimit(
 export function registerGameSocketHandlers(
   io: TypedSocketServer,
   socket: Socket,
-  gameService: GameService,
+  gameService: IGameService,
   logger: Logger,
   rateLimiter: SocketRateLimiter = createSocketRateLimiter(),
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
 ): void {
   // 1. game:move
-  const handleMove = wrapSocketHandler<
+  const handleMove = createGameHandler<
     MakeMoveRequest,
     { success: true; moveResult: MoveResult }
   >(
@@ -108,27 +150,10 @@ export function registerGameSocketHandlers(
     },
   );
 
-  socket.on(
-    "game:move",
-    async (rawReq: unknown, callback?: (res: unknown) => void) => {
-      if (
-        !checkGameRateLimit(
-          socket,
-          rateLimiter,
-          logger,
-          "game:move",
-          "Rate limit exceeded for game moves. Maximum 5 requests per 10 seconds allowed.",
-          callback,
-        )
-      ) {
-        return;
-      }
-      return handleMove(rawReq, callback as any);
-    },
-  );
+  socket.on("game:move", handleMove);
 
   // 2. game:resign
-  const handleResign = wrapSocketHandler<
+  const handleResign = createGameHandler<
     ResignRequest,
     { success: true }
   >(
@@ -145,27 +170,10 @@ export function registerGameSocketHandlers(
     },
   );
 
-  socket.on(
-    "game:resign",
-    async (rawReq: unknown, callback?: (res: unknown) => void) => {
-      if (
-        !checkGameRateLimit(
-          socket,
-          rateLimiter,
-          logger,
-          "game:resign",
-          "Rate limit exceeded for game resignation. Maximum 5 requests per 10 seconds allowed.",
-          callback,
-        )
-      ) {
-        return;
-      }
-      return handleResign(rawReq, callback as any);
-    },
-  );
+  socket.on("game:resign", handleResign);
 
   // 3. game:offer_draw
-  const handleOfferDraw = wrapSocketHandler<
+  const handleOfferDraw = createGameHandler<
     OfferDrawRequest,
     { success: true }
   >(
@@ -186,27 +194,10 @@ export function registerGameSocketHandlers(
     },
   );
 
-  socket.on(
-    "game:offer_draw",
-    async (rawReq: unknown, callback?: (res: unknown) => void) => {
-      if (
-        !checkGameRateLimit(
-          socket,
-          rateLimiter,
-          logger,
-          "game:offer_draw",
-          "Rate limit exceeded for draw offers. Maximum 5 requests per 10 seconds allowed.",
-          callback,
-        )
-      ) {
-        return;
-      }
-      return handleOfferDraw(rawReq, callback as any);
-    },
-  );
+  socket.on("game:offer_draw", handleOfferDraw);
 
   // 4. game:respond_draw
-  const handleRespondDraw = wrapSocketHandler<
+  const handleRespondDraw = createGameHandler<
     RespondDrawRequest,
     { success: true }
   >(
@@ -235,27 +226,10 @@ export function registerGameSocketHandlers(
     },
   );
 
-  socket.on(
-    "game:respond_draw",
-    async (rawReq: unknown, callback?: (res: unknown) => void) => {
-      if (
-        !checkGameRateLimit(
-          socket,
-          rateLimiter,
-          logger,
-          "game:respond_draw",
-          "Rate limit exceeded for draw responses. Maximum 5 requests per 10 seconds allowed.",
-          callback,
-        )
-      ) {
-        return;
-      }
-      return handleRespondDraw(rawReq, callback as any);
-    },
-  );
+  socket.on("game:respond_draw", handleRespondDraw);
 
   // 5. game:request_rematch
-  const handleRequestRematch = wrapSocketHandler<
+  const handleRequestRematch = createGameHandler<
     RequestRematchRequest,
     { success: true }
   >(
@@ -276,27 +250,10 @@ export function registerGameSocketHandlers(
     },
   );
 
-  socket.on(
-    "game:request_rematch",
-    async (rawReq: unknown, callback?: (res: unknown) => void) => {
-      if (
-        !checkGameRateLimit(
-          socket,
-          rateLimiter,
-          logger,
-          "game:request_rematch",
-          "Rate limit exceeded for rematch requests. Maximum 5 requests per 10 seconds allowed.",
-          callback,
-        )
-      ) {
-        return;
-      }
-      return handleRequestRematch(rawReq, callback as any);
-    },
-  );
+  socket.on("game:request_rematch", handleRequestRematch);
 
   // 6. game:respond_rematch
-  const handleRespondRematch = wrapSocketHandler<
+  const handleRespondRematch = createGameHandler<
     RespondRematchRequest,
     { success: true }
   >(
@@ -327,22 +284,5 @@ export function registerGameSocketHandlers(
     },
   );
 
-  socket.on(
-    "game:respond_rematch",
-    async (rawReq: unknown, callback?: (res: unknown) => void) => {
-      if (
-        !checkGameRateLimit(
-          socket,
-          rateLimiter,
-          logger,
-          "game:respond_rematch",
-          "Rate limit exceeded for rematch responses. Maximum 5 requests per 10 seconds allowed.",
-          callback,
-        )
-      ) {
-        return;
-      }
-      return handleRespondRematch(rawReq, callback as any);
-    },
-  );
+  socket.on("game:respond_rematch", handleRespondRematch);
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NetworkInterfaceInfo } from "node:os";
 import {
   RelayAddressService,
@@ -81,6 +81,83 @@ describe("RelayAddressService", () => {
       );
       expect(extractHostnameFromUrl("fun-chess.cloud")).toBe("fun-chess.cloud");
       expect(extractHostnameFromUrl("")).toBe("127.0.0.1");
+    });
+
+    it("logs debug diagnostic when normalizePublicUrl encounters a malformed URL (ENH-005)", () => {
+      const mockLogger = {
+        trace: vi.fn(),
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        fatal: vi.fn(),
+        child: vi.fn(),
+      };
+
+      const result = normalizePublicUrl("http://[invalid-ipv6", mockLogger);
+      expect(result).toBe("http://[invalid-ipv6");
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        "Failed to normalize public URL, falling back to trimmed string",
+        expect.objectContaining({
+          operation: "normalize_public_url",
+          rawUrl: "http://[invalid-ipv6",
+        }),
+      );
+    });
+
+    it("logs debug diagnostic when extractHostnameFromUrl encounters a malformed URL (ENH-005)", () => {
+      const mockLogger = {
+        trace: vi.fn(),
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        fatal: vi.fn(),
+        child: vi.fn(),
+      };
+
+      const result = extractHostnameFromUrl("http://[invalid-ipv6", mockLogger);
+      expect(result).toBe("[invalid-ipv6");
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        "Failed to parse hostname from URL, using regex fallback",
+        expect.objectContaining({
+          operation: "extract_hostname_from_url",
+          rawUrl: "http://[invalid-ipv6",
+        }),
+      );
+    });
+
+    it("passes logger to normalizePublicUrl and extractHostnameFromUrl in RelayAddressService (ENH-005)", () => {
+      const mockLogger = {
+        trace: vi.fn(),
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        fatal: vi.fn(),
+        child: vi.fn(),
+      };
+
+      const service = new RelayAddressService({
+        publicUrl: "http://[invalid-ipv6",
+        logger: mockLogger,
+      });
+
+      expect(service.getPublicUrl()).toBe("http://[invalid-ipv6");
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        "Failed to normalize public URL, falling back to trimmed string",
+        expect.objectContaining({
+          operation: "normalize_public_url",
+        }),
+      );
+
+      service.getLocalLanIp();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        "Failed to parse hostname from URL, using regex fallback",
+        expect.objectContaining({
+          operation: "extract_hostname_from_url",
+        }),
+      );
     });
   });
 

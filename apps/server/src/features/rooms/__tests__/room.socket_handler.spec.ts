@@ -882,4 +882,246 @@ describe("Room Socket Handlers", () => {
       }
     });
   });
+
+  describe("SC-3 Remediations", () => {
+    it("spectator disconnect does NOT schedule a forfeit timer and game continues playing (CRIT-001)", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "Alice", preferredColor: "w" },
+        "sock_alice",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Bob" },
+        "sock_bob",
+      );
+
+      // Add spectator
+      const playingRoom = (await service.getRoom(created.roomCode))!;
+      playingRoom.spectators = [
+        {
+          id: "spec_1",
+          socketId: "sock_spec",
+          name: "Spectator",
+          color: "w",
+          isHost: false,
+          isConnected: true,
+          connectedAt: Date.now(),
+        },
+      ];
+      await store.save(playingRoom);
+
+      const timerReg = new DisconnectTimerRegistry();
+
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        "sock_spec",
+        service,
+        logger,
+        20,
+        undefined,
+        timerReg,
+      );
+
+      // Verify no forfeit timer was scheduled for spectator
+      expect(timerReg.get(created.roomCode, "spec_1")).toBeUndefined();
+      expect(timerReg.size()).toBe(0);
+
+      // Wait 50ms to ensure no abandonment timer triggers
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const gameOverEmit = io.toEmits.find((e) => e.event === "game:over");
+      expect(gameOverEmit).toBeUndefined();
+
+      // Room status remains playing
+      const roomAfter = await service.getRoom(created.roomCode);
+      expect(roomAfter?.status).toBe("playing");
+    });
+
+    it("schedules forfeit timers for both players on sequential disconnect, and awards win if one reconnects (CRIT-002)", async () => {
+      const { room: created, sessionToken: aliceToken } = await service.createRoom(
+        { playerName: "Alice", preferredColor: "w" },
+        "sock_alice",
+      );
+      const { player: bobPlayer } = await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Bob" },
+        "sock_bob",
+      );
+
+      const timerReg = new DisconnectTimerRegistry();
+
+      // 1. Alice drops
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        "sock_alice",
+        service,
+        logger,
+        50,
+        undefined,
+        timerReg,
+      );
+      expect(timerReg.get(created.roomCode, created.hostId)).toBeDefined();
+
+      // 2. Bob drops while room is already paused_disconnect
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        "sock_bob",
+        service,
+        logger,
+        50,
+        undefined,
+        timerReg,
+      );
+      expect(timerReg.get(created.roomCode, bobPlayer.id)).toBeDefined();
+      expect(timerReg.size()).toBe(2);
+
+      // 3. Alice reconnects via socket handler
+      const aliceSocket = new TestSocket("sock_alice_new");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        aliceSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+        timerReg,
+      );
+
+      const reconnectHandler = aliceSocket.handlers.get("room:reconnect")!;
+      let ackResult: any;
+      await reconnectHandler(
+        {
+          roomCode: created.roomCode,
+          playerId: created.hostId,
+          sessionToken: aliceToken,
+        },
+        (res: any) => {
+          ackResult = res;
+        },
+      );
+
+      expect(ackResult?.success).toBe(true);
+      expect(ackResult?.roomStatus).toBe("paused_disconnect");
+
+      // Alice's timer must be cancelled, Bob's timer must STILL be active
+      expect(timerReg.get(created.roomCode, created.hostId)).toBeUndefined();
+      expect(timerReg.get(created.roomCode, bobPlayer.id)).toBeDefined();
+
+      // 4. Bob's 50ms timer expires -> game forfeited to Alice
+      await new Promise((resolve) => setTimeout(resolve, 80));
+
+      const gameOverEmit = io.toEmits.find((e) => e.event === "game:over");
+      expect(gameOverEmit).toBeDefined();
+      expect((gameOverEmit?.payload as any).winner).toBe("w");
+      expect((gameOverEmit?.payload as any).winnerName).toBe("Alice");
+    });
+
+    it("guest leaving lobby emits room:player_left and does not delete host room (CRIT-008 & MAJ-021)", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "HostAlice", preferredColor: "w" },
+        "sock_host",
+      );
+
+      // Put room in lobby state with guest Bob
+      const roomInLobby = (await service.getRoom(created.roomCode))!;
+      roomInLobby.status = "lobby";
+      roomInLobby.blackPlayer = {
+        id: "bob_guest_id",
+        socketId: "sock_guest_bob",
+        name: "GuestBob",
+        color: "b",
+        isHost: false,
+        isConnected: true,
+        connectedAt: Date.now(),
+      };
+      await store.save(roomInLobby);
+
+      const guestSocket = new TestSocket("sock_guest_bob");
+      guestSocket.rooms.add(created.roomCode);
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        guestSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      const leaveHandler = guestSocket.handlers.get("room:leave")!;
+      let leaveAck: any;
+      await leaveHandler({ roomCode: created.roomCode }, (res: any) => {
+        leaveAck = res;
+      });
+
+      expect(leaveAck?.success).toBe(true);
+
+      // Invariant: room:player_left was broadcast to the room
+      const playerLeftEmit = guestSocket.toEmits.find(
+        (e) => e.event === "room:player_left",
+      );
+      expect(playerLeftEmit).toBeDefined();
+      expect((playerLeftEmit?.payload as any).playerId).toBe("bob_guest_id");
+      expect((playerLeftEmit?.payload as any).playerName).toBe("GuestBob");
+      expect((playerLeftEmit?.payload as any).reason).toBe("player_left");
+
+      // Invariant: Host room was NOT deleted
+      const roomAfter = await service.getRoom(created.roomCode);
+      expect(roomAfter).not.toBeNull();
+      expect(roomAfter?.whitePlayer?.id).toBe(created.hostId);
+      expect(roomAfter?.blackPlayer).toBeNull();
+    });
+
+    it("authoritative roomStatus sent in room:player_disconnected and room:reconnected (MAJ-001)", async () => {
+      const { room: created, sessionToken } = await service.createRoom(
+        { playerName: "P1", preferredColor: "w" },
+        "sock_p1",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "P2" },
+        "sock_p2",
+      );
+
+      // Disconnect P1
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        "sock_p1",
+        service,
+        logger,
+        60_000,
+      );
+
+      const discEmit = io.toEmits.find(
+        (e) => e.event === "room:player_disconnected",
+      );
+      expect(discEmit).toBeDefined();
+      expect((discEmit?.payload as any).roomStatus).toBe("paused_disconnect");
+
+      // Reconnect P1
+      const reconnectSocket = new TestSocket("sock_p1_recon");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        reconnectSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      const reconnectHandler = reconnectSocket.handlers.get("room:reconnect")!;
+      let ackPayload: any;
+      await reconnectHandler(
+        {
+          roomCode: created.roomCode,
+          playerId: created.hostId,
+          sessionToken,
+        },
+        (res: any) => {
+          ackPayload = res;
+        },
+      );
+
+      expect(ackPayload?.roomStatus).toBe("playing");
+
+      const reconEvent = reconnectSocket.emittedEvents.find(
+        (e) => e.event === "room:reconnected",
+      );
+      expect(reconEvent).toBeDefined();
+      expect((reconEvent?.payload as any).roomStatus).toBe("playing");
+    });
+  });
 });

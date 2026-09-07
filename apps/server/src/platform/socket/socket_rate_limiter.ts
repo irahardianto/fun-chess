@@ -1,3 +1,6 @@
+import { Logger } from "../logger/logger.interface.js";
+import { runLoggedJob } from "../logger/job_runner.js";
+
 export interface SocketRateLimiterOptions {
   /**
    * Maximum number of requests allowed within the sliding window.
@@ -19,11 +22,16 @@ export interface SocketRateLimiterOptions {
    * Default: 10,000 keys.
    */
   maxKeys?: number;
+  /**
+   * Optional logger instance for logging background pruning operations (MAJ-015).
+   */
+  logger?: Logger;
 }
 
 /**
  * Extracts a reliable client IP address from a Socket.io socket instance.
- * When trustProxy is true, checks x-forwarded-for header (proxies/Cloud Run) before falling back to socket address.
+ * When trustProxy is true, evaluates x-forwarded-for header (proxies/Cloud Run)
+ * taking the RIGHTMOST IP before proxy (CRIT-006) to prevent rate limiting bypass and spoofing.
  * When trustProxy is false, ignores x-forwarded-for to prevent spoofing (CRIT-001).
  */
 export function extractClientIp(socket: unknown, trustProxy = false): string {
@@ -39,12 +47,11 @@ export function extractClientIp(socket: unknown, trustProxy = false): string {
   };
 
   if (trustProxy) {
-    const forwarded = s.handshake?.headers?.["x-forwarded-for"];
+    const rawForwarded = s.handshake?.headers?.["x-forwarded-for"];
+    const forwarded = Array.isArray(rawForwarded) ? rawForwarded.join(",") : rawForwarded;
     if (typeof forwarded === "string" && forwarded.trim()) {
-      return forwarded.split(",")[0]?.trim() || "127.0.0.1";
-    }
-    if (Array.isArray(forwarded) && forwarded[0]) {
-      return String(forwarded[0]).trim();
+      const parts = forwarded.split(",");
+      return parts[parts.length - 1]?.trim() || "127.0.0.1";
     }
   }
 
@@ -58,7 +65,7 @@ export function createSocketRateLimiter(
   options?: SocketRateLimiterOptions,
 ): SocketRateLimiter {
   return new SocketRateLimiter({
-    maxRequests: 5,
+    maxRequests: 60,
     windowMs: 10_000,
     maxKeys: 10_000,
     ...options,
@@ -68,23 +75,32 @@ export function createSocketRateLimiter(
 /**
  * In-memory sliding window rate limiter for Socket.io events.
  * Keyed by client IP to prevent disconnect evasion (MAJ-001) with bounded LRU memory cleanup (MAJ-003).
+ * Logs background scheduled pruning tasks via runLoggedJob when logger is supplied (MAJ-015).
  */
 export class SocketRateLimiter {
   private readonly maxRequests: number;
   private readonly windowMs: number;
   private readonly maxKeys: number;
+  private readonly logger?: Logger;
   private readonly timestamps = new Map<string, number[]>();
   private pruneTimer?: NodeJS.Timeout;
 
   constructor(options?: SocketRateLimiterOptions) {
-    this.maxRequests = options?.maxRequests ?? 5;
+    this.maxRequests = options?.maxRequests ?? 60;
     this.windowMs = options?.windowMs ?? 10_000;
     this.maxKeys = options?.maxKeys ?? 10_000;
+    this.logger = options?.logger;
     const pruneIntervalMs = options?.pruneIntervalMs ?? 60_000;
 
     if (pruneIntervalMs > 0) {
       this.pruneTimer = setInterval(() => {
-        this.prune();
+        if (this.logger) {
+          void runLoggedJob(this.logger, "rate_limiter_prune", async () => {
+            return this.prune();
+          }).catch(() => {});
+        } else {
+          this.prune();
+        }
       }, pruneIntervalMs);
       if (typeof this.pruneTimer.unref === "function") {
         this.pruneTimer.unref();

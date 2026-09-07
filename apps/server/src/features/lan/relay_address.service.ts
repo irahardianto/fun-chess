@@ -1,6 +1,7 @@
 import os, { NetworkInterfaceInfo } from "node:os";
 import QRCode from "qrcode";
 import { LanInfoResponse as BaseLanInfoResponse } from "@fun-chess/shared";
+import { Logger } from "../../platform/logger/index.js";
 
 /**
  * Extended LAN & Cloud Relay Information response structure.
@@ -28,6 +29,8 @@ export interface RelayAddressConfig {
   readonly lanIp?: string;
   /** Optional manual Host IP override */
   readonly hostIp?: string;
+  /** Optional logger for diagnostics (ENH-005) */
+  readonly logger?: Logger;
 }
 
 /**
@@ -73,9 +76,10 @@ export interface IRelayAddressService {
  * Normalizes a public URL string by stripping trailing slashes and omitting standard ports.
  *
  * @param rawUrl - Raw URL string (e.g. "https://fun-chess.a.run.app/" or "http://example.com:80")
+ * @param logger - Optional logger for structured diagnostics (ENH-005)
  * @returns Normalized URL string
  */
-export function normalizePublicUrl(rawUrl: string): string {
+export function normalizePublicUrl(rawUrl: string, logger?: Logger): string {
   const trimmed = rawUrl.trim();
   if (!trimmed) {
     return "";
@@ -99,7 +103,12 @@ export function normalizePublicUrl(rawUrl: string): string {
       isDefaultHttp || isDefaultHttps || !port ? "" : `:${port}`;
 
     return `${protocol}//${hostname}${portSuffix}${pathname}`;
-  } catch {
+  } catch (error) {
+    logger?.debug("Failed to normalize public URL, falling back to trimmed string", {
+      operation: "normalize_public_url",
+      rawUrl: trimmed,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return trimmed.replace(/\/+$/, "");
   }
 }
@@ -108,9 +117,13 @@ export function normalizePublicUrl(rawUrl: string): string {
  * Extracts the hostname or domain from a public URL string.
  *
  * @param publicUrl - Public URL string
+ * @param logger - Optional logger for structured diagnostics (ENH-005)
  * @returns Hostname string or fallback to raw string
  */
-export function extractHostnameFromUrl(publicUrl: string): string {
+export function extractHostnameFromUrl(
+  publicUrl: string,
+  logger?: Logger,
+): string {
   const trimmed = publicUrl.trim();
   if (!trimmed) {
     return "127.0.0.1";
@@ -120,7 +133,12 @@ export function extractHostnameFromUrl(publicUrl: string): string {
     const hasProtocol = /^https?:\/\//i.test(trimmed);
     const urlObj = new URL(hasProtocol ? trimmed : `https://${trimmed}`);
     return urlObj.hostname || trimmed;
-  } catch {
+  } catch (error) {
+    logger?.debug("Failed to parse hostname from URL, using regex fallback", {
+      operation: "extract_hostname_from_url",
+      rawUrl: trimmed,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return trimmed.replace(/^https?:\/\//i, "").split(/[:/]/)[0] || "127.0.0.1";
   }
 }
@@ -149,7 +167,7 @@ export class RelayAddressService implements IRelayAddressService {
     if (!publicUrl || !publicUrl.trim()) {
       return undefined;
     }
-    return normalizePublicUrl(publicUrl);
+    return normalizePublicUrl(publicUrl, this.config.logger);
   }
 
   /**
@@ -207,7 +225,7 @@ export class RelayAddressService implements IRelayAddressService {
     if (this.isCloudRelay()) {
       const publicUrl = this.getPublicUrl();
       if (publicUrl) {
-        return extractHostnameFromUrl(publicUrl);
+        return extractHostnameFromUrl(publicUrl, this.config.logger);
       }
     }
 

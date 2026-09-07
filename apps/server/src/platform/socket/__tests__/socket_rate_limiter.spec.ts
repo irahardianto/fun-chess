@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   SocketRateLimiter,
   extractClientIp,
 } from "../index.js";
+import { NullLogger } from "../../logger/null_logger.js";
 
 describe("SocketRateLimiter & Client IP Extraction", () => {
   let limiter: SocketRateLimiter;
@@ -14,7 +15,10 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
     });
   });
 
-  // Existing tests
+  afterEach(() => {
+    limiter.destroy();
+  });
+
   it("allows up to maxRequests within the sliding window", () => {
     const socketId = "sock_test_1";
     const now = 100_000;
@@ -91,8 +95,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
     expect(limiter.getRemaining("sock_2", now)).toBe(5);
   });
 
-  // New tests covering extractClientIp
-  describe("extractClientIp", () => {
+  describe("extractClientIp (CRIT-006)", () => {
     it("ignores x-forwarded-for by default (trustProxy = false) and uses address to prevent spoofing (CRIT-001)", () => {
       const socket = {
         handshake: {
@@ -107,7 +110,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       expect(extractClientIp(socket as any, false)).toBe("10.0.0.1");
     });
 
-    it("extracts the first IP from x-forwarded-for header when trustProxy is true", () => {
+    it("extracts the RIGHTMOST IP from x-forwarded-for header when trustProxy is true (CRIT-006)", () => {
       const socket = {
         handshake: {
           headers: {
@@ -117,7 +120,20 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any, true)).toBe("203.0.113.195");
+      expect(extractClientIp(socket as any, true)).toBe("150.172.238.178");
+    });
+
+    it("extracts the rightmost IP when x-forwarded-for header is an array when trustProxy is true", () => {
+      const socket = {
+        handshake: {
+          headers: {
+            "x-forwarded-for": ["203.0.113.195", "198.51.100.99"],
+          },
+          address: "10.0.0.1",
+        },
+      };
+
+      expect(extractClientIp(socket as any, true)).toBe("198.51.100.99");
     });
 
     it("extracts IP from single-value x-forwarded-for header with surrounding whitespace when trustProxy is true", () => {
@@ -177,6 +193,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         maxRequests: 5,
         windowMs: 10_000,
         maxKeys: 3,
+        pruneIntervalMs: 0,
       });
 
       const now = 100_000;
@@ -195,6 +212,8 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       expect(smallLimiter.getRemaining("client-2", now)).toBe(4);
       expect(smallLimiter.getRemaining("client-3", now)).toBe(4);
       expect(smallLimiter.getRemaining("client-4", now)).toBe(4);
+
+      smallLimiter.destroy();
     });
 
     it("refreshes LRU position on access so recently active keys are retained", () => {
@@ -202,6 +221,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         maxRequests: 5,
         windowMs: 10_000,
         maxKeys: 3,
+        pruneIntervalMs: 0,
       });
 
       const now = 100_000;
@@ -220,6 +240,8 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       expect(smallLimiter.getRemaining("client-1", now + 20)).toBe(3);
       // client-2 was evicted
       expect(smallLimiter.getRemaining("client-2", now + 20)).toBe(5);
+
+      smallLimiter.destroy();
     });
   });
 
@@ -258,8 +280,8 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
     });
   });
 
-  // prune() method tests
-  describe("prune()", () => {
+  // prune() method tests and scheduled logging (MAJ-015)
+  describe("prune() & Logged Background Job (MAJ-015)", () => {
     it("removes expired timestamps and cleans up keys with empty timestamp arrays", () => {
       const now = 300_000;
       limiter.consume("client-old", now - 15_000); // Expired (older than 10s)
@@ -278,6 +300,39 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       // Now advance time so client-fresh also expires
       limiter.prune(now + 12_000);
       expect(limiter.getRemaining("client-fresh", now + 12_000)).toBe(5);
+    });
+
+    it("logs background pruning job when logger is provided and timer triggers (MAJ-015)", async () => {
+      vi.useFakeTimers();
+      try {
+        const logger = new NullLogger();
+        const loggedLimiter = new SocketRateLimiter({
+          maxRequests: 5,
+          windowMs: 1000,
+          pruneIntervalMs: 500,
+          logger,
+        });
+
+        loggedLimiter.consume("expired-key", Date.now() - 2000);
+
+        // Advance timer to trigger prune interval
+        await vi.advanceTimersByTimeAsync(550);
+
+        const pruneStart = logger.infoLogs.find(
+          (l) => l.context?.["operation"] === "rate_limiter_prune" && l.context?.["status"] === "started",
+        );
+        const pruneSuccess = logger.infoLogs.find(
+          (l) => l.context?.["operation"] === "rate_limiter_prune" && l.context?.["status"] === "success",
+        );
+
+        expect(pruneStart).toBeDefined();
+        expect(pruneSuccess).toBeDefined();
+        expect(pruneSuccess?.context?.["correlationId"]).toBeDefined();
+
+        loggedLimiter.destroy();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

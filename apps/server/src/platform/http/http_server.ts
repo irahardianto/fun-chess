@@ -3,21 +3,37 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
-import { serveStaticFile } from "./static_handler.js";
+import { extractClientIp } from "./static_handler.js";
 import { IFileStorage } from "./file_storage.js";
-import { RoomStore } from "../../features/rooms/room.store.js";
-import { LanService } from "../../features/lan/lan.service.js";
-import {
-  RelayAddressService,
-  IRelayAddressService,
-} from "../../features/lan/relay_address.service.js";
-import { HealthCheckResponse } from "@fun-chess/shared";
+import { LanInfoResponse } from "@fun-chess/shared";
 import { isOriginAllowed, resolveAllowedOrigins, type ServerEnv } from "../config/index.js";
+import { HttpRateLimiter } from "./http_rate_limiter.js";
+import {
+  HealthController,
+  LanInfoController,
+  StaticController,
+} from "./controllers/index.js";
+
+/**
+ * Storage count provider contract for health checks (MAJ-005).
+ */
+export interface IRoomCountProvider {
+  count(): Promise<number>;
+}
+
+/**
+ * Addressing provider contract for network info and relay status (MAJ-005).
+ */
+export interface IAddressingInfoProvider {
+  getAddressingInfo(port: number): LanInfoResponse;
+  isCloudRelay?(): boolean;
+}
 
 export interface HttpServerConfig {
-  roomStore: RoomStore;
-  lanService?: LanService;
-  relayAddressService?: IRelayAddressService;
+  roomStore: IRoomCountProvider;
+  relayAddressService?: IAddressingInfoProvider;
+  /** @deprecated Use relayAddressService */
+  lanService?: IAddressingInfoProvider;
   logger: Logger;
   port?: number;
   distPath?: string;
@@ -25,6 +41,7 @@ export interface HttpServerConfig {
   env?: ServerEnv;
   fileStorage?: IFileStorage;
   getActiveSocketCount?: () => number;
+  rateLimiter?: HttpRateLimiter;
 }
 
 const START_TIME = Date.now();
@@ -111,59 +128,18 @@ function createFallbackHtml(port: number): string {
 </html>`;
 }
 
-async function handleHealthRequest(
-  roomStore: RoomStore,
-  addressService: IRelayAddressService,
-  port: number,
-  getActiveSocketCount: () => number,
-): Promise<HealthCheckResponse> {
-  const mem = process.memoryUsage();
-  const activeRooms = await roomStore.count();
-  const activeSockets = getActiveSocketCount();
-  const isCloud = addressService.isCloudRelay
-    ? addressService.isCloudRelay()
-    : false;
-  const addrInfo = addressService.getAddressingInfo(port);
-
-  return {
-    status: "ok",
-    uptimeSeconds: Math.round((Date.now() - START_TIME) / 100) / 10,
-    timestamp: new Date().toISOString(),
-    activeRooms,
-    activeSockets,
-    memoryUsageMb: {
-      rss: Math.round((mem.rss / 1024 / 1024) * 10) / 10,
-      heapTotal: Math.round((mem.heapTotal / 1024 / 1024) * 10) / 10,
-      heapUsed: Math.round((mem.heapUsed / 1024 / 1024) * 10) / 10,
-    },
-    relay: {
-      mode: isCloud ? "cloud" : "lan",
-      ...(addrInfo.publicUrl ? { publicUrl: addrInfo.publicUrl } : {}),
-    },
-  };
-}
-
 /**
  * Creates the HTTP request listener for Fun Chess API endpoints and static SPA hosting.
- * Validates configuration via caller injection without direct process.env reads (MAJ-004).
- * Enforces valid matching CORS headers (MAJ-005) and Google Fonts CSP (MAJ-001).
- * Logs static asset deliveries at INFO level (MAJ-024).
- * Decomposed into modular helper handlers (MAJ-038).
+ * Validates configuration via caller injection without concrete class defaults (MAJ-005).
+ * Logs preflight OPTIONS requests with start, reject, and allow events (MAJ-014).
+ * Extracts client IP in entry logs (ENH-008).
+ * Provides IP-based rate limiting on native HTTP endpoints (MIN-002).
+ * Formats standardized JSON error envelopes (MIN-032).
+ * Decomposed into modular route controllers (MIN-029).
  */
 export function createHttpServer(config: HttpServerConfig): RequestListener {
   const {
     roomStore,
-    lanService,
-    relayAddressService = new RelayAddressService(
-      config.env
-        ? {
-            publicUrl: config.env.PUBLIC_URL,
-            host: config.env.HOST,
-            port: config.env.PORT,
-            lanIp: config.env.LAN_IP,
-          }
-        : undefined,
-    ),
     logger,
     port = config.env?.PORT ?? 3000,
     distPath = path.resolve(process.cwd(), "../client/dist"),
@@ -171,6 +147,11 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     env = config.env,
     allowedOrigins: configuredAllowedOrigins,
     getActiveSocketCount = () => 0,
+    rateLimiter = new HttpRateLimiter({
+      maxRequests: config.env?.RATE_LIMIT_MAX_REQUESTS ?? 100,
+      windowMs: config.env?.RATE_LIMIT_WINDOW_MS ?? 10_000,
+      pruneIntervalMs: 0,
+    }),
   } = config;
 
   const effectiveAllowedOrigins =
@@ -179,13 +160,45 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       ? resolveAllowedOrigins(config.env)
       : resolveAllowedOrigins({}));
 
-  const addressService: IRelayAddressService =
+  // Interface contract resolution without concrete class instantiation (MAJ-005)
+  const addressService: IAddressingInfoProvider =
     config.relayAddressService ??
-    (lanService
-      ? (lanService as unknown as IRelayAddressService)
-      : relayAddressService);
+    config.lanService ?? {
+      getAddressingInfo: (p: number) => ({
+        lanIp: config.env?.LAN_IP ?? "127.0.0.1",
+        port: p,
+        localUrl: `http://localhost:${p}`,
+        joinUrl: `http://${config.env?.LAN_IP ?? "127.0.0.1"}:${p}`,
+        interfaces: [config.env?.LAN_IP ?? "127.0.0.1"],
+        relayMode: "lan",
+        isCloudRelay: false,
+      }),
+      isCloudRelay: () => false,
+    };
 
   const fallbackHtml = createFallbackHtml(port);
+  const isProduction = env?.NODE_ENV === "production";
+
+  // Modular Route Controllers (MIN-029)
+  const healthController = new HealthController({
+    roomStore,
+    addressService,
+    port,
+    getActiveSocketCount,
+    isProduction,
+    startTime: START_TIME,
+  });
+
+  const lanInfoController = new LanInfoController({
+    addressService,
+  });
+
+  const staticController = new StaticController({
+    distPath,
+    fallbackHtml,
+    fileStorage,
+    trustProxy: env?.TRUST_PROXY,
+  });
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const correlationId =
@@ -193,7 +206,8 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     const startTime = performance.now();
     const method = req.method?.toUpperCase() || "GET";
     const url = req.url || "/";
-    const [pathname] = url.split("?");
+    const [pathname = ""] = url.split("?");
+    const clientIp = extractClientIp(req, env?.TRUST_PROXY);
 
     // 1. Security Headers (SEC-02, MAJ-001)
     applySecurityHeaders(res, correlationId);
@@ -205,21 +219,56 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       effectiveAllowedOrigins,
     );
 
-    // 3. Preflight OPTIONS
+    // 3. Preflight OPTIONS Request Logging & Dispatch (MAJ-014)
     if (method === "OPTIONS") {
+      logger.info("HTTP OPTIONS preflight started", {
+        operation: "http_options_preflight",
+        correlationId,
+        clientIp,
+        origin,
+        path: pathname,
+      });
+
       if (origin && !isOriginPermitted && !effectiveAllowedOrigins.includes("*")) {
+        const duration = Math.round(performance.now() - startTime);
+        logger.warn("HTTP OPTIONS preflight rejected", {
+          operation: "http_options_preflight",
+          correlationId,
+          clientIp,
+          duration,
+          durationMs: duration,
+          origin,
+          path: pathname,
+          status: "rejected",
+        });
+
         res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
         res.end("CORS origin not allowed");
         return;
       }
+
+      const duration = Math.round(performance.now() - startTime);
+      logger.info("HTTP OPTIONS preflight allowed", {
+        operation: "http_options_preflight",
+        correlationId,
+        clientIp,
+        duration,
+        durationMs: duration,
+        origin,
+        path: pathname,
+        status: "success",
+      });
+
       res.writeHead(204);
       res.end();
       return;
     }
 
+    // 4. Request Entry Logging with Client IP (ENH-008)
     logger.info(`HTTP Request: ${method} ${pathname}`, {
       operation: "http_request",
       correlationId,
+      clientIp,
       method,
       path: pathname,
       userAgent: req.headers["user-agent"],
@@ -241,6 +290,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       logger.info(`HTTP Response: ${method} ${pathname} [${statusCode}]`, {
         operation: "http_response",
         correlationId,
+        clientIp,
         method,
         path: pathname,
         statusCode,
@@ -264,6 +314,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       logger.info(`HTTP Response: ${method} ${pathname} [${statusCode}]`, {
         operation: "http_response",
         correlationId,
+        clientIp,
         method,
         path: pathname,
         statusCode,
@@ -273,51 +324,61 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     };
 
     try {
-      // 4. GET / HEAD /healthz - Container Liveness & Readiness Probe
+      // 5. GET / HEAD /healthz - Container Liveness & Readiness Probe
       if ((method === "GET" || method === "HEAD") && pathname === "/healthz") {
-        sendTextResponse(200, "OK");
+        sendTextResponse(200, healthController.getLiveness());
         return;
       }
 
-      // 5. GET / HEAD /health & /api/health - Operational Telemetry Health Check
-      const requestPort = port || req.socket?.localPort || 3000;
+      // 6. Rate Limiting Check on non-healthz native endpoints (MIN-002)
+      if (rateLimiter && !rateLimiter.consume(clientIp)) {
+        logger.warn("HTTP rate limit exceeded", {
+          operation: "http_rate_limited",
+          correlationId,
+          clientIp,
+          path: pathname,
+          method,
+        });
 
+        sendJsonResponse(429, {
+          status: "error",
+          error: {
+            code: "ERR_RATE_LIMITED",
+            message: "Rate limit exceeded. Please wait before retrying.",
+          },
+          correlationId,
+        });
+        return;
+      }
+
+      // 7. GET / HEAD /health & /api/health - Operational Telemetry Health Check
       if (
         (method === "GET" || method === "HEAD") &&
         (pathname === "/health" || pathname === "/api/health")
       ) {
-        const health = await handleHealthRequest(
-          roomStore,
-          addressService,
-          requestPort,
-          getActiveSocketCount,
-        );
+        const health = await healthController.getHealth();
         sendJsonResponse(200, health);
         return;
       }
 
-      // 6. GET / HEAD /api/lan-info - Host Addressing & QR Discovery
+      // 8. GET / HEAD /api/lan-info - Host Addressing & QR Discovery
       if ((method === "GET" || method === "HEAD") && pathname === "/api/lan-info") {
-        const lanInfo = addressService.getAddressingInfo(requestPort);
+        const requestPort = port || req.socket?.localPort || 3000;
+        const lanInfo = lanInfoController.getLanInfo(requestPort);
         sendJsonResponse(200, lanInfo);
         return;
       }
 
-      // 7. Static Assets / SPA Fallback (non-API routes)
+      // 9. Static Assets / SPA Fallback (non-API routes)
       if ((method === "GET" || method === "HEAD") && !pathname.startsWith("/api/")) {
-        const served = await serveStaticFile(
-          req,
-          res,
-          { distPath, fallbackHtml, fileStorage, trustProxy: env?.TRUST_PROXY },
-          logger,
-        );
+        const served = await staticController.serve(req, res, logger, correlationId);
 
         if (served) {
           const duration = Math.round(performance.now() - startTime);
-          // Log static file serving at INFO level (MAJ-024)
           logger.info(`HTTP Static served: ${pathname}`, {
             operation: "http_static",
             correlationId,
+            clientIp,
             path: pathname,
             duration,
             durationMs: duration,
@@ -326,13 +387,14 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         }
       }
 
-      // 8. Unhandled 404
+      // 10. Unhandled 404 with standardized error envelope (MIN-032)
       sendJsonResponse(404, {
+        status: "error",
         error: {
           code: "ERR_NOT_FOUND",
           message: `Cannot ${method} ${pathname}`,
-          correlationId,
         },
+        correlationId,
       });
     } catch (err) {
       const duration = Math.round(performance.now() - startTime);
@@ -344,6 +406,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       logger.error(`HTTP Request Error: ${method} ${pathname}`, {
         operation: "http_error",
         correlationId,
+        clientIp,
         method,
         path: pathname,
         duration,
@@ -353,11 +416,13 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
 
       if (!res.headersSent) {
         sendJsonResponse(500, {
+          status: "error",
           error: {
             code: "ERR_INTERNAL_SERVER",
             message: "Internal server error",
             correlationId,
           },
+          correlationId,
         });
       }
     }

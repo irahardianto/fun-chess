@@ -37,7 +37,7 @@ export class PinoLogger implements Logger {
       this.logger = options as PinoInstance;
     } else {
       const opts = (options as PinoLoggerOptions) || {};
-      const level = opts.level || (process.env.LOG_LEVEL ?? "info");
+      const level = opts.level ?? "info";
       const pinoFn: any = (pino as any).default || pino;
       this.logger = pinoFn({
         level,

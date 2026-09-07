@@ -7,14 +7,14 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
-import { createTestServer, TestServerInstance } from "../helpers/test_server";
+import { createTestServer, TestServerInstance } from "./helpers/test_server.js";
 import {
   createConnectedSocketClient,
   disconnectSockets,
   emitAck,
   TypedSocketClient,
   waitForEvent,
-} from "../helpers/socket_client_helper";
+} from "./helpers/socket_client_helper.js";
 import {
   CreateRoomRequest,
   GameOverPayload,

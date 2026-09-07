@@ -3,7 +3,7 @@ import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
 import { IFileStorage, NodeFileStorage } from "./file_storage.js";
 
-const MIME_TYPES: Record<string, string> = {
+export const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".mjs": "application/javascript; charset=utf-8",
@@ -30,13 +30,131 @@ export interface StaticFileHandlerOptions {
   fallbackHtml?: string;
   fileStorage?: IFileStorage;
   trustProxy?: boolean;
+  correlationId?: string;
+}
+
+// --- Decomposed Helper Functions (MIN-022) ---
+
+/**
+ * Extracts client IP from incoming HTTP request.
+ * Takes the RIGHTMOST IP before proxy when trustProxy is enabled (CRIT-006).
+ */
+export function extractClientIp(
+  req: IncomingMessage,
+  trustProxy?: boolean,
+): string {
+  if (trustProxy === true) {
+    const rawForwarded = req.headers?.["x-forwarded-for"];
+    const forwarded = Array.isArray(rawForwarded)
+      ? rawForwarded.join(",")
+      : rawForwarded;
+
+    if (typeof forwarded === "string" && forwarded.trim()) {
+      const parts = forwarded.split(",");
+      const rightmost = parts[parts.length - 1]?.trim();
+      if (rightmost) return rightmost;
+    }
+  }
+
+  return req.socket?.remoteAddress || "127.0.0.1";
+}
+
+/**
+ * Checks for path traversal sequences, URL encoding bypasses (%2e%2e),
+ * null byte injections (%00, \0), and directory escape boundaries (CRIT-008, MAJ-034).
+ */
+export function checkPathTraversal(rootDir: string, urlPath: string): boolean {
+  if (urlPath.includes("\0") || urlPath.toLowerCase().includes("%00")) {
+    return true;
+  }
+
+  const lowerUrl = urlPath.toLowerCase();
+  let decodedPath = "";
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+    try {
+      decodedPath = decodeURIComponent(decodedPath);
+    } catch {
+      // Ignore secondary decoding failure
+    }
+  } catch {
+    decodedPath = urlPath;
+  }
+
+  if (decodedPath.includes("\0")) {
+    return true;
+  }
+
+  const normalizedPrefix = urlPath.startsWith("/") ? urlPath : "/" + urlPath;
+  const resolvedCandidate = path.resolve(rootDir, "." + normalizedPrefix);
+  const relativeCandidate = path.relative(rootDir, resolvedCandidate);
+  const escapesRoot =
+    relativeCandidate.startsWith("..") || path.isAbsolute(relativeCandidate);
+
+  return (
+    urlPath.includes("..") ||
+    lowerUrl.includes("%2e%2e") ||
+    decodedPath.includes("..") ||
+    escapesRoot
+  );
+}
+
+/**
+ * Resolves candidate file path on disk, ensuring it cannot escape root directory.
+ */
+export function resolveCandidatePath(
+  rootDir: string,
+  urlPath: string,
+): { sanitizedPath: string; targetFilePath: string; isTraversal: boolean } {
+  const isTraversal = checkPathTraversal(rootDir, urlPath);
+  const sanitizedPath = path.normalize(urlPath);
+  const targetFilePath = path.join(
+    rootDir,
+    sanitizedPath === "/" ? "index.html" : sanitizedPath,
+  );
+  const relative = path.relative(rootDir, targetFilePath);
+  const escapesRoot = relative.startsWith("..") || path.isAbsolute(relative);
+
+  return {
+    sanitizedPath,
+    targetFilePath,
+    isTraversal: isTraversal || escapesRoot,
+  };
+}
+
+/**
+ * Sends static asset HTTP response with appropriate caching and MIME headers.
+ */
+export function sendAssetResponse(
+  res: ServerResponse,
+  content: Buffer | string,
+  contentType: string,
+  isIndex: boolean,
+  isHead: boolean,
+): void {
+  const cacheControl = isIndex
+    ? "no-cache"
+    : "public, max-age=31536000, immutable";
+
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Content-Length": Buffer.byteLength(content),
+    "Cache-Control": cacheControl,
+  });
+
+  if (isHead) {
+    res.end();
+  } else {
+    res.end(content);
+  }
 }
 
 /**
  * Handles static asset serving and SPA HTML5 history mode fallback.
  * Uses injected IFileStorage abstraction (MAJ-016).
  * Inspects error codes and returns 500 on non-ENOENT system errors (MAJ-014).
- * Hardened against directory traversal (CRIT-008) and 200 asset masking.
+ * Hardened against directory traversal (CRIT-008, MAJ-034) and 200 asset masking.
+ * Decomposed into focused helpers (MIN-022).
  */
 export async function serveStaticFile(
   req: IncomingMessage,
@@ -48,47 +166,20 @@ export async function serveStaticFile(
   const isHead = req.method?.toUpperCase() === "HEAD";
   const urlPath = req.url?.split("?")[0] || "/";
   const rootDir = path.resolve(options.distPath);
+  const clientIp = extractClientIp(
+    req,
+    options.trustProxy ?? (!req.socket && Boolean(req.headers?.["x-forwarded-for"])),
+  );
+  const correlationId = options.correlationId;
 
-  const forwarded =
-    options.trustProxy === false ? undefined : req.headers?.["x-forwarded-for"];
-  const clientIp =
-    (typeof forwarded === "string"
-      ? forwarded.split(",")[0]?.trim()
-      : Array.isArray(forwarded)
-        ? forwarded[0]?.trim()
-        : undefined) ||
-    req.socket?.remoteAddress ||
-    "127.0.0.1";
-
-  // Pre-normalization Directory Traversal Inspection (SEC-HIGH-002, CRIT-008)
-  const lowerUrl = urlPath.toLowerCase();
-  let decodedPath = "";
-  try {
-    decodedPath = decodeURIComponent(urlPath);
-    try {
-      decodedPath = decodeURIComponent(decodedPath);
-    } catch {
-      // ignore secondary decoding failure
-    }
-  } catch {
-    decodedPath = urlPath;
-  }
-
-  const normalizedPrefix = urlPath.startsWith("/") ? urlPath : "/" + urlPath;
-  const resolvedCandidate = path.resolve(rootDir, "." + normalizedPrefix);
-  const relativeCandidate = path.relative(rootDir, resolvedCandidate);
-  const escapesRoot =
-    relativeCandidate.startsWith("..") || path.isAbsolute(relativeCandidate);
-
-  const isTraversal =
-    urlPath.includes("..") ||
-    lowerUrl.includes("%2e%2e") ||
-    decodedPath.includes("..") ||
-    escapesRoot;
+  // 1. Path Traversal Guard (SEC-HIGH-002, CRIT-008, MAJ-034)
+  const { sanitizedPath, targetFilePath: initialTarget, isTraversal } =
+    resolveCandidatePath(rootDir, urlPath);
 
   if (isTraversal) {
     logger?.warn("Directory traversal attempt detected", {
       operation: "security_violation",
+      correlationId,
       path: urlPath,
       clientIp,
     });
@@ -102,32 +193,11 @@ export async function serveStaticFile(
     return true;
   }
 
-  const sanitizedPath = path.normalize(urlPath);
-
-  // Target candidate path
-  let targetFilePath = path.join(rootDir, sanitizedPath === "/" ? "index.html" : sanitizedPath);
-  const relative = path.relative(rootDir, targetFilePath);
-
-  // Redundant defense-in-depth: target must reside inside rootDir (CRIT-008)
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    logger?.warn("Directory traversal attempt detected", {
-      operation: "security_violation",
-      path: urlPath,
-      clientIp,
-    });
-
-    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-    if (isHead) {
-      res.end();
-    } else {
-      res.end("Forbidden");
-    }
-    return true;
-  }
-
+  let targetFilePath = initialTarget;
   const ext = path.extname(sanitizedPath).toLowerCase();
   const acceptHeader = (req.headers?.["accept"] as string) || "";
 
+  // 2. Stat File or Directory
   try {
     const fileStat = await fileStorage.stat(targetFilePath);
     if (fileStat.isDirectory) {
@@ -138,7 +208,8 @@ export async function serveStaticFile(
     const errCode = (err as { code?: string })?.code;
     if (errCode && errCode !== "ENOENT") {
       logger?.error("Failed to stat static file", {
-        operation: "static_file_stat_error",
+        operation: "http_static",
+        correlationId,
         path: urlPath,
         targetFilePath,
         error:
@@ -155,7 +226,7 @@ export async function serveStaticFile(
       return true;
     }
 
-    // 2. Missing asset handling (CRIT-008):
+    // Missing asset handling (CRIT-008, MAJ-034):
     // If request has a file extension (e.g. .js, .css, .png, .json), NEVER rewrite to index.html with 200!
     if (ext) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
@@ -167,7 +238,7 @@ export async function serveStaticFile(
       return true;
     }
 
-    // 3. SPA History Mode Fallback: Only rewrite to index.html if caller accepts HTML navigation
+    // SPA History Mode Fallback: Only rewrite to index.html if caller accepts HTML navigation
     if (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader) {
       targetFilePath = path.join(rootDir, "index.html");
     } else {
@@ -181,33 +252,21 @@ export async function serveStaticFile(
     }
   }
 
+  // 3. Read and Send File Content
   try {
     const content = await fileStorage.readFile(targetFilePath);
     const resolvedExt = path.extname(targetFilePath).toLowerCase();
     const contentType = MIME_TYPES[resolvedExt] || "application/octet-stream";
-
-    // Cache immutable hashed assets, don't cache index.html
     const isIndex = targetFilePath.endsWith("index.html");
-    const cacheControl = isIndex
-      ? "no-cache"
-      : "public, max-age=31536000, immutable";
 
-    res.writeHead(200, {
-      "Content-Type": contentType,
-      "Content-Length": Buffer.byteLength(content),
-      "Cache-Control": cacheControl,
-    });
-    if (isHead) {
-      res.end();
-    } else {
-      res.end(content);
-    }
+    sendAssetResponse(res, content, contentType, isIndex, isHead);
     return true;
   } catch (err: unknown) {
     const errCode = (err as { code?: string })?.code;
     if (errCode && errCode !== "ENOENT") {
       logger?.error("Failed to read static file", {
-        operation: "static_file_read_error",
+        operation: "http_static",
+        correlationId,
         path: urlPath,
         targetFilePath,
         error:
@@ -230,22 +289,13 @@ export async function serveStaticFile(
       !ext &&
       (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader)
     ) {
-      const fbLength = Buffer.byteLength(options.fallbackHtml);
-      res.writeHead(200, {
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Length": fbLength,
-        "Cache-Control": "no-cache",
-      });
-      if (isHead) {
-        res.end();
-      } else {
-        res.end(options.fallbackHtml);
-      }
+      sendAssetResponse(res, options.fallbackHtml, "text/html; charset=utf-8", true, isHead);
       return true;
     }
 
     logger?.debug("Static file not found and no fallback provided", {
       targetFilePath,
+      correlationId,
       error: err instanceof Error ? err.message : String(err),
     });
 

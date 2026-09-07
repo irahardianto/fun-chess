@@ -12,14 +12,16 @@ export { RoomService } from "./room.service.js";
 export {
   registerRoomSocketHandlers,
   handleSocketDisconnect,
+} from "./room.socket_handler.js";
+export {
+  DisconnectTimerRegistry,
+  defaultDisconnectTimerRegistry,
   cancelDisconnectTimer,
   cancelAllDisconnectTimersForRoom,
   clearAllDisconnectTimers,
-  DisconnectTimerRegistry,
-  defaultDisconnectTimerRegistry,
   DISCONNECT_GRACE_PERIOD_MS,
-} from "./room.socket_handler.js";
-export type { IDisconnectTimerRegistry } from "./room.socket_handler.js";
+} from "./disconnect_timer_registry.js";
+export type { IDisconnectTimerRegistry } from "./disconnect_timer_registry.js";
 export {
   SystemClock,
   UuidGenerator,

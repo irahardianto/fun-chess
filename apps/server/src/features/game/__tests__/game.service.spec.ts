@@ -130,6 +130,63 @@ describe("GameService", () => {
       expect(lastResult.gameOverPayload?.message).toContain("threefold repetition");
     });
 
+    it("detects stalemate draw and sets room status to game_over with stalemate reason", async () => {
+      // White king on b6, Queen on b1, Black king on a8 -> White plays Ka6 (b6 to a6)
+      const stalematePreFen = "k7/8/1K6/8/8/8/8/1Q6 w - - 0 1";
+      const room = createActiveGameRoom("STALEMATE", stalematePreFen);
+      await store.save(room);
+
+      const result = await service.makeMove(
+        { roomCode: "STALEMATE", move: { from: "b6", to: "a6" } },
+        "sock_white",
+      );
+
+      expect(result.gameState.isStalemate).toBe(true);
+      expect(result.gameState.isDraw).toBe(true);
+      expect(result.room.status).toBe("game_over");
+      expect(result.gameOverPayload).toBeDefined();
+      expect(result.gameOverPayload?.winner).toBe("draw");
+      expect(result.gameOverPayload?.reason).toBe("stalemate");
+    });
+
+    it("detects insufficient material draw and sets room status to game_over with insufficient_material reason", async () => {
+      // White bishop on e4 captures Black's last pawn on d5 leaving King+Bishop vs King
+      const insufficientPreFen = "8/8/3k4/3p4/3KB3/8/8/8 w - - 0 1";
+      const room = createActiveGameRoom("INSUFFICIENT", insufficientPreFen);
+      await store.save(room);
+
+      const result = await service.makeMove(
+        { roomCode: "INSUFFICIENT", move: { from: "e4", to: "d5" } },
+        "sock_white",
+      );
+
+      expect(result.gameState.isInsufficientMaterial).toBe(true);
+      expect(result.gameState.isDraw).toBe(true);
+      expect(result.room.status).toBe("game_over");
+      expect(result.gameOverPayload).toBeDefined();
+      expect(result.gameOverPayload?.winner).toBe("draw");
+      expect(result.gameOverPayload?.reason).toBe("insufficient_material");
+    });
+
+    it("detects 50-move rule draw and sets room status to game_over with fifty_move_rule reason", async () => {
+      // Halfmove clock at 99, White plays non-pawn non-capture move Kg1 (h1 to g1)
+      const fiftyMovePreFen = "r6k/7p/8/8/8/8/P7/R6K w - - 99 50";
+      const room = createActiveGameRoom("50MOVE", fiftyMovePreFen);
+      await store.save(room);
+
+      const result = await service.makeMove(
+        { roomCode: "50MOVE", move: { from: "h1", to: "g1" } },
+        "sock_white",
+      );
+
+      expect(result.gameState.isFiftyMoveRule).toBe(true);
+      expect(result.gameState.isDraw).toBe(true);
+      expect(result.room.status).toBe("game_over");
+      expect(result.gameOverPayload).toBeDefined();
+      expect(result.gameOverPayload?.winner).toBe("draw");
+      expect(result.gameOverPayload?.reason).toBe("fifty_move_rule");
+    });
+
     it("detects check and populates checkInfo", async () => {
       // White queen on e2, black king on e8 -> White plays Qe7+ (assuming pawn not blocking)
       const checkPositionFen =
@@ -210,7 +267,7 @@ describe("GameService", () => {
 
     it("clears pending draw offer when a move is played", async () => {
       const room = createActiveGameRoom("TEST");
-      room.drawOffer = { offeredBy: "sock_black", offeredAt: Date.now() };
+      room.drawOffer = { offeredBy: "p_black_id", offeredAt: Date.now() };
       await store.save(room);
 
       const result = await service.makeMove(
@@ -227,7 +284,7 @@ describe("GameService", () => {
   describe("resign", () => {
     it("allows white to resign, clears drawOffer, and awards victory to black", async () => {
       const room = createActiveGameRoom("TEST");
-      room.drawOffer = { offeredBy: "sock_white", offeredAt: Date.now() };
+      room.drawOffer = { offeredBy: "p_white_id", offeredAt: Date.now() };
       await store.save(room);
 
       const { room: updatedRoom, gameOverPayload } = await service.resign(
@@ -262,12 +319,31 @@ describe("GameService", () => {
       expect(result.fromPlayer.id).toBe("p_white_id");
       expect(result.opponentPlayer?.id).toBe("p_black_id");
       expect(result.room.drawOffer).toEqual({
-        offeredBy: "sock_white",
+        offeredBy: "p_white_id",
         offeredAt: expect.any(Number),
       });
 
       const saved = await store.findByCode("DRAW");
-      expect(saved?.drawOffer?.offeredBy).toBe("sock_white");
+      expect(saved?.drawOffer?.offeredBy).toBe("p_white_id");
+    });
+
+    it("rejects respondDraw even if offering player reconnects with a different socketId (MAJ-022)", async () => {
+      const room = createActiveGameRoom("DRAW");
+      await store.save(room);
+
+      const { room: roomWithOffer } = await service.offerDraw("DRAW", "sock_white");
+
+      // Player reconnects: socketId changes from sock_white to sock_white_new
+      roomWithOffer.whitePlayer!.socketId = "sock_white_new";
+      await store.save(roomWithOffer);
+
+      await expect(
+        service.respondDraw("DRAW", "sock_white_new", true),
+      ).rejects.toThrow(InvalidPayloadError);
+
+      await expect(
+        service.respondDraw("DRAW", "sock_white_new", false),
+      ).rejects.toThrow(InvalidPayloadError);
     });
 
     it("rejects respondDraw if no draw offer is currently pending", async () => {
@@ -349,7 +425,7 @@ describe("GameService", () => {
     it("swaps player colors, clears drawOffer, and restarts game when rematch is accepted", async () => {
       const room = createActiveGameRoom("REMATCH");
       room.status = "game_over";
-      room.drawOffer = { offeredBy: "sock_white", offeredAt: Date.now() };
+      room.drawOffer = { offeredBy: "p_white_id", offeredAt: Date.now() };
       await store.save(room);
 
       await service.requestRematch("REMATCH", "sock_white");
@@ -368,10 +444,88 @@ describe("GameService", () => {
       expect(result.room.game.moveCount).toBe(0);
     });
 
+    it("calls sessionRegistry.updateSessionColor for both players with swapped colors when rematch is accepted (MIN-033)", async () => {
+      const mockSessionRegistry = {
+        createSession: vi.fn(),
+        validateSession: vi.fn(),
+        touchSession: vi.fn(),
+        deleteSession: vi.fn(),
+        deleteSessionsForRoom: vi.fn(),
+        cleanupExpiredSessions: vi.fn(),
+        clear: vi.fn(),
+        updateSessionColor: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const customService = new GameService(
+        store,
+        undefined,
+        undefined,
+        mockSessionRegistry,
+      );
+
+      const room = createActiveGameRoom("REMATCH_REG");
+      room.status = "game_over";
+      await store.save(room);
+
+      await customService.requestRematch("REMATCH_REG", "sock_white");
+      const result = await customService.respondRematch(
+        "REMATCH_REG",
+        "sock_black",
+        true,
+      );
+
+      expect(result.accept).toBe(true);
+      expect(mockSessionRegistry.updateSessionColor).toHaveBeenCalledTimes(2);
+      expect(mockSessionRegistry.updateSessionColor).toHaveBeenCalledWith(
+        "REMATCH_REG",
+        "p_white_id",
+        "b",
+      );
+      expect(mockSessionRegistry.updateSessionColor).toHaveBeenCalledWith(
+        "REMATCH_REG",
+        "p_black_id",
+        "w",
+      );
+    });
+
+    it("does not call sessionRegistry.updateSessionColor when rematch is declined (MIN-033)", async () => {
+      const mockSessionRegistry = {
+        createSession: vi.fn(),
+        validateSession: vi.fn(),
+        touchSession: vi.fn(),
+        deleteSession: vi.fn(),
+        deleteSessionsForRoom: vi.fn(),
+        cleanupExpiredSessions: vi.fn(),
+        clear: vi.fn(),
+        updateSessionColor: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const customService = new GameService(
+        store,
+        undefined,
+        undefined,
+        mockSessionRegistry,
+      );
+
+      const room = createActiveGameRoom("REMATCH_DEC");
+      room.status = "game_over";
+      await store.save(room);
+
+      await customService.requestRematch("REMATCH_DEC", "sock_white");
+      const result = await customService.respondRematch(
+        "REMATCH_DEC",
+        "sock_black",
+        false,
+      );
+
+      expect(result.accept).toBe(false);
+      expect(mockSessionRegistry.updateSessionColor).not.toHaveBeenCalled();
+    });
+
     it("reverts room to game_over and clears drawOffer when rematch is declined", async () => {
       const room = createActiveGameRoom("REMATCH");
       room.status = "game_over";
-      room.drawOffer = { offeredBy: "sock_white", offeredAt: Date.now() };
+      room.drawOffer = { offeredBy: "p_white_id", offeredAt: Date.now() };
       await store.save(room);
 
       await service.requestRematch("REMATCH", "sock_white");

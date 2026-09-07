@@ -10,7 +10,7 @@ import {
   PlayerNotInRoomError,
   InvalidPayloadError,
 } from "../room.errors.js";
-import { DisconnectTimerRegistry } from "../room.socket_handler.js";
+import { DisconnectTimerRegistry } from "../disconnect_timer_registry.js";
 import { IClock, IIdGenerator } from "../clock.js";
 
 describe("RoomService", () => {
@@ -663,6 +663,226 @@ describe("RoomService", () => {
       expect(cleaned).toBe(1);
       expect(registry.size()).toBe(0);
       expect(registry.get(room.roomCode, "p_bob")).toBeUndefined();
+    });
+  });
+
+  describe("Remediations (SC-3 findings)", () => {
+    it("initializes RoomState.version to 1 on createRoom (ENH-013)", async () => {
+      const { room } = await service.createRoom(
+        { playerName: "Host", preferredColor: "w" },
+        "sock_host",
+      );
+      expect(room.version).toBe(1);
+    });
+
+    it("retries room code generation upon collision and succeeds with unique code (MAJ-033)", async () => {
+      // Seed store with existing room 'AAAA'
+      const existingRoom: any = {
+        roomCode: "AAAA",
+        version: 1,
+        status: "lobby",
+        hostId: "h1",
+        createdAt: 1000,
+        lastActivityAt: 1000,
+        game: {} as any,
+        rematch: null,
+        drawOffer: null,
+        whitePlayer: null,
+        blackPlayer: null,
+        spectators: [],
+      };
+      await store.save(existingRoom);
+
+      // IdGenerator returns 'A' for first attempt (index 0 of charset), and 'B' for second attempt (index 1)
+      let attempt = 0;
+      const fakeIdGen: IIdGenerator = {
+        generateId: () => "p-uuid",
+        generateRandomInt: (_min, _max) => {
+          // Generates 4 chars per code. First 4 calls -> index 0 ('A'), next 4 calls -> index 1 ('B')
+          const val = attempt < 4 ? 0 : 1;
+          attempt++;
+          return val;
+        },
+      };
+
+      const customService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        fakeIdGen,
+      );
+
+      const { room } = await customService.createRoom(
+        { playerName: "Player1", preferredColor: "w" },
+        "sock_p1",
+      );
+
+      // Collided 'AAAA' was retried, generated 'BBBB'
+      expect(room.roomCode).toBe("BBBB");
+    });
+
+    it("falls back to timestamp-based room code if collision persists 100 times (MAJ-033)", async () => {
+      // Seed store with room 'AAAA'
+      const existingRoom: any = {
+        roomCode: "AAAA",
+        version: 1,
+        status: "lobby",
+        hostId: "h1",
+        createdAt: 1000,
+        lastActivityAt: 1000,
+        game: {} as any,
+        rematch: null,
+        drawOffer: null,
+        whitePlayer: null,
+        blackPlayer: null,
+        spectators: [],
+      };
+      await store.save(existingRoom);
+
+      // IdGenerator always produces index 0 ('A') -> 'AAAA' every time
+      const alwaysCollidingGen: IIdGenerator = {
+        generateId: () => "p-uuid",
+        generateRandomInt: () => 0,
+      };
+      const fixedClock: IClock = { now: () => 123456789 };
+
+      const customService = new RoomService(
+        store,
+        sessionRegistry,
+        fixedClock,
+        alwaysCollidingGen,
+      );
+
+      const { room } = await customService.createRoom(
+        { playerName: "Player1", preferredColor: "w" },
+        "sock_p1",
+      );
+
+      expect(room.roomCode.startsWith("R")).toBe(true);
+    });
+
+    it("spectator disconnect while playing keeps room in playing status and wasActiveGame false (CRIT-001)", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      // Add spectator to playing room
+      const currentRoom = (await service.getRoom(created.roomCode))!;
+      expect(currentRoom.status).toBe("playing");
+      currentRoom.spectators = [
+        {
+          id: "spec-1",
+          socketId: "sock_spec",
+          name: "Observer",
+          color: "w",
+          isHost: false,
+          isConnected: true,
+          connectedAt: Date.now(),
+        },
+      ];
+      await store.save(currentRoom);
+
+      const disconnectResult = await service.handleDisconnect("sock_spec");
+      expect(disconnectResult).not.toBeNull();
+      expect(disconnectResult?.player.id).toBe("spec-1");
+      expect(disconnectResult?.player.isConnected).toBe(false);
+      expect(disconnectResult?.wasActiveGame).toBe(false);
+
+      // Critical invariant: room status remains "playing", NOT "paused_disconnect"
+      expect(disconnectResult?.room.status).toBe("playing");
+      const updated = await service.getRoom(created.roomCode);
+      expect(updated?.status).toBe("playing");
+    });
+
+    it("handles sequential dual player disconnects without losing paused_disconnect status (CRIT-002)", async () => {
+      const { room: created, sessionToken: whiteToken } = await service.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+      const { sessionToken: blackToken, player: blackPlayer } = await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      // 1. Player 1 (White) disconnects
+      const disc1 = await service.handleDisconnect("sock_w");
+      expect(disc1).not.toBeNull();
+      expect(disc1?.wasActiveGame).toBe(true);
+      expect(disc1?.room.status).toBe("paused_disconnect");
+
+      // 2. Player 2 (Black) subsequently disconnects while room is already paused_disconnect
+      const disc2 = await service.handleDisconnect("sock_b");
+      expect(disc2).not.toBeNull();
+      // Invariant: wasActiveGame must be true for active player dropping in paused_disconnect state
+      expect(disc2?.wasActiveGame).toBe(true);
+      expect(disc2?.room.status).toBe("paused_disconnect");
+
+      // Both players are now disconnected
+      const pausedRoom = (await service.getRoom(created.roomCode))!;
+      expect(pausedRoom.whitePlayer?.isConnected).toBe(false);
+      expect(pausedRoom.blackPlayer?.isConnected).toBe(false);
+
+      // 3. Player 1 reconnects - room should REMAIN paused_disconnect because Player 2 is still offline
+      const recon1 = await service.reconnect(
+        {
+          roomCode: created.roomCode,
+          playerId: created.hostId,
+          sessionToken: whiteToken,
+        },
+        "sock_w_new",
+      );
+      expect(recon1.room.status).toBe("paused_disconnect");
+      expect(recon1.player.isConnected).toBe(true);
+
+      // 4. Player 2 reconnects - room should RESUME to "playing" because both are connected
+      const recon2 = await service.reconnect(
+        {
+          roomCode: created.roomCode,
+          playerId: blackPlayer.id,
+          sessionToken: blackToken,
+        },
+        "sock_b_new",
+      );
+      expect(recon2.room.status).toBe("playing");
+      expect(recon2.player.isConnected).toBe(true);
+    });
+
+    it("non-host leaving lobby does not delete room and sets shouldDelete to false (CRIT-008)", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "Host", preferredColor: "w" },
+        "sock_host",
+      );
+
+      // Place a guest in the lobby room
+      const lobbyRoom = (await service.getRoom(created.roomCode))!;
+      lobbyRoom.status = "lobby";
+      lobbyRoom.blackPlayer = {
+        id: "guest-id",
+        socketId: "sock_guest",
+        name: "Guest",
+        color: "b",
+        isHost: false,
+        isConnected: true,
+        connectedAt: Date.now(),
+      };
+      await store.save(lobbyRoom);
+
+      // Guest leaves the room
+      const leaveResult = await service.leaveRoom(created.roomCode, "sock_guest");
+
+      expect(leaveResult.player.id).toBe("guest-id");
+      expect(leaveResult.shouldDelete).toBe(false);
+
+      // Invariant: Host room is NOT deleted
+      const remainingRoom = await service.getRoom(created.roomCode);
+      expect(remainingRoom).not.toBeNull();
+      expect(remainingRoom?.whitePlayer?.id).toBe(created.hostId);
+      expect(remainingRoom?.blackPlayer).toBeNull();
     });
   });
 });

@@ -7,14 +7,14 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
-import { createTestServer, TestServerInstance } from "../helpers/test_server";
+import { createTestServer, TestServerInstance } from "./helpers/test_server.js";
 import {
   createConnectedSocketClient,
   disconnectSockets,
   emitAck,
   TypedSocketClient,
   waitForEvent,
-} from "../helpers/socket_client_helper";
+} from "./helpers/socket_client_helper.js";
 import {
   CreateRoomRequest,
   GameOverPayload,
@@ -29,7 +29,7 @@ import {
   RoomState,
   SocketErrorPayload,
 } from "@fun-chess/shared";
-import { FOOLS_MATE_SEQUENCE } from "../helpers/fixtures";
+import { FOOLS_MATE_SEQUENCE } from "./helpers/fixtures.js";
 
 describe("Game Completion Integration Tests", () => {
   let serverInstance: TestServerInstance;

@@ -203,6 +203,25 @@ describe("wrapSocketHandler", () => {
     });
   });
 
+  it("handles circular object references without crashing and replaces with [CIRCULAR] (MIN-040)", () => {
+    const circularObj: any = {
+      name: "test-node",
+      data: {
+        val: 123,
+      },
+    };
+    circularObj.self = circularObj;
+    circularObj.data.parent = circularObj;
+
+    const sanitized = sanitizePayload(circularObj);
+
+    expect(sanitized).toBeDefined();
+    expect(sanitized.name).toBe("test-node");
+    expect(sanitized.self).toBe("[CIRCULAR]");
+    expect(sanitized.data.val).toBe(123);
+    expect(sanitized.data.parent).toBe("[CIRCULAR]");
+  });
+
   it("handles rate limit drops with structured logger.warn and ERR_RATE_LIMITED (CRIT-001)", async () => {
     const logger = new NullLogger();
     const rateLimiter = new SocketRateLimiter({

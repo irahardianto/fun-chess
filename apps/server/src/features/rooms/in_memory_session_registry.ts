@@ -1,6 +1,11 @@
-import { randomUUID } from "node:crypto";
 import { PieceColor } from "@fun-chess/shared";
 import { SessionRecord, SessionRegistry } from "./session_registry.js";
+import {
+  IClock,
+  SystemClock,
+  IIdGenerator,
+  UuidGenerator,
+} from "./clock.js";
 
 /**
  * In-memory production implementation of SessionRegistry.
@@ -18,6 +23,11 @@ export class InMemorySessionRegistry implements SessionRegistry {
 
   private readonly DEFAULT_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
+  constructor(
+    private readonly clock: IClock = new SystemClock(),
+    private readonly idGenerator: IIdGenerator = new UuidGenerator(),
+  ) {}
+
   public async createSession(params: {
     playerId: string;
     roomCode: string;
@@ -27,8 +37,8 @@ export class InMemorySessionRegistry implements SessionRegistry {
     ttlMs?: number;
   }): Promise<SessionRecord> {
     const code = params.roomCode.toUpperCase();
-    const sessionToken = randomUUID();
-    const now = Date.now();
+    const sessionToken = this.idGenerator.generateId();
+    const now = this.clock.now();
     const expiresAt = now + (params.ttlMs || this.DEFAULT_TTL_MS);
 
     const record: SessionRecord = {
@@ -74,7 +84,7 @@ export class InMemorySessionRegistry implements SessionRegistry {
       return null;
     }
 
-    if (Date.now() > record.expiresAt) {
+    if (this.clock.now() > record.expiresAt) {
       await this.deleteSession(sessionToken);
       return null;
     }
@@ -89,7 +99,23 @@ export class InMemorySessionRegistry implements SessionRegistry {
     const record = this.sessions.get(sessionToken);
     if (record) {
       record.socketId = newSocketId;
-      record.lastSeenAt = Date.now();
+      record.lastSeenAt = this.clock.now();
+    }
+  }
+
+  public async updateSessionColor(
+    roomCode: string,
+    playerId: string,
+    newColor: PieceColor,
+  ): Promise<void> {
+    const code = roomCode.toUpperCase();
+    const token = this.playerIndex.get(`${code}:${playerId}`);
+    if (token) {
+      const record = this.sessions.get(token);
+      if (record) {
+        record.color = newColor;
+        record.lastSeenAt = this.clock.now();
+      }
     }
   }
 
@@ -128,7 +154,7 @@ export class InMemorySessionRegistry implements SessionRegistry {
   }
 
   public async cleanupExpiredSessions(): Promise<number> {
-    const now = Date.now();
+    const now = this.clock.now();
     let cleaned = 0;
     for (const [token, record] of this.sessions.entries()) {
       if (now > record.expiresAt) {

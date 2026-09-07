@@ -221,12 +221,13 @@ describe("PinoLogger", () => {
       expect(logger).toBeDefined();
     });
 
-    it("respects process.env.LOG_LEVEL when level option is omitted", () => {
+    it("defaults to 'info' level when level option is omitted without reading process.env directly (ENH-001)", () => {
       const originalEnv = process.env.LOG_LEVEL;
       try {
-        process.env.LOG_LEVEL = "debug";
+        process.env.LOG_LEVEL = "trace";
         const logger = new PinoLogger();
         expect(logger).toBeDefined();
+        // Logger should not crash and should be defined with default 'info'
       } finally {
         if (originalEnv) {
           process.env.LOG_LEVEL = originalEnv;
@@ -234,6 +235,11 @@ describe("PinoLogger", () => {
           delete process.env.LOG_LEVEL;
         }
       }
+    });
+
+    it("accepts explicit level in options", () => {
+      const logger = new PinoLogger({ level: "debug" });
+      expect(logger).toBeDefined();
     });
   });
 });

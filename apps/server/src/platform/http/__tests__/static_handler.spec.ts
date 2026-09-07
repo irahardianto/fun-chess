@@ -311,6 +311,105 @@ describe("serveStaticFile", () => {
       expect(loggedWarnings[0].meta.operation).toBe("security_violation");
       expect(loggedWarnings[0].meta.clientIp).toBe("172.16.0.22");
     });
+
+    it("detects null byte injection (%00 and \\0) returning 403 Forbidden (MAJ-034)", async () => {
+      for (const nullByteUrl of ["/%00/etc/passwd", "/assets/logo.png\0.html"]) {
+        let statusCode = 0;
+        let responseBody = "";
+
+        const mockRes = {
+          writeHead: (status: number) => {
+            statusCode = status;
+            return mockRes;
+          },
+          end: (body?: string) => {
+            responseBody = body || "";
+            return mockRes;
+          },
+        } as unknown as ServerResponse;
+
+        const customReq = {
+          url: nullByteUrl,
+          headers: {},
+        } as unknown as IncomingMessage;
+
+        const handled = await serveStaticFile(customReq, mockRes, {
+          distPath: tempDir,
+        });
+
+        expect(handled).toBe(true);
+        expect(statusCode).toBe(403);
+        expect(responseBody).toBe("Forbidden");
+      }
+    });
+
+    it("extracts rightmost IP from x-forwarded-for in security violation logs (CRIT-006)", async () => {
+      let loggedIp = "";
+
+      const mockRes = {
+        writeHead: () => mockRes,
+        end: () => mockRes,
+      } as unknown as ServerResponse;
+
+      const customReq = {
+        url: "/../secret",
+        headers: {
+          "x-forwarded-for": "10.0.0.1, 172.16.0.2, 198.51.100.77",
+        },
+      } as unknown as IncomingMessage;
+
+      const mockLogger = {
+        info: () => {},
+        warn: (_msg: string, meta: any) => {
+          loggedIp = meta.clientIp;
+        },
+        error: () => {},
+        debug: () => {},
+        child: () => mockLogger,
+      } as unknown as Logger;
+
+      await serveStaticFile(
+        customReq,
+        mockRes,
+        { distPath: tempDir },
+        mockLogger,
+      );
+
+      expect(loggedIp).toBe("198.51.100.77");
+    });
+
+    it("passes correlationId into static file serving security logs (MAJ-016)", async () => {
+      let loggedCorrId = "";
+
+      const mockRes = {
+        writeHead: () => mockRes,
+        end: () => mockRes,
+      } as unknown as ServerResponse;
+
+      const customReq = {
+        url: "/../secret",
+        headers: {},
+      } as unknown as IncomingMessage;
+
+      const mockLogger = {
+        info: () => {},
+        warn: (_msg: string, meta: any) => {
+          loggedCorrId = meta.correlationId;
+        },
+        error: () => {},
+        debug: () => {},
+        child: () => mockLogger,
+      } as unknown as Logger;
+
+      await serveStaticFile(
+        customReq,
+        mockRes,
+        { distPath: tempDir, correlationId: "static-corr-999" },
+        mockLogger,
+      );
+
+      expect(loggedCorrId).toBe("static-corr-999");
+    });
   });
 
   describe("Fallback HTML and Missing File Handling", () => {
@@ -390,6 +489,39 @@ describe("serveStaticFile", () => {
       expect(debugLogged).toBe(true);
 
       await fs.rm(emptyDir, { recursive: true, force: true });
+    });
+
+    it("returns 404 Not Found for missing non-HTML assets (.png, .js, .css) without returning index.html (MAJ-034)", async () => {
+      for (const assetPath of ["/missing-bundle.js", "/styles/missing.css", "/icons/missing.png"]) {
+        let statusCode = 0;
+        let responseBody = "";
+
+        const mockReq = {
+          url: assetPath,
+          headers: {
+            accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+        } as IncomingMessage;
+
+        const mockRes = {
+          writeHead: (status: number) => {
+            statusCode = status;
+            return mockRes;
+          },
+          end: (body?: string) => {
+            responseBody = body || "";
+            return mockRes;
+          },
+        } as unknown as ServerResponse;
+
+        const handled = await serveStaticFile(mockReq, mockRes, {
+          distPath: tempDir,
+        });
+
+        expect(handled).toBe(true);
+        expect(statusCode).toBe(404);
+        expect(responseBody).toBe("Not Found");
+      }
     });
   });
 

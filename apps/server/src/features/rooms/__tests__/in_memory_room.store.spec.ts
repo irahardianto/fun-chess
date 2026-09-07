@@ -378,5 +378,82 @@ describe("InMemoryRoomStore", () => {
       expect(finalRoom.game.moveCount).toBe(10);
       expect(finalRoom.version).toBe(11); // Initial (1) + 10 mutations = 11
     });
+
+    it("retains lock queue during delete when waiters are queued (MAJ-024)", async () => {
+      const room = createDummyRoom("HOLD");
+      await store.save(room);
+
+      let slowMutationStarted = false;
+      let slowMutationFinished = false;
+      let secondWaiterExecuted = false;
+
+      // First action holds the lock
+      const action1 = store.withLock("HOLD", async () => {
+        slowMutationStarted = true;
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        slowMutationFinished = true;
+        return "action1";
+      });
+
+      // Wait until action1 has acquired the lock
+      while (!slowMutationStarted) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+
+      // Second action is queued while action1 is running
+      const action2 = store.withLock("HOLD", async () => {
+        expect(slowMutationFinished).toBe(true);
+        secondWaiterExecuted = true;
+        return "action2";
+      });
+
+      // Call delete while action2 is waiting
+      const deleted = await store.delete("HOLD");
+      expect(deleted).toBe(true);
+
+      // Lock queue must NOT be deleted immediately because action2 is queued
+      const queueEntry = (store as any).lockQueues.get("HOLD");
+      expect(queueEntry).toBeDefined();
+
+      const [res1, res2] = await Promise.all([action1, action2]);
+      expect(res1).toBe("action1");
+      expect(res2).toBe("action2");
+      expect(secondWaiterExecuted).toBe(true);
+
+      // Wait for next tick for the finally cleanup
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // After waiters settle, queue should be cleaned up
+      expect((store as any).lockQueues.get("HOLD")).toBeUndefined();
+    });
+  });
+
+  describe("Clock and IdGenerator injection (MAJ-012)", () => {
+    it("uses injected IClock for lastActivityAt timestamps", async () => {
+      const fixedTime = 1699999999000;
+      const mockClock = { now: () => fixedTime };
+      const customStore = new InMemoryRoomStore(mockClock);
+
+      const room = createDummyRoom("TIME");
+      delete (room as any).lastActivityAt;
+      await customStore.save(room);
+
+      const saved = await customStore.findByCode("TIME");
+      expect(saved?.lastActivityAt).toBe(fixedTime);
+
+      const updatedTime = 1700000000000;
+      let currentTime = updatedTime;
+      const updatingClock = { now: () => currentTime };
+      const updatingStore = new InMemoryRoomStore(updatingClock);
+      await updatingStore.save(createDummyRoom("MUT8"));
+
+      await updatingStore.mutate("MUT8", (r) => ({
+        updatedRoom: { ...r, game: { ...r.game, moveCount: 1 } },
+        result: true,
+      }));
+
+      const mutated = await updatingStore.findByCode("MUT8");
+      expect(mutated?.lastActivityAt).toBe(updatedTime);
+    });
   });
 });

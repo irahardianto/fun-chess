@@ -1,7 +1,7 @@
 import { Server as HttpServer } from "node:http";
 import { Server as SocketIOServer, ServerOptions } from "socket.io";
 import { ClientToServerEvents, ServerToClientEvents } from "@fun-chess/shared";
-import { isOriginAllowed, loadServerConfig, resolveAllowedOrigins } from "../config/index.js";
+import { isOriginAllowed, resolveAllowedOrigins, type ServerEnv } from "../config/index.js";
 import { Logger } from "../logger/logger.interface.js";
 
 export type TypedSocketServer = SocketIOServer<
@@ -12,13 +12,14 @@ export type TypedSocketServer = SocketIOServer<
 export interface SocketServerConfig extends Partial<ServerOptions> {
   allowedOrigins?: string[];
   logger?: Logger;
+  env?: Partial<ServerEnv>;
 }
 
 /**
  * Creates and configures a Socket.io server instance attached to an HTTP server.
- * Enforces CORS origin allowlist restrictions in production mode (MAJ-003).
- * Fails fast on invalid configuration during origin resolution (CRIT-006).
- * Logs engine transport and handshake errors when logger is provided (MAJ-022).
+ * Delegates strictly to resolveAllowedOrigins without direct process.env reads (MAJ-002).
+ * Strips query strings before logging connection error URLs to prevent token exposure (MAJ-017).
+ * Enforces CORS origin allowlist restrictions.
  */
 export function createSocketServer(
   httpServer: HttpServer,
@@ -26,19 +27,7 @@ export function createSocketServer(
 ): TypedSocketServer {
   const allowedOrigins =
     customOptions?.allowedOrigins ??
-    (() => {
-      if (process.env.CORS_ORIGIN) {
-        return process.env.CORS_ORIGIN.split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-      }
-      if (process.env.NODE_ENV === "production") {
-        // Fail fast without swallowing config exceptions (CRIT-006)
-        const env = loadServerConfig(process.env);
-        return resolveAllowedOrigins(env);
-      }
-      return ["*"];
-    })();
+    resolveAllowedOrigins(customOptions?.env);
 
   const corsOrigin =
     allowedOrigins.includes("*")
@@ -56,7 +45,7 @@ export function createSocketServer(
             }
           };
 
-  const { allowedOrigins: _omit, logger, ...ioOptions } = customOptions || {};
+  const { allowedOrigins: _omit, logger, env: _env, ...ioOptions } = customOptions || {};
 
   const io = new SocketIOServer<ClientToServerEvents, ServerToClientEvents>(
     httpServer,
@@ -83,12 +72,14 @@ export function createSocketServer(
         context?: unknown;
       };
 
+      const sanitizedUrl = errorObj.req?.url?.split("?")[0];
+
       logger.warn("Socket engine connection error", {
         operation: "socket_engine_connection_error",
         code: errorObj.code,
         message: errorObj.message,
         context: errorObj.context,
-        url: errorObj.req?.url,
+        url: sanitizedUrl,
         origin: errorObj.req?.headers?.origin,
       });
     });

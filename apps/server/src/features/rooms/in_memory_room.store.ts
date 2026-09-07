@@ -5,6 +5,12 @@ import {
   OptimisticLockConflictError,
   LockTimeoutError,
 } from "./room.errors.js";
+import {
+  IClock,
+  SystemClock,
+  IIdGenerator,
+  UuidGenerator,
+} from "./clock.js";
 
 interface LockEntry {
   tail: Promise<unknown>;
@@ -21,6 +27,11 @@ export class InMemoryRoomStore implements RoomStore {
   // PERF: Reverse index from socketId -> { roomCode, playerId } for O(1) disconnect lookups (HIGH-006)
   private readonly socketIndex = new Map<string, { roomCode: string; playerId: string }>();
   private readonly LOCK_TIMEOUT_MS = 5000;
+
+  constructor(
+    private readonly clock: IClock = new SystemClock(),
+    private readonly idGenerator: IIdGenerator = new UuidGenerator(),
+  ) {}
 
   private indexSockets(room: RoomState): void {
     const code = room.roomCode.toUpperCase();
@@ -191,7 +202,7 @@ export class InMemoryRoomStore implements RoomStore {
         lastActivityAt:
           updatedRoom.lastActivityAt !== existing.lastActivityAt
             ? updatedRoom.lastActivityAt
-            : Date.now(),
+            : this.clock.now(),
       };
 
       this.rooms.set(code, roomToSave);
@@ -219,7 +230,7 @@ export class InMemoryRoomStore implements RoomStore {
     const roomToSave: RoomState = {
       ...structuredClone(room),
       version: nextVersion,
-      lastActivityAt: room.lastActivityAt ?? Date.now(),
+      lastActivityAt: room.lastActivityAt ?? this.clock.now(),
     };
 
     this.rooms.set(code, roomToSave);
@@ -228,7 +239,18 @@ export class InMemoryRoomStore implements RoomStore {
 
   public async delete(roomCode: string): Promise<boolean> {
     const code = roomCode.toUpperCase();
-    this.lockQueues.delete(code);
+    const entry = this.lockQueues.get(code);
+    if (entry && entry.waitersCount > 0) {
+      // Retain queue until all queued operations settle to preserve linearizability (MAJ-024)
+      entry.tail.finally(() => {
+        const current = this.lockQueues.get(code);
+        if (current && current.waitersCount <= 0) {
+          this.lockQueues.delete(code);
+        }
+      });
+    } else {
+      this.lockQueues.delete(code);
+    }
     this.unindexSockets(code);
     return this.rooms.delete(code);
   }

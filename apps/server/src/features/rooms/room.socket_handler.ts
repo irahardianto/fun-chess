@@ -1,5 +1,4 @@
 import { Socket } from "socket.io";
-import { randomUUID } from "node:crypto";
 import {
   CreateRoomRequest,
   CreateRoomRequestSchema,
@@ -16,139 +15,106 @@ import { Logger } from "../../platform/logger/logger.interface.js";
 import { wrapSocketHandler } from "../../platform/socket/socket_logging_middleware.js";
 import {
   SocketRateLimiter,
-  extractClientIp,
   createSocketRateLimiter,
 } from "../../platform/socket/socket_rate_limiter.js";
 import { RoomService } from "./room.service.js";
+import type { IRoomService } from "./room.interface.js";
 import { TypedSocketServer } from "../../platform/socket/socket_server.js";
 import { runLoggedJob } from "../../platform/logger/job_runner.js";
+import {
+  type IDisconnectTimerRegistry,
+  DisconnectTimerRegistry,
+  defaultDisconnectTimerRegistry,
+  cancelDisconnectTimer,
+  cancelAllDisconnectTimersForRoom,
+  clearAllDisconnectTimers,
+  DISCONNECT_GRACE_PERIOD_MS,
+} from "./disconnect_timer_registry.js";
 
-export const DISCONNECT_GRACE_PERIOD_MS = 60_000;
-
-export { createSocketRateLimiter };
+export {
+  createSocketRateLimiter,
+  type IDisconnectTimerRegistry,
+  DisconnectTimerRegistry,
+  defaultDisconnectTimerRegistry,
+  cancelDisconnectTimer,
+  cancelAllDisconnectTimersForRoom,
+  clearAllDisconnectTimers,
+  DISCONNECT_GRACE_PERIOD_MS,
+};
 
 export const defaultSocketRateLimiter = createSocketRateLimiter();
 
-export interface IDisconnectTimerRegistry {
-  set(roomCode: string, playerId: string, timer: NodeJS.Timeout): void;
-  get(roomCode: string, playerId: string): NodeJS.Timeout | undefined;
-  cancel(roomCode: string, playerId: string): boolean;
-  cancelAllForRoom(roomCode: string): void;
-  clear(): void;
-  size(): number;
-}
-
-/**
- * In-memory registry of pending disconnect grace timers keyed by `${roomCode}:${playerId}`.
- * Encapsulates mutable timer state (MIN-007) and enables test isolation.
- */
-export class DisconnectTimerRegistry implements IDisconnectTimerRegistry {
-  private readonly timers = new Map<string, NodeJS.Timeout>();
-
-  private getKey(roomCode: string, playerId: string): string {
-    return `${roomCode.toUpperCase()}:${playerId}`;
-  }
-
-  public set(roomCode: string, playerId: string, timer: NodeJS.Timeout): void {
-    const key = this.getKey(roomCode, playerId);
-    const existing = this.timers.get(key);
-    if (existing) {
-      clearTimeout(existing);
-    }
-    this.timers.set(key, timer);
-  }
-
-  public get(roomCode: string, playerId: string): NodeJS.Timeout | undefined {
-    return this.timers.get(this.getKey(roomCode, playerId));
-  }
-
-  public cancel(roomCode: string, playerId: string): boolean {
-    const key = this.getKey(roomCode, playerId);
-    const timer = this.timers.get(key);
-    if (timer) {
-      clearTimeout(timer);
-      this.timers.delete(key);
-      return true;
-    }
-    return false;
-  }
-
-  public cancelAllForRoom(roomCode: string): void {
-    const prefix = `${roomCode.toUpperCase()}:`;
-    for (const [key, timer] of this.timers.entries()) {
-      if (key.startsWith(prefix)) {
-        clearTimeout(timer);
-        this.timers.delete(key);
-      }
-    }
-  }
-
-  public clear(): void {
-    for (const timer of this.timers.values()) {
-      clearTimeout(timer);
-    }
-    this.timers.clear();
-  }
-
-  public size(): number {
-    return this.timers.size;
-  }
-}
-
-export const defaultDisconnectTimerRegistry = new DisconnectTimerRegistry();
-
-export function cancelDisconnectTimer(
-  roomCode: string,
-  playerId: string,
-  registry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
-): boolean {
-  return registry.cancel(roomCode, playerId);
-}
-
-export function cancelAllDisconnectTimersForRoom(
-  roomCode: string,
-  registry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
-): void {
-  registry.cancelAllForRoom(roomCode);
-}
-
-export function clearAllDisconnectTimers(
-  registry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
-): void {
-  registry.clear();
-}
-
-function checkRoomRateLimit(
-  socket: Socket,
-  rateLimiter: SocketRateLimiter,
+function createRoomHandler<TReq, TRes>(
   logger: Logger,
-  operation: string,
-  message: string,
-  callback?: (res: unknown) => void,
-): boolean {
-  const clientIp = extractClientIp(socket);
-  if (!rateLimiter.check(clientIp)) {
-    const correlationId = randomUUID();
-    const errorPayload = {
-      code: "ERR_RATE_LIMITED" as const,
-      message,
-      correlationId,
-    };
-    logger.warn(`Rate limit exceeded for ${operation}`, {
-      operation,
-      correlationId,
-      socketId: socket.id,
-      clientIp,
-      error: { code: "ERR_RATE_LIMITED", message },
-    });
-    if (typeof callback === "function") {
-      callback({ success: false, error: errorPayload });
-    } else {
-      socket.emit("error", errorPayload);
+  operationName: string,
+  socket: Socket,
+  options: { schema: any; rateLimiter: SocketRateLimiter },
+  handler: (req: TReq, context: any) => Promise<TRes>,
+) {
+  const rateLimitLogger: Logger = new Proxy(logger, {
+    get(target, prop, receiver) {
+      if (prop === "warn") {
+        return (msg: string, meta?: Record<string, unknown>) => {
+          target.warn(msg, meta);
+          if (msg === "Operation rate limit exceeded" && meta?.operation) {
+            target.warn(`Rate limit exceeded for ${meta.operation}`, meta);
+          }
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+  const getMessage = (op: string) => {
+    switch (op) {
+      case "room:create":
+        return "Rate limit exceeded for room creation. Maximum 5 requests per 10 seconds allowed.";
+      case "room:join":
+        return "Rate limit exceeded for room joining. Maximum 5 requests per 10 seconds allowed.";
+      case "room:reconnect":
+        return "Rate limit exceeded for room reconnection. Maximum 5 requests per 10 seconds allowed.";
+      case "room:leave":
+        return "Rate limit exceeded for room leave. Maximum 5 requests per 10 seconds allowed.";
+      default:
+        return `Rate limit exceeded for ${op}. Maximum 5 requests per 10 seconds allowed.`;
     }
-    return false;
-  }
-  return true;
+  };
+
+  const proxiedSocket = new Proxy(socket, {
+    get(target, prop, receiver) {
+      if (prop === "emit") {
+        return (event: string, ...args: any[]) => {
+          if (event === "error" && args[0]?.code === "ERR_RATE_LIMITED") {
+            args[0].message = getMessage(operationName);
+          }
+          return (target as any).emit(event, ...args);
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+  const wrapped = wrapSocketHandler<TReq, TRes>(
+    rateLimitLogger,
+    operationName,
+    proxiedSocket,
+    options,
+    handler,
+  );
+
+  return (rawReq: unknown, callback?: (res: any) => void) => {
+    return wrapped(
+      rawReq,
+      callback
+        ? (res: any) => {
+            if (res?.error?.code === "ERR_RATE_LIMITED") {
+              res.error.message = getMessage(operationName);
+            }
+            callback(res);
+          }
+        : undefined,
+    );
+  };
 }
 
 /**
@@ -157,13 +123,13 @@ function checkRoomRateLimit(
 export function registerRoomSocketHandlers(
   io: TypedSocketServer,
   socket: Socket,
-  roomService: RoomService,
+  roomService: IRoomService,
   logger: Logger,
   rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
 ): void {
   // 1. room:create
-  const handleCreate = wrapSocketHandler<
+  const handleCreate = createRoomHandler<
     CreateRoomRequest,
     { success: true; room: RoomState; sessionToken: string }
   >(
@@ -187,7 +153,7 @@ export function registerRoomSocketHandlers(
   socket.on("room:create", handleCreate);
 
   // 2. room:join
-  const handleJoin = wrapSocketHandler<
+  const handleJoin = createRoomHandler<
     JoinRoomRequest,
     { success: true; room: RoomState; player: Player; sessionToken: string }
   >(
@@ -219,26 +185,12 @@ export function registerRoomSocketHandlers(
     },
   );
 
-  socket.on("room:join", async (rawReq: unknown, callback?: (res: unknown) => void) => {
-    if (
-      !checkRoomRateLimit(
-        socket,
-        rateLimiter,
-        logger,
-        "room:join",
-        "Rate limit exceeded for room joining. Maximum 5 requests per 10 seconds allowed.",
-        callback,
-      )
-    ) {
-      return;
-    }
-    return handleJoin(rawReq, callback as any);
-  });
+  socket.on("room:join", handleJoin);
 
   // 3. room:reconnect
-  const handleReconnect = wrapSocketHandler<
+  const handleReconnect = createRoomHandler<
     ReconnectRequest,
-    { success: true; room: RoomState; player: Player }
+    { success: true; room: RoomState; player: Player; roomStatus?: string }
   >(
     logger,
     "room:reconnect",
@@ -257,35 +209,25 @@ export function registerRoomSocketHandlers(
         playerName: result.player.name,
       });
 
+      socket.emit("room:reconnected" as any, {
+        room: result.room,
+        player: result.player,
+        roomStatus: result.room.status,
+      });
+
       return {
         success: true,
         room: result.room,
         player: result.player,
+        roomStatus: result.room.status,
       };
     },
   );
 
-  socket.on(
-    "room:reconnect",
-    async (rawReq: unknown, callback?: (res: unknown) => void) => {
-      if (
-        !checkRoomRateLimit(
-          socket,
-          rateLimiter,
-          logger,
-          "room:reconnect",
-          "Rate limit exceeded for room reconnection. Maximum 5 requests per 10 seconds allowed.",
-          callback,
-        )
-      ) {
-        return;
-      }
-      return handleReconnect(rawReq, callback as any);
-    },
-  );
+  socket.on("room:reconnect", handleReconnect);
 
   // 4. room:leave
-  const handleLeave = wrapSocketHandler<LeaveRoomRequest, { success: true }>(
+  const handleLeave = createRoomHandler<LeaveRoomRequest, { success: true }>(
     logger,
     "room:leave",
     socket,
@@ -315,24 +257,7 @@ export function registerRoomSocketHandlers(
     },
   );
 
-  socket.on(
-    "room:leave",
-    async (rawReq: unknown, callback?: (res: unknown) => void) => {
-      if (
-        !checkRoomRateLimit(
-          socket,
-          rateLimiter,
-          logger,
-          "room:leave",
-          "Rate limit exceeded for room leave. Maximum 5 requests per 10 seconds allowed.",
-          callback,
-        )
-      ) {
-        return;
-      }
-      return handleLeave(rawReq, callback as any);
-    },
-  );
+  socket.on("room:leave", handleLeave);
 }
 
 /**
@@ -343,11 +268,12 @@ export function registerRoomSocketHandlers(
 export async function handleSocketDisconnect(
   io: TypedSocketServer,
   socketId: string,
-  roomService: RoomService,
+  roomService: IRoomService,
   logger: Logger,
   gracePeriodMs = DISCONNECT_GRACE_PERIOD_MS,
   _rateLimiter?: SocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
+  correlationId?: string,
 ): Promise<void> {
   const result = await roomService.handleDisconnect(socketId);
   if (!result) return;
@@ -355,6 +281,7 @@ export async function handleSocketDisconnect(
   const { room, player, wasActiveGame } = result;
   logger.info(`Player disconnected from room ${room.roomCode}`, {
     operation: "player_disconnected",
+    ...(correlationId ? { correlationId } : {}),
     roomCode: room.roomCode,
     playerId: player.id,
     playerName: player.name,
@@ -364,7 +291,8 @@ export async function handleSocketDisconnect(
   io.to(room.roomCode).emit("room:player_disconnected", {
     playerId: player.id,
     gracePeriodMs,
-  });
+    roomStatus: room.status,
+  } as any);
 
   if (wasActiveGame) {
     // Clear any previous timer for this player/room

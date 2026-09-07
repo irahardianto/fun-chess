@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/**/*.spec.ts'],
+    include: ['apps/server/src/__tests__/integration/**/*.spec.ts'],
     testTimeout: 10000,
     hookTimeout: 10000,
     isolate: true,
@@ -15,7 +15,7 @@ export default defineConfig({
       thresholds: {
         lines: 85,
         functions: 85,
-        branches: 80,
+        branches: 85,
         statements: 85,
       },
       exclude: [
@@ -24,7 +24,6 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.spec.ts',
         '**/*.test.ts',
-        'tests/**',
         'apps/e2e/**',
         'infra/**',
       ],

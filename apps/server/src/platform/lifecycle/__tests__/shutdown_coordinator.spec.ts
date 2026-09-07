@@ -123,4 +123,20 @@ describe("ShutdownCoordinator", () => {
     expect(timeoutLog).toBeDefined();
     expect(timeoutLog?.context?.["duration"]).toBeTypeOf("number");
   });
+
+  it("passes correlationId in shutdown logs (MAJ-016)", async () => {
+    const coordinator = new ShutdownCoordinator({
+      server: mockServer as HttpServer,
+      io: mockIo as TypedSocketServer,
+      logger,
+      onExit: (code) => exitCalls.push(code),
+    });
+
+    await coordinator.shutdown("SIGTERM", "custom-corr-id-123");
+
+    const startLog = logger.infoLogs.find((l) => l.message.includes("Received SIGTERM"));
+    expect(startLog?.context?.["correlationId"]).toBe("custom-corr-id-123");
+    const completeLog = logger.infoLogs.find((l) => l.message.includes("Fun Chess server closed successfully"));
+    expect(completeLog?.context?.["correlationId"]).toBe("custom-corr-id-123");
+  });
 });

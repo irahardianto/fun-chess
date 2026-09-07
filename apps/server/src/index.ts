@@ -147,14 +147,16 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
   const io = createSocketServer(server, {
     allowedOrigins,
     logger,
+    env,
   });
   ioInstance = io;
 
-  // Shared Socket Rate Limiter singleton (SEC-HIGH-001, MAJ-001, MAJ-003)
+  // Shared Socket Rate Limiter singleton (SEC-HIGH-001, MAJ-001, MAJ-003, MAJ-015)
   const rateLimiter = createSocketRateLimiter({
     maxKeys: env.RATE_LIMIT_MAX_KEYS ?? 10_000,
     windowMs: env.RATE_LIMIT_WINDOW_MS ?? 10_000,
-    maxRequests: env.RATE_LIMIT_MAX_REQUESTS ?? 5,
+    maxRequests: env.RATE_LIMIT_MAX_REQUESTS ?? (env.NODE_ENV === "production" ? 60 : 1000),
+    logger,
   });
 
   // 5. Register Feature Socket Ingress Handlers & Transport Error Logging (ENH-005, MAJ-025, CRIT-003)
@@ -184,6 +186,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
       });
     });
 
+    // Register all game & room handlers with structured logging middleware
     registerRoomSocketHandlers(
       io,
       socket,
@@ -213,6 +216,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
           undefined,
           rateLimiter,
           timerRegistry,
+          disconnectCorrelationId,
         );
       } catch (err: unknown) {
         logger.error("Client socket disconnect handler failed", {
@@ -357,11 +361,22 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
 // Auto-start if executed directly via node or CLI
 const isMain =
   Boolean(process.argv[1]) &&
-  fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1]!);
 
 if (isMain) {
   startServer().catch((err) => {
-    console.error("Fatal bootstrap error:", err);
+    const bootstrapCorrelationId = randomUUID();
+    const fallbackLogger = new PinoLogger({
+      level: (process.env.LOG_LEVEL as any) ?? "info",
+    });
+    fallbackLogger.fatal("Fatal bootstrap error during server startup", {
+      operation: "server_bootstrap_fatal",
+      correlationId: bootstrapCorrelationId,
+      error:
+        err instanceof Error
+          ? { name: err.name, message: err.message, stack: err.stack }
+          : { raw: err },
+    });
     process.exit(1);
   });
 }

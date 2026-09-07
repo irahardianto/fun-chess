@@ -3,11 +3,50 @@ import {
   loadServerConfig,
   resolveAllowedOrigins,
   isOriginAllowed,
-  ServerEnvSchema,
+  safeParseUrl,
   type ServerEnv,
 } from "../index.js";
 
-describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
+describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, ENH-003)", () => {
+  describe("safeParseUrl (CRIT-003)", () => {
+    it("parses valid URLs with http and https protocols", () => {
+      const u1 = safeParseUrl("https://fun-chess.com/play");
+      expect(u1).toBeDefined();
+      expect(u1?.origin).toBe("https://fun-chess.com");
+
+      const u2 = safeParseUrl("http://localhost:3000");
+      expect(u2).toBeDefined();
+      expect(u2?.origin).toBe("http://localhost:3000");
+    });
+
+    it("normalizes protocol-less URLs by prefixing with protocol", () => {
+      const u1 = safeParseUrl("chess.example.com");
+      expect(u1).toBeDefined();
+      expect(u1?.origin).toBe("https://chess.example.com");
+
+      const u2 = safeParseUrl("localhost:5173");
+      expect(u2).toBeDefined();
+      expect(u2?.origin).toBe("http://localhost:5173");
+
+      const u3 = safeParseUrl("127.0.0.1:8080/room/1234");
+      expect(u3).toBeDefined();
+      expect(u3?.origin).toBe("http://127.0.0.1:8080");
+    });
+
+    it("normalizes protocol-relative URLs", () => {
+      const u = safeParseUrl("//fun-chess-prod.a.run.app");
+      expect(u).toBeDefined();
+      expect(u?.origin).toBe("https://fun-chess-prod.a.run.app");
+    });
+
+    it("returns undefined for invalid or empty inputs without throwing", () => {
+      expect(safeParseUrl("")).toBeUndefined();
+      expect(safeParseUrl("   ")).toBeUndefined();
+      expect(safeParseUrl(undefined as any)).toBeUndefined();
+      expect(safeParseUrl("http://:invalid")).toBeUndefined();
+    });
+  });
+
   describe("loadServerConfig", () => {
     it("loads default configuration when raw environment is empty", () => {
       const config = loadServerConfig({});
@@ -116,6 +155,59 @@ describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
       expect(() => loadServerConfig({ NODE_ENV: "staging" })).toThrow();
       expect(() => loadServerConfig({ NODE_ENV: "qa" })).toThrow();
     });
+
+    describe("Production Cloud Run Validation (CRIT-007)", () => {
+      it("fails fast in production mode when neither CORS_ORIGIN nor PUBLIC_URL is provided", () => {
+        expect(() =>
+          loadServerConfig({
+            NODE_ENV: "production",
+          }),
+        ).toThrowError(/Either CORS_ORIGIN or PUBLIC_URL must be configured in production mode/);
+      });
+
+      it("fails fast in production mode when CORS_ORIGIN contains wildcard '*'", () => {
+        expect(() =>
+          loadServerConfig({
+            NODE_ENV: "production",
+            CORS_ORIGIN: "*",
+          }),
+        ).toThrowError(/Wildcard CORS_ORIGIN '\*' is forbidden in production mode/);
+
+        expect(() =>
+          loadServerConfig({
+            NODE_ENV: "production",
+            CORS_ORIGIN: "https://fun-chess.com, *",
+          }),
+        ).toThrowError(/Wildcard CORS_ORIGIN '\*' is forbidden in production mode/);
+      });
+
+      it("fails fast in production mode when PUBLIC_URL is invalid", () => {
+        expect(() =>
+          loadServerConfig({
+            NODE_ENV: "production",
+            PUBLIC_URL: "http://:invalid",
+          }),
+        ).toThrowError(/PUBLIC_URL must be a valid URL/);
+      });
+
+      it("succeeds in production mode with valid CORS_ORIGIN", () => {
+        const config = loadServerConfig({
+          NODE_ENV: "production",
+          CORS_ORIGIN: "https://fun-chess.com, https://play.fun-chess.com",
+        });
+        expect(config.NODE_ENV).toBe("production");
+        expect(config.CORS_ORIGIN).toBe("https://fun-chess.com, https://play.fun-chess.com");
+      });
+
+      it("succeeds in production mode with valid PUBLIC_URL", () => {
+        const config = loadServerConfig({
+          NODE_ENV: "production",
+          PUBLIC_URL: "https://fun-chess-app-prod.a.run.app",
+        });
+        expect(config.NODE_ENV).toBe("production");
+        expect(config.PUBLIC_URL).toBe("https://fun-chess-app-prod.a.run.app");
+      });
+    });
   });
 
   describe("resolveAllowedOrigins", () => {
@@ -135,13 +227,13 @@ describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
       ]);
     });
 
-    it("parses and trims comma-separated CORS_ORIGIN", () => {
+    it("parses and trims comma-separated CORS_ORIGIN, stripping trailing slashes (MIN-003)", () => {
       const env: ServerEnv = {
         NODE_ENV: "development",
         PORT: 3000,
         HOST: "0.0.0.0",
         LOG_LEVEL: "info",
-        CORS_ORIGIN: "https://chess.example.com, https://play.fun-chess.io , http://localhost:5173",
+        CORS_ORIGIN: "https://chess.example.com/, https://play.fun-chess.io/// , http://localhost:5173",
       };
 
       const origins = resolveAllowedOrigins(env);
@@ -152,7 +244,7 @@ describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
       ]);
     });
 
-    it("derives origin from PUBLIC_URL when CORS_ORIGIN is not set", () => {
+    it("derives origin from PUBLIC_URL when CORS_ORIGIN is not set, stripping trailing slashes", () => {
       const env: ServerEnv = {
         NODE_ENV: "development",
         PORT: 3000,
@@ -165,17 +257,70 @@ describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
       expect(origins).toEqual(["https://fun-chess-app-prod.a.run.app"]);
     });
 
-    it("derives origin from CLIENT_URL when CORS_ORIGIN is not set", () => {
+    it("derives origin from protocol-less PUBLIC_URL without crashing (CRIT-003)", () => {
       const env: ServerEnv = {
         NODE_ENV: "development",
         PORT: 3000,
         HOST: "0.0.0.0",
         LOG_LEVEL: "info",
-        CLIENT_URL: "https://fun-chess-client.example.com/play",
+        PUBLIC_URL: "fun-chess-prod.a.run.app/play",
+      };
+
+      const origins = resolveAllowedOrigins(env);
+      expect(origins).toEqual(["https://fun-chess-prod.a.run.app"]);
+    });
+
+    it("derives origin from CLIENT_URL when CORS_ORIGIN is not set, stripping trailing slashes", () => {
+      const env: ServerEnv = {
+        NODE_ENV: "development",
+        PORT: 3000,
+        HOST: "0.0.0.0",
+        LOG_LEVEL: "info",
+        CLIENT_URL: "https://fun-chess-client.example.com/play/",
       };
 
       const origins = resolveAllowedOrigins(env);
       expect(origins).toEqual(["https://fun-chess-client.example.com"]);
+    });
+
+    it("derives origin from protocol-less CLIENT_URL without crashing (CRIT-003)", () => {
+      const env: ServerEnv = {
+        NODE_ENV: "development",
+        PORT: 3000,
+        HOST: "0.0.0.0",
+        LOG_LEVEL: "info",
+        CLIENT_URL: "localhost:5173/play",
+      };
+
+      const origins = resolveAllowedOrigins(env);
+      expect(origins).toEqual(["http://localhost:5173"]);
+    });
+
+    it("strictly relies on passed env and does not fallback to process.env (ENH-003)", () => {
+      const originalEnv = process.env.CORS_ORIGIN;
+      try {
+        process.env.CORS_ORIGIN = "https://leaked-from-process-env.com";
+        const env: ServerEnv = {
+          NODE_ENV: "development",
+          PORT: 3000,
+          HOST: "0.0.0.0",
+          LOG_LEVEL: "info",
+        };
+
+        const origins = resolveAllowedOrigins(env);
+        // Should NOT contain the leaked process.env value!
+        expect(origins).toEqual([
+          "http://localhost:5173",
+          "http://127.0.0.1:5173",
+          "http://localhost:3000",
+        ]);
+      } finally {
+        if (originalEnv !== undefined) {
+          process.env.CORS_ORIGIN = originalEnv;
+        } else {
+          delete process.env.CORS_ORIGIN;
+        }
+      }
     });
 
     it("requires CORS_ORIGIN or PUBLIC_URL in production mode and throws if neither is set", () => {
@@ -236,6 +381,8 @@ describe("Server Config & Environment Validation (MAJ-015, MAJ-016)", () => {
       const allowed = ["https://fun-chess.com", "http://localhost:5173"];
       expect(isOriginAllowed("https://fun-chess.com", allowed)).toBe(true);
       expect(isOriginAllowed("http://localhost:5173", allowed)).toBe(true);
+      // Trailing slash tolerance
+      expect(isOriginAllowed("https://fun-chess.com/", allowed)).toBe(true);
     });
 
     it("returns false when origin is not in allowedOrigins", () => {

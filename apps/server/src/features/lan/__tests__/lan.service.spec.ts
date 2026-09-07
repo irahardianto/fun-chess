@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { LanService } from "../lan.service.js";
+import {
+  LanService,
+  getLocalLanIp,
+  getAllLanInterfaces,
+  generateJoinUrl,
+} from "../lan.service.js";
 import { NetworkInterfaceInfo } from "node:os";
 
 describe("LanService", () => {
@@ -183,6 +188,30 @@ describe("LanService", () => {
       expect(info.joinUrl).toContain(":3000");
       expect(info.lanIp).toBeDefined();
       expect(Array.isArray(info.interfaces)).toBe(true);
+    });
+  });
+
+  describe("Standalone Helper Functions (MIN-039)", () => {
+    it("getLocalLanIp returns valid string matching LanService instance", () => {
+      const instanceIp = new LanService().getLocalLanIp();
+      const helperIp = getLocalLanIp();
+      expect(helperIp).toBe(instanceIp);
+      expect(typeof helperIp).toBe("string");
+    });
+
+    it("getAllLanInterfaces returns valid array matching LanService instance", () => {
+      const instanceInterfaces = new LanService().getAllLanInterfaces();
+      const helperInterfaces = getAllLanInterfaces();
+      expect(helperInterfaces).toEqual(instanceInterfaces);
+      expect(Array.isArray(helperInterfaces)).toBe(true);
+    });
+
+    it("generateJoinUrl produces valid URL matching LanService instance", () => {
+      const instanceUrl = new LanService().generateJoinUrl(4000, "abc");
+      const helperUrl = generateJoinUrl(4000, "abc");
+      expect(helperUrl).toBe(instanceUrl);
+      expect(helperUrl).toContain(":4000");
+      expect(helperUrl).toContain("?room=ABC");
     });
   });
 });

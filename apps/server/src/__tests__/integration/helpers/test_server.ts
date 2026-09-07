@@ -1,13 +1,15 @@
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
-import { createHttpServer } from "../../apps/server/src/platform/http/index.js";
+import { createHttpServer, HttpRateLimiter } from "../../../platform/http/index.js";
 import {
   createSocketServer,
   SocketRateLimiter,
   TypedSocketServer,
-} from "../../apps/server/src/platform/socket/index.js";
-import { NullLogger } from "../../apps/server/src/platform/logger/index.js";
+} from "../../../platform/socket/index.js";
+import { NullLogger } from "../../../platform/logger/index.js";
+import type { Logger } from "../../../platform/logger/index.js";
+import type { ServerEnv } from "../../../platform/config/index.js";
 import {
   InMemoryRoomStore,
   InMemorySessionRegistry,
@@ -15,12 +17,12 @@ import {
   registerRoomSocketHandlers,
   handleSocketDisconnect,
   clearAllDisconnectTimers,
-} from "../../apps/server/src/features/rooms/index.js";
+} from "../../../features/rooms/index.js";
 import {
   GameService,
   registerGameSocketHandlers,
-} from "../../apps/server/src/features/game/index.js";
-import { RelayAddressService } from "../../apps/server/src/features/lan/index.js";
+} from "../../../features/game/index.js";
+import { RelayAddressService } from "../../../features/lan/index.js";
 
 export interface TestServerInstance {
   server: http.Server;
@@ -31,7 +33,16 @@ export interface TestServerInstance {
   sessionRegistry: InMemorySessionRegistry;
   roomService: RoomService;
   gameService: GameService;
+  logger: NullLogger;
   close: () => Promise<void>;
+}
+
+export interface CreateTestServerOptions {
+  customPort?: number;
+  env?: Partial<ServerEnv>;
+  logger?: Logger;
+  allowedOrigins?: string[];
+  rateLimiter?: HttpRateLimiter;
 }
 
 /**
@@ -40,13 +51,19 @@ export interface TestServerInstance {
  * tests exercise production backend behavior directly (CRIT-004).
  */
 export async function createTestServer(
-  customPort = 0,
+  customPortOrOptions: number | CreateTestServerOptions = 0,
 ): Promise<TestServerInstance> {
-  const logger = new NullLogger();
+  const options: CreateTestServerOptions =
+    typeof customPortOrOptions === "number"
+      ? { customPort: customPortOrOptions }
+      : customPortOrOptions;
+
+  const customPort = options.customPort ?? 0;
+  const logger = (options.logger as NullLogger) ?? new NullLogger();
   const roomStore = new InMemoryRoomStore();
   const sessionRegistry = new InMemorySessionRegistry();
   const roomService = new RoomService(roomStore, sessionRegistry);
-  const gameService = new GameService(roomStore);
+  const gameService = new GameService(roomStore, sessionRegistry);
 
   // Rate limiter for tests: high capacity and disabled background interval to prevent timer leaks
   const rateLimiter = new SocketRateLimiter({
@@ -93,17 +110,26 @@ export async function createTestServer(
     lanIp: "127.0.0.1",
   });
 
+  const clientDistPath = path.resolve(
+    process.cwd().endsWith("apps/server")
+      ? path.resolve(process.cwd(), "../client/dist")
+      : path.resolve(process.cwd(), "apps/client/dist"),
+  );
+
   httpHandler = createHttpServer({
     roomStore,
     relayAddressService,
     logger,
     port: assignedPort,
-    distPath: path.resolve(process.cwd(), "apps/client/dist"),
-    allowedOrigins: ["*"],
+    distPath: clientDistPath,
+    allowedOrigins: options.allowedOrigins ?? ["*"],
     getActiveSocketCount: () => (io ? io.sockets.sockets.size : 0),
+    env: options.env as any,
+    rateLimiter: options.rateLimiter,
   });
 
   const close = async () => {
+    options.rateLimiter?.destroy();
     clearAllDisconnectTimers();
     const sockets = await io.fetchSockets();
     for (const s of sockets) {
@@ -122,6 +148,7 @@ export async function createTestServer(
     sessionRegistry,
     roomService,
     gameService,
+    logger,
     close,
   };
 }

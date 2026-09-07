@@ -3,10 +3,12 @@ import http from "node:http";
 import { createSocketServer } from "../socket_server.js";
 import { NullLogger } from "../../logger/null_logger.js";
 
-describe("createSocketServer", () => {
+describe("createSocketServer (MAJ-002, MAJ-017)", () => {
   it("initializes Socket.io server with pingInterval of 25000ms and pingTimeout of 20000ms", () => {
     const httpServer = http.createServer();
-    const io = createSocketServer(httpServer);
+    const io = createSocketServer(httpServer, {
+      allowedOrigins: ["*"],
+    });
 
     expect(io.opts.pingInterval).toBe(25000);
     expect(io.opts.pingTimeout).toBe(20000);
@@ -23,6 +25,7 @@ describe("createSocketServer", () => {
     const io = createSocketServer(httpServer, {
       pingInterval: 15000,
       pingTimeout: 8000,
+      allowedOrigins: ["*"],
     });
 
     expect(io.opts.pingInterval).toBe(15000);
@@ -31,63 +34,52 @@ describe("createSocketServer", () => {
     io.close();
   });
 
-  it("respects process.env.CORS_ORIGIN when specified", () => {
-    const originalCors = process.env.CORS_ORIGIN;
-    try {
-      process.env.CORS_ORIGIN = "https://fun-chess.example.com";
-      const httpServer = http.createServer();
-      const io = createSocketServer(httpServer);
+  it("respects injected env.CORS_ORIGIN without direct process.env reads (MAJ-002)", () => {
+    const httpServer = http.createServer();
+    const io = createSocketServer(httpServer, {
+      env: {
+        NODE_ENV: "development",
+        PORT: 3000,
+        HOST: "0.0.0.0",
+        LOG_LEVEL: "info",
+        CORS_ORIGIN: "https://fun-chess.example.com",
+      },
+    });
 
-      expect(io.opts.cors).toEqual({
-        origin: "https://fun-chess.example.com",
-        methods: ["GET", "POST"],
-      });
+    expect(io.opts.cors).toEqual({
+      origin: "https://fun-chess.example.com",
+      methods: ["GET", "POST"],
+    });
 
-      io.close();
-    } finally {
-      if (originalCors !== undefined) {
-        process.env.CORS_ORIGIN = originalCors;
-      } else {
-        delete process.env.CORS_ORIGIN;
-      }
-    }
+    io.close();
   });
 
-  it("fails fast with clear diagnostics when config resolution fails in production (CRIT-006)", () => {
-    const originalNodeEnv = process.env.NODE_ENV;
-    const originalCors = process.env.CORS_ORIGIN;
-    const originalPublicUrl = process.env.PUBLIC_URL;
-
-    try {
-      process.env.NODE_ENV = "production";
-      delete process.env.CORS_ORIGIN;
-      delete process.env.PUBLIC_URL;
-
-      const httpServer = http.createServer();
-      expect(() => createSocketServer(httpServer)).toThrowError(
-        /FATAL: CORS_ORIGIN or PUBLIC_URL must be configured in production mode/,
-      );
-    } finally {
-      process.env.NODE_ENV = originalNodeEnv;
-      if (originalCors !== undefined) process.env.CORS_ORIGIN = originalCors;
-      else delete process.env.CORS_ORIGIN;
-      if (originalPublicUrl !== undefined) process.env.PUBLIC_URL = originalPublicUrl;
-      else delete process.env.PUBLIC_URL;
-    }
+  it("fails fast with clear diagnostics when config resolution fails in production without direct process.env (MAJ-002, CRIT-006)", () => {
+    const httpServer = http.createServer();
+    expect(() =>
+      createSocketServer(httpServer, {
+        env: {
+          NODE_ENV: "production",
+          PORT: 8080,
+          HOST: "0.0.0.0",
+          LOG_LEVEL: "info",
+        },
+      }),
+    ).toThrowError(/FATAL: CORS_ORIGIN or PUBLIC_URL must be configured in production mode/);
   });
 
-  it("registers engine connection_error listener with structured warning logging (MAJ-022)", () => {
+  it("registers engine connection_error listener and strips query string from URL (MAJ-017, MAJ-022)", () => {
     const logger = new NullLogger();
     const httpServer = http.createServer();
-    const io = createSocketServer(httpServer, { logger });
+    const io = createSocketServer(httpServer, { logger, allowedOrigins: ["*"] });
 
-    // Emit connection_error on io.engine
+    // Emit connection_error on io.engine with sensitive token in query string
     io.engine.emit("connection_error", {
       code: 1,
       message: "Session ID unknown",
       context: { transport: "websocket" },
       req: {
-        url: "/socket.io/?EIO=4&transport=websocket",
+        url: "/socket.io/?EIO=4&transport=websocket&token=super-secret-token-12345",
         headers: {
           origin: "https://unauthorized-origin.com",
         },
@@ -102,6 +94,8 @@ describe("createSocketServer", () => {
     expect(warnLog?.context?.["code"]).toBe(1);
     expect(warnLog?.context?.["message"]).toBe("Session ID unknown");
     expect(warnLog?.context?.["origin"]).toBe("https://unauthorized-origin.com");
+    // URL must be stripped of query string to prevent sensitive token exposure
+    expect(warnLog?.context?.["url"]).toBe("/socket.io/");
 
     io.close();
   });
