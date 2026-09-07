@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { Chess } from "chess.js";
+import { randomUUID, randomInt } from "node:crypto";
 import {
   CreateRoomRequest,
   GameOverPayload,
@@ -8,8 +7,11 @@ import {
   Player,
   ReconnectRequest,
   RoomState,
+  createInitialGameState,
 } from "@fun-chess/shared";
 import { RoomStore } from "./room.store.js";
+import { SessionRegistry } from "./session_registry.js";
+import { InMemorySessionRegistry } from "./in_memory_session_registry.js";
 import {
   RoomNotFoundError,
   RoomFullError,
@@ -18,7 +20,6 @@ import {
   PlayerNotInRoomError,
   InvalidPayloadError,
 } from "./room.errors.js";
-import { ChessEngine } from "../game/chess_engine.js";
 
 const ROOM_CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Excludes 0, O, 1, I
 const ROOM_CODE_LENGTH = 4;
@@ -27,7 +28,10 @@ const ROOM_CODE_LENGTH = 4;
  * Service coordinating room creation, player joining, reconnection, and session lifecycle.
  */
 export class RoomService {
-  constructor(private readonly store: RoomStore) {}
+  constructor(
+    private readonly store: RoomStore,
+    private readonly sessionRegistry: SessionRegistry = new InMemorySessionRegistry(),
+  ) {}
 
   /**
    * Initializes a new game room with host player and returns state + sessionToken.
@@ -52,11 +56,10 @@ export class RoomService {
 
     const roomCode = await this.generateUniqueRoomCode();
     const playerId = randomUUID();
-    const sessionToken = randomUUID();
 
     let hostColor: PieceColor;
     if (req.preferredColor === "random" || !req.preferredColor) {
-      hostColor = Math.random() < 0.5 ? "w" : "b";
+      hostColor = randomInt(0, 2) === 0 ? "w" : "b";
     } else {
       hostColor = req.preferredColor;
     }
@@ -69,11 +72,10 @@ export class RoomService {
       color: hostColor,
       isHost: true,
       isConnected: true,
-      sessionToken,
       connectedAt: Date.now(),
     };
 
-    const initialGameState = ChessEngine.extractGameState(new Chess(), null);
+    const initialGameState = createInitialGameState();
 
     const newRoom: RoomState = {
       roomCode,
@@ -90,7 +92,16 @@ export class RoomService {
     };
 
     await this.store.save(newRoom);
-    return { room: newRoom, sessionToken };
+
+    const sessionRecord = await this.sessionRegistry.createSession({
+      playerId,
+      roomCode,
+      color: hostColor,
+      isHost: true,
+      socketId,
+    });
+
+    return { room: newRoom, sessionToken: sessionRecord.sessionToken };
   }
 
   /**
@@ -119,42 +130,54 @@ export class RoomService {
       );
     }
 
-    const room = await this.store.findByCode(normalizedCode);
-    if (!room) {
-      throw new RoomNotFoundError(normalizedCode);
-    }
-
-    if (room.whitePlayer && room.blackPlayer) {
-      throw new RoomFullError(normalizedCode);
-    }
-
     const playerId = randomUUID();
-    const sessionToken = randomUUID();
-    const assignedColor: PieceColor = room.whitePlayer ? "b" : "w";
 
-    const player: Player = {
-      id: playerId,
-      socketId,
-      name: rawName,
-      avatar: req.avatar || "🦁",
-      color: assignedColor,
+    const result = await this.store.mutate(normalizedCode, async (room) => {
+      if (room.whitePlayer && room.blackPlayer) {
+        throw new RoomFullError(normalizedCode);
+      }
+
+      const assignedColor: PieceColor = room.whitePlayer ? "b" : "w";
+
+      const player: Player = {
+        id: playerId,
+        socketId,
+        name: rawName,
+        avatar: req.avatar || "🦁",
+        color: assignedColor,
+        isHost: false,
+        isConnected: true,
+        connectedAt: Date.now(),
+      };
+
+      if (assignedColor === "w") {
+        room.whitePlayer = player;
+      } else {
+        room.blackPlayer = player;
+      }
+
+      room.status = "playing";
+      room.lastActivityAt = Date.now();
+
+      return {
+        updatedRoom: room,
+        result: { room, player, assignedColor },
+      };
+    });
+
+    const sessionRecord = await this.sessionRegistry.createSession({
+      playerId,
+      roomCode: normalizedCode,
+      color: result.assignedColor,
       isHost: false,
-      isConnected: true,
-      sessionToken,
-      connectedAt: Date.now(),
+      socketId,
+    });
+
+    return {
+      room: result.room,
+      player: result.player,
+      sessionToken: sessionRecord.sessionToken,
     };
-
-    if (assignedColor === "w") {
-      room.whitePlayer = player;
-    } else {
-      room.blackPlayer = player;
-    }
-
-    room.status = "playing";
-    room.lastActivityAt = Date.now();
-
-    await this.store.save(room);
-    return { room, player, sessionToken };
   }
 
   /**
@@ -165,42 +188,54 @@ export class RoomService {
     socketId: string,
   ): Promise<{ room: RoomState; player: Player }> {
     const normalizedCode = (req.roomCode || "").trim().toUpperCase();
-    const room = await this.store.findByCode(normalizedCode);
-    if (!room) {
+    const existing = await this.store.findByCode(normalizedCode);
+    if (!existing) {
       throw new RoomNotFoundError(normalizedCode);
     }
 
-    let targetPlayer: Player | null = null;
-    if (room.whitePlayer?.id === req.playerId) {
-      targetPlayer = room.whitePlayer;
-    } else if (room.blackPlayer?.id === req.playerId) {
-      targetPlayer = room.blackPlayer;
-    } else {
-      targetPlayer = room.spectators.find((s) => s.id === req.playerId) || null;
-    }
-
-    if (!targetPlayer) {
-      throw new UnauthorizedError("Player not found in room");
-    }
-
-    if (targetPlayer.sessionToken !== req.sessionToken) {
+    const session = await this.sessionRegistry.validateSession(
+      req.sessionToken,
+      normalizedCode,
+      req.playerId,
+    );
+    if (!session) {
       throw new UnauthorizedError("Invalid session token");
     }
 
-    targetPlayer.socketId = socketId;
-    targetPlayer.isConnected = true;
-
-    // If game was paused waiting for disconnect, resume if both players now connected
-    if (room.status === "paused_disconnect") {
-      if (room.whitePlayer?.isConnected && room.blackPlayer?.isConnected) {
-        room.status = "playing";
+    const result = await this.store.mutate(normalizedCode, async (room) => {
+      let targetPlayer: Player | null = null;
+      if (room.whitePlayer?.id === req.playerId) {
+        targetPlayer = room.whitePlayer;
+      } else if (room.blackPlayer?.id === req.playerId) {
+        targetPlayer = room.blackPlayer;
+      } else {
+        targetPlayer =
+          room.spectators.find((s) => s.id === req.playerId) || null;
       }
-    }
 
-    room.lastActivityAt = Date.now();
-    await this.store.save(room);
+      if (!targetPlayer) {
+        throw new UnauthorizedError("Player not found in room");
+      }
 
-    return { room, player: targetPlayer };
+      targetPlayer.socketId = socketId;
+      targetPlayer.isConnected = true;
+
+      // If game was paused waiting for disconnect, resume if both players now connected
+      if (room.status === "paused_disconnect") {
+        if (room.whitePlayer?.isConnected && room.blackPlayer?.isConnected) {
+          room.status = "playing";
+        }
+      }
+
+      room.lastActivityAt = Date.now();
+      return {
+        updatedRoom: room,
+        result: { room, player: targetPlayer },
+      };
+    });
+
+    await this.sessionRegistry.touchSession(req.sessionToken, socketId);
+    return result;
   }
 
   /**
@@ -216,78 +251,82 @@ export class RoomService {
     gameOverPayload?: GameOverPayload;
   }> {
     const normalizedCode = roomCode.trim().toUpperCase();
-    const room = await this.store.findByCode(normalizedCode);
-    if (!room) {
-      throw new RoomNotFoundError(normalizedCode);
-    }
 
-    let leavingPlayer: Player | null = null;
-    let isPlayingPlayer = false;
-    if (room.whitePlayer?.socketId === socketId) {
-      leavingPlayer = room.whitePlayer;
-      room.whitePlayer = null;
-      isPlayingPlayer = true;
-    } else if (room.blackPlayer?.socketId === socketId) {
-      leavingPlayer = room.blackPlayer;
-      room.blackPlayer = null;
-      isPlayingPlayer = true;
-    } else {
-      const idx = room.spectators.findIndex((s) => s.socketId === socketId);
-      if (idx !== -1 && room.spectators[idx]) {
-        leavingPlayer = room.spectators[idx];
-        room.spectators.splice(idx, 1);
+    return this.store.withLock(normalizedCode, async () => {
+      const room = await this.store.findByCode(normalizedCode);
+      if (!room) {
+        throw new RoomNotFoundError(normalizedCode);
       }
-    }
 
-    if (!leavingPlayer) {
-      throw new PlayerNotInRoomError(socketId);
-    }
+      let leavingPlayer: Player | null = null;
+      let isPlayingPlayer = false;
+      if (room.whitePlayer?.socketId === socketId) {
+        leavingPlayer = room.whitePlayer;
+        room.whitePlayer = null;
+        isPlayingPlayer = true;
+      } else if (room.blackPlayer?.socketId === socketId) {
+        leavingPlayer = room.blackPlayer;
+        room.blackPlayer = null;
+        isPlayingPlayer = true;
+      } else {
+        const idx = room.spectators.findIndex((s) => s.socketId === socketId);
+        if (idx !== -1 && room.spectators[idx]) {
+          leavingPlayer = room.spectators[idx];
+          room.spectators.splice(idx, 1);
+        }
+      }
 
-    if (
-      isPlayingPlayer &&
-      (room.status === "playing" || room.status === "paused_disconnect")
-    ) {
-      const remainingPlayer =
-        leavingPlayer.color === "w" ? room.blackPlayer : room.whitePlayer;
-      if (remainingPlayer) {
-        room.status = "game_over";
+      if (!leavingPlayer) {
+        throw new PlayerNotInRoomError(socketId);
+      }
+
+      if (
+        isPlayingPlayer &&
+        (room.status === "playing" || room.status === "paused_disconnect")
+      ) {
+        const remainingPlayer =
+          leavingPlayer.color === "w" ? room.blackPlayer : room.whitePlayer;
+        if (remainingPlayer) {
+          room.status = "game_over";
+          room.lastActivityAt = Date.now();
+          const durationSeconds = Math.max(
+            1,
+            Math.round((Date.now() - room.createdAt) / 1000),
+          );
+          const gameOverPayload: GameOverPayload = {
+            winner: remainingPlayer.color,
+            winnerName: remainingPlayer.name,
+            reason: "abandonment",
+            message: `${leavingPlayer.name} left the game. ${remainingPlayer.name} won by abandonment!`,
+            finalFen: room.game.fen,
+            totalMoves: room.game.moveCount,
+            durationSeconds,
+          };
+          await this.store.save(room);
+          return {
+            room,
+            player: leavingPlayer,
+            shouldDelete: false,
+            gameOverPayload,
+          };
+        }
+      }
+
+      const shouldDelete =
+        leavingPlayer.isHost ||
+        (!room.whitePlayer && !room.blackPlayer) ||
+        room.status === "lobby";
+
+      if (shouldDelete) {
+        await this.store.delete(normalizedCode);
+        await this.sessionRegistry.deleteSessionsForRoom(normalizedCode);
+      } else {
         room.lastActivityAt = Date.now();
-        const durationSeconds = Math.max(
-          1,
-          Math.round((Date.now() - room.createdAt) / 1000),
-        );
-        const gameOverPayload: GameOverPayload = {
-          winner: remainingPlayer.color,
-          winnerName: remainingPlayer.name,
-          reason: "abandonment",
-          message: `${leavingPlayer.name} left the game. ${remainingPlayer.name} won by abandonment!`,
-          finalFen: room.game.fen,
-          totalMoves: room.game.moveCount,
-          durationSeconds,
-        };
         await this.store.save(room);
-        return {
-          room,
-          player: leavingPlayer,
-          shouldDelete: false,
-          gameOverPayload,
-        };
       }
-    }
 
-    const shouldDelete =
-      leavingPlayer.isHost ||
-      (!room.whitePlayer && !room.blackPlayer) ||
-      room.status === "lobby";
-
-    if (shouldDelete) {
-      await this.store.delete(normalizedCode);
-    } else {
-      room.lastActivityAt = Date.now();
-      await this.store.save(room);
-    }
-
-    return { room, player: leavingPlayer, shouldDelete };
+      return { room, player: leavingPlayer, shouldDelete };
+    });
   }
 
   /**
@@ -301,34 +340,40 @@ export class RoomService {
     const match = await this.store.findBySocketId(socketId);
     if (!match) return null;
 
-    const { room, playerId } = match;
-    let droppedPlayer: Player | null = null;
+    const { room: matchedRoom, playerId } = match;
 
-    if (room.whitePlayer?.id === playerId) {
-      room.whitePlayer.isConnected = false;
-      droppedPlayer = room.whitePlayer;
-    } else if (room.blackPlayer?.id === playerId) {
-      room.blackPlayer.isConnected = false;
-      droppedPlayer = room.blackPlayer;
-    } else {
-      const spectator = room.spectators.find((s) => s.id === playerId);
-      if (spectator) {
-        spectator.isConnected = false;
-        droppedPlayer = spectator;
+    return this.store.withLock(matchedRoom.roomCode, async () => {
+      const room = await this.store.findByCode(matchedRoom.roomCode);
+      if (!room) return null;
+
+      let droppedPlayer: Player | null = null;
+
+      if (room.whitePlayer?.id === playerId) {
+        room.whitePlayer.isConnected = false;
+        droppedPlayer = room.whitePlayer;
+      } else if (room.blackPlayer?.id === playerId) {
+        room.blackPlayer.isConnected = false;
+        droppedPlayer = room.blackPlayer;
+      } else {
+        const spectator = room.spectators.find((s) => s.id === playerId);
+        if (spectator) {
+          spectator.isConnected = false;
+          droppedPlayer = spectator;
+        }
       }
-    }
 
-    if (!droppedPlayer) return null;
+      if (!droppedPlayer) return null;
 
-    const wasActiveGame = room.status === "playing";
-    if (wasActiveGame) {
-      room.status = "paused_disconnect";
-    }
+      const wasActiveGame = room.status === "playing";
+      if (wasActiveGame) {
+        room.status = "paused_disconnect";
+      }
 
-    room.lastActivityAt = Date.now();
-    await this.store.save(room);
+      room.lastActivityAt = Date.now();
+      await this.store.save(room);
 
-    return { room, player: droppedPlayer, wasActiveGame };
+      return { room, player: droppedPlayer, wasActiveGame };
+    });
   }
 
   /**
@@ -340,64 +385,67 @@ export class RoomService {
     disconnectedPlayerId: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload } | null> {
     const normalizedCode = roomCode.trim().toUpperCase();
-    const room = await this.store.findByCode(normalizedCode);
-    if (!room) return null;
 
-    // Only forfeit if room is still paused waiting for reconnect
-    if (room.status !== "paused_disconnect") return null;
+    return this.store.withLock(normalizedCode, async () => {
+      const room = await this.store.findByCode(normalizedCode);
+      if (!room) return null;
 
-    // Check if disconnected player is still disconnected
-    let disconnectedPlayer: Player | null = null;
-    if (room.whitePlayer?.id === disconnectedPlayerId) {
-      disconnectedPlayer = room.whitePlayer;
-    } else if (room.blackPlayer?.id === disconnectedPlayerId) {
-      disconnectedPlayer = room.blackPlayer;
-    }
+      // Only forfeit if room is still paused waiting for reconnect
+      if (room.status !== "paused_disconnect") return null;
 
-    if (!disconnectedPlayer || disconnectedPlayer.isConnected) {
-      return null;
-    }
+      // Check if disconnected player is still disconnected
+      let disconnectedPlayer: Player | null = null;
+      if (room.whitePlayer?.id === disconnectedPlayerId) {
+        disconnectedPlayer = room.whitePlayer;
+      } else if (room.blackPlayer?.id === disconnectedPlayerId) {
+        disconnectedPlayer = room.blackPlayer;
+      }
 
-    const winnerColor: PieceColor =
-      disconnectedPlayer.color === "w" ? "b" : "w";
-    const winnerPlayer =
-      winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
+      if (!disconnectedPlayer || disconnectedPlayer.isConnected) {
+        return null;
+      }
 
-    room.status = "game_over";
-    room.lastActivityAt = Date.now();
+      const winnerColor: PieceColor =
+        disconnectedPlayer.color === "w" ? "b" : "w";
+      const winnerPlayer =
+        winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
 
-    const durationSeconds = Math.max(
-      1,
-      Math.round((Date.now() - room.createdAt) / 1000),
-    );
+      room.status = "game_over";
+      room.lastActivityAt = Date.now();
 
-    let gameOverPayload: GameOverPayload;
+      const durationSeconds = Math.max(
+        1,
+        Math.round((Date.now() - room.createdAt) / 1000),
+      );
 
-    if (winnerPlayer && winnerPlayer.isConnected) {
-      const winnerName = winnerPlayer.name;
-      gameOverPayload = {
-        winner: winnerColor,
-        winnerName,
-        reason: "abandonment",
-        message: `${disconnectedPlayer.name} disconnected. ${winnerName} won by abandonment!`,
-        finalFen: room.game.fen,
-        totalMoves: room.game.moveCount,
-        durationSeconds,
-      };
-    } else {
-      // Both players are disconnected when the grace timer expires
-      gameOverPayload = {
-        winner: "draw",
-        reason: "abandonment",
-        message: "Both players disconnected. Game ended by abandonment.",
-        finalFen: room.game.fen,
-        totalMoves: room.game.moveCount,
-        durationSeconds,
-      };
-    }
+      let gameOverPayload: GameOverPayload;
 
-    await this.store.save(room);
-    return { room, gameOverPayload };
+      if (winnerPlayer && winnerPlayer.isConnected) {
+        const winnerName = winnerPlayer.name;
+        gameOverPayload = {
+          winner: winnerColor,
+          winnerName,
+          reason: "abandonment",
+          message: `${disconnectedPlayer.name} disconnected. ${winnerName} won by abandonment!`,
+          finalFen: room.game.fen,
+          totalMoves: room.game.moveCount,
+          durationSeconds,
+        };
+      } else {
+        // Both players are disconnected when the grace timer expires
+        gameOverPayload = {
+          winner: "draw",
+          reason: "abandonment",
+          message: "Both players disconnected. Game ended by abandonment.",
+          finalFen: room.game.fen,
+          totalMoves: room.game.moveCount,
+          durationSeconds,
+        };
+      }
+
+      await this.store.save(room);
+      return { room, gameOverPayload };
+    });
   }
 
   /**
@@ -413,6 +461,9 @@ export class RoomService {
   public async cleanupAbandonedRooms(
     maxAgeMs = 10 * 60 * 1000,
   ): Promise<number> {
+    // PERF: Also evict expired sessions across all rooms to prevent memory leaks
+    await this.sessionRegistry.cleanupExpiredSessions();
+
     const rooms = await this.store.listActiveRooms();
     const now = Date.now();
     let cleaned = 0;
@@ -420,11 +471,20 @@ export class RoomService {
     for (const room of rooms) {
       if (now - room.lastActivityAt > maxAgeMs) {
         await this.store.delete(room.roomCode);
+        await this.sessionRegistry.deleteSessionsForRoom(room.roomCode);
         cleaned++;
       }
     }
 
     return cleaned;
+  }
+
+  /**
+   * Cleans up expired sessions in the session registry.
+   * PERF: Prevents unbounded memory growth in long-running deployments.
+   */
+  public async cleanupExpiredSessions(): Promise<number> {
+    return this.sessionRegistry.cleanupExpiredSessions();
   }
 
   /**
@@ -435,7 +495,7 @@ export class RoomService {
     while (attempts < 100) {
       let code = "";
       for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
-        const idx = Math.floor(Math.random() * ROOM_CODE_CHARSET.length);
+        const idx = randomInt(0, ROOM_CODE_CHARSET.length);
         code += ROOM_CODE_CHARSET.charAt(idx);
       }
 

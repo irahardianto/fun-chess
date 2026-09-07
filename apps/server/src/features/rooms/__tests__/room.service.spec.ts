@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { RoomService } from "../room.service.js";
 import { MockRoomStore } from "../mock_room.store.js";
+import { InMemorySessionRegistry } from "../in_memory_session_registry.js";
 import {
   RoomNotFoundError,
   RoomFullError,
@@ -12,15 +13,17 @@ import {
 
 describe("RoomService", () => {
   let store: MockRoomStore;
+  let sessionRegistry: InMemorySessionRegistry;
   let service: RoomService;
 
   beforeEach(() => {
     store = new MockRoomStore();
-    service = new RoomService(store);
+    sessionRegistry = new InMemorySessionRegistry();
+    service = new RoomService(store, sessionRegistry);
   });
 
   describe("createRoom", () => {
-    it("creates a room with 4-letter uppercase code and correct host player", async () => {
+    it("creates a room with 4-letter uppercase code and correct host player without sessionToken on Player", async () => {
       const { room, sessionToken } = await service.createRoom(
         { playerName: "Leo", preferredColor: "w" },
         "sock_host",
@@ -34,18 +37,34 @@ describe("RoomService", () => {
       expect(room.whitePlayer?.isHost).toBe(true);
       expect(room.whitePlayer?.socketId).toBe("sock_host");
       expect(room.blackPlayer).toBeNull();
+
+      // Invariant: sessionToken returned in result, NEVER stored on Player in room
       expect(sessionToken).toBeDefined();
+      expect((room.whitePlayer as any)?.sessionToken).toBeUndefined();
+      expect((room.blackPlayer as any)?.sessionToken).toBeUndefined();
+
+      // Invariant: session registered in SessionRegistry
+      const session = await sessionRegistry.validateSession(
+        sessionToken,
+        room.roomCode,
+        room.hostId,
+      );
+      expect(session).not.toBeNull();
+      expect(session?.playerId).toBe(room.hostId);
+
       expect(store.saveCalls).toHaveLength(1);
     });
 
     it("supports host choosing black pieces", async () => {
-      const { room } = await service.createRoom(
+      const { room, sessionToken } = await service.createRoom(
         { playerName: "Maya", preferredColor: "b" },
         "sock_host",
       );
 
       expect(room.blackPlayer?.name).toBe("Maya");
       expect(room.whitePlayer).toBeNull();
+      expect((room.blackPlayer as any)?.sessionToken).toBeUndefined();
+      expect(sessionToken).toBeDefined();
     });
 
     it("supports random color choice", async () => {
@@ -76,7 +95,7 @@ describe("RoomService", () => {
   });
 
   describe("joinRoom", () => {
-    it("allows player 2 to join and transitions room to playing", async () => {
+    it("allows player 2 to join, transitions room to playing, and registers session without sessionToken on Player", async () => {
       const { room: created } = await service.createRoom(
         { playerName: "HostPlayer", preferredColor: "w" },
         "sock_1",
@@ -95,7 +114,21 @@ describe("RoomService", () => {
       expect(joined.blackPlayer?.name).toBe("JoinerPlayer");
       expect(player.color).toBe("b");
       expect(player.isHost).toBe(false);
+
+      // Invariant: sessionToken returned in result, NOT on Player model
       expect(sessionToken).toBeDefined();
+      expect((player as any)?.sessionToken).toBeUndefined();
+      expect((joined.blackPlayer as any)?.sessionToken).toBeUndefined();
+      expect((joined.whitePlayer as any)?.sessionToken).toBeUndefined();
+
+      // Invariant: session registered in SessionRegistry
+      const session = await sessionRegistry.validateSession(
+        sessionToken,
+        joined.roomCode,
+        player.id,
+      );
+      expect(session).not.toBeNull();
+      expect(session?.playerId).toBe(player.id);
     });
 
     it("assigns white if host chose black", async () => {
@@ -144,12 +177,12 @@ describe("RoomService", () => {
   });
 
   describe("reconnect", () => {
-    it("restores dropped player socket and unpauses game", async () => {
+    it("validates against SessionRegistry, restores dropped player socket, and unpauses game", async () => {
       const { room: created, sessionToken: p1Token } = await service.createRoom(
         { playerName: "P1", preferredColor: "w" },
         "sock_1",
       );
-      const { player: p2 } = await service.joinRoom(
+      await service.joinRoom(
         { roomCode: created.roomCode, playerName: "P2" },
         "sock_2",
       );
@@ -160,7 +193,7 @@ describe("RoomService", () => {
       expect(disconnectedRoom?.status).toBe("paused_disconnect");
       expect(disconnectedRoom?.whitePlayer?.isConnected).toBe(false);
 
-      // Reconnect P1
+      // Reconnect P1 with valid token from SessionRegistry
       const { room: reconnectedRoom, player } = await service.reconnect(
         {
           roomCode: created.roomCode,
@@ -175,7 +208,7 @@ describe("RoomService", () => {
       expect(reconnectedRoom.status).toBe("playing");
     });
 
-    it("rejects invalid session token", async () => {
+    it("rejects reconnect with invalid session token", async () => {
       const { room: created } = await service.createRoom(
         { playerName: "P1", preferredColor: "w" },
         "sock_1",
@@ -192,11 +225,57 @@ describe("RoomService", () => {
         ),
       ).rejects.toThrow(UnauthorizedError);
     });
+
+    it("rejects reconnect with expired session token in SessionRegistry", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "P1", preferredColor: "w" },
+        "sock_1",
+      );
+
+      // Create an expired session record directly in registry
+      const expiredSession = await sessionRegistry.createSession({
+        playerId: created.hostId,
+        roomCode: created.roomCode,
+        color: "w",
+        isHost: true,
+        socketId: "sock_1",
+        ttlMs: -1000,
+      });
+
+      await expect(
+        service.reconnect(
+          {
+            roomCode: created.roomCode,
+            playerId: created.hostId,
+            sessionToken: expiredSession.sessionToken,
+          },
+          "sock_new",
+        ),
+      ).rejects.toThrow(UnauthorizedError);
+    });
+
+    it("rejects reconnect when player ID does not match session", async () => {
+      const { room: created, sessionToken } = await service.createRoom(
+        { playerName: "P1", preferredColor: "w" },
+        "sock_1",
+      );
+
+      await expect(
+        service.reconnect(
+          {
+            roomCode: created.roomCode,
+            playerId: "wrong_player_id",
+            sessionToken,
+          },
+          "sock_new",
+        ),
+      ).rejects.toThrow(UnauthorizedError);
+    });
   });
 
   describe("leaveRoom & handleDisconnect", () => {
-    it("deletes room when host leaves lobby", async () => {
-      const { room: created } = await service.createRoom(
+    it("deletes room and deletes sessions when host leaves lobby", async () => {
+      const { room: created, sessionToken } = await service.createRoom(
         { playerName: "Host", preferredColor: "w" },
         "sock_1",
       );
@@ -207,6 +286,15 @@ describe("RoomService", () => {
       );
       expect(shouldDelete).toBe(true);
       expect(await service.getRoom(created.roomCode)).toBeNull();
+
+      // Invariant: cascade session deletion on room delete
+      expect(
+        await sessionRegistry.validateSession(
+          sessionToken,
+          created.roomCode,
+          created.hostId,
+        ),
+      ).toBeNull();
     });
 
     it("awards abandonment victory when a player leaves during active match", async () => {
@@ -284,17 +372,94 @@ describe("RoomService", () => {
       ).rejects.toThrow(PlayerNotInRoomError);
     });
 
-    it("cleans up abandoned rooms older than maxAge", async () => {
-      const { room: created } = await service.createRoom(
-        { playerName: "Host", preferredColor: "w" },
-        "sock_1",
-      );
-      created.lastActivityAt = Date.now() - 15 * 60 * 1000; // 15 mins ago
-      await store.save(created);
+    it("cleans up abandoned rooms older than maxAge, deletes sessions, and cancels disconnect timers", async () => {
+      const { room: created, sessionToken: hostToken } =
+        await service.createRoom(
+          { playerName: "Host", preferredColor: "w" },
+          "sock_1",
+        );
+      const { sessionToken: joinerToken, player: joiner } =
+        await service.joinRoom(
+          { roomCode: created.roomCode, playerName: "Joiner" },
+          "sock_2",
+        );
+
+      // Verify sessions exist before cleanup
+      expect(
+        await sessionRegistry.validateSession(
+          hostToken,
+          created.roomCode,
+          created.hostId,
+        ),
+      ).not.toBeNull();
+      expect(
+        await sessionRegistry.validateSession(
+          joinerToken,
+          created.roomCode,
+          joiner.id,
+        ),
+      ).not.toBeNull();
+
+      // Trigger disconnect so a disconnect timer exists
+      await service.handleDisconnect("sock_1");
+
+      const currentRoom = (await service.getRoom(created.roomCode))!;
+      currentRoom.lastActivityAt = Date.now() - 15 * 60 * 1000; // 15 mins ago
+      await store.save(currentRoom);
 
       const count = await service.cleanupAbandonedRooms(10 * 60 * 1000);
       expect(count).toBe(1);
       expect(await service.getRoom(created.roomCode)).toBeNull();
+
+      // Invariant: cascade deletion of sessions
+      expect(
+        await sessionRegistry.validateSession(
+          hostToken,
+          created.roomCode,
+          created.hostId,
+        ),
+      ).toBeNull();
+      expect(
+        await sessionRegistry.validateSession(
+          joinerToken,
+          created.roomCode,
+          joiner.id,
+        ),
+      ).toBeNull();
+    });
+
+    it("cleans up expired sessions via cleanupExpiredSessions", async () => {
+      const { room: created, sessionToken } = await service.createRoom(
+        { playerName: "Host", preferredColor: "w" },
+        "sock_host",
+      );
+
+      // Verify session exists
+      expect(
+        await sessionRegistry.validateSession(
+          sessionToken,
+          created.roomCode,
+          created.hostId,
+        ),
+      ).not.toBeNull();
+
+      // Fast forward expiry: set session expiresAt to past
+      const sessionRecord = (sessionRegistry as any).sessions.get(sessionToken);
+      if (sessionRecord) {
+        sessionRecord.expiresAt = Date.now() - 1000;
+      }
+
+      const cleaned = await service.cleanupExpiredSessions();
+      expect(cleaned).toBe(1);
+
+      // Session is now gone
+      expect(
+        await sessionRegistry.validateSession(
+          sessionToken,
+          created.roomCode,
+          created.hostId,
+        ),
+      ).toBeNull();
     });
   });
 
