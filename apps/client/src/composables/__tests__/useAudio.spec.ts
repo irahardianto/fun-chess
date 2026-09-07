@@ -22,6 +22,8 @@ describe('useAudio composable', () => {
     vi.spyOn(mockSynth, 'playMascotHappy').mockImplementation(() => {});
     vi.spyOn(mockSynth, 'playMascotBlunder').mockImplementation(() => {});
     vi.spyOn(mockSynth, 'playStepComplete').mockImplementation(() => {});
+    vi.spyOn(mockSynth, 'playCheckmate').mockImplementation(() => {});
+    vi.spyOn(mockSynth, 'playDefeat').mockImplementation(() => {});
     vi.spyOn(mockSynth, 'resumeContext').mockImplementation(() => {});
     vi.spyOn(mockSynth, 'initContext').mockImplementation(() => null);
   });
@@ -149,5 +151,96 @@ describe('useAudio composable', () => {
 
     initAudio();
     expect(mockSynth.initContext).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Game domain events audio handling (ENH-006)', () => {
+    it('should route handleGameEvent to appropriate audio playback', () => {
+      const { handleGameEvent } = useAudio(mockSynth);
+
+      handleGameEvent({ type: 'move', captured: false });
+      expect(mockSynth.playMove).toHaveBeenCalledTimes(1);
+
+      handleGameEvent({ type: 'move', captured: true });
+      expect(mockSynth.playCapture).toHaveBeenCalledTimes(1);
+
+      handleGameEvent({ type: 'opponentMove', move: { captured: false } as any });
+      expect(mockSynth.playMove).toHaveBeenCalledTimes(2);
+
+      handleGameEvent({ type: 'opponentMove', move: { captured: true } as any });
+      expect(mockSynth.playCapture).toHaveBeenCalledTimes(2);
+
+      handleGameEvent({ type: 'check' });
+      expect(mockSynth.playCheck).toHaveBeenCalledTimes(1);
+
+      handleGameEvent({ type: 'checkmate' });
+      expect(mockSynth.playCheckmate).toHaveBeenCalledTimes(1);
+
+      handleGameEvent({ type: 'victory' });
+      expect(mockSynth.playVictory).toHaveBeenCalledTimes(1);
+
+      handleGameEvent({ type: 'defeat' });
+      expect(mockSynth.playDefeat).toHaveBeenCalledTimes(1);
+
+      handleGameEvent({ type: 'draw' });
+      expect(mockSynth.playDraw).toHaveBeenCalledTimes(1);
+    });
+
+    it('should attach listeners to game domain event source and unsubscribe cleanly', () => {
+      const { attachGameEventListeners } = useAudio(mockSynth);
+
+      let opponentMoveCb: ((data: any) => void) | undefined;
+      let checkCb: (() => void) | undefined;
+      let gameOverCb: ((payload: any) => void) | undefined;
+
+      const unsubOpponentMove = vi.fn();
+      const unsubCheck = vi.fn();
+      const unsubGameOver = vi.fn();
+
+      const mockSource = {
+        onOpponentMove: vi.fn((cb: any) => {
+          opponentMoveCb = cb;
+          return unsubOpponentMove;
+        }),
+        onGameCheck: vi.fn((cb: any) => {
+          checkCb = cb;
+          return unsubCheck;
+        }),
+        onGameOver: vi.fn((cb: any) => {
+          gameOverCb = cb;
+          return unsubGameOver;
+        }),
+      };
+
+      const cleanup = attachGameEventListeners(mockSource);
+
+      expect(mockSource.onOpponentMove).toHaveBeenCalledTimes(1);
+      expect(mockSource.onGameCheck).toHaveBeenCalledTimes(1);
+      expect(mockSource.onGameOver).toHaveBeenCalledTimes(1);
+
+      // Trigger opponentMove event
+      opponentMoveCb!({ move: { captured: false } });
+      expect(mockSynth.playMove).toHaveBeenCalledTimes(1);
+
+      opponentMoveCb!({ move: { captured: true } });
+      expect(mockSynth.playCapture).toHaveBeenCalledTimes(1);
+
+      // Trigger gameCheck event
+      checkCb!();
+      expect(mockSynth.playCheck).toHaveBeenCalledTimes(1);
+
+      // Trigger gameOver event (draw)
+      gameOverCb!({ winner: 'draw' });
+      expect(mockSynth.playDraw).toHaveBeenCalledTimes(1);
+
+      // Trigger gameOver event (victory)
+      gameOverCb!({ winner: 'w' });
+      expect(mockSynth.playVictory).toHaveBeenCalledTimes(1);
+
+      // Cleanup
+      cleanup();
+      expect(unsubOpponentMove).toHaveBeenCalledTimes(1);
+      expect(unsubCheck).toHaveBeenCalledTimes(1);
+      expect(unsubGameOver).toHaveBeenCalledTimes(1);
+    });
   });
 });

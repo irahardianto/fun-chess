@@ -1,5 +1,6 @@
 import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
 import { safeLocalStorage } from '@/platform/storage';
+import { logger } from '@/platform/telemetry';
 
 export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -27,7 +28,11 @@ function checkSnoozeStatus(): boolean {
     if (!snoozedUntil) return false;
     const until = Number(snoozedUntil);
     return !isNaN(until) && until > Date.now();
-  } catch {
+  } catch (err) {
+    logger.warn('Failed to read PWA snooze status from storage', {
+      operation: 'pwa_check_snooze_status',
+      error: err instanceof Error ? err.message : String(err),
+    });
     return false;
   }
 }
@@ -47,18 +52,19 @@ function handleBeforeInstallPrompt(e: Event) {
   e.preventDefault();
   isAppInstalledFlag.value = false;
   deferredPrompt.value = e as BeforeInstallPromptEvent;
-  if (typeof console !== 'undefined') {
-    console.info('[FC_PWA] Captured beforeinstallprompt event');
-  }
+  logger.info('Captured beforeinstallprompt event', {
+    operation: 'pwa_before_install_prompt',
+  });
 }
 
 function handleAppInstalled() {
   isAppInstalledFlag.value = true;
   deferredPrompt.value = null;
-  if (typeof console !== 'undefined') {
-    console.info('[FC_PWA] App installed successfully into standalone mode');
-  }
+  logger.info('App installed successfully into standalone mode', {
+    operation: 'pwa_app_installed',
+  });
 }
+
 
 function setupPwaListeners() {
   if (typeof window === 'undefined' || initialized) return;
@@ -132,18 +138,20 @@ export function usePwaInstall() {
         const promptEvent = deferredPrompt.value;
         await promptEvent.prompt();
         const choice = await promptEvent.userChoice;
-        if (typeof console !== 'undefined') {
-          console.info('[FC_PWA] User response to install prompt:', choice.outcome);
-        }
+        logger.info('User response to install prompt', {
+          operation: 'pwa_prompt_install',
+          outcome: choice.outcome,
+        });
         if (choice.outcome === 'accepted') {
           isAppInstalledFlag.value = true;
         }
         deferredPrompt.value = null;
         return choice.outcome === 'accepted';
       } catch (err) {
-        if (typeof console !== 'undefined') {
-          console.error('[FC_PWA] Error prompting installation:', err);
-        }
+        logger.error('Error prompting installation', {
+          operation: 'pwa_prompt_install',
+          error: err instanceof Error ? err.message : String(err),
+        });
         isInstallModalOpen.value = true;
         return false;
       }
@@ -161,16 +169,17 @@ export function usePwaInstall() {
     try {
       safeLocalStorage.setItem(SNOOZE_STORAGE_KEY, until.toString());
     } catch (err) {
-      if (typeof console !== 'undefined') {
-        console.warn('[FC_PWA] Failed to persist install snooze:', err);
-      }
+      logger.warn('Failed to persist install snooze', {
+        operation: 'pwa_snooze_prompt',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     snoozeTrigger.value++;
-    if (typeof console !== 'undefined') {
-      console.info(
-        `[FC_PWA] Install prompt snoozed for ${validDays} days until ${new Date(until).toISOString()}`
-      );
-    }
+    logger.info('Install prompt snoozed', {
+      operation: 'pwa_snooze_prompt',
+      days: validDays,
+      until: new Date(until).toISOString(),
+    });
   }
 
   function dismissInstall(days: number = DEFAULT_SNOOZE_DAYS): void {
@@ -188,7 +197,12 @@ export function usePwaInstall() {
   function resetSnooze(): void {
     try {
       safeLocalStorage.removeItem(SNOOZE_STORAGE_KEY);
-    } catch {}
+    } catch (err) {
+      logger.warn('Failed to reset install snooze from storage', {
+        operation: 'pwa_reset_snooze',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     snoozeTrigger.value++;
   }
 

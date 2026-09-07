@@ -29,6 +29,8 @@ const emit = defineEmits<{
 const qrDataUrl = ref<string>('');
 const copied = ref(false);
 let copyTimeout: ReturnType<typeof setTimeout> | null = null;
+const copyError = ref(false);
+let copyErrorTimeout: ReturnType<typeof setTimeout> | null = null;
 const showIpGuide = ref(false);
 
 // Composable for persistent LAN discovery and WebRTC detection
@@ -270,10 +272,17 @@ async function copyLink() {
 
   if (succeeded) {
     copied.value = true;
+    copyError.value = false;
     if (copyTimeout) clearTimeout(copyTimeout);
     copyTimeout = setTimeout(() => {
       copied.value = false;
     }, 2000);
+  } else {
+    copyError.value = true;
+    if (copyErrorTimeout) clearTimeout(copyErrorTimeout);
+    copyErrorTimeout = setTimeout(() => {
+      copyError.value = false;
+    }, 5000);
   }
 }
 
@@ -467,6 +476,16 @@ function handleClose() {
           </template>
           {{ copied ? 'Copied! ✅' : 'Copy Invite Link' }}
         </BaseButton>
+
+        <p
+          v-if="copyError"
+          class="copy-error-notice"
+          role="alert"
+          aria-live="polite"
+          data-testid="copy-error-notice"
+        >
+          ⚠️ Could not copy automatically. Please select and copy the link above.
+        </p>
       </div>
 
       <!-- Network Info Footer -->
@@ -828,6 +847,15 @@ function handleClose() {
   padding: var(--space-1-5) var(--space-3);
   border-radius: var(--radius-md);
   word-break: break-all;
+}
+
+.copy-error-notice {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold, 700);
+  color: var(--color-danger, #ef4444);
+  margin: 0;
+  text-align: center;
 }
 
 .network-info-footer {

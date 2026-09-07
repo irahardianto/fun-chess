@@ -9,7 +9,7 @@ import {
   puzzleAnalysisEngine,
   getMaterialCount,
 } from '../puzzle_analysis_engine';
-import { Chess } from 'chess.js';
+import { Chess, type Square } from 'chess.js';
 
 describe('PuzzleAnalysisEngine', () => {
   // Royal Knight Fork: White plays c3b5, Black plays e8d8, White plays b5c7 winning rook on a8
@@ -67,7 +67,7 @@ describe('PuzzleAnalysisEngine', () => {
       for (const m of forkPuzzle.moves) {
         const from = m.slice(0, 2);
         const to = m.slice(2, 4);
-        chess.move({ from: from as any, to: to as any });
+        chess.move({ from: from as Square, to: to as Square });
       }
       const finalFen = chess.fen();
 

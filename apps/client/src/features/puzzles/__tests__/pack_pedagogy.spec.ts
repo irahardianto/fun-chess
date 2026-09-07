@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Chess } from 'chess.js';
+import { Chess, type Move } from 'chess.js';
 import type { Puzzle, TacticalReward } from '@fun-chess/shared';
 import {
   ALL_PUZZLES,
@@ -186,7 +186,7 @@ describe('Pack Pedagogy & Tactical Resolution Test Suite (SC-4)', () => {
           const to = moveUci.slice(2, 4);
           const promotion = moveUci.slice(4) || undefined;
 
-          let moveRes: any = null;
+          let moveRes: Move | null = null;
           try {
             moveRes = chess.move({
               from: from as unknown as import('chess.js').Square,

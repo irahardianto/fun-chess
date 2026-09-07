@@ -4,6 +4,7 @@
  * Respects prefers-reduced-motion.
  */
 import defaultConfetti from 'canvas-confetti';
+import { logger } from '../telemetry';
 
 export interface ConfettiOptions {
   particleCount?: number;
@@ -20,6 +21,7 @@ export interface ConfettiOptions {
 export class ConfettiTrigger {
   private confettiFn: typeof defaultConfetti;
   private isCustomFn: boolean;
+  private burstTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(injectedConfetti?: typeof defaultConfetti) {
     this.confettiFn = injectedConfetti || defaultConfetti;
@@ -67,7 +69,11 @@ export class ConfettiTrigger {
       });
 
       // Center burst fired after 300ms
-      setTimeout(() => {
+      if (this.burstTimeout !== null) {
+        clearTimeout(this.burstTimeout);
+      }
+      this.burstTimeout = setTimeout(() => {
+        this.burstTimeout = null;
         try {
           if (this.shouldReduceMotion()) return;
           this.confettiFn({
@@ -76,12 +82,18 @@ export class ConfettiTrigger {
             origin: { y: 0.6 },
             colors,
           });
-        } catch {
-          // Ignore
+        } catch (err) {
+          logger.debug('Center confetti burst failed', {
+            operation: 'confetti_center_burst',
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }, 300);
-    } catch {
-      // Confetti error handled safely
+    } catch (err) {
+      logger.debug('Victory confetti trigger failed', {
+        operation: 'confetti_victory_trigger',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -95,8 +107,11 @@ export class ConfettiTrigger {
         origin: { y: 0.6 },
         colors: ['#94a3b8', '#64748b', '#cbd5e1'],
       });
-    } catch {
-      // Ignore
+    } catch (err) {
+      logger.debug('Draw celebration confetti failed', {
+        operation: 'confetti_draw_trigger',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -104,9 +119,31 @@ export class ConfettiTrigger {
     try {
       if (!this.canExecute()) return;
       this.confettiFn(options as any);
-    } catch {
-      // Ignore
+    } catch (err) {
+      logger.debug('Custom confetti trigger failed', {
+        operation: 'confetti_custom_trigger',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
+  }
+
+  public clear(): void {
+    if (this.burstTimeout !== null) {
+      clearTimeout(this.burstTimeout);
+      this.burstTimeout = null;
+    }
+    try {
+      (this.confettiFn as unknown as { reset?: () => void }).reset?.();
+    } catch (err) {
+      logger.debug('Confetti reset failed', {
+        operation: 'confetti_reset',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  public dispose(): void {
+    this.clear();
   }
 }
 
@@ -116,3 +153,4 @@ export const confettiTrigger = defaultConfettiTrigger;
 export function triggerVictoryConfetti(): void {
   defaultConfettiTrigger.triggerVictoryConfetti();
 }
+

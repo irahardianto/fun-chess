@@ -348,10 +348,44 @@ describe('AppViewRouter.vue', () => {
     await arena.vm.$emit('execute-move', { from: 'e2', to: 'e4' });
     expect(wrapper.emitted('execute-move') || wrapper.emitted('executeMove')).toBeTruthy();
 
+    await arena.vm.$emit('promotion-required', { from: 'e7', to: 'e8' });
+    expect(wrapper.emitted('promotion-required')).toBeTruthy();
+
     await arena.vm.$emit('offer-draw');
     expect(wrapper.emitted('offer-draw') || wrapper.emitted('offerDraw')).toBeTruthy();
 
+    await arena.vm.$emit('accept-draw');
+    expect(wrapper.emitted('accept-draw')).toBeTruthy();
+
+    await arena.vm.$emit('decline-draw');
+    expect(wrapper.emitted('decline-draw')).toBeTruthy();
+
     await arena.vm.$emit('resign');
     expect(wrapper.emitted('resign')).toBeTruthy();
+
+    await arena.vm.$emit('flip-board');
+    expect(wrapper.emitted('flip-board')).toBeTruthy();
+  });
+
+  it('forwards create-room, join-room, launch-ladder, and open-sync events from LobbyView', async () => {
+    const wrapper = mount(AppViewRouter, {
+      props: defaultProps,
+      global: globalConfig,
+    });
+
+    const lobby = wrapper.findComponent({ name: 'LobbyView' });
+    expect(lobby.exists()).toBe(true);
+
+    await lobby.vm.$emit('create-room', { playerName: 'Alice', avatar: '🦁', preferredColor: 'w' });
+    expect(wrapper.emitted('create-room')).toBeTruthy();
+
+    await lobby.vm.$emit('join-room', { roomCode: 'TEST', playerName: 'Bob', avatar: '🐼' });
+    expect(wrapper.emitted('join-room')).toBeTruthy();
+
+    await lobby.vm.$emit('launch-ladder');
+    expect(wrapper.emitted('launch-ladder')).toBeTruthy();
+
+    await lobby.vm.$emit('open-sync');
+    expect(wrapper.emitted('open-sync')).toBeTruthy();
   });
 });

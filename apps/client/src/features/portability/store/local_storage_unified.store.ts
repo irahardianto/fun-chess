@@ -10,6 +10,7 @@ import { UNIFIED_PROGRESS_SCHEMA_VERSION, assertValidProgress } from '@fun-chess
 import { LocalStorageProgressStore } from '@/features/scenarios';
 import { LocalStoragePuzzleProgressStore } from '@/features/puzzles';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
+import { logger, generateCorrelationId } from '@/platform/telemetry';
 
 export class StorageCommitError extends Error {
   public readonly rolledBack: boolean;
@@ -71,14 +72,18 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
 
     // Phase 2: Staged write
     try {
-      // 2a. Reset and write scenario records
-      await this.scenarioStore.resetAllProgress();
-      for (const [id, progress] of Object.entries(validatedPayload.scenarios)) {
-        await this.scenarioStore.saveProgress(
-          id,
-          progress.starsEarned,
-          progress.hintsUsedTotal
-        );
+      // 2a. Reset and restore scenario records
+      if (typeof this.scenarioStore.restoreProgressMap === 'function') {
+        await this.scenarioStore.restoreProgressMap(validatedPayload.scenarios);
+      } else {
+        await this.scenarioStore.resetAllProgress();
+        for (const [id, progress] of Object.entries(validatedPayload.scenarios)) {
+          await this.scenarioStore.saveProgress(
+            id,
+            progress.starsEarned,
+            progress.hintsUsedTotal
+          );
+        }
       }
 
       // 2b. Write full puzzle state (including themeMastery & arcadeStats)
@@ -87,18 +92,30 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
       // Compensating Rollback: restore from snapshot
       let rollbackSucceeded = false;
       try {
-        await this.scenarioStore.resetAllProgress();
-        for (const [id, progress] of Object.entries(snapshot.scenarios)) {
-          await this.scenarioStore.saveProgress(
-            id,
-            progress.starsEarned,
-            progress.hintsUsedTotal
-          );
+        if (typeof this.scenarioStore.restoreProgressMap === 'function') {
+          await this.scenarioStore.restoreProgressMap(snapshot.scenarios);
+        } else {
+          await this.scenarioStore.resetAllProgress();
+          for (const [id, progress] of Object.entries(snapshot.scenarios)) {
+            await this.scenarioStore.saveProgress(
+              id,
+              progress.starsEarned,
+              progress.hintsUsedTotal
+            );
+          }
         }
         await this.puzzleStore.restoreProgress(snapshot.puzzles);
         rollbackSucceeded = true;
       } catch (rollbackErr) {
-        console.error('FATAL: Two-phase commit rollback failed:', rollbackErr);
+        const correlationId = generateCorrelationId();
+        logger.fatal('FATAL: Two-phase commit rollback failed', {
+          operation: 'unified_store_rollback',
+          correlationId,
+          error:
+            rollbackErr instanceof Error
+              ? { name: rollbackErr.name, message: rollbackErr.message, stack: rollbackErr.stack }
+              : { raw: rollbackErr },
+        });
         rollbackSucceeded = false;
       }
 

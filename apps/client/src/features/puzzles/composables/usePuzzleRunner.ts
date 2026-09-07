@@ -1,5 +1,5 @@
 import { ref, computed, readonly, onUnmounted, getCurrentInstance } from 'vue';
-import { Chess } from 'chess.js';
+import { Chess, type Square as ChessSquare } from 'chess.js';
 import type {
   Puzzle,
   Square,
@@ -123,7 +123,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     if (!sq) return [];
     try {
       const chess = new Chess(fenStr);
-      const moves = chess.moves({ square: sq as any, verbose: true });
+      const moves = chess.moves({ square: sq as ChessSquare, verbose: true });
       return moves.map((m) => m.to as Square);
     } catch {
       return [];
@@ -167,7 +167,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     // Check if clicked square has player's piece
     try {
       const chess = new Chess(currentFen.value);
-      const piece = chess.get(sq as any);
+      const piece = chess.get(sq as ChessSquare);
       if (piece && piece.color === playerColor.value) {
         selectedSquare.value = sq;
         legalMoves.value = recalculateLegalMoves(currentFen.value, sq);

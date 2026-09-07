@@ -19,7 +19,7 @@ describe('useAiWorker composable', () => {
 
   it('should successfully calculate, apply move, and invoke onMoveComputed callback', async () => {
     const onMoveComputed = vi.fn();
-    const { isAiThinking, requestAiMove } = useAiWorker({ onMoveComputed });
+    const { isAiThinking, requestAiMove } = useAiWorker({ onMoveComputed, simulateThinkDelay: false });
 
     const mockMove = { from: 'e7', to: 'e5', color: 'b' } as Move;
     vi.spyOn(minimaxEngine, 'findBestMove').mockResolvedValue({
@@ -53,7 +53,7 @@ describe('useAiWorker composable', () => {
 
   it('should handle blunder move identification correctly', async () => {
     const onMoveComputed = vi.fn();
-    const { requestAiMove } = useAiWorker({ onMoveComputed });
+    const { requestAiMove } = useAiWorker({ onMoveComputed, simulateThinkDelay: false });
 
     const blunderMove = { from: 'g8', to: 'h6', color: 'b' } as Move;
     vi.spyOn(minimaxEngine, 'findBestMove').mockResolvedValue({
@@ -80,9 +80,9 @@ describe('useAiWorker composable', () => {
 
   it('should discard in-flight calculation when cancelCalculation() is invoked', async () => {
     const onMoveComputed = vi.fn();
-    const { isAiThinking, requestAiMove, cancelCalculation } = useAiWorker({ onMoveComputed });
+    const { isAiThinking, requestAiMove, cancelCalculation } = useAiWorker({ onMoveComputed, simulateThinkDelay: false });
 
-    let resolveMinimax: (val: any) => void;
+    let resolveMinimax: (val: import('@fun-chess/shared').AiMoveEvaluation) => void;
     vi.spyOn(minimaxEngine, 'findBestMove').mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -128,6 +128,7 @@ describe('useAiWorker composable', () => {
     const { isAiThinking, requestAiMove } = useAiWorker({
       onCalculationFailed,
       onMoveComputed,
+      simulateThinkDelay: false,
     });
 
     const failureError = new Error('Minimax timeout failure');
@@ -158,7 +159,7 @@ describe('useAiWorker composable', () => {
   it('should return null when engine throws and no legal fallback moves exist', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const onCalculationFailed = vi.fn();
-    const { requestAiMove } = useAiWorker({ onCalculationFailed });
+    const { requestAiMove } = useAiWorker({ onCalculationFailed, simulateThinkDelay: false });
 
     vi.spyOn(minimaxEngine, 'findBestMove').mockRejectedValue(new Error('Engine crash'));
 
@@ -176,7 +177,7 @@ describe('useAiWorker composable', () => {
   it('should trigger emergency fallback when engine returns an invalid move rejected by applyMoveFn', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const onCalculationFailed = vi.fn();
-    const { requestAiMove } = useAiWorker({ onCalculationFailed });
+    const { requestAiMove } = useAiWorker({ onCalculationFailed, simulateThinkDelay: false });
 
     vi.spyOn(minimaxEngine, 'findBestMove').mockResolvedValue({
       move: { from: 'a1', to: 'a8' }, // Invalid move
@@ -211,7 +212,7 @@ describe('useAiWorker composable', () => {
     const scope = effectScope();
     let worker: ReturnType<typeof useAiWorker>;
     scope.run(() => {
-      worker = useAiWorker();
+      worker = useAiWorker({ simulateThinkDelay: false });
     });
 
     vi.spyOn(minimaxEngine, 'findBestMove').mockImplementation(() => new Promise(() => {}));
@@ -225,9 +226,9 @@ describe('useAiWorker composable', () => {
   it('should return null if cancelled while calculation failed', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const onCalculationFailed = vi.fn();
-    const { requestAiMove, cancelCalculation } = useAiWorker({ onCalculationFailed });
+    const { requestAiMove, cancelCalculation } = useAiWorker({ onCalculationFailed, simulateThinkDelay: false });
 
-    let rejectPromise: (err: any) => void;
+    let rejectPromise: (err: unknown) => void;
     vi.spyOn(minimaxEngine, 'findBestMove').mockImplementation(
       () => new Promise((_, reject) => { rejectPromise = reject; })
     );
@@ -239,5 +240,30 @@ describe('useAiWorker composable', () => {
     const result = await promise;
     expect(result).toBeNull();
     expect(onCalculationFailed).not.toHaveBeenCalled();
+  });
+
+  it('delegates simulated thinking delay when enabled (MAJ-007)', async () => {
+    const onMoveComputed = vi.fn();
+    const { requestAiMove } = useAiWorker({ onMoveComputed, simulateThinkDelay: true });
+
+    const mockMove = { from: 'e7', to: 'e5', color: 'b' } as Move;
+    vi.spyOn(minimaxEngine, 'findBestMove').mockResolvedValue({
+      move: { from: 'e7', to: 'e5' },
+      score: 10,
+      depth: 1,
+      nodesEvaluated: 5,
+      isBlunder: false,
+      searchDurationMs: 2,
+    });
+
+    const start = performance.now();
+    await requestAiMove(
+      'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1',
+      'sparky', // sparky simulatedThinkTimeMs: [150, 350]
+      () => [mockMove],
+      () => mockMove
+    );
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeGreaterThanOrEqual(100);
   });
 });

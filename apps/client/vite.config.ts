@@ -154,10 +154,10 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       reportsDirectory: './coverage',
       thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 75,
-        statements: 80,
+        lines: 85,
+        functions: 85,
+        branches: 85,
+        statements: 85,
       },
       exclude: [
         'node_modules/**',
@@ -168,6 +168,8 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.spec.ts',
         '**/*.test.ts',
+        '**/*.bench.ts',
+        'vite.config.*',
       ],
     },
   },

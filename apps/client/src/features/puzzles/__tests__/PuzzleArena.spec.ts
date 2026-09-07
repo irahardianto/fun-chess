@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+import type { Puzzle } from '@fun-chess/shared';
 import PuzzleArena from '../PuzzleArena.vue';
 import { InMemoryPuzzleProgressStore } from '../store/in_memory_puzzle_progress.store';
 import PuzzleBoardWrapper from '../components/PuzzleBoardWrapper.vue';
@@ -375,7 +376,7 @@ describe('PuzzleArena.vue', () => {
       });
 
       const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
-      const puzzle = (wrapper.vm as any).activePuzzle;
+      const puzzle = (wrapper.vm as unknown as { activePuzzle: Puzzle }).activePuzzle;
       expect(puzzle).not.toBeNull();
 
       // Solve the ladder puzzle plies
@@ -510,7 +511,7 @@ describe('PuzzleArena.vue', () => {
       const guideSlot = wrapper.find('[data-testid="puzzle-guide-slot"]');
       expect(guideSlot.exists()).toBe(true);
 
-      const activePuzzle = (wrapper.vm as any).activePuzzle;
+      const activePuzzle = (wrapper.vm as unknown as { activePuzzle: Puzzle }).activePuzzle;
       expect(activePuzzle).toBeDefined();
 
       // In pre-move state, verify zero spoilers in the arena DOM
@@ -548,11 +549,11 @@ describe('PuzzleArena.vue', () => {
 
       const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
       expect(boardWrapper.exists()).toBe(true);
-      const puzzle = (wrapper.vm as any).activePuzzle;
+      const puzzle = (wrapper.vm as unknown as { activePuzzle: Puzzle }).activePuzzle;
       expect(puzzle.keySquares).toBeDefined();
-      expect(puzzle.keySquares.length).toBeGreaterThan(0);
+      expect(puzzle.keySquares?.length).toBeGreaterThan(0);
       expect(puzzle.targetSquares).toBeDefined();
-      expect(puzzle.targetSquares.length).toBeGreaterThan(0);
+      expect(puzzle.targetSquares?.length).toBeGreaterThan(0);
     });
   });
 });

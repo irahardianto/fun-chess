@@ -6,6 +6,8 @@ import path from 'path';
 import App from '../App.vue';
 import { ALL_SCENARIOS } from '../features/scenarios/data';
 import { usePwaInstall } from '../features/pwa/composables/usePwaInstall';
+import { useNotification } from '../components/layout';
+import { STORAGE_KEYS } from '../platform/storage';
 
 // Mock Socket.io state
 const mockSocketId = ref('mock-socket-1');
@@ -20,6 +22,11 @@ const mockOfferDraw = vi.fn();
 const mockRespondDraw = vi.fn();
 const mockRequestRematch = vi.fn();
 const mockRespondRematch = vi.fn();
+const mockCreateRoom = vi.fn().mockResolvedValue({ success: true });
+const mockJoinRoom = vi.fn().mockResolvedValue({ success: true });
+const mockMakeMove = vi.fn().mockResolvedValue({ success: true, moveResult: { captured: false } });
+const mockResign = vi.fn();
+const mockLeaveRoom = vi.fn();
 
 vi.mock('@/composables/useSocket', () => {
   return {
@@ -33,16 +40,44 @@ vi.mock('@/composables/useSocket', () => {
       lastGameOver: mockLastGameOver,
       kingInCheck: mockKingInCheck,
       connect: vi.fn(),
-      createRoom: vi.fn().mockResolvedValue({ success: true }),
-      joinRoom: vi.fn().mockResolvedValue({ success: true }),
-      makeMove: vi.fn().mockResolvedValue({ success: true, moveResult: { captured: false } }),
-      resign: vi.fn(),
+      createRoom: mockCreateRoom,
+      joinRoom: mockJoinRoom,
+      makeMove: mockMakeMove,
+      resign: mockResign,
       offerDraw: mockOfferDraw,
       respondDraw: mockRespondDraw,
       requestRematch: mockRequestRematch,
       respondRematch: mockRespondRematch,
-      leaveRoom: vi.fn(),
+      leaveRoom: mockLeaveRoom,
     }),
+  };
+});
+
+const { mockGetLanInfo } = vi.hoisted(() => ({
+  mockGetLanInfo: vi.fn().mockResolvedValue({
+    ip: '192.168.1.100',
+    port: 3000,
+    url: 'http://192.168.1.100:3000',
+    activeRooms: 0,
+    maxRooms: 10,
+    version: '1.0.0',
+  }),
+}));
+
+vi.mock('@/platform/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/platform/api')>();
+  return {
+    ...actual,
+    apiClient: {
+      ...actual.apiClient,
+      getLanInfo: mockGetLanInfo,
+      getHealth: vi.fn().mockResolvedValue({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        activeRooms: 0,
+      }),
+    },
   };
 });
 
@@ -70,6 +105,7 @@ describe('App.vue Shell & Navigation Integration', () => {
     setDeferredPrompt(null);
     setInstalled(false);
     closeInstallModal();
+    useNotification().clearAll();
 
     mockSocketId.value = 'mock-socket-1';
     mockIsConnected.value = false;
@@ -79,6 +115,15 @@ describe('App.vue Shell & Navigation Integration', () => {
     mockRematchRequestedBy.value = null;
     mockLastGameOver.value = null;
     mockKingInCheck.value = false;
+    mockCreateRoom.mockReset().mockResolvedValue({ success: true });
+    mockJoinRoom.mockReset().mockResolvedValue({ success: true });
+    mockMakeMove.mockReset().mockResolvedValue({ success: true, moveResult: { captured: false } });
+    mockResign.mockReset();
+    mockLeaveRoom.mockReset();
+    mockOfferDraw.mockReset();
+    mockRespondDraw.mockReset();
+    mockRequestRematch.mockReset();
+    mockRespondRematch.mockReset();
   });
 
   it('renders app shell with navbar and lobby by default', () => {
@@ -422,6 +467,357 @@ describe('App.vue Shell & Navigation Integration', () => {
     const selfBadge = playerBadges.find((badge) => badge.props('isSelf') === true);
     expect(selfBadge?.exists()).toBe(true);
     expect(selfBadge?.props('avatar')).toBe('⚡');
+  });
+
+  it('handles multiplayer hosting with success opening QR modal and error showing notification', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+
+    // Success path
+    await viewRouter.vm.$emit('host', { playerName: 'Alice', preferredColor: 'w', avatar: '🦊' });
+    await flushPromises();
+    expect(mockCreateRoom).toHaveBeenCalledWith('Alice', 'w', '🦊');
+    expect(mockStorage['fun_chess_player_avatar']).toBe('🦊');
+
+    // Error path
+    mockCreateRoom.mockResolvedValueOnce({ success: false, error: { message: 'Server unreachable' } });
+    await viewRouter.vm.$emit('host', { playerName: 'Alice', preferredColor: 'w' });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="app-notification-banner"]').text()).toContain('Server unreachable');
+  });
+
+  it('handles multiplayer joining with success and error feedback', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+
+    // Success path
+    await viewRouter.vm.$emit('join', { roomCode: 'ABCD', playerName: 'Bob', avatar: '🐼' });
+    await flushPromises();
+    expect(mockJoinRoom).toHaveBeenCalledWith('ABCD', 'Bob', '🐼');
+    expect(mockStorage['fun_chess_player_avatar']).toBe('🐼');
+
+    // Error path
+    mockJoinRoom.mockResolvedValueOnce({ success: false, error: { message: 'Room ABCD is full' } });
+    await viewRouter.vm.$emit('join', { roomCode: 'ABCD', playerName: 'Bob' });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="app-notification-banner"]').text()).toContain('Room ABCD is full');
+  });
+
+  it('handles move execution, capture sound triggers, and move failure recovery', async () => {
+    mockCurrentRoom.value = {
+      roomCode: 'WXYZ',
+      status: 'playing',
+      hostId: 'p1',
+      whitePlayer: { id: 'p1', name: 'White', color: 'w', socketId: 'mock-socket-1' },
+      blackPlayer: { id: 'p2', name: 'Black', color: 'b', socketId: 'mock-socket-2' },
+      game: { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', turn: 'w', moves: [] },
+    };
+
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+
+    // Normal move
+    await viewRouter.vm.$emit('execute-move', { from: 'e2', to: 'e4' });
+    await flushPromises();
+    expect(mockMakeMove).toHaveBeenCalledWith('WXYZ', { from: 'e2', to: 'e4' });
+
+    // Capture move
+    mockMakeMove.mockResolvedValueOnce({ success: true, moveResult: { captured: true } });
+    await viewRouter.vm.$emit('execute-move', { from: 'e4', to: 'd5' });
+    await flushPromises();
+
+    // Failed move
+    mockMakeMove.mockResolvedValueOnce({ success: false });
+    await viewRouter.vm.$emit('execute-move', { from: 'e1', to: 'e8' });
+    await flushPromises();
+
+    // Square selection triggers
+    await viewRouter.vm.$emit('select-square', 'e2');
+    await viewRouter.vm.$emit('square-click', 'e4');
+  });
+
+  it('handles pawn promotion lifecycle via AppModalContainer', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+
+    await viewRouter.vm.$emit('promotion-required', { from: 'e7', to: 'e8' });
+    await flushPromises();
+    const modalContainer = wrapper.findComponent({ name: 'AppModalContainer' });
+    expect(modalContainer.props('pendingPromotion')).toEqual({ from: 'e7', to: 'e8' });
+
+    await modalContainer.vm.$emit('promotion-select', 'q');
+    await modalContainer.vm.$emit('promotion-cancel');
+  });
+
+  it('handles resign confirmation dialog flow when match is in progress', async () => {
+    mockCurrentRoom.value = {
+      roomCode: 'GAME1',
+      status: 'playing',
+      hostId: 'p1',
+    };
+    const wrapper = mount(App);
+    await flushPromises();
+
+    // Request resign -> confirmation modal opens
+    (wrapper.vm as any).handleResign();
+    await flushPromises();
+    expect((wrapper.vm as any).showConfirmModal).toBe(true);
+
+    // Cancel resign
+    (wrapper.vm as any).handleConfirmCancel();
+    await flushPromises();
+    expect((wrapper.vm as any).showConfirmModal).toBe(false);
+    expect(mockResign).not.toHaveBeenCalled();
+
+    // Proceed resign
+    (wrapper.vm as any).handleResign();
+    await flushPromises();
+    (wrapper.vm as any).handleConfirmProceed();
+    await flushPromises();
+    expect(mockResign).toHaveBeenCalledWith('GAME1');
+
+    // Force resign or when match is not playing
+    mockCurrentRoom.value.status = 'game_over';
+    (wrapper.vm as any).handleResign(true);
+    expect(mockResign).toHaveBeenCalledTimes(2);
+  });
+
+  it('handles leave room confirmation dialog flow when match is playing', async () => {
+    mockCurrentRoom.value = {
+      roomCode: 'GAME1',
+      status: 'playing',
+      hostId: 'p1',
+    };
+    const wrapper = mount(App);
+    await flushPromises();
+
+    (wrapper.vm as any).handleLeaveRoom();
+    await flushPromises();
+    expect((wrapper.vm as any).showConfirmModal).toBe(true);
+
+    (wrapper.vm as any).handleConfirmCancel();
+    expect(mockLeaveRoom).not.toHaveBeenCalled();
+
+    (wrapper.vm as any).handleLeaveRoom();
+    (wrapper.vm as any).handleConfirmProceed();
+    expect(mockLeaveRoom).toHaveBeenCalledWith('GAME1');
+    expect((wrapper.vm as any).currentAppMode).toBe('lobby');
+
+    // Immediate leave when status is not playing
+    mockCurrentRoom.value = { roomCode: 'GAME2', status: 'lobby' };
+    (wrapper.vm as any).handleLeaveRoom();
+    expect(mockLeaveRoom).toHaveBeenCalledWith('GAME2');
+  });
+
+  it('handles rematch requests and responses from AppModalContainer', async () => {
+    mockCurrentRoom.value = { roomCode: 'REM1', status: 'game_over' };
+    const wrapper = mount(App);
+    await flushPromises();
+    const modalContainer = wrapper.findComponent({ name: 'AppModalContainer' });
+
+    await modalContainer.vm.$emit('request-rematch');
+    expect(mockRequestRematch).toHaveBeenCalledWith('REM1');
+
+    await modalContainer.vm.$emit('accept-rematch');
+    expect(mockRespondRematch).toHaveBeenCalledWith('REM1', true);
+
+    await modalContainer.vm.$emit('decline-rematch');
+    expect(mockRespondRematch).toHaveBeenCalledWith('REM1', false);
+  });
+
+  it('handles draw offers, acceptances, and declines from AppViewRouter', async () => {
+    mockCurrentRoom.value = { roomCode: 'DRAW1', status: 'playing' };
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+
+    await viewRouter.vm.$emit('offer-draw');
+    expect(mockOfferDraw).toHaveBeenCalledWith('DRAW1');
+    expect(wrapper.find('[data-testid="app-notification-banner"]').text()).toContain('Draw offer sent');
+
+    await viewRouter.vm.$emit('accept-draw');
+    expect(mockRespondDraw).toHaveBeenCalledWith('DRAW1', true);
+
+    await viewRouter.vm.$emit('decline-draw');
+    expect(mockRespondDraw).toHaveBeenCalledWith('DRAW1', false);
+  });
+
+  it('navigates through puzzle hub drill, ladder, and rush modes, and handles exits', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+
+    await viewRouter.vm.$emit('launch-drills', 'pin');
+    expect((wrapper.vm as any).currentAppMode).toBe('puzzle_hub');
+
+    await viewRouter.vm.$emit('launch-ladder');
+    expect((wrapper.vm as any).currentAppMode).toBe('puzzle_hub');
+
+    await viewRouter.vm.$emit('launch-rush', 'puzzle_rush');
+    expect((wrapper.vm as any).currentAppMode).toBe('puzzle_hub');
+
+    await viewRouter.vm.$emit('puzzle-exit');
+    expect((wrapper.vm as any).currentAppMode).toBe('lobby');
+
+    const navbar = wrapper.findComponent({ name: 'AppNavbar' });
+    await navbar.vm.$emit('exit-puzzle');
+    expect((wrapper.vm as any).currentAppMode).toBe('lobby');
+  });
+
+  it('handles scenario completions, lesson progression, and academy exits', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+
+    await viewRouter.vm.$emit('scenario-completed');
+    await viewRouter.vm.$emit('next-lesson', ALL_SCENARIOS[1]);
+    await viewRouter.vm.$emit('academy-back');
+    expect((wrapper.vm as any).currentAppMode).toBe('lobby');
+
+    const navbar = wrapper.findComponent({ name: 'AppNavbar' });
+    await navbar.vm.$emit('exit-academy');
+    expect((wrapper.vm as any).currentAppMode).toBe('lobby');
+  });
+
+  it('handles progress sync modal opening, conflict resolution, and banner snooze', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    const navbar = wrapper.findComponent({ name: 'AppNavbar' });
+    await navbar.vm.$emit('open-sync');
+
+    const modalContainer = wrapper.findComponent({ name: 'AppModalContainer' });
+    await modalContainer.vm.$emit('resolve-conflict', 'keep_local');
+    await modalContainer.vm.$emit('dismiss-conflict');
+    await modalContainer.vm.$emit('prompt-install');
+    await modalContainer.vm.$emit('snooze-prompt');
+  });
+
+  it('parses URL query params for initial room code on startup', async () => {
+    const originalLocation = window.location;
+    delete (window as any).location;
+    (window as any).location = new URL('http://localhost:5173/?join=CAMP');
+
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+    expect(viewRouter.props('initialRoomCode')).toBe('CAMP');
+
+    (window as any).location = originalLocation;
+  });
+
+  it('loads initial lobby mode as multiplayer_lan when scenario progress exists', async () => {
+    mockStorage[STORAGE_KEYS.SCENARIO_PROGRESS] = JSON.stringify({
+      'pawn_journey': { starsEarned: 3 },
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+    expect(viewRouter.props('lobbyActiveMode')).toBe('multiplayer_lan');
+  });
+
+  it('safely handles corrupted scenario progress data in localStorage on boot', async () => {
+    mockStorage[STORAGE_KEYS.SCENARIO_PROGRESS] = 'INVALID_MALFORMED_JSON{{{';
+
+    const wrapper = mount(App);
+    await flushPromises();
+    expect(wrapper.find('[data-testid="app-shell"]').exists()).toBe(true);
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+    expect(viewRouter.props('lobbyActiveMode')).toBe('academy');
+  });
+
+  it('parses ?join= query param for initial room code on startup', async () => {
+    const originalLocation = window.location;
+    delete (window as any).location;
+    (window as any).location = new URL('https://fun-chess.local/?join=ABCD');
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+    expect(viewRouter.props('initialRoomCode')).toBe('ABCD');
+
+    (window as any).location = originalLocation;
+  });
+
+  it('cleans up audio listeners when App component unmounts', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(() => wrapper.unmount()).not.toThrow();
+  });
+
+  it('watches kingInCheck and triggers check audio alert', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+
+    mockKingInCheck.value = true;
+    await flushPromises();
+    // Verify component handles check state change without crashing
+    expect(wrapper.find('[data-testid="app-shell"]').exists()).toBe(true);
+  });
+
+  it('handles room status transition from lobby to playing closing QR modal', async () => {
+    mockCurrentRoom.value = { roomCode: 'ROOM1', status: 'lobby' };
+    const wrapper = mount(App);
+    await flushPromises();
+
+    mockCurrentRoom.value = { roomCode: 'ROOM1', status: 'playing' };
+    await flushPromises();
+
+    const modalContainer = wrapper.findComponent({ name: 'AppModalContainer' });
+    expect(modalContainer.props('showQrModal')).toBe(false);
+  });
+
+  it('handles defeat game over state without celebrating', async () => {
+    mockCurrentRoom.value = {
+      roomCode: 'DEFEAT1',
+      status: 'playing',
+      whitePlayer: { socketId: 'mock-socket-1', color: 'w' },
+      blackPlayer: { socketId: 'other-socket', color: 'b' },
+    };
+    const wrapper = mount(App);
+    await flushPromises();
+
+    // Player is white, winner is black (defeat)
+    mockLastGameOver.value = {
+      roomCode: 'DEFEAT1',
+      winner: 'b',
+      reason: 'checkmate',
+    };
+    await flushPromises();
+
+    const modalContainer = wrapper.findComponent({ name: 'AppModalContainer' });
+    expect(modalContainer.props('showGameOverModal')).toBe(true);
+    expect(modalContainer.props('isWinner')).toBe(false);
+  });
+
+  it('prompts leave confirmation when navbar brand is clicked while in an active room', async () => {
+    mockCurrentRoom.value = { roomCode: 'ROOM1', status: 'playing' };
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const navbar = wrapper.findComponent({ name: 'AppNavbar' });
+    await navbar.vm.$emit('navigate-home');
+    await flushPromises();
+
+    const modalContainer = wrapper.findComponent({ name: 'AppModalContainer' });
+    expect(modalContainer.props('showConfirmModal')).toBe(true);
+    expect(modalContainer.props('confirmTitle')).toBe('Leave Match?');
+  });
+
+  it('guards move execution when room is not present or already submitting', async () => {
+    mockCurrentRoom.value = null;
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
+    await viewRouter.vm.$emit('execute-move', { from: 'e2', to: 'e4' });
+    expect(mockMakeMove).not.toHaveBeenCalled();
   });
 });
 

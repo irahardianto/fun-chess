@@ -6,6 +6,7 @@ export type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 export interface SocketClientOptions {
   url?: string;
   correlationId?: string;
+  reconnectionDelayMax?: number;
 }
 
 export function createSocketClient(urlOrOptions?: string | SocketClientOptions): TypedSocket {
@@ -15,15 +16,19 @@ export function createSocketClient(urlOrOptions?: string | SocketClientOptions):
 
   const auth = options.correlationId ? { correlationId: options.correlationId } : undefined;
   const query = options.correlationId ? { correlationId: options.correlationId } : undefined;
+  const reconnectionDelayMax =
+    options.reconnectionDelayMax ?? (typeof urlOrOptions === 'string' ? undefined : 10000);
 
   return io(targetUrl, {
     autoConnect: false,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
+    ...(reconnectionDelayMax !== undefined ? { reconnectionDelayMax } : {}),
     timeout: 20000,
     transports: ['websocket', 'polling'],
     ...(auth ? { auth } : {}),
     ...(query ? { query } : {}),
   });
 }
+

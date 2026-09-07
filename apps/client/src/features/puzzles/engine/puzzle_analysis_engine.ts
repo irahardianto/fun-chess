@@ -1,4 +1,4 @@
-import { Chess } from 'chess.js';
+import { Chess, type Move } from 'chess.js';
 import type {
   Square,
   PieceColor,
@@ -622,7 +622,7 @@ export function generateMistakeRefutation(
 
   const playerColor = chess.turn();
   const playerUci = formatPlayerMoveToUci(playerMove);
-  let playerResult: any = null;
+  let playerResult: Move | null = null;
   try {
     playerResult = chess.move({
       from: playerMove.from as unknown as import('chess.js').Square,
@@ -743,7 +743,7 @@ export function generateStepBreakdowns(puzzle: Puzzle): readonly PuzzleStepExpla
     const movingPiece = chess.get(from as unknown as import('chess.js').Square);
     const pieceName = movingPiece ? PIECE_DISPLAY_NAMES[movingPiece.type as PieceType] : 'Piece';
 
-    let moveRes: any = null;
+    let moveRes: Move | null = null;
     try {
       moveRes = chess.move({
         from: from as unknown as import('chess.js').Square,

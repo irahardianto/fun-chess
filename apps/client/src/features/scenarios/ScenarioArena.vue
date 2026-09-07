@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { watch, ref, computed } from 'vue';
 import type { ChessScenario, StarRating, Square } from '@fun-chess/shared';
-import ChessBoard from '../board/ChessBoard.vue';
-import PromotionModal from '../modals/PromotionModal.vue';
+import { ChessBoard } from '@/features/board/index.js';
+import { PromotionModal } from '@/features/modals/index.js';
 import BaseButton from '../../components/base/BaseButton.vue';
 import ScenarioGuideOverlay from './components/ScenarioGuideOverlay.vue';
 import ScenarioCompletionModal from './components/ScenarioCompletionModal.vue';
-import ProgressiveHintLayer from '../puzzles/components/ProgressiveHintLayer.vue';
+import { ProgressiveHintLayer } from '@/features/puzzles/index.js';
 import { useScenarioRunner, type ScenarioStepOutcomeEvent } from './composables/useScenarioRunner';
 import { useScenarioProgress } from './composables/useScenarioProgress';
 import { getNextScenario } from './data';

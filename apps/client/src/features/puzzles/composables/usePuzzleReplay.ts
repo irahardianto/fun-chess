@@ -1,5 +1,5 @@
 import { ref, computed, readonly, type Ref } from 'vue';
-import { Chess } from 'chess.js';
+import { Chess, type Move } from 'chess.js';
 import type {
   Puzzle,
   Square,
@@ -78,7 +78,7 @@ export function usePuzzleReplay(options: UsePuzzleReplayOptions = {}) {
       const { from, to, promotion } = parseUciMove(uci);
       const actor: PieceColor = sim.turn();
 
-      let moveRes: any = null;
+      let moveRes: Move | null = null;
       try {
         moveRes = sim.move({
           from: from as unknown as import('chess.js').Square,

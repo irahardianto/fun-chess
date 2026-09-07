@@ -1,8 +1,32 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import LobbyView from '../LobbyView.vue';
+import { STORAGE_KEYS } from '@/platform/storage/keys';
 
 describe('LobbyView.vue', () => {
+  let mockStorage: Record<string, string> = {};
+
+  beforeEach(() => {
+    mockStorage = {};
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn((key: string) => mockStorage[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        mockStorage[key] = value;
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete mockStorage[key];
+      }),
+      clear: vi.fn(() => {
+        mockStorage = {};
+      }),
+    });
+  });
+
+  afterEach(() => {
+    mockStorage = {};
+    vi.restoreAllMocks();
+  });
+
   it('defaults fresh users to Chess Academy mode', () => {
     const wrapper = mount(LobbyView);
 
@@ -219,6 +243,52 @@ describe('LobbyView.vue', () => {
     // Home -> selects 🦁 (first avatar)
     await pandaBtn.trigger('keydown', { key: 'Home' });
     expect(lionBtn.classes()).toContain('is-selected');
+  });
+
+  it('reads and saves player avatar using STORAGE_KEYS.PLAYER_AVATAR (MIN-031)', async () => {
+    localStorage.setItem(STORAGE_KEYS.PLAYER_AVATAR, '🦄');
+
+    const wrapper = mount(LobbyView, {
+      props: {
+        initialMode: 'multiplayer_lan',
+      },
+    });
+
+    const unicornBtn = wrapper.find('[data-testid="lobby-avatar-option-🦄"]');
+    expect(unicornBtn.classes()).toContain('is-selected');
+
+    const pandaBtn = wrapper.find('[data-testid="lobby-avatar-option-🐼"]');
+    await pandaBtn.trigger('click');
+
+    expect(pandaBtn.classes()).toContain('is-selected');
+    expect(localStorage.getItem(STORAGE_KEYS.PLAYER_AVATAR)).toBe('🐼');
+  });
+
+  it('resolves initial mode from props.progressMap without accessing legacy raw localStorage (MIN-031)', () => {
+    // When progressMap has completed scenarios (> 0), defaults to multiplayer_lan
+    const wrapperCompleted = mount(LobbyView, {
+      props: {
+        progressMap: {
+          'scenario-1': {
+            scenarioId: 'scenario-1',
+            starsEarned: 3,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 123456,
+            lastCompletedAt: 123456,
+          },
+        },
+      },
+    });
+    expect(wrapperCompleted.find('.host-card').exists()).toBe(true);
+
+    // When progressMap is empty (0 completed), defaults to academy
+    const wrapperEmpty = mount(LobbyView, {
+      props: {
+        progressMap: {},
+      },
+    });
+    expect(wrapperEmpty.find('.academy-browser-container').exists()).toBe(true);
   });
 });
 

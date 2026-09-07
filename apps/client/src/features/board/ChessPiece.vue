@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import type { PieceColor, PieceType, Square } from '@fun-chess/shared';
 import type { PieceKey } from '@/assets/pieces';
+import { logger } from '@/platform/telemetry/index.js';
 import ChessPieceSvg from '../../components/base/ChessPieceSvg.vue';
 
 interface Props {
@@ -90,8 +91,12 @@ function handlePointerDown(e: PointerEvent) {
   pointerId.value = e.pointerId;
   try {
     target.setPointerCapture(e.pointerId);
-  } catch {
-    // Ignore
+  } catch (err) {
+    logger.warn('Failed to set pointer capture', {
+      operation: 'set_pointer_capture',
+      pointerId: e.pointerId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 
   startPos.value = { x: e.clientX, y: e.clientY };
@@ -126,8 +131,12 @@ function handlePointerUp(e: PointerEvent) {
   const target = e.currentTarget as HTMLElement;
   try {
     target.releasePointerCapture(e.pointerId);
-  } catch {
-    // Ignore
+  } catch (err) {
+    logger.warn('Failed to release pointer capture', {
+      operation: 'release_pointer_capture',
+      pointerId: e.pointerId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 
   const wasDragging = isInternalDragging.value;

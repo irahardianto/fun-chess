@@ -156,16 +156,17 @@ describe('Minimax Search Engine (Alpha-Beta Search & Tactics)', () => {
       expect(evalResult.depth).toBe(1);
     });
 
-    it('respects simulated think time range when configured', async () => {
+    it('executes purely without artificial delays (MAJ-007)', async () => {
       const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       const start = performance.now();
-      await engine.findBestMove(startFen, {
+      const evalResult = await engine.findBestMove(startFen, {
         ...fastConfig,
         depth: 1,
-        simulatedThinkTimeMs: [50, 80],
+        simulatedThinkTimeMs: [500, 1000],
       });
       const elapsed = performance.now() - start;
-      expect(elapsed).toBeGreaterThanOrEqual(40);
+      expect(evalResult.move).toBeDefined();
+      expect(elapsed).toBeLessThan(400);
     });
   });
 });

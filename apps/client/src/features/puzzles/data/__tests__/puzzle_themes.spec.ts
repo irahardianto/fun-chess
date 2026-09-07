@@ -53,7 +53,7 @@ describe("Puzzle Themes Catalog (puzzle_themes.spec.ts)", () => {
     expect(endgameAlias).toBeDefined();
     expect(endgameAlias?.id).toBe("pawn_endgame");
 
-    const nonExistent = getThemeDescriptor("invalid_theme" as any);
+    const nonExistent = getThemeDescriptor("invalid_theme" as unknown as Parameters<typeof getThemeDescriptor>[0]);
     expect(nonExistent).toBeUndefined();
   });
 

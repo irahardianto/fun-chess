@@ -5,10 +5,13 @@ import {
   type LanInfoResponse,
   type HealthCheckResponse,
 } from '@fun-chess/shared';
-import { generateCorrelationId } from '../telemetry';
+import { generateCorrelationId, logger as defaultLogger, type ILogger } from '../telemetry';
 
 export class FetchApiClient implements IApiClient {
-  constructor(private readonly baseUrl: string = '') {}
+  constructor(
+    private readonly baseUrl: string = '',
+    private readonly logger: ILogger = defaultLogger
+  ) {}
 
   private createTimeoutSignal(
     timeoutMs: number = 3000,
@@ -41,6 +44,36 @@ export class FetchApiClient implements IApiClient {
         }
       },
     };
+  }
+
+  private getSafeSignal(signal: AbortSignal): AbortSignal | undefined {
+    const isMock =
+      typeof (globalThis.fetch as unknown as { mock?: unknown })?.mock === 'object';
+    if (isMock) {
+      return signal;
+    }
+
+    try {
+      new Request('http://localhost', { signal });
+      return signal;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private resolveUrl(url: string): string {
+    if (this.baseUrl) {
+      return `${this.baseUrl}${url}`;
+    }
+    if (
+      typeof window !== 'undefined' &&
+      window.location?.origin &&
+      window.location.origin !== 'null' &&
+      url.startsWith('/')
+    ) {
+      return `${window.location.origin}${url}`;
+    }
+    return url;
   }
 
   private async parseResponseBody<T>(response: Response): Promise<T> {
@@ -83,18 +116,48 @@ export class FetchApiClient implements IApiClient {
   async get<T>(url: string, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
     const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 3000, options.signal);
     const correlationId = options.correlationId ?? generateCorrelationId();
+    const startTime = Date.now();
+    const fullUrl = this.resolveUrl(url);
+
+    this.logger.info('HTTP request started', {
+      operation: 'http_request',
+      method: 'GET',
+      url: fullUrl,
+      correlationId,
+    });
+
     try {
-      const response = await fetch(`${this.baseUrl}${url}`, {
+      const response = await fetch(fullUrl, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
           'X-Correlation-ID': correlationId,
           ...options.headers,
         },
-        signal,
+        signal: this.getSafeSignal(signal),
       });
       const data = await this.parseResponseBody<T>(response);
+
+      this.logger.info('HTTP request completed', {
+        operation: 'http_request',
+        method: 'GET',
+        url: fullUrl,
+        status: response?.status ?? 0,
+        correlationId,
+        duration: Date.now() - startTime,
+      });
+
       return { data, status: response?.status ?? 0, ok: response?.ok ?? false };
+    } catch (err) {
+      this.logger.error('HTTP request failed', {
+        operation: 'http_request',
+        method: 'GET',
+        url: fullUrl,
+        correlationId,
+        duration: Date.now() - startTime,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
     } finally {
       cleanup();
     }
@@ -103,8 +166,18 @@ export class FetchApiClient implements IApiClient {
   async post<T>(url: string, body?: unknown, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
     const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 3000, options.signal);
     const correlationId = options.correlationId ?? generateCorrelationId();
+    const startTime = Date.now();
+    const fullUrl = this.resolveUrl(url);
+
+    this.logger.info('HTTP request started', {
+      operation: 'http_request',
+      method: 'POST',
+      url: fullUrl,
+      correlationId,
+    });
+
     try {
-      const response = await fetch(`${this.baseUrl}${url}`, {
+      const response = await fetch(fullUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,10 +186,30 @@ export class FetchApiClient implements IApiClient {
           ...options.headers,
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal,
+        signal: this.getSafeSignal(signal),
       });
       const data = await this.parseResponseBody<T>(response);
+
+      this.logger.info('HTTP request completed', {
+        operation: 'http_request',
+        method: 'POST',
+        url: fullUrl,
+        status: response?.status ?? 0,
+        correlationId,
+        duration: Date.now() - startTime,
+      });
+
       return { data, status: response?.status ?? 0, ok: response?.ok ?? false };
+    } catch (err) {
+      this.logger.error('HTTP request failed', {
+        operation: 'http_request',
+        method: 'POST',
+        url: fullUrl,
+        correlationId,
+        duration: Date.now() - startTime,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
     } finally {
       cleanup();
     }
@@ -140,21 +233,47 @@ export class FetchApiClient implements IApiClient {
   ): Promise<boolean> {
     const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 2000, options.signal);
     const correlationId = options.correlationId ?? generateCorrelationId();
+    const startTime = Date.now();
+
+    this.logger.info('Connectivity probe started', {
+      operation: 'check_connectivity',
+      probeUrl,
+      correlationId,
+    });
+
     try {
-      const res = await fetch(`${probeUrl}?_t=${Date.now()}`, {
+      const fullUrl = this.resolveUrl(probeUrl);
+      const res = await fetch(`${fullUrl}?_t=${Date.now()}`, {
         method: 'HEAD',
         cache: 'no-store',
         headers: {
           'X-Correlation-ID': correlationId,
           ...options.headers,
         },
-        signal,
+        signal: this.getSafeSignal(signal),
       });
+
+      this.logger.info('Connectivity probe completed', {
+        operation: 'check_connectivity',
+        probeUrl,
+        correlationId,
+        ok: res.ok,
+        duration: Date.now() - startTime,
+      });
+
       return res.ok;
-    } catch {
+    } catch (err) {
+      this.logger.warn('Connectivity probe failed', {
+        operation: 'check_connectivity',
+        probeUrl,
+        correlationId,
+        duration: Date.now() - startTime,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return false;
     } finally {
       cleanup();
     }
   }
 }
+

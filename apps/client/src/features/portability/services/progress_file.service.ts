@@ -1,13 +1,25 @@
+import { logger as defaultLogger, type ILogger } from '../../../platform/telemetry';
+
 /**
  * Maximum progress backup file size (2MB).
  */
 export const MAX_PROGRESS_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB limit
 
 /**
+ * Contract for progress backup file service.
+ */
+export interface IProgressFileService {
+  downloadProgressFile(envelopeJson: string, filename?: string): void;
+  readProgressFile(file: File | Blob): Promise<string>;
+}
+
+/**
  * Service for 1-click JSON backup file download and upload reading.
  * Adheres to Rule 1 (I/O Isolation) and Defensive Programming Mandates.
  */
-export class ProgressFileService {
+export class ProgressFileService implements IProgressFileService {
+  constructor(private readonly logger: ILogger = defaultLogger) {}
+
   /**
    * Triggers client-side browser download of progress JSON envelope file.
    *
@@ -35,7 +47,11 @@ export class ProgressFileService {
       document.body.appendChild(link);
       link.click();
     } catch (err) {
-      console.error('[FC_PROGRESS_SYNC] Failed to initiate file download', err);
+      this.logger.error('Failed to initiate file download', {
+        operation: 'progress_file_download',
+        filename,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw new Error('Unable to download backup file');
     } finally {
       if (link && link.parentNode) {
@@ -70,7 +86,11 @@ export class ProgressFileService {
       try {
         return await file.text();
       } catch (err) {
-        console.warn('[FC_PROGRESS_SYNC] file.text() failed, trying FileReader fallback', err);
+        this.logger.warn('file.text() failed, trying FileReader fallback', {
+          operation: 'progress_file_read',
+          fileSize: file.size,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
@@ -90,6 +110,11 @@ export class ProgressFileService {
         }
       };
       reader.onerror = () => {
+        this.logger.error('Failed to read save file', {
+          operation: 'progress_file_read',
+          fileSize: file.size,
+          error: reader.error ? reader.error.message : 'Unknown FileReader error',
+        });
         reject(reader.error || new Error('Failed to read save file'));
       };
       reader.readAsText(file);
@@ -99,3 +124,4 @@ export class ProgressFileService {
 
 export const defaultProgressFileService = new ProgressFileService();
 export const progressFileService = defaultProgressFileService;
+

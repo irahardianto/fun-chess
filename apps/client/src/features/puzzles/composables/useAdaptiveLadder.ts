@@ -1,4 +1,4 @@
-import { ref, computed, readonly } from 'vue';
+import { ref, computed, readonly, onScopeDispose, getCurrentScope, onUnmounted, getCurrentInstance } from 'vue';
 import type { Puzzle, StarRating, PuzzleProgressStore } from '@fun-chess/shared';
 import {
   calculateAdaptiveRatingAdjustment,
@@ -17,6 +17,15 @@ export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
   const currentPuzzle = ref<Puzzle | null>(null);
   const ratingDeltaAnim = ref<number | null>(null);
   const lastRatingDelta = ref<number>(0);
+
+  let ratingDeltaTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearRatingDeltaTimer(): void {
+    if (ratingDeltaTimer) {
+      clearTimeout(ratingDeltaTimer);
+      ratingDeltaTimer = null;
+    }
+  }
 
   const currentElo = computed<number>(() => progressModule.currentElo.value);
   const playerRating = computed<number>(() => progressModule.currentElo.value);
@@ -39,12 +48,9 @@ export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
     const sorted = [...pool].sort(
       (a, b) => Math.abs(a.rating - target) - Math.abs(b.rating - target)
     );
-    const topCandidates = sorted.slice(0, Math.min(5, sorted.length));
-    const chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)] || pool[0];
+    const chosen = sorted[0] || ALL_PUZZLES[0]!;
     currentPuzzle.value = chosen;
-    if (chosen) {
-      runner.loadPuzzle(chosen);
-    }
+    runner.loadPuzzle(chosen);
     return chosen;
   }
 
@@ -67,8 +73,10 @@ export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
 
     ratingDeltaAnim.value = adjustment.delta;
     lastRatingDelta.value = adjustment.delta;
-    setTimeout(() => {
+    clearRatingDeltaTimer();
+    ratingDeltaTimer = setTimeout(() => {
       ratingDeltaAnim.value = null;
+      ratingDeltaTimer = null;
     }, 1800);
 
     const oldProfile = progressModule.progress.value?.ratingProfile;
@@ -109,8 +117,10 @@ export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
 
     ratingDeltaAnim.value = adjustment.delta;
     lastRatingDelta.value = adjustment.delta;
-    setTimeout(() => {
+    clearRatingDeltaTimer();
+    ratingDeltaTimer = setTimeout(() => {
       ratingDeltaAnim.value = null;
+      ratingDeltaTimer = null;
     }, 1800);
 
     const oldProfile = progressModule.progress.value?.ratingProfile;
@@ -133,6 +143,16 @@ export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
     };
 
     await progressModule.updateRating(newProfile);
+  }
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      clearRatingDeltaTimer();
+    });
+  } else if (getCurrentInstance()) {
+    onUnmounted(() => {
+      clearRatingDeltaTimer();
+    });
   }
 
   // Pick initial puzzle

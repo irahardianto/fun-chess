@@ -4,9 +4,11 @@ import type {
   ScenarioProgressStore,
   StarRating,
 } from '@fun-chess/shared';
-import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
+import { safeLocalStorage, STORAGE_KEYS, type KeyValueStorage } from '@/platform/storage';
+import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
+import { logger } from '@/platform/telemetry';
 
-export const SCENARIO_PROGRESS_STORAGE_KEY = 'fun_chess_scenario_progress_v1';
+export const SCENARIO_PROGRESS_STORAGE_KEY = STORAGE_KEYS.SCENARIO_PROGRESS;
 
 /**
  * Robust localStorage implementation of ScenarioProgressStore.
@@ -131,12 +133,61 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
     if (this.storage.isAvailable()) {
       try {
         this.storage.setItem(this.storageKey, JSON.stringify(currentMap));
-      } catch {
-        // Fallback already updated in memoryFallback
+      } catch (err) {
+        if (isQuotaExceededError(err)) {
+          storageAlertDispatcher.notify({
+            type: 'STORAGE_QUOTA_EXCEEDED',
+            store: 'scenarios',
+            attemptedAction: 'save',
+            timestamp: Date.now(),
+            message: 'Storage quota exceeded while saving scenario progress.',
+            suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+          });
+        } else {
+          logger.warn('Failed to persist scenario progress to storage', {
+            operation: 'save_scenario_progress',
+            scenarioId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }
 
     return { ...updated };
+  }
+
+  public async restoreProgressMap(map: ScenarioProgressMap): Promise<void> {
+    const sanitizedMap: ScenarioProgressMap = {};
+    this.memoryFallback.clear();
+    for (const [id, rec] of Object.entries(map)) {
+      const sanitized = this.sanitizeRecord(rec);
+      if (sanitized) {
+        sanitizedMap[id] = sanitized;
+        this.memoryFallback.set(id, sanitized);
+      }
+    }
+
+    if (this.storage.isAvailable()) {
+      try {
+        this.storage.setItem(this.storageKey, JSON.stringify(sanitizedMap));
+      } catch (err) {
+        if (isQuotaExceededError(err)) {
+          storageAlertDispatcher.notify({
+            type: 'STORAGE_QUOTA_EXCEEDED',
+            store: 'scenarios',
+            attemptedAction: 'save',
+            timestamp: Date.now(),
+            message: 'Storage quota exceeded while restoring scenario progress.',
+            suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+          });
+          throw err;
+        }
+        logger.warn('Failed to persist restored scenario progress to storage', {
+          operation: 'restore_scenario_progress_map',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
   }
 
   public async resetAllProgress(): Promise<void> {
@@ -144,8 +195,11 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
     if (this.storage.isAvailable()) {
       try {
         this.storage.removeItem(this.storageKey);
-      } catch {
-        // Safe ignore
+      } catch (err) {
+        logger.warn('Failed to remove scenario progress from storage', {
+          operation: 'reset_scenario_progress',
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
   }

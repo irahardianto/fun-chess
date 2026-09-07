@@ -276,4 +276,198 @@ describe('AppModalContainer.vue', () => {
 
     expect(wrapper.findComponent({ name: 'PwaInstallBanner' }).exists()).toBe(false);
   });
+
+  it('renders confirmation dialog and handles confirm proceed and cancel interactions', async () => {
+    const wrapper = mount(AppModalContainer, {
+      props: {
+        ...defaultProps,
+        showConfirmModal: true,
+        confirmTitle: 'Leave Match?',
+        confirmMessage: 'Are you sure you want to forfeit?',
+        confirmButtonText: 'Yes, Forfeit',
+        cancelButtonText: 'Keep Playing',
+        confirmVariant: 'danger',
+      },
+      global: globalConfig,
+    });
+
+    expect(wrapper.find('[data-testid="confirm-dialog-body"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="confirm-dialog-message"]').text()).toBe('Are you sure you want to forfeit?');
+
+    const proceedBtn = wrapper.find('[data-testid="confirm-proceed-btn"]');
+    expect(proceedBtn.text()).toContain('Yes, Forfeit');
+    await proceedBtn.trigger('click');
+
+    expect(wrapper.emitted('update:showConfirmModal')?.[0]).toEqual([false]);
+    expect(wrapper.emitted('confirm-proceed') || wrapper.emitted('confirmProceed')).toBeTruthy();
+
+    const cancelBtn = wrapper.find('[data-testid="confirm-cancel-btn"]');
+    expect(cancelBtn.text()).toContain('Keep Playing');
+    await cancelBtn.trigger('click');
+
+    expect(wrapper.emitted('confirm-cancel') || wrapper.emitted('confirmCancel')).toBeTruthy();
+
+    // BaseModal close event
+    const baseModal = wrapper.findComponent({ name: 'BaseModal' });
+    await baseModal.vm.$emit('close');
+    expect(wrapper.emitted('confirm-cancel') || wrapper.emitted('confirmCancel')).toBeTruthy();
+
+    // BaseModal update:modelValue
+    await baseModal.vm.$emit('update:modelValue', false);
+    expect(wrapper.emitted('update:showConfirmModal')).toBeTruthy();
+  });
+
+  it('renders confirmation dialog with default button labels and variant when props are omitted', () => {
+    const wrapper = mount(AppModalContainer, {
+      props: {
+        ...defaultProps,
+        showConfirmModal: true,
+        confirmTitle: 'Default Dialog',
+        confirmMessage: 'Default message',
+      },
+      global: globalConfig,
+    });
+
+    const cancelBtn = wrapper.find('[data-testid="confirm-cancel-btn"]');
+    expect(cancelBtn.text()).toBe('Cancel');
+
+    const proceedBtn = wrapper.find('[data-testid="confirm-proceed-btn"]');
+    expect(proceedBtn.text()).toBe('Confirm');
+  });
+
+  it('handles QrCodeModal and GameOverModal close events directly', async () => {
+    const wrapper = mount(AppModalContainer, {
+      props: {
+        ...defaultProps,
+        showQrModal: true,
+        currentRoom: mockRoom,
+        showGameOverModal: true,
+        lastGameOver: mockGameOver,
+      },
+      global: globalConfig,
+    });
+
+    const qrModal = wrapper.findComponent({ name: 'QrCodeModal' });
+    await qrModal.vm.$emit('close');
+    expect(wrapper.emitted('update:showQrModal')).toBeTruthy();
+
+    const gameOverModal = wrapper.findComponent({ name: 'GameOverModal' });
+    await gameOverModal.vm.$emit('close');
+    expect(wrapper.emitted('update:showGameOverModal')).toBeTruthy();
+  });
+
+  it('handles RematchModal update:modelValue false by declining rematch', async () => {
+    const wrapper = mount(AppModalContainer, {
+      props: {
+        ...defaultProps,
+        showIncomingRematchModal: true,
+        rematchRequestedBy: { requesterId: 'p2', requesterName: 'Bob' },
+      },
+      global: globalConfig,
+    });
+
+    const rematchModal = wrapper.findComponent({ name: 'RematchModal' });
+    await rematchModal.vm.$emit('update:modelValue', false);
+    expect(wrapper.emitted('decline-rematch') || wrapper.emitted('declineRematch')).toBeTruthy();
+  });
+
+  it('handles ProgressConflictModal merge and replace shortcuts', async () => {
+    const wrapper = mount(AppModalContainer, {
+      props: {
+        ...defaultProps,
+        isConflictModalOpen: true,
+      },
+      global: globalConfig,
+    });
+
+    const conflictModal = wrapper.findComponent({ name: 'ProgressConflictModal' });
+
+    await conflictModal.vm.$emit('merge');
+    expect(wrapper.emitted('resolve-conflict')?.[0]).toEqual(['smart_merge']);
+
+    await conflictModal.vm.$emit('replace');
+    expect(wrapper.emitted('resolve-conflict')?.[1]).toEqual(['replace_local']);
+
+    await conflictModal.vm.$emit('update:modelValue', false);
+    expect(wrapper.emitted('update:isConflictModalOpen')?.[0]).toEqual([false]);
+  });
+
+  it('dismisses appropriate active modal on keyboard Escape press', async () => {
+    // 1. Confirm modal
+    const wrapperConfirm = mount(AppModalContainer, {
+      props: { ...defaultProps, showConfirmModal: true },
+      global: globalConfig,
+    });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapperConfirm.emitted('confirm-cancel') || wrapperConfirm.emitted('confirmCancel')).toBeTruthy();
+    wrapperConfirm.unmount();
+
+    // 2. QR modal
+    const wrapperQr = mount(AppModalContainer, {
+      props: { ...defaultProps, showQrModal: true, currentRoom: mockRoom },
+      global: globalConfig,
+    });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapperQr.emitted('update:showQrModal')?.[0]).toEqual([false]);
+    wrapperQr.unmount();
+
+    // 3. Pending promotion
+    const wrapperPromotion = mount(AppModalContainer, {
+      props: { ...defaultProps, pendingPromotion: { from: 'e7', to: 'e8' } },
+      global: globalConfig,
+    });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapperPromotion.emitted('promotion-cancel') || wrapperPromotion.emitted('promotionCancel')).toBeTruthy();
+    wrapperPromotion.unmount();
+
+    // 4. Game Over modal
+    const wrapperGameOver = mount(AppModalContainer, {
+      props: { ...defaultProps, showGameOverModal: true },
+      global: globalConfig,
+    });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapperGameOver.emitted('update:showGameOverModal')?.[0]).toEqual([false]);
+    wrapperGameOver.unmount();
+
+    // 5. Incoming rematch modal
+    const wrapperRematch = mount(AppModalContainer, {
+      props: { ...defaultProps, showIncomingRematchModal: true },
+      global: globalConfig,
+    });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapperRematch.emitted('decline-rematch') || wrapperRematch.emitted('declineRematch')).toBeTruthy();
+    wrapperRematch.unmount();
+
+    // 6. Sync modal
+    const wrapperSync = mount(AppModalContainer, {
+      props: { ...defaultProps, isSyncModalOpen: true },
+      global: globalConfig,
+    });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapperSync.emitted('update:isSyncModalOpen')?.[0]).toEqual([false]);
+    wrapperSync.unmount();
+
+    // 7. Conflict modal
+    const wrapperConflict = mount(AppModalContainer, {
+      props: { ...defaultProps, isConflictModalOpen: true },
+      global: globalConfig,
+    });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapperConflict.emitted('cancel-conflict') || wrapperConflict.emitted('cancelConflict') || wrapperConflict.emitted('cancel')).toBeTruthy();
+    wrapperConflict.unmount();
+
+    // 8. Install modal
+    const wrapperInstall = mount(AppModalContainer, {
+      props: { ...defaultProps, isInstallModalOpen: true },
+      global: globalConfig,
+    });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapperInstall.emitted('update:isInstallModalOpen')?.[0]).toEqual([false]);
+
+    // Non-Escape key does not trigger dismiss
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(wrapperInstall.emitted('update:isInstallModalOpen')?.length).toBe(1);
+
+    wrapperInstall.unmount();
+  });
 });

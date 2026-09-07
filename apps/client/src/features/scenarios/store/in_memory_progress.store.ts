@@ -57,5 +57,12 @@ export class InMemoryProgressStore implements ScenarioProgressStore {
   public async resetAllProgress(): Promise<void> {
     this.progressMap.clear();
   }
+
+  public async restoreProgressMap(map: ScenarioProgressMap): Promise<void> {
+    this.progressMap.clear();
+    for (const [id, rec] of Object.entries(map)) {
+      this.progressMap.set(id, { ...rec });
+    }
+  }
 }
 export { InMemoryProgressStore as InMemoryScenarioProgressStore };

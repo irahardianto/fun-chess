@@ -55,14 +55,79 @@ describe('useProgressiveHint Composable', () => {
     expect(hintHook.hintsUsedCount.value).toBe(3);
   });
 
-  it('resets hints state cleanly', () => {
+  it('computes visual hint reactive signals (nudgeSquare, targetSquare, solutionArrow, tiers) across all levels', () => {
     const hintHook = useProgressiveHint();
-    hintHook.requestNextHint(samplePuzzle, 0, samplePuzzle.fen);
-    expect(hintHook.hintsUsedCount.value).toBe(1);
 
+    // Initial state: Level 0
+    expect(hintHook.isTier1Active.value).toBe(false);
+    expect(hintHook.isTier2Active.value).toBe(false);
+    expect(hintHook.isTier3Active.value).toBe(false);
+    expect(hintHook.nudgeSquare.value).toBeNull();
+    expect(hintHook.targetSquare.value).toBeNull();
+    expect(hintHook.solutionArrow.value).toBeNull();
+
+    // Level 1: Nudge source square
+    hintHook.requestNextHint(samplePuzzle, 0, samplePuzzle.fen);
+    expect(hintHook.isTier1Active.value).toBe(true);
+    expect(hintHook.isTier2Active.value).toBe(false);
+    expect(hintHook.isTier3Active.value).toBe(false);
+    expect(hintHook.nudgeSquare.value).toBe('a1');
+    expect(hintHook.targetSquare.value).toBeNull();
+    expect(hintHook.solutionArrow.value).toBeNull();
+
+    // Level 2: Glow target square
+    hintHook.requestNextHint(samplePuzzle, 0, samplePuzzle.fen);
+    expect(hintHook.isTier1Active.value).toBe(true);
+    expect(hintHook.isTier2Active.value).toBe(true);
+    expect(hintHook.isTier3Active.value).toBe(false);
+    expect(hintHook.nudgeSquare.value).toBe('a1');
+    expect(hintHook.targetSquare.value).toBe('a8');
+    expect(hintHook.solutionArrow.value).toBeNull();
+
+    // Level 3: Full solution arrow
+    hintHook.requestNextHint(samplePuzzle, 0, samplePuzzle.fen);
+    expect(hintHook.isTier1Active.value).toBe(true);
+    expect(hintHook.isTier2Active.value).toBe(true);
+    expect(hintHook.isTier3Active.value).toBe(true);
+    expect(hintHook.nudgeSquare.value).toBe('a1');
+    expect(hintHook.targetSquare.value).toBe('a8');
+    expect(hintHook.solutionArrow.value).toEqual({ from: 'a1', to: 'a8' });
+
+    // Resetting hints clears all computed visual signals
     hintHook.resetHints();
+    expect(hintHook.isTier1Active.value).toBe(false);
+    expect(hintHook.isTier2Active.value).toBe(false);
+    expect(hintHook.isTier3Active.value).toBe(false);
+    expect(hintHook.nudgeSquare.value).toBeNull();
+    expect(hintHook.targetSquare.value).toBeNull();
+    expect(hintHook.solutionArrow.value).toBeNull();
+  });
+
+  it('triggers auto-nudge coaching when consecutive mistakes >= 2 at level 0', () => {
+    const hintHook = useProgressiveHint();
+
+    // Not triggered on 1 mistake
+    const result1 = hintHook.checkAutoNudge(1, samplePuzzle, 0, samplePuzzle.fen);
+    expect(result1).toBeNull();
+    expect(hintHook.currentHintLevel.value).toBe(0);
+
+    // Triggered on 2 mistakes
+    const result2 = hintHook.checkAutoNudge(2, samplePuzzle, 0, samplePuzzle.fen);
+    expect(result2).not.toBeNull();
+    expect(hintHook.currentHintLevel.value).toBe(1);
+    expect(hintHook.nudgeSquare.value).toBe('a1');
+  });
+
+  it('handles explicit setHintLevel(0) and setHintLevel(2) correctly', () => {
+    const hintHook = useProgressiveHint();
+
+    hintHook.setHintLevel(2, samplePuzzle, 0, samplePuzzle.fen);
+    expect(hintHook.currentHintLevel.value).toBe(2);
+    expect(hintHook.targetSquare.value).toBe('a8');
+
+    hintHook.setHintLevel(0, samplePuzzle, 0, samplePuzzle.fen);
     expect(hintHook.currentHintLevel.value).toBe(0);
     expect(hintHook.activeHint.value).toBeNull();
-    expect(hintHook.hintsUsedCount.value).toBe(0);
+    expect(hintHook.targetSquare.value).toBeNull();
   });
 });

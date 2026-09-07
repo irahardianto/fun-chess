@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import type { Square, PuzzleProgressStore } from '@fun-chess/shared';
 import BaseButton from '../../../components/base/BaseButton.vue';
 import PuzzleBoardWrapper from './PuzzleBoardWrapper.vue';
@@ -86,6 +86,13 @@ watch(
 
 onMounted(() => {
   rush.startRun(effectiveSubMode.value);
+});
+
+onUnmounted(() => {
+  if (bonusTimeout) {
+    clearTimeout(bonusTimeout);
+    bonusTimeout = null;
+  }
 });
 
 watch(

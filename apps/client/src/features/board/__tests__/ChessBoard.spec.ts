@@ -183,4 +183,157 @@ describe('ChessBoard.vue', () => {
     await a8Square!.trigger('keydown', { key: 'ArrowLeft' });
     expect(findSquare('a8')!.props('isSquareActive')).toBe(true);
   });
+
+  it('supports Ctrl+Home, Ctrl+End, PageUp, PageDown, and ignores unmapped keys', async () => {
+    const wrapper = mount(ChessBoard, {
+      props: {
+        fen: DEFAULT_FEN,
+        orientation: 'w',
+        selectedSquare: 'd4' as Square,
+      },
+    });
+
+    const findSquare = (sq: Square) =>
+      wrapper.findAllComponents({ name: 'ChessSquare' }).find((s) => s.props('square') === sq);
+
+    const d4Square = findSquare('d4');
+
+    // PageUp jumps to row 0 (rank 8)
+    await d4Square!.trigger('keydown', { key: 'PageUp' });
+    expect(findSquare('d8')!.props('isSquareActive')).toBe(true);
+
+    // PageDown jumps to row 7 (rank 1)
+    await findSquare('d8')!.trigger('keydown', { key: 'PageDown' });
+    expect(findSquare('d1')!.props('isSquareActive')).toBe(true);
+
+    // Ctrl+Home jumps to top-left (a8)
+    await findSquare('d1')!.trigger('keydown', { key: 'Home', ctrlKey: true });
+    expect(findSquare('a8')!.props('isSquareActive')).toBe(true);
+
+    // Ctrl+End jumps to bottom-right (h1)
+    await findSquare('a8')!.trigger('keydown', { key: 'End', ctrlKey: true });
+    expect(findSquare('h1')!.props('isSquareActive')).toBe(true);
+
+    // Unhandled key (e.g. Tab or Escape)
+    await findSquare('h1')!.trigger('keydown', { key: 'Tab' });
+    expect(findSquare('h1')!.props('isSquareActive')).toBe(true);
+  });
+
+  it('handles piece select and drag-start events with audio feedback', async () => {
+    const wrapper = mount(ChessBoard, {
+      props: {
+        fen: DEFAULT_FEN,
+        orientation: 'w',
+      },
+    });
+
+    const piece = wrapper.findComponent({ name: 'ChessPiece' });
+    expect(piece.exists()).toBe(true);
+
+    // Piece selection emits select
+    await piece.vm.$emit('select', 'e2');
+    expect(wrapper.emitted('select')).toBeTruthy();
+    expect(wrapper.emitted('select')?.[0]).toEqual(['e2']);
+
+    // Drag start emits select
+    await piece.vm.$emit('drag-start', 'd2');
+    expect(wrapper.emitted('select')?.[1]).toEqual(['d2']);
+  });
+
+  it('handles drag-end: legal move, promotion, illegal destination, same square, and disabled board', async () => {
+    const dummyEvent = {} as PointerEvent;
+    // 1. Legal pawn move
+    const wrapper = mount(ChessBoard, {
+      props: {
+        fen: DEFAULT_FEN,
+        orientation: 'w',
+        legalMoves: ['e4' as Square],
+      },
+    });
+
+    const piece = wrapper.findComponent({ name: 'ChessPiece' });
+
+    // Mock document.elementFromPoint
+    const origElementFromPoint = document.elementFromPoint;
+    const mockSquareEl = document.createElement('div');
+    mockSquareEl.setAttribute('data-square', 'e4');
+    document.elementFromPoint = () => mockSquareEl;
+
+    await piece.vm.$emit('drag-end', 'e2', dummyEvent, { x: 100, y: 100 });
+    expect(wrapper.emitted('move')).toBeTruthy();
+    expect(wrapper.emitted('move')?.[0]).toEqual([{ from: 'e2', to: 'e4' }]);
+
+    // 2. Promotion move (white pawn to rank 8)
+    const promoWrapper = mount(ChessBoard, {
+      props: {
+        fen: '4k3/4P3/8/8/8/8/8/4K3 w - - 0 1',
+        orientation: 'w',
+        legalMoves: ['e8' as Square],
+      },
+    });
+    const promoPiece = promoWrapper.findComponent({ name: 'ChessPiece' });
+    const mockPromoSquareEl = document.createElement('div');
+    mockPromoSquareEl.setAttribute('data-square', 'e8');
+    document.elementFromPoint = () => mockPromoSquareEl;
+
+    await promoPiece.vm.$emit('drag-end', 'e7', dummyEvent, { x: 100, y: 100 });
+    expect(promoWrapper.emitted('promotionRequired')).toBeTruthy();
+    expect(promoWrapper.emitted('promotionRequired')?.[0]).toEqual([{ from: 'e7', to: 'e8' }]);
+
+    // 3. Black pawn promotion (black pawn to rank 1)
+    const blackPromoWrapper = mount(ChessBoard, {
+      props: {
+        fen: '4k3/8/8/8/8/8/4p3/4K3 b - - 0 1',
+        orientation: 'b',
+        legalMoves: ['e1' as Square],
+      },
+    });
+    const blackPromoPiece = blackPromoWrapper.findComponent({ name: 'ChessPiece' });
+    const mockBlackPromoSquareEl = document.createElement('div');
+    mockBlackPromoSquareEl.setAttribute('data-square', 'e1');
+    document.elementFromPoint = () => mockBlackPromoSquareEl;
+
+    await blackPromoPiece.vm.$emit('drag-end', 'e2', dummyEvent, { x: 100, y: 100 });
+    expect(blackPromoWrapper.emitted('promotionRequired')).toBeTruthy();
+
+    // 4. Illegal destination (not in legalMoves)
+    const mockIllegalSquareEl = document.createElement('div');
+    mockIllegalSquareEl.setAttribute('data-square', 'a5');
+    document.elementFromPoint = () => mockIllegalSquareEl;
+
+    await piece.vm.$emit('drag-end', 'e2', dummyEvent, { x: 100, y: 100 });
+    // Should play error and not emit move
+    expect(wrapper.emitted('move')).toHaveLength(1);
+
+    // 5. Dropping on same square (targetSq === fromSq)
+    const mockSameSquareEl = document.createElement('div');
+    mockSameSquareEl.setAttribute('data-square', 'e2');
+    document.elementFromPoint = () => mockSameSquareEl;
+
+    await piece.vm.$emit('drag-end', 'e2', dummyEvent, { x: 100, y: 100 });
+    expect(wrapper.emitted('move')).toHaveLength(1);
+
+    // 6. Dropping outside board (null element)
+    document.elementFromPoint = () => null;
+    await piece.vm.$emit('drag-end', 'e2', dummyEvent, { x: 0, y: 0 });
+    expect(wrapper.emitted('move')).toHaveLength(1);
+
+    // 7. Non-interactive or disabled board ignores drag events
+    const disabledWrapper = mount(ChessBoard, {
+      props: {
+        fen: DEFAULT_FEN,
+        orientation: 'w',
+        disabled: true,
+      },
+    });
+    const disabledPiece = disabledWrapper.findComponent({ name: 'ChessPiece' });
+    await disabledPiece.vm.$emit('select', 'e2');
+    await disabledPiece.vm.$emit('drag-start', 'e2');
+    await disabledPiece.vm.$emit('drag-end', 'e2', dummyEvent, { x: 100, y: 100 });
+    expect(disabledWrapper.emitted('select')).toBeUndefined();
+    expect(disabledWrapper.emitted('move')).toBeUndefined();
+
+    // Restore original elementFromPoint
+    document.elementFromPoint = origElementFromPoint;
+  });
 });

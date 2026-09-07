@@ -284,6 +284,26 @@ describe('Puzzle Validator Engine', () => {
       expect(isPieceOfColor(singlePlyPuzzle.fen, 'g8', 'b')).toBe(true);
       expect(isPieceOfColor(singlePlyPuzzle.fen, 'e4', 'w')).toBe(false);
     });
+
+    it('gracefully handles malformed FEN in isPawnPromotionMove, getLegalMovesForSquare, and isPieceOfColor (MIN-041)', () => {
+      const invalidFen = 'not-a-valid-fen-string';
+      expect(isPawnPromotionMove(invalidFen, 'e7', 'e8')).toBe(false);
+      expect(getLegalMovesForSquare(invalidFen, 'e2')).toEqual([]);
+      expect(isPieceOfColor(invalidFen, 'e2', 'w')).toBe(false);
+    });
+
+    it('gracefully handles malformed FEN in validatePuzzleMove (MIN-041)', () => {
+      const invalidFen = 'corrupted-board-fen';
+      const outcome = validatePuzzleMove(
+        singlePlyPuzzle,
+        0,
+        invalidFen,
+        { from: 'a1', to: 'a8' }
+      );
+      expect(outcome.isCorrect).toBe(false);
+      expect(outcome.isPuzzleComplete).toBe(false);
+      expect(outcome.feedback).toBe('Corrupted board state.');
+    });
   });
 });
 

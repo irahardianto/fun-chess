@@ -6,6 +6,7 @@ export * from './key_value_storage';
 export * from './browser_storage_adapter';
 export * from './in_memory_storage_adapter';
 export * from './storage_alert';
+export * from './keys';
 
 /**
  * Creates a safe KeyValueStorage instance.

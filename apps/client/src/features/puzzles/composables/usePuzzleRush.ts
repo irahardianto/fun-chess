@@ -22,7 +22,12 @@ export interface UsePuzzleRushOptions {
 }
 
 function isPuzzleProgressStore(obj: unknown): obj is PuzzleProgressStore {
-  return obj !== null && typeof obj === 'object' && typeof (obj as any).getProgress === 'function';
+  return (
+    obj !== null &&
+    typeof obj === 'object' &&
+    'getProgress' in obj &&
+    typeof (obj as { getProgress: unknown }).getProgress === 'function'
+  );
 }
 
 export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressStore) {

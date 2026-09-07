@@ -8,6 +8,7 @@ import ProgressConflictModal from './ProgressConflictModal.vue';
 import { useProgressSync } from '../composables/useProgressSync';
 import { defaultProgressFileService } from '../services/progress_file.service';
 import { usePwaInstall } from '@/features/pwa';
+import { logger } from '@/platform/telemetry';
 
 const modelValue = defineModel<boolean>({ default: false });
 
@@ -34,8 +35,12 @@ const {
 async function refreshExportQr() {
   try {
     qrString.value = await exportQrString();
-  } catch {
-    // handled by composable syncError
+  } catch (err: unknown) {
+    syncError.value = err instanceof Error ? err.message : 'Failed to generate export QR code';
+    logger.warn('Failed to refresh export QR code', {
+      operation: 'progress_sync_refresh_qr',
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -44,7 +49,15 @@ watch(
   async (isOpen) => {
     if (isOpen) {
       clearError();
-      await loadCurrentProgress().catch(() => {});
+      try {
+        await loadCurrentProgress();
+      } catch (err: unknown) {
+        syncError.value = err instanceof Error ? err.message : 'Failed to load progress data';
+        logger.warn('Failed to load current progress', {
+          operation: 'progress_sync_load_progress',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       if (activeTab.value === 'export') {
         await refreshExportQr();
       }
@@ -61,8 +74,17 @@ watch(activeTab, async (newTab) => {
 });
 
 async function handleDownloadJson() {
-  await exportJson('funchess-save.json').catch(() => {});
+  try {
+    await exportJson('funchess-save.json');
+  } catch (err: unknown) {
+    syncError.value = err instanceof Error ? err.message : 'Failed to export backup file';
+    logger.warn('Failed to export backup file', {
+      operation: 'progress_sync_export_json',
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
+
 
 async function handleImportCode(code: string) {
   const success = await importPayload(code);

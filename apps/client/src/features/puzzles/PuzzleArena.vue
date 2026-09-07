@@ -8,7 +8,7 @@ import type {
   Puzzle,
 } from '@fun-chess/shared';
 import BaseButton from '../../components/base/BaseButton.vue';
-import PromotionModal from '../modals/PromotionModal.vue';
+import { PromotionModal } from '@/features/modals/index.js';
 import PuzzleBoardWrapper from './components/PuzzleBoardWrapper.vue';
 import RatingClimbHud from './components/RatingClimbHud.vue';
 import StreakHud from './components/StreakHud.vue';

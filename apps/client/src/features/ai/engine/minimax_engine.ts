@@ -357,25 +357,13 @@ export class MinimaxEngine implements ChessAiEngine {
 
     const calculationDuration = performance.now() - startTime;
 
-    // Emulate simulated think time if requested
-    const [minThinkMs, maxThinkMs] = config.simulatedThinkTimeMs;
-    if (maxThinkMs > 0) {
-      const targetThinkMs = minThinkMs + Math.random() * (maxThinkMs - minThinkMs);
-      const remainingDelay = Math.max(0, targetThinkMs - calculationDuration);
-      if (remainingDelay > 0) {
-        await new Promise((resolve) => setTimeout(resolve, remainingDelay));
-      }
-    }
-
-    const totalDuration = performance.now() - startTime;
-
     return {
       move: selected.move,
       score: selected.score,
       depth: searchDepth,
       nodesEvaluated: state.nodesEvaluated,
       isBlunder,
-      searchDurationMs: Math.round(totalDuration),
+      searchDurationMs: Math.round(calculationDuration),
     };
   }
 }

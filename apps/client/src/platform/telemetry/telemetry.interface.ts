@@ -1,7 +1,7 @@
 /**
  * Log level severity definitions.
  */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'none';
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'none';
 
 /**
  * Standard structured logging context.
@@ -31,5 +31,6 @@ export interface ILogger {
   info(message: string, context?: LogContext): void;
   warn(message: string, context?: LogContext): void;
   error(message: string, context?: LogContext): void;
+  fatal(message: string, context?: LogContext): void;
   child(context: LogContext): ILogger;
 }

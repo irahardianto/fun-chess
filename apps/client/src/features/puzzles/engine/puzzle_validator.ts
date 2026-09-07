@@ -1,4 +1,4 @@
-import { Chess } from 'chess.js';
+import { Chess, type Move } from 'chess.js';
 import type {
   Square,
   PieceColor,
@@ -113,7 +113,7 @@ export function validatePuzzleMove(
     };
   }
 
-  let playerResult: any = null;
+  let playerResult: Move | null = null;
   try {
     playerResult = chess.move({
       from: playerMove.from as unknown as import('chess.js').Square,
@@ -221,7 +221,7 @@ export function validatePuzzleMove(
   }
 
   const oppParsed = parseUciMove(opponentUci);
-  let oppResult: any = null;
+  let oppResult: Move | null = null;
   try {
     oppResult = chess.move({
       from: oppParsed.from as unknown as import('chess.js').Square,

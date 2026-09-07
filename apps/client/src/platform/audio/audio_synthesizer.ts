@@ -4,6 +4,7 @@
  * Adheres to Rule 1 (I/O Isolation) and MAJ-008 (DOM side-effect elimination).
  */
 import type { IAudioService } from './audio.interface';
+import { logger } from '../telemetry';
 
 export interface AudioSynthesizerOptions {
   muted?: boolean;
@@ -16,6 +17,7 @@ export class AudioSynthesizer implements IAudioService {
   private bootstrapped: boolean = false;
   private visibilityHandler: (() => void) | null = null;
   private unlockHandler: (() => void) | null = null;
+  private pagehideHandler: (() => void) | null = null;
 
   constructor(options?: AudioSynthesizerOptions) {
     if (options?.muted !== undefined) {
@@ -37,7 +39,10 @@ export class AudioSynthesizer implements IAudioService {
           this.masterGain.gain.setValueAtTime(this._isMuted ? 0 : 0.4, this.ctx.currentTime);
           this.masterGain.connect(this.ctx.destination);
         } catch (err) {
-          console.warn('[FC_AUDIO] Failed to initialize AudioContext', err);
+          logger.warn('Failed to initialize AudioContext', {
+            operation: 'audio_init_context',
+            error: err instanceof Error ? err.message : String(err),
+          });
           return null;
         }
       }
@@ -45,7 +50,10 @@ export class AudioSynthesizer implements IAudioService {
 
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch((err) => {
-        console.warn('[FC_AUDIO] Autoplay policy suspended AudioContext', err);
+        logger.warn('Autoplay policy suspended AudioContext', {
+          operation: 'audio_resume_autoplay',
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
     }
 
@@ -59,7 +67,10 @@ export class AudioSynthesizer implements IAudioService {
   public resumeContext(): void {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch((err) => {
-        console.warn('[FC_AUDIO] Failed to resume suspended AudioContext', err);
+        logger.warn('Failed to resume suspended AudioContext', {
+          operation: 'audio_resume_context',
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
     }
   }
@@ -97,7 +108,10 @@ export class AudioSynthesizer implements IAudioService {
           try {
             window.removeEventListener(evt, this.unlockHandler!, true);
           } catch (err) {
-            console.warn('[FC_AUDIO] Failed to remove unlock listener', err);
+            logger.warn('Failed to remove unlock listener', {
+              operation: 'audio_remove_unlock_listener',
+              error: err instanceof Error ? err.message : String(err),
+            });
           }
         });
         this.unlockHandler = null;
@@ -108,7 +122,10 @@ export class AudioSynthesizer implements IAudioService {
       try {
         window.addEventListener(evt, this.unlockHandler!, { once: true, capture: true, passive: true });
       } catch (err) {
-        console.warn('[FC_AUDIO] Failed to attach unlock listener', err);
+        logger.warn('Failed to attach unlock listener', {
+          operation: 'audio_attach_unlock_listener',
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     });
 
@@ -120,19 +137,40 @@ export class AudioSynthesizer implements IAudioService {
       };
       document.addEventListener('visibilitychange', this.visibilityHandler);
     }
+
+    // Hook pagehide lifecycle event (ENH-004)
+    this.pagehideHandler = () => {
+      void this.dispose();
+    };
+    window.addEventListener('pagehide', this.pagehideHandler);
   }
 
   /**
-   * Closes AudioContext and removes all DOM event listeners (MIN-005).
+   * Closes AudioContext and removes all DOM event listeners (MIN-005, ENH-004).
    */
   public async dispose(): Promise<void> {
     if (this.visibilityHandler && typeof document !== 'undefined') {
       try {
         document.removeEventListener('visibilitychange', this.visibilityHandler);
       } catch (err) {
-        console.warn('[FC_AUDIO] Failed to remove visibilitychange listener', err);
+        logger.warn('Failed to remove visibilitychange listener', {
+          operation: 'audio_dispose',
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
       this.visibilityHandler = null;
+    }
+
+    if (this.pagehideHandler && typeof window !== 'undefined') {
+      try {
+        window.removeEventListener('pagehide', this.pagehideHandler);
+      } catch (err) {
+        logger.warn('Failed to remove pagehide listener', {
+          operation: 'audio_dispose',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      this.pagehideHandler = null;
     }
 
     if (this.unlockHandler && typeof window !== 'undefined') {
@@ -141,7 +179,10 @@ export class AudioSynthesizer implements IAudioService {
         try {
           window.removeEventListener(evt, this.unlockHandler!, true);
         } catch (err) {
-          console.warn('[FC_AUDIO] Failed to remove unlock listener', err);
+          logger.warn('Failed to remove unlock listener', {
+            operation: 'audio_dispose',
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       });
       this.unlockHandler = null;
@@ -153,7 +194,10 @@ export class AudioSynthesizer implements IAudioService {
           await this.ctx.close();
         }
       } catch (err) {
-        console.warn('[FC_AUDIO] Failed to close AudioContext during disposal', err);
+        logger.warn('Failed to close AudioContext during disposal', {
+          operation: 'audio_dispose',
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
       this.ctx = null;
     }
@@ -186,7 +230,10 @@ export class AudioSynthesizer implements IAudioService {
       osc.start(now);
       osc.stop(now + 0.035);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play click sound', err);
+      logger.warn('Failed to play click sound', {
+        operation: 'audio_play_click',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -220,7 +267,10 @@ export class AudioSynthesizer implements IAudioService {
       osc.start(now);
       osc.stop(now + 0.08);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play move sound', err);
+      logger.warn('Failed to play move sound', {
+        operation: 'audio_play_move',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -262,7 +312,10 @@ export class AudioSynthesizer implements IAudioService {
       osc1.stop(now + 0.12);
       osc2.stop(now + 0.12);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play capture sound', err);
+      logger.warn('Failed to play capture sound', {
+        operation: 'audio_play_capture',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -303,7 +356,51 @@ export class AudioSynthesizer implements IAudioService {
       osc2.start(now + 0.08);
       osc2.stop(now + 0.23);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play check sound', err);
+      logger.warn('Failed to play check sound', {
+        operation: 'audio_play_check',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Checkmate Alert: Decisive, dramatic fanfare celebrating checkmate.
+   */
+  public playCheckmate(): void {
+    if (this._isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx || !this.masterGain) return;
+
+    try {
+      const now = ctx.currentTime;
+      const notes = [
+        { freq: 440.0, time: 0.0, duration: 0.12 }, // A4
+        { freq: 554.37, time: 0.09, duration: 0.12 }, // C#5
+        { freq: 659.25, time: 0.18, duration: 0.15 }, // E5
+        { freq: 880.0, time: 0.28, duration: 0.35 }, // A5
+      ];
+
+      notes.forEach(({ freq, time, duration }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + time);
+
+        gain.gain.setValueAtTime(0, now + time);
+        gain.gain.linearRampToValueAtTime(0.6, now + time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + time + duration);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain!);
+
+        osc.start(now + time);
+        osc.stop(now + time + duration + 0.02);
+      });
+    } catch (err) {
+      logger.warn('Failed to play checkmate sound', {
+        operation: 'audio_play_checkmate',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -341,7 +438,10 @@ export class AudioSynthesizer implements IAudioService {
         osc.stop(now + time + duration + 0.02);
       });
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play victory sound', err);
+      logger.warn('Failed to play victory sound', {
+        operation: 'audio_play_victory',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -378,7 +478,10 @@ export class AudioSynthesizer implements IAudioService {
         osc.stop(now + time + duration + 0.02);
       });
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play defeat sound', err);
+      logger.warn('Failed to play defeat sound', {
+        operation: 'audio_play_defeat',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -408,7 +511,10 @@ export class AudioSynthesizer implements IAudioService {
       osc.start(now);
       osc.stop(now + 0.33);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play draw sound', err);
+      logger.warn('Failed to play draw sound', {
+        operation: 'audio_play_draw',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -438,7 +544,10 @@ export class AudioSynthesizer implements IAudioService {
       osc.start(now);
       osc.stop(now + 0.15);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play error sound', err);
+      logger.warn('Failed to play error sound', {
+        operation: 'audio_play_error',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -467,7 +576,10 @@ export class AudioSynthesizer implements IAudioService {
       osc.start(now);
       osc.stop(now + 0.2);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play turn notification sound', err);
+      logger.warn('Failed to play turn notification sound', {
+        operation: 'audio_play_turn_notification',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -499,7 +611,10 @@ export class AudioSynthesizer implements IAudioService {
         osc.stop(now + 0.36);
       });
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play start sound', err);
+      logger.warn('Failed to play start sound', {
+        operation: 'audio_play_start',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -536,7 +651,10 @@ export class AudioSynthesizer implements IAudioService {
         osc.stop(now + time + duration + 0.02);
       });
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play hint sound', err);
+      logger.warn('Failed to play hint sound', {
+        operation: 'audio_play_hint',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -573,7 +691,10 @@ export class AudioSynthesizer implements IAudioService {
         osc.stop(now + time + duration + 0.02);
       });
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play star earned sound', err);
+      logger.warn('Failed to play star earned sound', {
+        operation: 'audio_play_star_earned',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -604,7 +725,10 @@ export class AudioSynthesizer implements IAudioService {
       osc.start(now);
       osc.stop(now + 0.24);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play mascot happy sound', err);
+      logger.warn('Failed to play mascot happy sound', {
+        operation: 'audio_play_mascot_happy',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -634,7 +758,10 @@ export class AudioSynthesizer implements IAudioService {
       osc.start(now);
       osc.stop(now + 0.36);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play mascot blunder sound', err);
+      logger.warn('Failed to play mascot blunder sound', {
+        operation: 'audio_play_mascot_blunder',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -671,7 +798,10 @@ export class AudioSynthesizer implements IAudioService {
       osc1.stop(now + 0.26);
       osc2.stop(now + 0.26);
     } catch (err) {
-      console.warn('[FC_AUDIO] Failed to play step complete sound', err);
+      logger.warn('Failed to play step complete sound', {
+        operation: 'audio_play_step_complete',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 }

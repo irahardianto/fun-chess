@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Chess } from 'chess.js';
+import { Chess, type Square } from 'chess.js';
 import {
   ALL_SCENARIOS,
   CURRICULUM_SECTIONS,
@@ -79,14 +79,14 @@ describe('Chess Academy Scenario Data Integrity (scenarios_data.spec.ts)', () =>
               expect(moveConstraint.to).toMatch(/^[a-h][1-8]$/);
 
               const testChess = new Chess(step.setupFen);
-              const pieceAtSource = testChess.get(moveConstraint.from as any);
+              const pieceAtSource = testChess.get(moveConstraint.from as Square);
               expect(pieceAtSource).not.toBeNull();
 
               // Verify move legality in chess.js
               const moveResult = testChess.move({
-                from: moveConstraint.from as any,
-                to: moveConstraint.to as any,
-                promotion: moveConstraint.promotion as any,
+                from: moveConstraint.from as Square,
+                to: moveConstraint.to as Square,
+                promotion: moveConstraint.promotion as 'q' | 'r' | 'b' | 'n' | undefined,
               });
               expect(moveResult).not.toBeNull();
             }
@@ -102,15 +102,15 @@ describe('Chess Academy Scenario Data Integrity (scenarios_data.spec.ts)', () =>
               const flowChess = new Chess(step.setupFen);
               const firstAllowed = step.allowedMoves![0];
               flowChess.move({
-                from: firstAllowed.from as any,
-                to: firstAllowed.to as any,
-                promotion: firstAllowed.promotion as any,
+                from: firstAllowed.from as Square,
+                to: firstAllowed.to as Square,
+                promotion: firstAllowed.promotion as 'q' | 'r' | 'b' | 'n' | undefined,
               });
 
               const botMoveResult = flowChess.move({
-                from: resp.from as any,
-                to: resp.to as any,
-                promotion: resp.promotion as any,
+                from: resp.from as Square,
+                to: resp.to as Square,
+                promotion: resp.promotion as 'q' | 'r' | 'b' | 'n' | undefined,
               });
               expect(botMoveResult).not.toBeNull();
             }

@@ -33,6 +33,7 @@ export function squareToCoordinates(
 import { computed } from 'vue';
 import { Chess } from 'chess.js';
 import type { HintData, HintLevel, PieceType } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry/index.js';
 import BaseButton from '../../../components/base/BaseButton.vue';
 import ChessPieceSvg from '../../../components/base/ChessPieceSvg.vue';
 
@@ -107,15 +108,20 @@ const resolvedMovingPiece = computed<{ type: PieceType; color: PieceColor } | nu
   if (props.fen && effectiveSource.value) {
     try {
       const chess = new Chess(props.fen);
-      const piece = chess.get(effectiveSource.value as any);
+      const piece = chess.get(effectiveSource.value as import('chess.js').Square);
       if (piece) {
         return {
           type: piece.type as PieceType,
           color: piece.color as PieceColor,
         };
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      logger.warn('Failed to parse FEN or retrieve piece in ProgressiveHintLayer', {
+        operation: 'resolve_moving_piece',
+        fen: props.fen,
+        source: effectiveSource.value,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
   return null;

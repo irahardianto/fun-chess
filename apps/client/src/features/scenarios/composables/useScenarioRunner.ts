@@ -1,4 +1,5 @@
 import { ref, computed, readonly, onUnmounted, getCurrentInstance } from 'vue';
+import type { Move } from 'chess.js';
 import type {
   Square,
   PieceColor,
@@ -193,7 +194,7 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     try {
       const promoChar = move.promotion ? (move.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n') : 'q';
       const isPromo = checkIsPromotionMove(move.from, move.to);
-      let res: any = null;
+      let res: Move | null = null;
 
       try {
         res = chess.move({
@@ -244,7 +245,7 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
             const oppPromo = opp.promotion
               ? (opp.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n')
               : undefined;
-            let oppRes: any = null;
+            let oppRes: Move | null = null;
 
             try {
               oppRes = chess.move({

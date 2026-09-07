@@ -1,5 +1,6 @@
 import type { KeyValueStorage } from './key_value_storage';
 import { isQuotaExceededError, storageAlertDispatcher } from './storage_alert';
+import { logger } from '../telemetry';
 
 export class BrowserStorageAdapter implements KeyValueStorage {
   private available = false;
@@ -92,6 +93,12 @@ export class BrowserStorageAdapter implements KeyValueStorage {
         });
         throw err;
       }
+
+      logger.warn('Failed to persist item to browser storage, using fallback cache', {
+        operation: 'browser_storage_set_item',
+        key,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -101,8 +108,17 @@ export class BrowserStorageAdapter implements KeyValueStorage {
     if (storage) {
       try {
         storage.removeItem(key);
-      } catch {
-        // Safe ignore
+      } catch (err) {
+        if (isQuotaExceededError(err)) {
+          storageAlertDispatcher.notify({
+            type: 'STORAGE_QUOTA_EXCEEDED',
+            store: 'unified',
+            attemptedAction: 'save',
+            timestamp: Date.now(),
+            message: 'Storage quota exceeded while removing item.',
+            suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+          });
+        }
       }
     }
   }
@@ -113,8 +129,17 @@ export class BrowserStorageAdapter implements KeyValueStorage {
     if (storage) {
       try {
         storage.clear();
-      } catch {
-        // Safe ignore
+      } catch (err) {
+        if (isQuotaExceededError(err)) {
+          storageAlertDispatcher.notify({
+            type: 'STORAGE_QUOTA_EXCEEDED',
+            store: 'unified',
+            attemptedAction: 'save',
+            timestamp: Date.now(),
+            message: 'Storage quota exceeded while clearing storage.',
+            suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+          });
+        }
       }
     }
   }
@@ -152,7 +177,17 @@ export class BrowserStorageAdapter implements KeyValueStorage {
     try {
       this.setItem(key, value);
       return true;
-    } catch {
+    } catch (err) {
+      if (isQuotaExceededError(err)) {
+        storageAlertDispatcher.notify({
+          type: 'STORAGE_QUOTA_EXCEEDED',
+          store: 'unified',
+          attemptedAction: 'save',
+          timestamp: Date.now(),
+          message: 'Storage quota exceeded during safe write.',
+          suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+        });
+      }
       return false;
     }
   }

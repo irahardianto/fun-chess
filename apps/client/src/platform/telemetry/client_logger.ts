@@ -5,32 +5,51 @@ const LOG_LEVEL_SEVERITY: Record<LogLevel, number> = {
   info: 1,
   warn: 2,
   error: 3,
-  none: 4,
+  fatal: 4,
+  none: 5,
 };
 
 const SENSITIVE_KEY_REGEX = /password|token|sessionToken|secret|authorization/i;
 
 /**
- * Scrubs sensitive values such as tokens or passwords from logged objects.
+ * Recursively scrubs sensitive values from objects and arrays with circular reference protection.
  */
-function sanitizeContext(context: Record<string, unknown>): Record<string, unknown> {
+function sanitizeValue(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    };
+  }
+  if (seen.has(value)) {
+    return '[CIRCULAR]';
+  }
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item, seen));
+  }
+
   const sanitized: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(context)) {
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     if (SENSITIVE_KEY_REGEX.test(k)) {
       sanitized[k] = '[REDACTED]';
-    } else if (v && typeof v === 'object' && !(v instanceof Error)) {
-      sanitized[k] = sanitizeContext(v as Record<string, unknown>);
-    } else if (v instanceof Error) {
-      sanitized[k] = {
-        name: v.name,
-        message: v.message,
-        stack: v.stack,
-      };
     } else {
-      sanitized[k] = v;
+      sanitized[k] = sanitizeValue(v, seen);
     }
   }
   return sanitized;
+}
+
+/**
+ * Scrubs sensitive values such as tokens or passwords from logged objects.
+ */
+function sanitizeContext(context: Record<string, unknown>): Record<string, unknown> {
+  return sanitizeValue(context) as Record<string, unknown>;
 }
 
 export class ClientLogger implements ILogger {
@@ -81,6 +100,7 @@ export class ClientLogger implements ILogger {
         console.warn(prefix, message, merged);
         break;
       case 'error':
+      case 'fatal':
         // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring
         console.error(prefix, message, merged);
         break;
@@ -101,6 +121,10 @@ export class ClientLogger implements ILogger {
 
   public error(message: string, context?: LogContext): void {
     this.log('error', message, context);
+  }
+
+  public fatal(message: string, context?: LogContext): void {
+    this.log('fatal', message, context);
   }
 
   public child(childContext: LogContext): ILogger {

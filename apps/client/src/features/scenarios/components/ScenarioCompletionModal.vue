@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, computed, ref } from 'vue';
+import { watch, computed, ref, onBeforeUnmount } from 'vue';
 import type { ChessScenario, StarRating } from '@fun-chess/shared';
 import BaseModal from '../../../components/base/BaseModal.vue';
 import BaseButton from '../../../components/base/BaseButton.vue';
@@ -30,6 +30,12 @@ const emit = defineEmits<{
 
 const { celebrateVictory } = useConfetti();
 const activeStarCount = ref<number>(0);
+const starTimeouts: ReturnType<typeof setTimeout>[] = [];
+
+function clearStarTimeouts(): void {
+  starTimeouts.forEach((t) => clearTimeout(t));
+  starTimeouts.length = 0;
+}
 
 const isVisible = computed(() => {
   if (props.modelValue !== undefined) return props.modelValue;
@@ -56,19 +62,33 @@ watch(
 
       // Cascade star animation
       activeStarCount.value = 0;
-      setTimeout(() => {
-        if (props.stars >= 1) activeStarCount.value = 1;
-      }, 200);
-      setTimeout(() => {
-        if (props.stars >= 2) activeStarCount.value = 2;
-      }, 400);
-      setTimeout(() => {
-        if (props.stars >= 3) activeStarCount.value = 3;
-      }, 600);
+      clearStarTimeouts();
+
+      starTimeouts.push(
+        setTimeout(() => {
+          if (props.stars >= 1) activeStarCount.value = 1;
+        }, 200)
+      );
+      starTimeouts.push(
+        setTimeout(() => {
+          if (props.stars >= 2) activeStarCount.value = 2;
+        }, 400)
+      );
+      starTimeouts.push(
+        setTimeout(() => {
+          if (props.stars >= 3) activeStarCount.value = 3;
+        }, 600)
+      );
+    } else {
+      clearStarTimeouts();
     }
   },
   { immediate: true }
 );
+
+onBeforeUnmount(() => {
+  clearStarTimeouts();
+});
 
 function handleClose() {
   emit('update:modelValue', false);

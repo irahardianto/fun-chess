@@ -1,25 +1,36 @@
 import { ref, computed, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope } from 'vue';
 import type { MascotId } from '@fun-chess/shared';
 import type { Move } from 'chess.js';
+import { logger } from '@/platform/telemetry/index.js';
 import { getAiConfigForMascot } from '../data/index.js';
 import { minimaxEngine } from '../engine/index.js';
 
 export interface UseAiWorkerOptions {
   onMoveComputed?: (move: Move, isBlunder: boolean) => void;
   onCalculationFailed?: (err: unknown) => void;
+  simulateThinkDelay?: boolean;
 }
 
 /**
- * useAiWorker composable (MAJ-041).
- * Encapsulates AI search execution, isAiThinking state, blunder evaluation,
- * and operation cancellation.
+ * useAiWorker composable (MAJ-041, MAJ-007).
+ * Encapsulates AI search execution, simulated think delay delegation,
+ * isAiThinking state, blunder evaluation, and operation cancellation.
  */
 export function useAiWorker(options: UseAiWorkerOptions = {}) {
   const isAiThinking = ref<boolean>(false);
   let activeOperationId = 0;
+  let thinkTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  function clearThinkTimeout(): void {
+    if (thinkTimeout) {
+      clearTimeout(thinkTimeout);
+      thinkTimeout = null;
+    }
+  }
 
   function cancelCalculation(): void {
     activeOperationId++;
+    clearThinkTimeout();
     isAiThinking.value = false;
   }
 
@@ -30,14 +41,35 @@ export function useAiWorker(options: UseAiWorkerOptions = {}) {
     applyMoveFn: (move: { from: string; to: string; promotion?: string }) => Move | null
   ): Promise<{ move: Move; isBlunder: boolean } | null> {
     const currentOpId = ++activeOperationId;
+    clearThinkTimeout();
     isAiThinking.value = true;
 
     try {
       const config = getAiConfigForMascot(mascotId);
+      const startTime = performance.now();
       const evaluation = await minimaxEngine.findBestMove(fen, config);
 
       if (currentOpId !== activeOperationId) {
         return null;
+      }
+
+      // Delegate simulated think delay to composable (MAJ-007)
+      const [minThinkMs, maxThinkMs] = config.simulatedThinkTimeMs;
+      if (maxThinkMs > 0 && options.simulateThinkDelay !== false) {
+        const calculationDuration = performance.now() - startTime;
+        const targetThinkMs = minThinkMs + Math.random() * (maxThinkMs - minThinkMs);
+        const remainingDelay = Math.max(0, targetThinkMs - calculationDuration);
+        if (remainingDelay > 0) {
+          await new Promise<void>((resolve) => {
+            thinkTimeout = setTimeout(() => {
+              thinkTimeout = null;
+              resolve();
+            }, remainingDelay);
+          });
+          if (currentOpId !== activeOperationId) {
+            return null;
+          }
+        }
       }
 
       const chosenMove = evaluation.move;
@@ -57,7 +89,10 @@ export function useAiWorker(options: UseAiWorkerOptions = {}) {
       if (currentOpId !== activeOperationId) {
         return null;
       }
-      console.error('[useAiWorker] AI calculation failed, executing emergency fallback move:', err);
+      logger.error('AI calculation failed, executing emergency fallback move', {
+        operation: 'request_ai_move',
+        error: err instanceof Error ? err.message : String(err),
+      });
       options.onCalculationFailed?.(err);
 
       // Emergency fallback legal move (random or first valid move) so game never freezes

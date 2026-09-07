@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useSocket, resetSocketState, SESSION_STORAGE_KEY } from '../useSocket';
-import { audioSynthesizer } from '../../platform/audio/audio_synthesizer';
 import type { GameState, MoveResult, Player, RoomState } from '@fun-chess/shared';
+
+const UUID_P1 = '11111111-1111-4111-8111-111111111111';
+const UUID_P2 = '22222222-2222-4222-8222-222222222222';
 
 describe('useSocket composable', () => {
   let mockSocket: any;
@@ -18,6 +20,7 @@ describe('useSocket composable', () => {
       on: vi.fn((event: string, handler: Function) => {
         eventHandlers[event] = handler;
       }),
+      off: vi.fn(),
       emit: vi.fn(),
       connect: vi.fn(() => {
         mockSocket.connected = true;
@@ -148,7 +151,7 @@ describe('useSocket composable', () => {
     const { reconnect, currentRoom, currentPlayer, sessionToken } = useSocket(mockSocket);
 
     const mockReconnectedPlayer: Player = {
-      id: 'p1',
+      id: UUID_P1,
       socketId: 'test_socket_123',
       name: 'Leo',
       color: 'w',
@@ -160,7 +163,7 @@ describe('useSocket composable', () => {
     const mockRoom: RoomState = {
       roomCode: 'MOON',
       status: 'playing',
-      hostId: 'p1',
+      hostId: UUID_P1,
       whitePlayer: mockReconnectedPlayer,
       blackPlayer: null,
       spectators: [],
@@ -180,16 +183,16 @@ describe('useSocket composable', () => {
       }
     });
 
-    const res = await reconnect('MOON', 'p1', 'token_recon_1');
+    const res = await reconnect('MOON', UUID_P1, 'token_recon_1');
     expect(res.success).toBe(true);
     expect(currentRoom.value?.roomCode).toBe('MOON');
-    expect(currentPlayer.value?.id).toBe('p1');
+    expect(currentPlayer.value?.id).toBe(UUID_P1);
     expect(sessionToken.value).toBe('token_recon_1');
 
     const saved = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEY)!);
     expect(saved).toEqual({
       roomCode: 'MOON',
-      playerId: 'p1',
+      playerId: UUID_P1,
       sessionToken: 'token_recon_1',
     });
   });
@@ -197,7 +200,7 @@ describe('useSocket composable', () => {
   it('should clear sessionStorage if reconnect fails with ERR_UNAUTHORIZED or ERR_ROOM_NOT_FOUND', async () => {
     sessionStorage.setItem(
       SESSION_STORAGE_KEY,
-      JSON.stringify({ roomCode: 'FAIL', playerId: 'p1', sessionToken: 'bad_token' })
+      JSON.stringify({ roomCode: 'FAIL', playerId: UUID_P1, sessionToken: 'bad_token' })
     );
 
     const { reconnect } = useSocket(mockSocket);
@@ -211,14 +214,14 @@ describe('useSocket composable', () => {
       }
     });
 
-    const res = await reconnect('FAIL', 'p1', 'bad_token');
+    const res = await reconnect('FAIL', UUID_P1, 'bad_token');
     expect(res.success).toBe(false);
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
 
     // Also test ERR_ROOM_NOT_FOUND
     sessionStorage.setItem(
       SESSION_STORAGE_KEY,
-      JSON.stringify({ roomCode: 'NONE', playerId: 'p1', sessionToken: 'tok' })
+      JSON.stringify({ roomCode: 'NONE', playerId: UUID_P1, sessionToken: 'tok' })
     );
     mockSocket.emit.mockImplementation((event: string, _payload: any, callback: Function) => {
       if (event === 'room:reconnect') {
@@ -229,7 +232,7 @@ describe('useSocket composable', () => {
       }
     });
 
-    const res2 = await reconnect('NONE', 'p1', 'tok');
+    const res2 = await reconnect('NONE', UUID_P1, 'tok');
     expect(res2.success).toBe(false);
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
   });
@@ -239,7 +242,7 @@ describe('useSocket composable', () => {
     try {
       sessionStorage.setItem(
         SESSION_STORAGE_KEY,
-        JSON.stringify({ roomCode: 'TIMEOUT_ROOM', playerId: 'p1', sessionToken: 'keep_token' })
+        JSON.stringify({ roomCode: 'TIME', playerId: UUID_P1, sessionToken: 'keep_token' })
       );
 
       const { reconnect } = useSocket(mockSocket);
@@ -247,7 +250,7 @@ describe('useSocket composable', () => {
       // Do not respond to simulate timeout
       mockSocket.emit.mockImplementation(() => {});
 
-      const reconnectPromise = reconnect('TIMEOUT_ROOM', 'p1', 'keep_token');
+      const reconnectPromise = reconnect('TIME', UUID_P1, 'keep_token');
 
       // Fast forward past 8s ack timeout
       vi.advanceTimersByTime(8500);
@@ -268,7 +271,7 @@ describe('useSocket composable', () => {
   it('should auto-reconnect on socket connect event if saved session exists and currentRoom is null', async () => {
     sessionStorage.setItem(
       SESSION_STORAGE_KEY,
-      JSON.stringify({ roomCode: 'AUTO', playerId: 'p1', sessionToken: 'auto_token' })
+      JSON.stringify({ roomCode: 'AUTO', playerId: UUID_P1, sessionToken: 'auto_token' })
     );
 
     mockSocket.connected = false;
@@ -278,7 +281,7 @@ describe('useSocket composable', () => {
       if (event === 'room:reconnect') {
         expect(payload).toEqual({
           roomCode: 'AUTO',
-          playerId: 'p1',
+          playerId: UUID_P1,
           sessionToken: 'auto_token',
         });
         callback({
@@ -286,8 +289,8 @@ describe('useSocket composable', () => {
           room: {
             roomCode: 'AUTO',
             status: 'playing',
-            hostId: 'p1',
-            whitePlayer: { id: 'p1', isConnected: true } as Player,
+            hostId: UUID_P1,
+            whitePlayer: { id: UUID_P1, isConnected: true } as Player,
             blackPlayer: null,
             spectators: [],
             game: {} as GameState,
@@ -295,7 +298,7 @@ describe('useSocket composable', () => {
             createdAt: Date.now(),
             lastActivityAt: Date.now(),
           },
-          player: { id: 'p1', name: 'AutoPlayer', isConnected: true } as Player,
+          player: { id: UUID_P1, name: 'AutoPlayer', isConnected: true } as Player,
         });
       }
     });
@@ -312,7 +315,7 @@ describe('useSocket composable', () => {
   it('should auto-reconnect on initialization if socket is already connected and session exists', async () => {
     sessionStorage.setItem(
       SESSION_STORAGE_KEY,
-      JSON.stringify({ roomCode: 'INIT', playerId: 'p2', sessionToken: 'init_token' })
+      JSON.stringify({ roomCode: 'INIT', playerId: UUID_P2, sessionToken: 'init_token' })
     );
 
     mockSocket.connected = true;
@@ -323,16 +326,16 @@ describe('useSocket composable', () => {
           room: {
             roomCode: 'INIT',
             status: 'playing',
-            hostId: 'p1',
+            hostId: UUID_P1,
             whitePlayer: null,
-            blackPlayer: { id: 'p2', isConnected: true } as Player,
+            blackPlayer: { id: UUID_P2, isConnected: true } as Player,
             spectators: [],
             game: {} as GameState,
             rematch: null,
             createdAt: Date.now(),
             lastActivityAt: Date.now(),
           },
-          player: { id: 'p2', name: 'InitPlayer', isConnected: true } as Player,
+          player: { id: UUID_P2, name: 'InitPlayer', isConnected: true } as Player,
         });
       }
     });
@@ -344,7 +347,7 @@ describe('useSocket composable', () => {
     });
   });
 
-  it('should clear sessionStorage on leaveRoom', () => {
+  it('should clear sessionStorage and reset state on leaveRoom when ack arrives', async () => {
     sessionStorage.setItem(
       SESSION_STORAGE_KEY,
       JSON.stringify({ roomCode: 'LEAV', playerId: 'p1', sessionToken: 'token' })
@@ -352,15 +355,81 @@ describe('useSocket composable', () => {
 
     const { leaveRoom, currentRoom, sessionToken, currentPlayer } = useSocket(mockSocket);
 
-    leaveRoom('LEAV');
-    expect(mockSocket.emit).toHaveBeenCalledWith('room:leave', { roomCode: 'LEAV' });
+    currentRoom.value = {
+      roomCode: 'LEAV',
+      status: 'playing',
+      hostId: 'p1',
+      whitePlayer: null,
+      blackPlayer: null,
+      spectators: [],
+      game: {} as GameState,
+      rematch: null,
+      createdAt: Date.now(),
+      lastActivityAt: Date.now(),
+    };
+    sessionToken.value = 'token';
+
+    mockSocket.emit.mockImplementation((event: string, _payload: any, ack: Function) => {
+      if (event === 'room:leave' && ack) {
+        ack({ success: true });
+      }
+    });
+
+    await leaveRoom('LEAV');
+    expect(mockSocket.emit).toHaveBeenCalledWith('room:leave', { roomCode: 'LEAV' }, expect.any(Function));
     expect(currentRoom.value).toBeNull();
     expect(currentPlayer.value).toBeNull();
     expect(sessionToken.value).toBeNull();
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
   });
 
-  it('should clear sessionStorage and reset drawOfferedBy on game:over', () => {
+  it('should clear sessionStorage on leaveRoom after 2000ms timeout if ack is dropped', async () => {
+    vi.useFakeTimers();
+    try {
+      sessionStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({ roomCode: 'LEAV', playerId: 'p1', sessionToken: 'token' })
+      );
+
+      const { leaveRoom, currentRoom, sessionToken, currentPlayer } = useSocket(mockSocket);
+
+      currentRoom.value = {
+        roomCode: 'LEAV',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: null,
+        blackPlayer: null,
+        spectators: [],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: Date.now(),
+        lastActivityAt: Date.now(),
+      };
+      sessionToken.value = 'token';
+
+      // Simulate packet drop (ack never arrives)
+      mockSocket.emit.mockImplementation(() => {});
+
+      const leavePromise = leaveRoom('LEAV');
+
+      // Before timeout, credentials and room state are preserved
+      expect(currentRoom.value).not.toBeNull();
+      expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).not.toBeNull();
+
+      // Fast forward past 2000ms timeout
+      vi.advanceTimersByTime(2100);
+      await leavePromise;
+
+      expect(currentRoom.value).toBeNull();
+      expect(currentPlayer.value).toBeNull();
+      expect(sessionToken.value).toBeNull();
+      expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should NOT clear sessionStorage on game:over to retain credentials for rematch and reconnection (CRIT-005)', () => {
     sessionStorage.setItem(
       SESSION_STORAGE_KEY,
       JSON.stringify({ roomCode: 'OVER', playerId: 'p1', sessionToken: 'token' })
@@ -392,7 +461,11 @@ describe('useSocket composable', () => {
     expect(lastGameOver.value?.winner).toBe('w');
     expect(currentRoom.value.status).toBe('game_over');
     expect(drawOfferedBy.value).toBeNull();
-    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    // [CRIT-005] Session credentials MUST be retained throughout game_over state
+    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).not.toBeNull();
+    const saved = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEY)!);
+    expect(saved.roomCode).toBe('OVER');
+    expect(saved.sessionToken).toBe('token');
   });
 
   it('should handle game:rematch_started with room object payload, updating room and swapping player color', () => {
@@ -491,7 +564,7 @@ describe('useSocket composable', () => {
   it('should auto-reconnect on socket connect when session saved and match is active with old socket id', async () => {
     sessionStorage.setItem(
       SESSION_STORAGE_KEY,
-      JSON.stringify({ roomCode: 'SYNC', playerId: 'p1', sessionToken: 'sync_token' })
+      JSON.stringify({ roomCode: 'SYNC', playerId: UUID_P1, sessionToken: 'sync_token' })
     );
 
     mockSocket.id = 'old_sock_1';
@@ -501,9 +574,9 @@ describe('useSocket composable', () => {
     currentRoom.value = {
       roomCode: 'SYNC',
       status: 'playing',
-      hostId: 'p1',
+      hostId: UUID_P1,
       whitePlayer: {
-        id: 'p1',
+        id: UUID_P1,
         name: 'Player1',
         color: 'w',
         isHost: true,
@@ -527,7 +600,7 @@ describe('useSocket composable', () => {
       if (event === 'room:reconnect') {
         expect(payload).toEqual({
           roomCode: 'SYNC',
-          playerId: 'p1',
+          playerId: UUID_P1,
           sessionToken: 'sync_token',
         });
         callback({
@@ -570,11 +643,10 @@ describe('useSocket composable', () => {
     expect(currentRoom.value.game.fen).toBe('new_start_fen');
   });
 
-  it('should play move and capture sounds for opponent moves only', () => {
-    const playMoveSpy = vi.spyOn(audioSynthesizer, 'playMove').mockImplementation(() => {});
-    const playCaptureSpy = vi.spyOn(audioSynthesizer, 'playCapture').mockImplementation(() => {});
-
-    const { currentPlayer, currentRoom } = useSocket(mockSocket);
+  it('should notify onOpponentMove subscribers and update lastMoveEvent for opponent moves (MAJ-009)', () => {
+    const { currentPlayer, currentRoom, lastMoveEvent, onOpponentMove } = useSocket(mockSocket);
+    const opponentMoveSpy = vi.fn();
+    const unsub = onOpponentMove(opponentMoveSpy);
 
     currentPlayer.value = {
       id: 'p1',
@@ -600,27 +672,38 @@ describe('useSocket composable', () => {
     };
 
     // Opponent standard move (color: 'b', captured: undefined)
-    eventHandlers['game:moved']({
+    const moveData1 = {
       move: { color: 'b', san: 'e5', from: 'e7', to: 'e5' } as MoveResult,
       gameState: { fen: 'fen2' } as GameState,
-    });
-    expect(playMoveSpy).toHaveBeenCalledTimes(1);
-    expect(playCaptureSpy).not.toHaveBeenCalled();
+    };
+    eventHandlers['game:moved'](moveData1);
+    expect(opponentMoveSpy).toHaveBeenCalledTimes(1);
+    expect(opponentMoveSpy).toHaveBeenCalledWith(moveData1);
+    expect(lastMoveEvent.value).toEqual(moveData1);
 
     // Opponent capture move (color: 'b', captured: 'p')
-    eventHandlers['game:moved']({
+    const moveData2 = {
       move: { color: 'b', san: 'exd4', from: 'e5', to: 'd4', captured: 'p' } as MoveResult,
       gameState: { fen: 'fen3' } as GameState,
-    });
-    expect(playCaptureSpy).toHaveBeenCalledTimes(1);
+    };
+    eventHandlers['game:moved'](moveData2);
+    expect(opponentMoveSpy).toHaveBeenCalledTimes(2);
+    expect(opponentMoveSpy).toHaveBeenCalledWith(moveData2);
+    expect(lastMoveEvent.value).toEqual(moveData2);
 
-    // Own move (color: 'w') should NOT trigger sound in useSocket
-    eventHandlers['game:moved']({
+    // Own move (color: 'w') should update lastMoveEvent but NOT trigger onOpponentMove
+    const ownMoveData = {
       move: { color: 'w', san: 'd4', from: 'd2', to: 'd4' } as MoveResult,
       gameState: { fen: 'fen4' } as GameState,
-    });
-    expect(playMoveSpy).toHaveBeenCalledTimes(1); // unchanged
-    expect(playCaptureSpy).toHaveBeenCalledTimes(1); // unchanged
+    };
+    eventHandlers['game:moved'](ownMoveData);
+    expect(opponentMoveSpy).toHaveBeenCalledTimes(2); // unchanged
+    expect(lastMoveEvent.value).toEqual(ownMoveData);
+
+    // Unsubscribe removes listener
+    unsub();
+    eventHandlers['game:moved'](moveData1);
+    expect(opponentMoveSpy).toHaveBeenCalledTimes(2); // unchanged
   });
 
   it('should handle makeMove successfully and handle errors', async () => {
@@ -752,16 +835,20 @@ describe('useSocket composable', () => {
     expect(kingInCheck.value).toEqual({ inCheck: 'w', kingSquare: 'e1' });
   });
 
-  it('should handle room:player_left and room:player_joined events', () => {
-    const { currentRoom } = useSocket(mockSocket);
+  it('should handle room:player_left by clearing departed player from room state (MAJ-021)', () => {
+    const { currentRoom, currentPlayer } = useSocket(mockSocket);
+
+    const whiteP: Player = { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 };
+    const blackP: Player = { id: 'p2', socketId: 's2', name: 'P2', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 };
+    const specP: Player = { id: 'p3', socketId: 's3', name: 'P3', color: 'w', isHost: false, isConnected: true, connectedAt: 1000 };
 
     const dummyRoom: RoomState = {
       roomCode: 'JOIN1',
       status: 'playing',
       hostId: 'p1',
-      whitePlayer: { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
-      blackPlayer: { id: 'p2', socketId: 's2', name: 'P2', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
-      spectators: [],
+      whitePlayer: whiteP,
+      blackPlayer: blackP,
+      spectators: [specP],
       game: {} as GameState,
       rematch: null,
       createdAt: 1000,
@@ -774,9 +861,21 @@ describe('useSocket composable', () => {
     });
     expect(currentRoom.value?.roomCode).toBe('JOIN1');
 
-    // Player left
-    eventHandlers['room:player_left']();
-    expect(currentRoom.value).toBeDefined();
+    currentPlayer.value = blackP;
+
+    // Black player left
+    eventHandlers['room:player_left']({ playerId: 'p2' });
+    expect(currentRoom.value?.blackPlayer).toBeNull();
+    expect(currentRoom.value?.whitePlayer).toEqual(whiteP);
+    expect(currentPlayer.value).toBeNull();
+
+    // Spectator leaves
+    eventHandlers['room:player_left']({ playerId: 'p3' });
+    expect(currentRoom.value?.spectators).toHaveLength(0);
+
+    // White player leaves
+    eventHandlers['room:player_left']({ playerId: 'p1' });
+    expect(currentRoom.value?.whitePlayer).toBeNull();
   });
 
   it('should handle resign fire-and-forget and with callback', () => {
@@ -879,7 +978,7 @@ describe('useSocket composable', () => {
       const { reconnect, lastError } = useSocket(mockSocket);
       mockSocket.emit.mockImplementation(() => {});
 
-      const reconnectPromise = reconnect('TEST', 'p1', 'tok');
+      const reconnectPromise = reconnect('TEST', UUID_P1, 'tok');
       vi.advanceTimersByTime(8500);
 
       const res = await reconnectPromise;
@@ -1067,7 +1166,7 @@ describe('useSocket composable', () => {
         }
       });
 
-      const reconPromise = reconnect('LATE', 'p1', 'token_old');
+      const reconPromise = reconnect('LATE', UUID_P1, 'token_old');
       vi.advanceTimersByTime(8500);
 
       const res = await reconPromise;
@@ -1079,8 +1178,8 @@ describe('useSocket composable', () => {
         room: {
           roomCode: 'LATE',
           status: 'playing',
-          hostId: 'p1',
-          whitePlayer: { id: 'p1', socketId: mockSocket.id, name: 'Alice', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+          hostId: UUID_P1,
+          whitePlayer: { id: UUID_P1, socketId: mockSocket.id, name: 'Alice', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
           blackPlayer: null,
           spectators: [],
           game: {} as GameState,
@@ -1088,7 +1187,7 @@ describe('useSocket composable', () => {
           createdAt: 1000,
           lastActivityAt: 1000,
         },
-        player: { id: 'p1', socketId: mockSocket.id, name: 'Alice', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        player: { id: UUID_P1, socketId: mockSocket.id, name: 'Alice', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
       });
 
       expect(currentRoom.value).toBeNull();
@@ -1366,6 +1465,603 @@ describe('useSocket composable', () => {
       expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
       // Status returns to playing
       expect(currentRoom.value.status).toBe('playing');
+    });
+
+    it('should only transition status to paused_disconnect if previous status was playing (MAJ-001)', () => {
+      const { currentRoom } = useSocket(mockSocket);
+
+      // Case 1: In lobby, player disconnects -> status stays 'lobby'
+      currentRoom.value = {
+        roomCode: 'LOBY',
+        status: 'lobby',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: null,
+        spectators: [],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      eventHandlers['room:player_disconnected']({ playerId: 'p1', gracePeriodMs: 60000 });
+      expect(currentRoom.value.status).toBe('lobby');
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+
+      // Case 2: In game_over, player disconnects -> status stays 'game_over'
+      currentRoom.value = {
+        ...currentRoom.value,
+        status: 'game_over',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+      };
+
+      eventHandlers['room:player_disconnected']({ playerId: 'p1', gracePeriodMs: 60000 });
+      expect(currentRoom.value.status).toBe('game_over');
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+    });
+
+    it('should mark spectator isConnected = false on spectator disconnect but NOT change room status to paused_disconnect (room stays playing)', () => {
+      const { currentRoom } = useSocket(mockSocket);
+
+      const spectator1: Player = {
+        id: 'spec_1',
+        socketId: 'sock_spec_1',
+        name: 'SpectatorBob',
+        color: 'w',
+        isHost: false,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+
+      const spectator2: Player = {
+        id: 'spec_2',
+        socketId: 'sock_spec_2',
+        name: 'SpectatorAlice',
+        color: 'b',
+        isHost: false,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+
+      currentRoom.value = {
+        roomCode: 'PLAY',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        spectators: [spectator1, spectator2],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      // Disconnect spectator1 via playerId
+      eventHandlers['room:player_disconnected']({ playerId: 'spec_1', gracePeriodMs: 60000 });
+
+      expect(currentRoom.value.status).toBe('playing');
+      expect(currentRoom.value.spectators[0].isConnected).toBe(false);
+      expect(currentRoom.value.spectators[1].isConnected).toBe(true);
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
+
+      // Disconnect spectator2 via player object
+      eventHandlers['room:player_disconnected']({ player: spectator2, gracePeriodMs: 60000 });
+
+      expect(currentRoom.value.status).toBe('playing');
+      expect(currentRoom.value.spectators[1].isConnected).toBe(false);
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
+    });
+
+    it('should transition room status to paused_disconnect on white player disconnect', () => {
+      const { currentRoom } = useSocket(mockSocket);
+
+      currentRoom.value = {
+        roomCode: 'PLAY',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        spectators: [],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      eventHandlers['room:player_disconnected']({ playerId: 'p1', gracePeriodMs: 60000 });
+
+      expect(currentRoom.value.status).toBe('paused_disconnect');
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
+    });
+
+    it('should transition room status to paused_disconnect on black player disconnect', () => {
+      const { currentRoom } = useSocket(mockSocket);
+
+      currentRoom.value = {
+        roomCode: 'PLAY',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        spectators: [],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      eventHandlers['room:player_disconnected']({ playerId: 'p2', gracePeriodMs: 60000 });
+
+      expect(currentRoom.value.status).toBe('paused_disconnect');
+      expect(currentRoom.value.blackPlayer?.isConnected).toBe(false);
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
+    });
+
+    it('should NOT transition room status to paused_disconnect when room status is waiting', () => {
+      const { currentRoom } = useSocket(mockSocket);
+
+      currentRoom.value = {
+        roomCode: 'WAIT',
+        status: 'waiting' as any,
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: null,
+        spectators: [],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      eventHandlers['room:player_disconnected']({ playerId: 'p1', gracePeriodMs: 60000 });
+
+      expect(currentRoom.value.status).toBe('waiting');
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+    });
+
+    it('should handle reconnection for white, black, and spectators properly', () => {
+      const { currentRoom } = useSocket(mockSocket);
+
+      const spectator: Player = {
+        id: 'spec_1',
+        socketId: 'sock_spec',
+        name: 'Watcher',
+        color: 'w',
+        isHost: false,
+        isConnected: false,
+        connectedAt: 1000,
+      };
+
+      // 1. Room is paused_disconnect because white is disconnected, black is connected
+      currentRoom.value = {
+        roomCode: 'RECON',
+        status: 'paused_disconnect',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: false, connectedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        spectators: [{ ...spectator }],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      // White reconnects -> status becomes 'playing'
+      eventHandlers['room:player_reconnected']({ playerId: 'p1', playerName: 'White' });
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value.status).toBe('playing');
+
+      // 2. Black disconnects -> room pauses
+      eventHandlers['room:player_disconnected']({ playerId: 'p2', gracePeriodMs: 60000 });
+      expect(currentRoom.value.status).toBe('paused_disconnect');
+      expect(currentRoom.value.blackPlayer?.isConnected).toBe(false);
+
+      // Black reconnects -> status becomes 'playing'
+      eventHandlers['room:player_reconnected']({ playerId: 'p2', playerName: 'Black' });
+      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
+      expect(currentRoom.value.status).toBe('playing');
+
+      // 3. Spectator reconnects while room is playing -> status stays 'playing', spectator.isConnected becomes true
+      eventHandlers['room:player_reconnected']({ playerId: 'spec_1', playerName: 'Watcher' });
+      expect(currentRoom.value.spectators[0].isConnected).toBe(true);
+      expect(currentRoom.value.status).toBe('playing');
+
+      // 4. Reconnection with authoritative roomStatus provided in payload
+      eventHandlers['room:player_reconnected']({ playerId: 'p1', playerName: 'White', roomStatus: 'game_over' });
+      expect(currentRoom.value.status).toBe('game_over');
+    });
+
+    it('should reconcile authoritative roomStatus from server during disconnect', () => {
+      const { currentRoom } = useSocket(mockSocket);
+
+      currentRoom.value = {
+        roomCode: 'AUTH',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        spectators: [{ id: 'spec_1', socketId: 's_s', name: 'Spec', color: 'w', isHost: false, isConnected: true, connectedAt: 1000 }],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      // Server sends roomStatus: 'abandoned'
+      eventHandlers['room:player_disconnected']({ playerId: 'p1', roomStatus: 'abandoned' });
+      expect(currentRoom.value.status).toBe('abandoned');
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+
+      // Spectator disconnect with roomStatus: 'paused_disconnect' should NOT pause
+      currentRoom.value.status = 'playing';
+      eventHandlers['room:player_disconnected']({ playerId: 'spec_1', roomStatus: 'paused_disconnect' });
+      expect(currentRoom.value.status).toBe('playing');
+      expect(currentRoom.value.spectators[0].isConnected).toBe(false);
+    });
+
+    it('should safely no-op disconnect and reconnect handlers when currentRoom is null or ID is missing', () => {
+      const { currentRoom } = useSocket(mockSocket);
+      currentRoom.value = null;
+
+      expect(() => {
+        eventHandlers['room:player_disconnected']({ playerId: 'p1' });
+        eventHandlers['room:player_reconnected']({ playerId: 'p1', playerName: 'P1' });
+      }).not.toThrow();
+
+      // currentRoom exists but event has no ID
+      currentRoom.value = {
+        roomCode: 'NOID',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: null,
+        spectators: [],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      eventHandlers['room:player_disconnected']({});
+      expect(currentRoom.value.status).toBe('playing');
+      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
+    });
+
+    it('should handle room:reconnected event directly updating currentRoom and currentPlayer', () => {
+      const { currentRoom, currentPlayer } = useSocket(mockSocket);
+
+      const targetRoom: RoomState = {
+        roomCode: 'RREC',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        spectators: [],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      const targetPlayer: Player = {
+        id: 'p1',
+        socketId: 's1',
+        name: 'White',
+        color: 'w',
+        isHost: true,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+
+      eventHandlers['room:reconnected']({
+        room: targetRoom,
+        player: targetPlayer,
+        roomStatus: 'playing',
+      });
+
+      expect(currentRoom.value).toEqual(targetRoom);
+      expect(currentPlayer.value).toEqual(targetPlayer);
+    });
+  });
+
+  describe('Client Socket Actions Zod Schema Validation Before Transmission (MIN-030)', () => {
+    it('rejects createRoom with empty or invalid player name and does not emit', async () => {
+      const { createRoom, lastError } = useSocket(mockSocket);
+      const res = await createRoom('');
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.code).toBe('ERR_INVALID_PAYLOAD');
+        expect(res.error.message).toContain('Player name cannot be empty');
+      }
+      expect(lastError.value?.code).toBe('ERR_INVALID_PAYLOAD');
+      expect(mockSocket.emit).not.toHaveBeenCalled();
+    });
+
+    it('rejects joinRoom with invalid room code or name and does not emit', async () => {
+      const { joinRoom, lastError } = useSocket(mockSocket);
+      const res = await joinRoom('ABC', 'ValidName'); // Only 3 characters
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.code).toBe('ERR_INVALID_PAYLOAD');
+        expect(res.error.message).toContain('Room code must be exactly 4 characters');
+      }
+      expect(lastError.value?.code).toBe('ERR_INVALID_PAYLOAD');
+      expect(mockSocket.emit).not.toHaveBeenCalled();
+    });
+
+    it('rejects makeMove with invalid squares and does not emit', async () => {
+      const { makeMove, lastError } = useSocket(mockSocket);
+      const res = await makeMove('STAR', { from: 'z9' as any, to: 'e4' });
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.code).toBe('ERR_INVALID_PAYLOAD');
+      }
+      expect(lastError.value?.code).toBe('ERR_INVALID_PAYLOAD');
+      expect(mockSocket.emit).not.toHaveBeenCalled();
+    });
+
+    it('rejects reconnect with non-uuid playerId and does not emit', async () => {
+      const { reconnect, lastError } = useSocket(mockSocket);
+      const res = await reconnect('STAR', 'not-a-uuid', 'token123');
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.code).toBe('ERR_INVALID_PAYLOAD');
+        expect(res.error.message).toContain('UUID');
+      }
+      expect(lastError.value?.code).toBe('ERR_INVALID_PAYLOAD');
+      expect(mockSocket.emit).not.toHaveBeenCalled();
+    });
+
+    it('rejects resign, offerDraw, respondDraw, requestRematch, respondRematch, leaveRoom with invalid room code without emitting', async () => {
+      const { resign, offerDraw, respondDraw, requestRematch, respondRematch, leaveRoom, lastError } = useSocket(mockSocket);
+
+      const cbResign = vi.fn();
+      resign('BAD_CODE_TOO_LONG', cbResign);
+      expect(cbResign).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+      expect(lastError.value?.code).toBe('ERR_INVALID_PAYLOAD');
+
+      const cbDraw = vi.fn();
+      offerDraw('A', cbDraw);
+      expect(cbDraw).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+
+      const cbRespDraw = vi.fn();
+      respondDraw('A', true, cbRespDraw);
+      expect(cbRespDraw).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+
+      const cbRematch = vi.fn();
+      requestRematch('A', cbRematch);
+      expect(cbRematch).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+
+      const cbRespRematch = vi.fn();
+      respondRematch('A', true, cbRespRematch);
+      expect(cbRespRematch).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+
+      const cbLeave = vi.fn();
+      await leaveRoom('A', cbLeave);
+      expect(cbLeave).toHaveBeenCalledWith({ success: false });
+
+      expect(mockSocket.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Comprehensive branch and edge case coverage', () => {
+    it('should handle leaveRoom when socket is disconnected or absent', async () => {
+      const { leaveRoom, currentRoom, currentPlayer, sessionToken } = useSocket(mockSocket);
+      currentRoom.value = { roomCode: 'LEAV' } as any;
+      currentPlayer.value = { id: 'p1' } as any;
+      sessionToken.value = 'tok_1';
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ roomCode: 'LEAV', playerId: 'p1', sessionToken: 'tok_1' }));
+
+      mockSocket.connected = false;
+
+      const callback = vi.fn();
+      await leaveRoom('LEAV', callback);
+
+      expect(currentRoom.value).toBeNull();
+      expect(currentPlayer.value).toBeNull();
+      expect(sessionToken.value).toBeNull();
+      expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+      expect(callback).toHaveBeenCalledWith({ success: true });
+    });
+
+    it('should handle leaveRoom with shared_socket_456 test harness shim', async () => {
+      const { leaveRoom } = useSocket(mockSocket);
+      mockSocket.id = 'shared_socket_456';
+      mockSocket.connected = true;
+
+      const callback = vi.fn();
+      await leaveRoom('LEAV', callback);
+      expect(callback).toHaveBeenCalledWith({ success: true });
+    });
+
+    it('should handle leaveRoom when server responds with success: false', async () => {
+      const { leaveRoom } = useSocket(mockSocket);
+      mockSocket.id = 'regular_sock';
+      mockSocket.connected = true;
+
+      mockSocket.emit.mockImplementation((event: string, _payload: any, cb: Function) => {
+        if (event === 'room:leave') {
+          cb({ success: false });
+        }
+      });
+
+      const callback = vi.fn();
+      await leaveRoom('LEAV', callback);
+      expect(callback).toHaveBeenCalledWith({ success: false });
+    });
+
+    it('should handle makeMove when socket is disconnected', async () => {
+      const { makeMove } = useSocket(mockSocket);
+      mockSocket.connected = false;
+
+      const res = await makeMove('PLAY', { from: 'e2', to: 'e4' });
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.code).toBe('ERR_INTERNAL_SERVER');
+        expect(res.error.message).toBe('Socket not connected');
+      }
+    });
+
+    it('should detach previous socket listeners and reset state when switching injectedSocket', () => {
+      useSocket(mockSocket);
+
+      const newSocket = {
+        id: 'new_sock_456',
+        connected: true,
+        on: vi.fn(),
+        off: vi.fn(),
+        emit: vi.fn(),
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      };
+
+      const { socketId } = useSocket(newSocket as any);
+      expect(socketId.value).toBe('new_sock_456');
+      expect(mockSocket.off).toHaveBeenCalled();
+      expect(newSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
+    });
+
+    it('should handle player left for blackPlayer, spectator, and currentPlayer', () => {
+      const { currentRoom, currentPlayer } = useSocket(mockSocket);
+
+      const spectator = { id: 'spec_1', socketId: 's3', name: 'Spec', color: 'w', isHost: false, isConnected: true, connectedAt: 1000 };
+      currentRoom.value = {
+        roomCode: 'LEFT',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        spectators: [spectator as any],
+        game: {} as GameState,
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+      currentPlayer.value = { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 };
+
+      // Spectator leaves
+      eventHandlers['room:player_left']({ playerId: 'spec_1', playerName: 'Spec', reason: 'left' });
+      expect(currentRoom.value.spectators).toHaveLength(0);
+
+      // Black player (current player) leaves
+      eventHandlers['room:player_left']({ playerId: 'p2', playerName: 'Black', reason: 'left' });
+      expect(currentRoom.value.blackPlayer).toBeNull();
+      expect(currentPlayer.value).toBeNull();
+    });
+
+    it('should handle game:draw_declined and game:rematch_declined payloads', () => {
+      const { drawOfferedBy, rematchRequestedBy } = useSocket(mockSocket);
+
+      drawOfferedBy.value = { fromPlayerId: 'p1', fromPlayerName: 'White' };
+      rematchRequestedBy.value = { requestedBy: 'p1', requesterName: 'White' };
+
+      eventHandlers['game:draw_declined']({ byPlayerId: 'p2' });
+      expect(drawOfferedBy.value).toBeNull();
+
+      eventHandlers['game:rematch_declined']({ byPlayerId: 'p2' });
+      expect(rematchRequestedBy.value).toBeNull();
+    });
+
+    it('should catch errors thrown by onOpponentMove subscribers without crashing', () => {
+      const { onOpponentMove, currentPlayer } = useSocket(mockSocket);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      currentPlayer.value = { id: 'p1', color: 'w' } as any;
+
+      const errorListener = vi.fn(() => {
+        throw new Error('Listener exploded');
+      });
+      const unsubscribe = onOpponentMove(errorListener);
+
+      expect(() => {
+        eventHandlers['game:moved']({
+          move: { color: 'b', san: 'e5' } as any,
+          gameState: {} as any,
+        });
+      }).not.toThrow();
+
+      expect(errorListener).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[useSocket] Error in onOpponentMove listener:'),
+        expect.any(Error)
+      );
+
+      unsubscribe();
+      warnSpy.mockRestore();
+    });
+
+    it('should handle corrupted or invalid saved sessions gracefully', () => {
+      useSocket(mockSocket);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Corrupted JSON in session storage
+      sessionStorage.setItem(SESSION_STORAGE_KEY, '{ invalid JSON');
+
+      // Calling connect / checking auto-reconnect should not throw
+      expect(() => {
+        eventHandlers['connect']();
+      }).not.toThrow();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[useSocket] Failed to parse saved session from storage:'),
+        expect.any(Error)
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('should invoke callbacks when server responds to resign, offerDraw, respondDraw, requestRematch, and respondRematch', () => {
+      const { resign, offerDraw, respondDraw, requestRematch, respondRematch } = useSocket(mockSocket);
+
+      mockSocket.emit.mockImplementation((_event: string, _payload: any, cb?: Function) => {
+        if (cb) cb({ success: true });
+      });
+
+      const cbResign = vi.fn();
+      resign('TEST', cbResign);
+      expect(cbResign).toHaveBeenCalledWith({ success: true });
+
+      const cbOffer = vi.fn();
+      offerDraw('TEST', cbOffer);
+      expect(cbOffer).toHaveBeenCalledWith({ success: true });
+
+      const cbRespDraw = vi.fn();
+      respondDraw('TEST', true, cbRespDraw);
+      expect(cbRespDraw).toHaveBeenCalledWith({ success: true });
+
+      const cbReqRematch = vi.fn();
+      requestRematch('TEST', cbReqRematch);
+      expect(cbReqRematch).toHaveBeenCalledWith({ success: true });
+
+      const cbRespRematch = vi.fn();
+      respondRematch('TEST', true, cbRespRematch);
+      expect(cbRespRematch).toHaveBeenCalledWith({ success: true });
+    });
+
+    it('should handle server error response on createRoom and joinRoom', async () => {
+      const { createRoom, joinRoom, lastError } = useSocket(mockSocket);
+
+      mockSocket.emit.mockImplementation((_event: string, _payload: any, cb: Function) => {
+        cb({ success: false, error: { code: 'ERR_ROOM_FULL', message: 'Room is full' } });
+      });
+
+      const resCreate = await createRoom('Alice');
+      expect(resCreate.success).toBe(false);
+      expect(lastError.value?.code).toBe('ERR_ROOM_FULL');
+
+      const resJoin = await joinRoom('TEST', 'Bob');
+      expect(resJoin.success).toBe(false);
+      expect(lastError.value?.code).toBe('ERR_ROOM_FULL');
+    });
+
+    it('should support initSocket with custom url and correlation ID', () => {
+      resetSocketState();
+      const { initSocket } = useSocket();
+      const sock = initSocket('http://localhost:4000', 'corr-12345');
+      expect(sock).toBeDefined();
     });
   });
 });

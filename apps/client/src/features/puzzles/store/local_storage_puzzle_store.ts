@@ -14,6 +14,7 @@ import {
 } from './puzzle_progress.store';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
 import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
+import { logger } from '@/platform/telemetry';
 
 export { PUZZLE_PROGRESS_STORAGE_KEY };
 
@@ -161,7 +162,11 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
       const parsed = JSON.parse(raw);
       this.memoryCache = this.sanitizeProgress(parsed);
       return JSON.parse(JSON.stringify(this.memoryCache));
-    } catch {
+    } catch (err) {
+      logger.warn('Failed to parse or deserialize puzzle progress from storage, using fallback cache', {
+        operation: 'get_puzzle_progress',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return JSON.parse(JSON.stringify(this.memoryCache));
     }
   }
@@ -290,7 +295,10 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
       try {
         this.storage.removeItem(this.storageKey);
       } catch (err) {
-        console.warn('[FC_PUZZLE_STORE] Failed to clear puzzle storage key', err);
+        logger.warn('Failed to clear puzzle storage key', {
+          operation: 'reset_puzzle_progress',
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
   }
@@ -315,7 +323,10 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
           }
           // Preserve in-memory without crashing the UI for regular gameplay
         } else {
-          console.warn('[FC_PUZZLE_STORE] Failed to persist puzzle progress to storage', err);
+          logger.warn('Failed to persist puzzle progress to storage', {
+            operation: 'persist_puzzle_progress',
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     }

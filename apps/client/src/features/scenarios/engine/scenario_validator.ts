@@ -1,4 +1,5 @@
 import type { Square, TutorialStep, StepMoveConstraint } from '@fun-chess/shared';
+import type { Square as ChessSquare } from 'chess.js';
 import { createSafeChess } from '@fun-chess/shared';
 
 export interface PlayerMoveInput {
@@ -20,33 +21,27 @@ export interface PlayerMoveInput {
 export function validateStepMove(
   step: TutorialStep,
   move: PlayerMoveInput,
-  chess?: { fen(): string } | any
+  chess?: { fen(): string } | null
 ): boolean {
   if (!step) return false;
-
-  // If no allowedMoves are specified or the array is empty, any legal move advances the step
-  if (!step.allowedMoves || step.allowedMoves.length === 0) {
-    return true;
-  }
+  if (!move || !move.from || !move.to) return false;
 
   const normalizedPromotion = move.promotion ? move.promotion.toLowerCase() : undefined;
 
-  const matchesExplicit = step.allowedMoves.some((constraint: StepMoveConstraint) => {
-    if (constraint.from !== move.from) return false;
-    if (constraint.to !== move.to) return false;
+  // If step defines specific allowed move constraints, verify match
+  if (step.allowedMoves && step.allowedMoves.length > 0) {
+    const isConstraintMatched = step.allowedMoves.some((constraint: StepMoveConstraint) => {
+      const matchFrom = constraint.from === move.from;
+      const matchTo = constraint.to === move.to;
+      const matchPromo = !constraint.promotion || constraint.promotion.toLowerCase() === normalizedPromotion;
+      return matchFrom && matchTo && matchPromo;
+    });
 
-    // Check promotion match if constraint specifies a promotion
-    if (constraint.promotion) {
-      const constraintPromo = constraint.promotion.toLowerCase();
-      if (normalizedPromotion !== constraintPromo) {
-        return false;
-      }
+    if (isConstraintMatched) {
+      return true;
     }
-
-    return true;
-  });
-
-  if (matchesExplicit) {
+  } else {
+    // If no specific allowed moves specified, any move is acceptable
     return true;
   }
 
@@ -56,9 +51,9 @@ export function validateStepMove(
     try {
       const testEngine = createSafeChess(fen);
       const res = testEngine.move({
-        from: move.from as any,
-        to: move.to as any,
-        promotion: (normalizedPromotion as any) ?? 'q',
+        from: move.from as ChessSquare,
+        to: move.to as ChessSquare,
+        promotion: (normalizedPromotion as 'q' | 'r' | 'b' | 'n' | undefined) ?? 'q',
       });
       if (res && testEngine.isCheckmate()) {
         return true;
@@ -77,7 +72,7 @@ export function validateStepMove(
 export function isSourceSquareAllowed(
   step: TutorialStep,
   from: Square,
-  chess?: { fen(): string } | any
+  chess?: { fen(): string } | null
 ): boolean {
   if (!step || !step.allowedMoves || step.allowedMoves.length === 0) {
     return true;
@@ -92,7 +87,7 @@ export function isSourceSquareAllowed(
     try {
       const testEngine = createSafeChess(fen);
       const legalMoves = testEngine.moves({
-        square: from as any,
+        square: from as ChessSquare,
         verbose: true,
       });
       for (const m of legalMoves) {
@@ -120,7 +115,7 @@ export function isSourceSquareAllowed(
 export function getAllowedTargetsForSource(
   step: TutorialStep,
   from: Square,
-  chess?: { fen(): string } | any
+  chess?: { fen(): string } | null
 ): Square[] {
   if (!step) {
     return [];
@@ -140,7 +135,7 @@ export function getAllowedTargetsForSource(
     try {
       const testEngine = createSafeChess(fen);
       const legalMoves = testEngine.moves({
-        square: from as any,
+        square: from as ChessSquare,
         verbose: true,
       });
       for (const m of legalMoves) {
