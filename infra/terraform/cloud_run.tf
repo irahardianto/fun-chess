@@ -41,6 +41,11 @@ resource "google_cloud_run_v2_service" "default" {
         value = var.cors_origin
       }
 
+      env {
+        name  = "TRUST_PROXY"
+        value = "true"
+      }
+
       startup_probe {
         http_get {
           path = "/healthz"

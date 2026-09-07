@@ -22,10 +22,12 @@ max_instances = 1
 cpu_limit    = "1"
 memory_limit = "512Mi"
 
-# Optional: Public URL (e.g. custom domain or pre-allocated Cloud Run domain)
-# If left empty, join links will automatically adapt to the incoming host.
-public_url = ""
+# Either public_url or cors_origin (or both) must be specified.
+# In production, Cloud Run will fail to start if both are empty.
 
-# Optional: Allowed CORS origins (e.g. "https://fun-chess.example.com")
-# In production, either cors_origin or public_url must be specified.
-cors_origin = ""
+# Public URL (e.g. custom domain or pre-allocated Cloud Run domain)
+public_url = "https://fun-chess.example.com"
+
+# Allowed CORS origins (comma-separated list or "*", e.g. "https://fun-chess.example.com")
+cors_origin = "https://fun-chess.example.com"
+

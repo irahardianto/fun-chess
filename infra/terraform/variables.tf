@@ -46,12 +46,29 @@ variable "memory_limit" {
 
 variable "public_url" {
   type        = string
-  description = "Public URL for Cloud Relay (optional override for join links; leave empty for auto-detection)"
+  description = "Public URL for Cloud Relay (e.g. https://fun-chess.example.com). Either public_url or cors_origin must be specified to prevent container crash."
   default     = ""
+
+  validation {
+    condition     = var.public_url == "" || can(regex("^https?://", var.public_url))
+    error_message = "public_url must be empty or a valid HTTP/HTTPS URL starting with http:// or https://"
+  }
+
+  validation {
+    condition     = length(trimspace(var.public_url)) > 0 || length(trimspace(var.cors_origin)) > 0
+    error_message = "At least one of public_url or cors_origin must be specified and non-empty."
+  }
 }
 
 variable "cors_origin" {
   type        = string
-  description = "Allowed CORS origins for Cloud Run (comma-separated list of origins, e.g. https://fun-chess.example.com)"
+  description = "Allowed CORS origins for Cloud Run (comma-separated list of origins, e.g. https://fun-chess.example.com). Either public_url or cors_origin must be specified to prevent container crash."
   default     = ""
+
+  validation {
+    condition     = var.cors_origin == "" || can(regex("^(https?://[^,]+|\\*)(,\\s*https?://[^,]+)*$", var.cors_origin))
+    error_message = "cors_origin must be empty, '*', or a comma-separated list of valid HTTP/HTTPS origins."
+  }
 }
+
+
