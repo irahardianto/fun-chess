@@ -1,375 +1,331 @@
 # Frozen API & Network Contracts: Fun Chess Remediation
 
-**Status**: FROZEN CONTRACT
-**Author**: @architect (System Architecture)
-**Date**: 2026-09-07
-**Scope**: Full Codebase Remediation (Findings CRIT-001, CRIT-002, CRIT-005, CRIT-008, MAJ-001, MAJ-002, MAJ-003, MAJ-007, MAJ-015, MAJ-016, MAJ-018, MIN-002, MIN-004, ENH-001, ENH-005)
-**Target Locations**: `@fun-chess/shared`, `apps/server`, `apps/client`, `infra/terraform`
+**Status**: FROZEN CONTRACT  
+**Author**: @architect (System Architecture)  
+**Date**: 2026-09-08  
+**Scope**: Full Monorepo Audit Remediation (Findings MAJ-026, MAJ-027, MAJ-028, ENH-003, CRIT-002, CRIT-003, F-MAJ-005, E-ENH-004)  
+**Target Locations**: `@fun-chess/shared`, `apps/server`, `apps/client`
 
 ---
 
-## 1. Executive Architecture Summary
+## 1. Executive Summary & Design Scope
 
-This document establishes the authoritative, frozen network and API contracts across the Fun Chess monorepo. All builders and tech leads implementing Scope Cards 1 through 7 must adhere strictly to these types, schemas, wire protocols, and interface contracts.
+This document establishes the authoritative, frozen network, error, and API contracts for the Fun Chess platform audit remediation. All builders, tech leads, and test automation engineers implementing Scope Cards 1 through 5 (`SC-1-SHARED`, `SC-2-SERVER`, `SC-3-CLIENT-CORE`, `SC-4-CLIENT-FEATURES`, `SC-5-DEVOPS-E2E`) must adhere strictly to the types, signatures, schemas, wire protocols, and status codes specified herein.
 
-### Core Architectural Invariants:
-1. **Zero Secret Leakage**: The secret `sessionToken` is strictly excised from all public models (`Player`, `RoomState`). Session credentials are treated as private authentication secrets: stored server-side only in a private session registry and communicated only to the authorized client in a private acknowledgement callback.
-2. **Strict Ingress Schema Validation**: Every inbound Socket.IO event payload and HTTP endpoint request is validated at runtime using declarative Zod schemas before reaching domain services.
-3. **Deterministic Error Handling & Sanitization**: Socket errors are normalized into a unified `SocketErrorPayload`. Acknowledged events receive error objects via callbacks; unacknowledged events receive the `error` event. 4xx validation/client errors are demoted to `WARN`; 500 errors are logged at `ERROR` and sanitized to prevent leaking stack traces or internal runtime details.
-4. **Hardened HTTP Ingress**: Wildcard `*` CORS is rejected in production. Modern HTTP security headers (CSP, HSTS, Permissions-Policy, X-Frame-Options) are enforced across all HTTP responses.
-5. **Abstracted I/O with Fail-Safe Timeouts**: Client HTTP calls are encapsulated in an `IApiClient` service enforcing a 3-second timeout (`AbortSignal.timeout(3000)`).
+### Architectural Invariants:
+1. **Contract Integrity**: Every client-to-server and server-to-client interaction is explicitly typed in `@fun-chess/shared`. No `(socket as any).emit(...)` casts are permitted.
+2. **Deterministic Error Responses**: All HTTP error responses adhere to a unified error response envelope formatted by a centralized `formatHttpError` helper. All Socket.IO error responses adhere to `SocketErrorPayload`.
+3. **Defense-in-Depth Observability**: Operational metrics and internal process telemetry are strictly partitioned from unauthenticated container health checks (`/health` vs `/metrics` or `/health/detail`).
+4. **State Machine Synchronization**: Reconnection handshakes provide complete, strongly-typed room lifecycle status (`RoomStatus`) to eliminate UI state guessing across network blips.
 
 ---
 
-## 2. Private Session Token Separation & Reconnection Protocol
+## 2. Socket Event Contract Updates
 
-### 2.1 Problem Analysis (CRIT-001)
-Previously, `sessionToken` was declared as a field on `interface Player` (`shared/src/contracts/models.ts:96`). Because `RoomState` contains `whitePlayer`, `blackPlayer`, and `spectators`, every state broadcast (`room:joined`, `room:player_joined`, `game:moved`, `game:rematch_started`) transmitted the victim's plaintext `sessionToken` to all connected peers, enabling trivial session hijacking via `room:reconnect`.
+### 2.1 `room:leave` Acknowledgement Callback Contract (MAJ-026)
 
-### 2.2 Model Definitions
-
-#### A. Public Player Model (`shared/src/contracts/models.ts`)
+#### Problem
+In `shared/src/contracts/events.ts`, `ClientToServerEvents["room:leave"]` previously declared a signature with no acknowledgement callback:
 ```typescript
-import { PieceColor, PieceType, Square } from "./models.js";
+// Legacy declaration (caused client cast: (s as any).emit('room:leave', ..., callback))
+"room:leave": (req: LeaveRoomRequest) => void;
+```
+Because the client (`apps/client/src/composables/useSocket.ts`) requires acknowledgement to finalize room departures and clean up local session state, callers were forced to bypass TypeScript type safety with `(s as any).emit(...)`.
 
-/**
- * Public representation of a player inside a room.
- * MUST NEVER contain private session credentials or secret tokens.
- */
-export interface Player {
-  /** Unique UUID v4 identifier for the player */
-  id: string;
-  /** Ephemeral Socket.io connection identifier */
-  socketId: string;
-  /** Player display name (1-20 characters, sanitized) */
-  name: string;
-  /** Selected emoji avatar (e.g. 🦁, 🚀, 🦄, ⚡, 👑, 🐼) */
-  avatar?: string;
-  /** Active piece color assignment ('w' or 'b') */
-  color: PieceColor;
-  /** Indicates whether the player is the room creator */
-  isHost: boolean;
-  /** Real-time socket connectivity state */
-  isConnected: boolean;
-  /** Epoch timestamp (milliseconds) when the player joined */
-  connectedAt: number;
+#### Updated Wire Contract (`shared/src/contracts/events.ts`)
+
+```typescript
+export interface ClientToServerEvents {
+  // ...
+
+  /**
+   * Voluntarily leaves a room.
+   * Acknowledged upon server room state mutation, socket room detachment,
+   * and timer cancellation.
+   */
+  "room:leave": (
+    req: LeaveRoomRequest,
+    callback?: (
+      res:
+        | { success: true }
+        | { success: false; error: SocketErrorPayload },
+    ) => void,
+  ) => void;
+
+  // ...
 }
-
-/**
- * Semantic alias for Player explicitly denoting public view visibility.
- */
-export type PublicPlayer = Player;
 ```
 
-#### B. Private Session Credential Model (`shared/src/contracts/models.ts`)
+#### Payload Specifications
+
+1. **Request Schema (`LeaveRoomRequest`)**:
+   ```typescript
+   export const LeaveRoomRequestSchema = z.object({
+     roomCode: RoomCodeSchema,
+   });
+   export type LeaveRoomRequest = z.infer<typeof LeaveRoomRequestSchema>;
+   ```
+
+2. **Acknowledgement Responses**:
+   - **Success (200 equivalent)**:
+     ```typescript
+     { success: true }
+     ```
+   - **Failure (4xx/5xx equivalent)**:
+     ```typescript
+     {
+       success: false,
+       error: {
+         code: ErrorCode,
+         message: string,
+         roomCode?: string,
+         correlationId?: string,
+         details?: Record<string, unknown>
+       }
+     }
+     ```
+
+#### Server Implementation Semantics (`apps/server/src/features/rooms/room.socket_handler.ts`)
 ```typescript
-/**
- * Private authentication credential stored server-side and client-side (sessionStorage).
- * Exchanged ONLY over initial private room establishment and reconnection handshakes.
- */
-export interface SessionInfo {
-  /** Cryptographic secret UUID token used to authenticate reconnection */
-  sessionToken: string;
-  /** Player ID associated with this session */
+const handleLeave = createRoomHandler<LeaveRoomRequest, { success: true }>(
+  logger,
+  "room:leave",
+  socket,
+  { schema: LeaveRoomRequestSchema, rateLimiter },
+  async (req) => {
+    const result = await roomService.leaveRoom(req.roomCode, socket.id);
+    const roomCode = req.roomCode.toUpperCase();
+    await socket.leave(roomCode);
+
+    // Cancel pending disconnect timers for this leaving player
+    timerRegistry.cancel(roomCode, result.player.id);
+
+    if (result.gameOverPayload) {
+      timerRegistry.cancelAllForRoom(roomCode);
+      io.to(roomCode).emit("game:over", result.gameOverPayload);
+    } else if (result.shouldDelete) {
+      timerRegistry.cancelAllForRoom(roomCode);
+    } else {
+      socket.to(roomCode).emit("room:player_left", {
+        playerId: result.player.id,
+        playerName: result.player.name,
+      });
+    }
+
+    return { success: true };
+  },
+);
+socket.on("room:leave", handleLeave);
+```
+
+#### Client Implementation Semantics (`apps/client/src/composables/useSocket.ts`)
+1. Remove `(s as any)` cast when emitting `room:leave`.
+2. Remove hardcoded `'shared_socket_456'` test backdoor shim (CRIT-003).
+3. Execute teardown via a 2000ms race timeout:
+```typescript
+export function leaveRoom(): Promise<void> {
+  return new Promise((resolve) => {
+    const s = socket.value;
+    const code = currentRoom.value?.roomCode;
+
+    if (!s || !code) {
+      clearSession();
+      resolve();
+      return;
+    }
+
+    let finalized = false;
+    const finalize = (success: boolean) => {
+      if (finalized) return;
+      finalized = true;
+      clearTimeout(timer);
+      clearSession();
+      resolve();
+    };
+
+    const timer = setTimeout(() => {
+      finalize(true);
+    }, 2000);
+
+    // Strongly typed call with ack callback
+    s.emit("room:leave", { roomCode: code }, (res) => {
+      finalize(res?.success !== false);
+    });
+  });
+}
+```
+
+---
+
+### 2.2 `room:reconnect` Acknowledgement Signature & `room:player_reconnected` Broadcast Contract (MAJ-026, MAJ-027)
+
+#### Problem
+1. `ClientToServerEvents["room:reconnect"]` acknowledgement callback did not declare `roomStatus: RoomStatus`, even though the server was already providing it.
+2. In `ServerToClientEvents["room:player_reconnected"]`, the broadcast payload omitted `roomStatus: RoomStatus`. When a disconnected opponent reconnected, the remaining client received `{ playerId, playerName }` without authoritative room status, requiring fragile heuristics in the client UI.
+
+#### Updated Wire Contract (`shared/src/contracts/events.ts`)
+
+```typescript
+import type { RoomStatus, RoomState, Player } from "./models.js";
+
+export interface ClientToServerEvents {
+  /**
+   * Re-authenticates an interrupted session using private credentials.
+   * Returns complete RoomState, authenticated Player, and authoritative RoomStatus.
+   */
+  "room:reconnect": (
+    req: ReconnectRequest,
+    callback?: (
+      res:
+        | {
+            success: true;
+            room: RoomState;
+            player: Player;
+            roomStatus: RoomStatus;
+          }
+        | { success: false; error: SocketErrorPayload },
+    ) => void,
+  ) => void;
+}
+
+export interface ServerToClientEvents {
+  /**
+   * Broadcast when a previously disconnected player successfully re-establishes connection.
+   * Includes authoritative room status so peers know whether the match has resumed from pause.
+   */
+  "room:player_reconnected": (data: {
+    playerId: string;
+    playerName: string;
+    roomStatus: RoomStatus;
+  }) => void;
+
+  /**
+   * Emitted directly to the reconnecting client upon successful reconnection.
+   */
+  "room:reconnected": (data: {
+    room: RoomState;
+    player: Player;
+    roomStatus: RoomStatus;
+  }) => void;
+}
+```
+
+#### Server Implementation Semantics (`apps/server/src/features/rooms/room.socket_handler.ts`)
+
+```typescript
+const handleReconnect = createRoomHandler<
+  ReconnectRequest,
+  {
+    room: RoomState;
+    player: Player;
+    roomStatus: RoomStatus;
+  }
+>(
+  logger,
+  "room:reconnect",
+  socket,
+  { schema: ReconnectRequestSchema, rateLimiter },
+  async (req) => {
+    const result = await roomService.reconnect(req, socket.id);
+    const roomCode = result.room.roomCode;
+    await socket.join(roomCode);
+
+    // Cancel any pending disconnect timer for this reconnected player
+    timerRegistry.cancel(roomCode, result.player.id);
+
+    // Broadcast to opponent with authoritative roomStatus (MAJ-027)
+    socket.to(roomCode).emit("room:player_reconnected", {
+      playerId: result.player.id,
+      playerName: result.player.name,
+      roomStatus: result.room.status,
+    });
+
+    // Unicast to reconnecting client
+    socket.emit("room:reconnected", {
+      room: result.room,
+      player: result.player,
+      roomStatus: result.room.status,
+    });
+
+    return {
+      success: true,
+      room: result.room,
+      player: result.player,
+      roomStatus: result.room.status,
+    };
+  },
+);
+socket.on("room:reconnect", handleReconnect);
+```
+
+#### Client State Reconciliation (`apps/client/src/composables/useSocket.ts`)
+```typescript
+function handlePlayerReconnected(data: {
   playerId: string;
-  /** Room code associated with this session */
-  roomCode: string;
-  /** Epoch timestamp (milliseconds) when session was created */
-  createdAt: number;
-  /** Epoch timestamp (milliseconds) of last observed activity */
-  lastSeenAt: number;
+  playerName: string;
+  roomStatus: RoomStatus;
+}) {
+  if (currentRoom.value) {
+    // Authoritative room status from server broadcast
+    currentRoom.value.status = data.roomStatus;
+
+    if (currentRoom.value.whitePlayer?.id === data.playerId) {
+      currentRoom.value.whitePlayer.isConnected = true;
+    }
+    if (currentRoom.value.blackPlayer?.id === data.playerId) {
+      currentRoom.value.blackPlayer.isConnected = true;
+    }
+  }
+
+  if (currentPlayer.value?.id === data.playerId) {
+    currentPlayer.value.isConnected = true;
+  }
 }
 
+function handleRoomReconnected(data: {
+  room: RoomState;
+  player: Player;
+  roomStatus: RoomStatus;
+}) {
+  if (data?.room) {
+    currentRoom.value = data.room;
+    currentRoom.value.status = data.roomStatus;
+
+    // Restore pending offers from authoritative room state (CRIT-003)
+    if (data.room.drawOffer) {
+      drawOfferedBy.value = data.room.drawOffer.offeredBy;
+    } else {
+      drawOfferedBy.value = null;
+    }
+
+    if (data.room.rematch) {
+      rematchRequestedBy.value = data.room.rematch.requestedBy;
+    } else {
+      rematchRequestedBy.value = null;
+    }
+  }
+  if (data?.player) {
+    currentPlayer.value = data.player;
+  }
+}
+```
+
+---
+
+## 3. Error Contracts & Normalized Wire Schemas
+
+### 3.1 Domain Error Code Definition (`shared/src/contracts/errors.ts`)
+
+#### Problem (F-MAJ-005, E-ENH-004)
+`OptimisticLockConflictError` in `apps/server/src/features/rooms/room.errors.ts` was forced to use `"ERR_CONFLICT" as ErrorCode` because `ERR_CONFLICT` was missing from `ErrorCode` in `@fun-chess/shared`.
+
+#### Contract Definition
+Add `ERR_CONFLICT` directly to `ErrorCode`:
+
+```typescript
 /**
- * Client-persisted session data stored in browser sessionStorage.
+ * Standardized domain error codes across client and server.
  */
-export interface SavedSession {
-  roomCode: string;
-  playerId: string;
-  sessionToken: string;
-}
-```
-
-#### C. Sanitized Room State (`shared/src/contracts/models.ts`)
-```typescript
-export interface RoomState {
-  /** 4-character uppercase alphanumeric code */
-  roomCode: string;
-  /** Room lifecycle phase */
-  status: RoomStatus;
-  /** Player ID of host */
-  hostId: string;
-  /** Assigned white player (clean of session secrets) */
-  whitePlayer: Player | null;
-  /** Assigned black player (clean of session secrets) */
-  blackPlayer: Player | null;
-  /** Spectators in the room (clean of session secrets) */
-  spectators: Player[];
-  /** Authoritative chess match state */
-  game: GameState;
-  /** Active rematch proposal state */
-  rematch: RematchState | null;
-  /** Active draw offer state */
-  drawOffer?: { offeredBy: string; offeredAt: number } | null;
-  /** Epoch timestamp of room creation */
-  createdAt: number;
-  /** Epoch timestamp of last mutation */
-  lastActivityAt: number;
-}
-```
-
-### 2.3 Reconnection Authentication Protocol Sequence
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as Player Client
-    participant Svr as Socket Server (wrapSocketHandler)
-    participant Reg as Server Session Registry (Private)
-    participant Store as Room Store (InMemoryRoomStore)
-    participant Peers as Opponent & Spectators
-
-    Note over Client, Svr: 1. Room Creation or Join Flow
-    Client->>Svr: emit("room:create" | "room:join", payload, ackCallback)
-    Svr->>Store: Save RoomState (Contains Player without sessionToken)
-    Svr->>Reg: Store SessionInfo (playerId, roomCode, sessionToken)
-    Svr-->>Peers: broadcast("room:player_joined", { player, room }) [NO TOKEN]
-    Svr-->>Client: ackCallback({ success: true, room, player, sessionToken }) [PRIVATE]
-    Client->>Client: sessionStorage.setItem("fun_chess_session", { roomCode, playerId, sessionToken })
-
-    Note over Client, Svr: 2. Network Interruption & Disconnect
-    Client-xSvr: Transport disconnects (socketId terminates)
-    Svr->>Store: Mark Player.isConnected = false
-    Svr->>Svr: Start 60-second Disconnect Grace Timer
-    Svr-->>Peers: broadcast("room:player_disconnected", { playerId, gracePeriodMs: 60000 })
-
-    Note over Client, Svr: 3. Secure Reconnection Handshake
-    Client->>Svr: New Socket connects -> emit("room:reconnect", { roomCode, playerId, sessionToken }, ackCallback)
-    Svr->>Reg: Validate sessionToken for (roomCode, playerId)
-    alt Invalid or Expired Token
-        Svr-->>Client: ackCallback({ success: false, error: ERR_UNAUTHORIZED })
-    else Valid Token
-        Svr->>Svr: Cancel Disconnect Grace Timer
-        Svr->>Store: Rebind Player.socketId = newSocketId, isConnected = true
-        Svr->>Svr: socket.join(roomCode)
-        Svr-->>Peers: broadcast("room:player_reconnected", { playerId, playerName })
-        Svr-->>Client: ackCallback({ success: true, room, player })
-    end
-```
-
-### 2.4 Server Session Store Contract (`apps/server/src/features/rooms/session.interface.ts`)
-```typescript
-export interface ISessionRegistry {
-  /** Stores a private session token for a given player in a room */
-  registerSession(roomCode: string, playerId: string, sessionToken: string): Promise<void>;
-
-  /** Validates that the provided session token matches the registered player */
-  validateSession(roomCode: string, playerId: string, sessionToken: string): Promise<boolean>;
-
-  /** Updates lastSeenAt timestamp for session activity tracking */
-  touchSession(roomCode: string, playerId: string): Promise<void>;
-
-  /** Removes session on explicit leave or room abandonment */
-  removeSession(roomCode: string, playerId: string): Promise<void>;
-
-  /** Prunes all sessions associated with a terminated room */
-  pruneRoomSessions(roomCode: string): Promise<void>;
-}
-```
-
----
-
-## 3. Runtime Ingress Validation Schemas (Zod)
-
-All schemas are placed in `@fun-chess/shared/src/contracts/schemas.ts` and exported via `@fun-chess/shared`. Both server and client consume these schemas.
-
-### 3.1 Common Primitives & Domain Enums
-```typescript
-import { z } from "zod";
-
-export const RoomCodeSchema = z
-  .string()
-  .trim()
-  .length(4, "Room code must be exactly 4 characters")
-  .regex(/^[A-Za-z0-9]{4}$/, "Room code must contain only alphanumeric characters")
-  .transform((code) => code.toUpperCase());
-
-export const PlayerNameSchema = z
-  .string()
-  .trim()
-  .min(1, "Player name cannot be empty")
-  .max(20, "Player name must be 20 characters or fewer")
-  // Strip control characters & dangerous HTML brackets
-  .transform((name) => name.replace(/[<>&"']/g, ""));
-
-export const AvatarEmojiSchema = z
-  .string()
-  .trim()
-  .max(16, "Avatar emoji must be 16 characters or fewer")
-  .optional()
-  .default("🦁");
-
-export const PieceColorSchema = z.enum(["w", "b"]);
-
-export const PreferredColorSchema = z
-  .enum(["w", "b", "random"])
-  .optional()
-  .default("random");
-
-export const ChessSquareSchema = z
-  .string()
-  .regex(/^[a-h][1-8]$/, "Must be a valid chess square notation (a1-h8)");
-
-export const PromotionPieceSchema = z.enum(["q", "r", "b", "n"]);
-```
-
-### 3.2 Socket Ingress Payload Schemas
-
-#### A. `CreateRoomRequestSchema`
-```typescript
-export const CreateRoomRequestSchema = z.object({
-  playerName: PlayerNameSchema,
-  preferredColor: PreferredColorSchema,
-  avatar: AvatarEmojiSchema,
-});
-export type CreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;
-```
-
-#### B. `JoinRoomRequestSchema`
-```typescript
-export const JoinRoomRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-  playerName: PlayerNameSchema,
-  avatar: AvatarEmojiSchema,
-});
-export type JoinRoomRequest = z.infer<typeof JoinRoomRequestSchema>;
-```
-
-#### C. `ReconnectRequestSchema`
-```typescript
-export const ReconnectRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-  playerId: z.string().uuid("Player ID must be a valid UUID"),
-  sessionToken: z.string().min(1, "Session token is required").max(128),
-});
-export type ReconnectRequest = z.infer<typeof ReconnectRequestSchema>;
-```
-
-#### D. `LeaveRoomRequestSchema`
-```typescript
-export const LeaveRoomRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-});
-export type LeaveRoomRequest = z.infer<typeof LeaveRoomRequestSchema>;
-```
-
-#### E. `MakeMoveRequestSchema` & `MovePayloadSchema`
-```typescript
-export const MovePayloadSchema = z.object({
-  from: ChessSquareSchema,
-  to: ChessSquareSchema,
-  promotion: PromotionPieceSchema.optional(),
-});
-export type MovePayload = z.infer<typeof MovePayloadSchema>;
-
-export const MakeMoveRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-  move: MovePayloadSchema,
-});
-export type MakeMoveRequest = z.infer<typeof MakeMoveRequestSchema>;
-```
-
-#### F. Game Control Requests (`Resign`, `Draw`, `Rematch`)
-```typescript
-export const ResignRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-});
-export type ResignRequest = z.infer<typeof ResignRequestSchema>;
-
-export const OfferDrawRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-});
-export type OfferDrawRequest = z.infer<typeof OfferDrawRequestSchema>;
-
-export const RespondDrawRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-  accept: z.boolean(),
-});
-export type RespondDrawRequest = z.infer<typeof RespondDrawRequestSchema>;
-
-export const RequestRematchRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-});
-export type RequestRematchRequest = z.infer<typeof RequestRematchRequestSchema>;
-
-export const RespondRematchRequestSchema = z.object({
-  roomCode: RoomCodeSchema,
-  accept: z.boolean(),
-});
-export type RespondRematchRequest = z.infer<typeof RespondRematchRequestSchema>;
-```
-
-### 3.3 HTTP Endpoints Response Schemas
-
-#### A. `/api/lan-info` Response Schema
-```typescript
-export const LanInfoResponseSchema = z.object({
-  lanIp: z.string(),
-  port: z.number().int().positive(),
-  localUrl: z.string().url(),
-  joinUrl: z.string().url(),
-  interfaces: z.array(z.string()),
-  relayMode: z.enum(["cloud", "lan"]).optional(),
-  isCloudRelay: z.boolean().optional(),
-  publicUrl: z.string().url().optional(),
-});
-export type LanInfoResponse = z.infer<typeof LanInfoResponseSchema>;
-```
-
-#### B. `/health` & `/api/health` Response Schema
-```typescript
-export const HealthCheckResponseSchema = z.object({
-  status: z.enum(["ok", "degraded"]),
-  uptimeSeconds: z.number().nonnegative(),
-  timestamp: z.string().datetime(),
-  activeRooms: z.number().int().nonnegative(),
-  activeSockets: z.number().int().nonnegative(),
-  memoryUsageMb: z.object({
-    rss: z.number(),
-    heapTotal: z.number(),
-    heapUsed: z.number(),
-  }),
-  relay: z
-    .object({
-      mode: z.enum(["cloud", "lan"]),
-      publicUrl: z.string().url().optional(),
-    })
-    .optional(),
-});
-export type HealthCheckResponse = z.infer<typeof HealthCheckResponseSchema>;
-```
-
-#### C. Server Environment Configuration Schema (`apps/server/src/platform/config/env.ts`)
-```typescript
-export const ServerEnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  PORT: z.coerce.number().int().min(1024).max(65535).default(3000),
-  HOST: z.string().default("0.0.0.0"),
-  CORS_ORIGIN: z.string().optional(),
-  PUBLIC_URL: z.string().url().optional(),
-  LAN_IP: z.string().ip().optional(),
-  HOST_IP: z.string().ip().optional(),
-  LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
-});
-export type ServerEnv = z.infer<typeof ServerEnvSchema>;
-```
-
----
-
-## 4. Standardized Error Contracts & Status Codes
-
-### 4.1 Error Payload Interface (`shared/src/contracts/errors.ts`)
-```typescript
 export type ErrorCode =
   | "ERR_ROOM_NOT_FOUND"
   | "ERR_ROOM_FULL"
@@ -383,440 +339,387 @@ export type ErrorCode =
   | "ERR_INVALID_PAYLOAD"
   | "ERR_RATE_LIMITED"
   | "ERR_SOCKET_TIMEOUT"
+  | "ERR_CONFLICT"            // Added: optimistic concurrency conflict / state conflict
   | "ERR_INTERNAL_SERVER";
+```
 
+### 3.2 Standard Socket Error Payload Schema
+
+```typescript
+/**
+ * Normalized wire error payload transmitted over Socket.io acknowledgements or error events.
+ */
 export interface SocketErrorPayload {
+  /** Domain error classification code */
   readonly code: ErrorCode;
+  /** Human-readable error description safe for client display */
   readonly message: string;
+  /** Associated room code, if applicable */
   readonly roomCode?: string;
-  readonly correlationId: string;
+  /** UUID tracing correlation identifier */
+  readonly correlationId?: string;
+  /** Additional structured error diagnostics (redacted in production) */
   readonly details?: Record<string, unknown>;
 }
 ```
 
-### 4.2 Error Classification, Status Codes & Log Level Matrix
-| Error Code | HTTP Status | Log Level | Error Message Strategy |
+### 3.3 Domain Exception Hierarchy (`shared/src/contracts/errors.ts`)
+
+```typescript
+export abstract class AppError extends Error {
+  public readonly isAppError = true;
+
+  constructor(
+    public readonly code: ErrorCode,
+    message: string,
+    public readonly statusCode: number = 400,
+    public readonly details?: Record<string, unknown>,
+    public override readonly cause?: Error,
+  ) {
+    super(message);
+    this.name = this.constructor.name;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an optimistic concurrency control version check fails during a room mutation.
+ */
+export class OptimisticLockConflictError extends AppError {
+  constructor(roomCode: string, expectedVersion: number, actualVersion: number) {
+    super(
+      "ERR_CONFLICT",
+      `State conflict for room '${roomCode}': expected version ${expectedVersion}, found ${actualVersion}. The room was updated concurrently.`,
+      409,
+      { roomCode, expectedVersion, actualVersion },
+    );
+  }
+}
+```
+
+### 3.4 Error Code to HTTP Status & Client Action Mapping
+
+| Error Code | HTTP Status | Meaning | Client Presentation / Action |
 |---|---|---|---|
-| `ERR_INVALID_PAYLOAD` | 400 | `WARN` | Safe Zod validation summary (e.g. `"playerName: Player name cannot be empty"`) |
-| `ERR_INVALID_ROOM_CODE` | 400 | `WARN` | Safe message: `"Room code must be 4 alphanumeric characters"` |
-| `ERR_UNAUTHORIZED` | 401 | `WARN` | Safe message: `"Invalid or expired session credentials"` |
-| `ERR_NOT_YOUR_TURN` | 403 | `WARN` | Safe message: `"It is not your turn to move"` |
-| `ERR_PLAYER_NOT_IN_ROOM` | 403 | `WARN` | Safe message: `"Player is not an active participant in room"` |
-| `ERR_ROOM_NOT_FOUND` | 404 | `WARN` | Safe message: `"Room with code 'ABCD' does not exist"` |
-| `ERR_ROOM_FULL` | 409 | `WARN` | Safe message: `"Room 'ABCD' already has 2 active players"` |
-| `ERR_ROOM_ALREADY_EXISTS` | 409 | `WARN` | Safe message: `"Room 'ABCD' already exists"` |
-| `ERR_GAME_NOT_ACTIVE` | 409 | `WARN` | Safe message: `"Game is not in active playing state"` |
-| `ERR_INVALID_MOVE` | 422 | `WARN` | Safe chess engine reason: `"Illegal move: e2 to e5"` |
-| `ERR_RATE_LIMITED` | 429 | `WARN` | Safe rate message: `"Rate limit exceeded. Please wait before retrying."` |
-| `ERR_SOCKET_TIMEOUT` | 408 | `WARN` | Safe timeout message: `"Request timed out"` |
-| `ERR_INTERNAL_SERVER` | 500 | `ERROR` | **Sanitized**: `"An internal server error occurred"`. NEVER leak runtime stack or SQL/system exceptions. |
+| `ERR_INVALID_PAYLOAD` | 400 | Malformed schema, invalid string lengths | Highlight input field, display validation message |
+| `ERR_INVALID_ROOM_CODE`| 400 | Room code not 4 uppercase chars | Show invalid room code error on lobby input |
+| `ERR_GAME_NOT_ACTIVE`  | 400 | Move/draw attempted while in lobby or game over | Dismiss action banner, sync room status |
+| `ERR_UNAUTHORIZED`     | 401 | Invalid or expired session token | Clear local session storage, redirect to lobby |
+| `ERR_NOT_YOUR_TURN`    | 403 | Move submitted out of turn | Reset selected piece, play illegal move sound |
+| `ERR_PLAYER_NOT_IN_ROOM`| 403 | Socket is spectator attempting player action | Disable player control buttons |
+| `ERR_ROOM_NOT_FOUND`   | 404 | Room does not exist or expired | Show "Room not found" toast, return to lobby |
+| `ERR_ROOM_FULL`        | 409 | Room already has 2 active players | Show "Room full" dialog, offer spectator mode |
+| `ERR_CONFLICT`         | 409 | Concurrent mutation or version mismatch | Re-fetch latest room state and retry action |
+| `ERR_INVALID_MOVE`     | 422 | Move violates chess rules (e.g. king in check) | Snap piece back to source square |
+| `ERR_RATE_LIMITED`     | 429 | Exceeded request threshold | Show "Too many requests. Please wait." banner |
+| `ERR_SOCKET_TIMEOUT`   | 408 / 504 | Lock wait or socket ack timed out | Retry with exponential backoff |
+| `ERR_INTERNAL_SERVER`  | 500 | Unhandled server exception | Show generic error toast with correlation ID |
 
-### 4.3 Dual-Channel Socket Error Dispatch Pattern (CRIT-005)
-All incoming socket handlers wrapped by `wrapSocketHandler` must handle errors consistently according to whether the client provided an acknowledgement callback:
+---
+
+## 4. HTTP Standard Error Response Envelope (MAJ-028)
+
+### 4.1 Problem
+`apps/server/src/platform/http/http_server.ts` generated ad-hoc error formats across rate limiting (429), not found (404), and server error (500) handlers, lacking top-level transport status `code`, timestamps, or consistent error properties.
+
+### 4.2 Error Response Envelope Schema
 
 ```typescript
-// apps/server/src/platform/socket/socket_logging_middleware.ts
-export function wrapSocketHandler<TReq, TRes>(
-  logger: Logger,
-  operationName: string,
-  socket: Socket,
-  schema: z.ZodSchema<TReq>,
-  handler: (validatedReq: TReq, context: SocketOperationContext) => Promise<TRes>
-) {
-  return async (rawReq: unknown, callback?: (res: SocketResponse<TRes>) => void): Promise<void> => {
-    const correlationId = randomUUID();
-    const startTime = performance.now();
-    const clientIp = extractClientIp(socket);
+/**
+ * Canonical HTTP error response envelope returned by all HTTP routes.
+ * Strictly compliant with api-design-principles.md and rugged-software-constitution.md.
+ */
+export interface HttpErrorResponse {
+  /** Redundant HTTP transport status code (e.g. 400, 404, 409, 429, 500) */
+  code: number;
+  /** Machine-readable domain error code (UPPER_SNAKE_CASE) */
+  error: string;
+  /** Human-readable, safe error message */
+  message: string;
+  /** Request tracing UUID for cross-system correlation */
+  correlationId?: string;
+  /** Unix epoch timestamp in milliseconds when the error was generated */
+  timestamp: number;
+}
+```
 
-    // 1. Ingress Schema Validation
-    const validationResult = schema.safeParse(rawReq);
-    if (!validationResult.success) {
-      const duration = Math.round(performance.now() - startTime);
-      const errorMessage = validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
-      const errorPayload: SocketErrorPayload = {
-        code: "ERR_INVALID_PAYLOAD",
-        message: errorMessage,
-        correlationId,
-      };
+### 4.3 Helper Contract: `formatHttpError` (`apps/server/src/platform/http/http_server.ts`)
 
-      logger.warn(`Operation validation failed: ${operationName}`, {
-        operation: operationName,
-        correlationId,
-        socketId: socket.id,
-        clientIp,
-        duration,
-        error: { code: "ERR_INVALID_PAYLOAD", message: errorMessage },
-      });
-
-      if (typeof callback === "function") {
-        callback({ success: false, error: errorPayload });
-      } else {
-        socket.emit("error", errorPayload);
-      }
-      return;
-    }
-
-    // 2. Execution & Error Handling
-    try {
-      const result = await handler(validationResult.data, { correlationId, socketId: socket.id, clientIp });
-      const duration = Math.round(performance.now() - startTime);
-
-      logger.info(`Operation succeeded: ${operationName}`, {
-        operation: operationName,
-        correlationId,
-        socketId: socket.id,
-        duration,
-        status: "success",
-      });
-
-      if (typeof callback === "function") {
-        callback({ success: true, ...result });
-      }
-    } catch (err: unknown) {
-      const duration = Math.round(performance.now() - startTime);
-      const isAppError = err instanceof AppError;
-      const statusCode = isAppError ? err.statusCode : 500;
-      const code: ErrorCode = isAppError ? err.code : "ERR_INTERNAL_SERVER";
-
-      // Sanitization: Never expose 500 runtime errors
-      const clientMessage = (isAppError && statusCode < 500)
-        ? err.message
-        : "An internal server error occurred";
-
-      const errorPayload: SocketErrorPayload = {
-        code,
-        message: clientMessage,
-        correlationId,
-        ...(isAppError && err.details ? { details: err.details } : {}),
-      };
-
-      if (statusCode < 500) {
-        logger.warn(`Operation rejected: ${operationName}`, {
-          operation: operationName,
-          correlationId,
-          socketId: socket.id,
-          clientIp,
-          duration,
-          status: "rejected",
-          error: { code, message: err instanceof Error ? err.message : String(err) },
-        });
-      } else {
-        logger.error(`Operation failed: ${operationName}`, {
-          operation: operationName,
-          correlationId,
-          socketId: socket.id,
-          clientIp,
-          duration,
-          status: "failed",
-          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
-        });
-      }
-
-      // CONTRACT DISPATCH: Callback if present, else contracted 'error' event
-      if (typeof callback === "function") {
-        callback({ success: false, error: errorPayload });
-      } else {
-        socket.emit("error", errorPayload);
-      }
-    }
+```typescript
+/**
+ * Formats a standardized HTTP error response envelope.
+ *
+ * @param code - HTTP status code (4xx or 5xx)
+ * @param error - Machine-readable error code (e.g. "ERR_NOT_FOUND", "ERR_RATE_LIMITED")
+ * @param message - Human-readable error message safe for client presentation
+ * @param correlationId - Optional request tracing correlation ID
+ * @param timestamp - Optional timestamp (defaults to Date.now())
+ */
+export function formatHttpError(
+  code: number,
+  error: string,
+  message: string,
+  correlationId?: string,
+  timestamp: number = Date.now(),
+): HttpErrorResponse {
+  return {
+    code,
+    error,
+    message,
+    ...(correlationId ? { correlationId } : {}),
+    timestamp,
   };
 }
-```
 
----
-
-## 5. Security Headers & CORS Configuration
-
-### 5.1 HTTP Security Headers Specification
-Applied to every HTTP response in `apps/server/src/platform/http/http_server.ts`:
-
-```typescript
-export const SECURITY_HEADERS: Record<string, string> = {
-  // Content-Security-Policy: restrict origins, allow inline styles for Vue animations, allow websockets
-  "Content-Security-Policy": [
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "media-src 'self' blob:",
-    "connect-src 'self' ws: wss:",
-    "font-src 'self'",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-  ].join("; "),
-
-  // Strict-Transport-Security (1 year, include subdomains, preload)
-  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-
-  // Frame Protection
-  "X-Frame-Options": "DENY",
-
-  // MIME type sniffing protection
-  "X-Content-Type-Options": "nosniff",
-
-  // Referrer disclosure restriction
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-
-  // Browser feature permissions
-  "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=()",
-};
-```
-
-### 5.2 CORS Origin Allowlist Configuration
-Wildcard `*` is strictly forbidden when `NODE_ENV === "production"`.
-
-```typescript
-export function resolveAllowedOrigins(env: ServerEnv): string[] {
-  if (env.CORS_ORIGIN) {
-    return env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean);
-  }
-  if (env.PUBLIC_URL) {
-    const parsed = new URL(env.PUBLIC_URL);
-    return [parsed.origin];
-  }
-  if (env.NODE_ENV === "production") {
-    throw new Error("FATAL: CORS_ORIGIN or PUBLIC_URL must be configured in production mode.");
-  }
-  // Safe development fallbacks
-  return ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"];
-}
-
-export function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
-  if (!origin) return true; // Same-origin or server-to-server
-  return allowedOrigins.includes("*") || allowedOrigins.includes(origin);
-}
-```
-
-### 5.3 Static Asset Ingress & Path Traversal Prevention (CRIT-008)
-Static file resolver must enforce canonical boundary validation and correct MIME 404 behavior:
-
-```typescript
-import path from "node:path";
-import fs from "node:fs/promises";
-
-export async function serveStaticFile(
-  reqPath: string,
-  staticRoot: string,
-  acceptHeader: string = ""
-): Promise<{ status: number; filePath?: string; contentType?: string }> {
-  // Normalize and resolve canonical path
-  const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, "");
-  const targetPath = path.join(staticRoot, safePath === "/" ? "index.html" : safePath);
-  const relative = path.relative(staticRoot, targetPath);
-
-  // Path Traversal Guard: target must reside inside staticRoot
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    return { status: 403 }; // Forbidden
-  }
-
-  try {
-    const stat = await fs.stat(targetPath);
-    if (stat.isFile()) {
-      return { status: 200, filePath: targetPath, contentType: getMimeType(targetPath) };
-    }
-  } catch {
-    // Missing asset handling
-    const ext = path.extname(targetPath);
-    // If request is for a missing concrete asset (.js, .css, .png), NEVER return index.html
-    if (ext) {
-      return { status: 404 };
-    }
-    // SPA Fallback: Only rewrite to index.html if caller accepts text/html
-    if (acceptHeader.includes("text/html")) {
-      const indexPath = path.join(staticRoot, "index.html");
-      return { status: 200, filePath: indexPath, contentType: "text/html; charset=utf-8" };
-    }
-  }
-
-  return { status: 404 };
-}
-```
-
----
-
-## 6. Client HTTP API Client Interface (`IApiClient`)
-
-### 6.1 Interface Definition (`apps/client/src/platform/api/api_client.interface.ts`)
-```typescript
-import type { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
-
-export interface ApiRequestOptions {
-  /** Request timeout in milliseconds. Defaults to 3000ms. */
-  timeoutMs?: number;
-  /** Optional custom AbortSignal to cancel requests from callers */
-  signal?: AbortSignal;
-  /** Custom request headers */
-  headers?: Record<string, string>;
-}
-
-export interface ApiResponse<T> {
-  data: T;
-  status: number;
-  ok: boolean;
-}
-
-export interface IApiClient {
-  /** Performs GET request with timeout and error handling */
-  get<T>(url: string, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
-
-  /** Performs POST request with JSON body and timeout */
-  post<T>(url: string, body?: unknown, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
-
-  /** Discovers LAN networking information from server */
-  getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse>;
-
-  /** Queries operational health telemetry */
-  checkHealth(options?: ApiRequestOptions): Promise<HealthCheckResponse>;
-
-  /** Verifies network connectivity via light probe HEAD request */
-  checkConnectivity(probeUrl?: string, options?: ApiRequestOptions): Promise<boolean>;
-}
-```
-
-### 6.2 Production Implementation (`apps/client/src/platform/api/fetch_api_client.ts`)
-```typescript
-import type { IApiClient, ApiRequestOptions, ApiResponse } from "./api_client.interface.js";
-import { LanInfoResponseSchema, HealthCheckResponseSchema, type LanInfoResponse, type HealthCheckResponse } from "@fun-chess/shared";
-
-export class FetchApiClient implements IApiClient {
-  constructor(private readonly baseUrl: string = "") {}
-
-  private createTimeoutSignal(timeoutMs: number = 3000, callerSignal?: AbortSignal): { signal: AbortSignal; cleanup: () => void } {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
-
-    if (callerSignal) {
-      callerSignal.addEventListener("abort", () => controller.abort(callerSignal.reason), { once: true });
-    }
-
+/**
+ * Maps any AppError or native Error into a standardized HttpErrorResponse.
+ */
+export function formatHttpErrorFromException(
+  err: unknown,
+  correlationId?: string,
+  timestamp: number = Date.now(),
+): { statusCode: number; payload: HttpErrorResponse } {
+  if (err instanceof AppError) {
     return {
-      signal: controller.signal,
-      cleanup: () => clearTimeout(timeoutId),
+      statusCode: err.statusCode,
+      payload: formatHttpError(
+        err.statusCode,
+        err.code,
+        err.message,
+        correlationId,
+        timestamp,
+      ),
     };
   }
 
-  async get<T>(url: string, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
-    const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 3000, options.signal);
-    try {
-      const response = await fetch(`${this.baseUrl}${url}`, {
-        method: "GET",
-        headers: { Accept: "application/json", ...options.headers },
-        signal,
-      });
-      const data = response.status === 204 ? (null as T) : await response.json();
-      return { data, status: response.status, ok: response.ok };
-    } finally {
-      cleanup();
-    }
-  }
+  // Generic unhandled exception (never leak stack trace in production)
+  const isProduction = process.env.NODE_ENV === "production";
+  const message = isProduction
+    ? "Internal server error"
+    : err instanceof Error
+      ? err.message
+      : "Internal server error";
 
-  async post<T>(url: string, body?: unknown, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
-    const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 3000, options.signal);
-    try {
-      const response = await fetch(`${this.baseUrl}${url}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json", ...options.headers },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal,
-      });
-      const data = await response.json();
-      return { data, status: response.status, ok: response.ok };
-    } finally {
-      cleanup();
-    }
-  }
+  return {
+    statusCode: 500,
+    payload: formatHttpError(
+      500,
+      "ERR_INTERNAL_SERVER",
+      message,
+      correlationId,
+      timestamp,
+    ),
+  };
+}
+```
 
-  async getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse> {
-    const res = await this.get<unknown>("/api/lan-info", options);
-    if (!res.ok) throw new Error(`Failed to fetch LAN info: HTTP ${res.status}`);
-    return LanInfoResponseSchema.parse(res.data);
-  }
+### 4.4 HTTP Server Handler Usage Examples
 
-  async checkHealth(options?: ApiRequestOptions): Promise<HealthCheckResponse> {
-    const res = await this.get<unknown>("/health", options);
-    if (!res.ok) throw new Error(`Health check failed: HTTP ${res.status}`);
-    return HealthCheckResponseSchema.parse(res.data);
-  }
+#### 1. Rate Limiting (429)
+```typescript
+if (rateLimiter && !rateLimiter.consume(clientIp)) {
+  const limitDesc = rateLimiter.getLimitDescription?.() || "Rate limit exceeded. Please wait before retrying.";
+  sendJsonResponse(
+    429,
+    formatHttpError(429, "ERR_RATE_LIMITED", limitDesc, correlationId),
+  );
+  return;
+}
+```
 
-  async checkConnectivity(probeUrl: string = "/favicon.svg", options: ApiRequestOptions = {}): Promise<boolean> {
-    const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 2000, options.signal);
-    try {
-      const res = await fetch(`${probeUrl}?_t=${Date.now()}`, {
-        method: "HEAD",
-        cache: "no-store",
-        signal,
-      });
-      return res.ok;
-    } catch {
-      return false;
-    } finally {
-      cleanup();
-    }
+#### 2. Not Found (404)
+```typescript
+sendJsonResponse(
+  404,
+  formatHttpError(404, "ERR_NOT_FOUND", `Cannot ${method} ${pathname}`, correlationId),
+);
+```
+
+#### 3. Unhandled Server Exceptions (500)
+```typescript
+catch (err) {
+  const { statusCode, payload } = formatHttpErrorFromException(err, correlationId);
+  if (!res.headersSent) {
+    sendJsonResponse(statusCode, payload);
   }
 }
 ```
 
-### 6.3 Test Double (`apps/client/src/platform/api/mock_api_client.ts`)
+---
+
+## 5. Observability Endpoints: `/health` vs `/metrics` / `/health/detail` (ENH-003)
+
+### 5.1 Problem
+`HealthController` in `apps/server/src/platform/http/controllers/health.controller.ts` exposed internal process memory metrics (`rss`, `heapTotal`, `heapUsed`), active socket counts, and room counts on the public, unauthenticated `/health` endpoint, presenting an information disclosure risk (CWE-200).
+
+### 5.2 Endpoint Partitioning
+
+```
+                          ┌───────────────────────────┐
+                          │   Incoming HTTP Request   │
+                          └─────────────┬─────────────┘
+                                        │
+                 ┌──────────────────────┴──────────────────────┐
+                 ▼                                             ▼
+       GET /health, /api/health                   GET /metrics, /health/detail
+  ┌───────────────────────────────┐             ┌───────────────────────────────┐
+  │ Liveness & Readiness Probe    │             │ Deep Operational Telemetry    │
+  │ • Public / Unauthenticated    │             │ • Internal / Authenticated    │
+  │ • Status, uptime, timestamp   │             │ • Memory, sockets, rooms,     │
+  │ • Minimal footprint (<100 B)  │             │   relay network addressing    │
+  └───────────────────────────────┘             └───────────────────────────────┘
+```
+
+### 5.3 `/health` & `/api/health` — Lightweight Container Liveness Probe
+
+- **Target Audience**: Kubernetes Liveness/Readiness probes, Cloud Run healthchecks, load balancers.
+- **Authentication**: None (Public).
+- **HTTP Status**:
+  - `200 OK`: Server is accepting traffic.
+  - `503 Service Unavailable`: Server is shutting down or in an unrecoverable state.
+- **Response Schema (`LivenessHealthResponse`)**:
+  ```typescript
+  export const LivenessHealthResponseSchema = z.object({
+    status: z.enum(["ok", "degraded"]),
+    uptimeSeconds: z.number().nonnegative(),
+    timestamp: z.string().datetime(),
+  });
+  export type LivenessHealthResponse = z.infer<typeof LivenessHealthResponseSchema>;
+  ```
+- **Example Response Body**:
+  ```json
+  {
+    "status": "ok",
+    "uptimeSeconds": 342.5,
+    "timestamp": "2026-09-08T07:45:00.000Z"
+  }
+  ```
+
+### 5.4 `/metrics` & `/health/detail` — Deep Operational Telemetry
+
+- **Target Audience**: Prometheus scrapers, internal diagnostic dashboards, cluster monitoring agents.
+- **Authentication**:
+  - Development / Test: Accessible on localhost / LAN.
+  - Production: Restricted via internal network binding or optional basic auth/bearer token header if exposed publicly.
+- **HTTP Status**:
+  - `200 OK`: Normal operation.
+  - `401 Unauthorized` / `403 Forbidden`: Unauthenticated access in production.
+- **Response Schema (`DetailedHealthResponse`)**:
+  ```typescript
+  export const DetailedHealthResponseSchema = z.object({
+    status: z.enum(["ok", "degraded"]),
+    uptimeSeconds: z.number().nonnegative(),
+    timestamp: z.string().datetime(),
+    activeRooms: z.number().int().nonnegative(),
+    activeSockets: z.number().int().nonnegative(),
+    memoryUsageMb: z.object({
+      rss: z.number().nonnegative(),
+      heapTotal: z.number().nonnegative(),
+      heapUsed: z.number().nonnegative(),
+    }),
+    relay: z
+      .object({
+        mode: z.enum(["cloud", "lan"]),
+        publicUrl: z.string().url().optional(),
+      })
+      .optional(),
+  });
+  export type DetailedHealthResponse = z.infer<typeof DetailedHealthResponseSchema>;
+  ```
+- **Example Response Body**:
+  ```json
+  {
+    "status": "ok",
+    "uptimeSeconds": 342.5,
+    "timestamp": "2026-09-08T07:45:00.000Z",
+    "activeRooms": 3,
+    "activeSockets": 6,
+    "memoryUsageMb": {
+      "rss": 48.2,
+      "heapTotal": 24.5,
+      "heapUsed": 18.3
+    },
+    "relay": {
+      "mode": "lan"
+    }
+  }
+  ```
+
+### 5.5 HealthController Interface Specification (`apps/server/src/platform/http/controllers/health.controller.ts`)
+
 ```typescript
-import type { IApiClient, ApiRequestOptions, ApiResponse } from "./api_client.interface.js";
-import type { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
+export interface HealthControllerOptions {
+  roomStore: IRoomCountProvider;
+  addressService: IAddressingInfoProvider;
+  port: number;
+  getActiveSocketCount: () => number;
+  isProduction?: boolean;
+  startTime?: number;
+}
 
-export class MockApiClient implements IApiClient {
-  public lanInfoResult: LanInfoResponse = {
-    lanIp: "192.168.1.50",
-    port: 3000,
-    localUrl: "http://localhost:3000",
-    joinUrl: "http://192.168.1.50:3000",
-    interfaces: ["192.168.1.50"],
-    relayMode: "lan",
-    isCloudRelay: false,
-  };
-  public isHealthy: boolean = true;
-  public isOnline: boolean = true;
-
-  async get<T>(_url: string, _options?: ApiRequestOptions): Promise<ApiResponse<T>> {
-    return { data: {} as T, status: 200, ok: true };
-  }
-
-  async post<T>(_url: string, _body?: unknown, _options?: ApiRequestOptions): Promise<ApiResponse<T>> {
-    return { data: {} as T, status: 200, ok: true };
-  }
-
-  async getLanInfo(_options?: ApiRequestOptions): Promise<LanInfoResponse> {
-    return this.lanInfoResult;
-  }
-
-  async checkHealth(_options?: ApiRequestOptions): Promise<HealthCheckResponse> {
+export class HealthController {
+  // ...
+  public getLiveness(): LivenessHealthResponse {
     return {
-      status: this.isHealthy ? "ok" : "degraded",
-      uptimeSeconds: 120,
+      status: "ok",
+      uptimeSeconds: Math.round((Date.now() - this.startTime) / 100) / 10,
       timestamp: new Date().toISOString(),
-      activeRooms: 1,
-      activeSockets: 2,
-      memoryUsageMb: { rss: 40, heapTotal: 30, heapUsed: 20 },
     };
   }
 
-  async checkConnectivity(_probeUrl?: string, _options?: ApiRequestOptions): Promise<boolean> {
-    return this.isOnline;
+  public async getDetailedHealth(): Promise<DetailedHealthResponse> {
+    const mem = process.memoryUsage();
+    const activeRooms = await this.roomStore.count();
+    const activeSockets = this.getActiveSocketCount();
+    const isCloud = this.addressService.isCloudRelay
+      ? this.addressService.isCloudRelay()
+      : false;
+    const addrInfo = this.addressService.getAddressingInfo(this.port);
+
+    return {
+      status: "ok",
+      uptimeSeconds: Math.round((Date.now() - this.startTime) / 100) / 10,
+      timestamp: new Date().toISOString(),
+      activeRooms,
+      activeSockets,
+      memoryUsageMb: {
+        rss: Math.round((mem.rss / 1024 / 1024) * 10) / 10,
+        heapTotal: Math.round((mem.heapTotal / 1024 / 1024) * 10) / 10,
+        heapUsed: Math.round((mem.heapUsed / 1024 / 1024) * 10) / 10,
+      },
+      relay: {
+        mode: isCloud ? "cloud" : "lan",
+        ...(addrInfo.publicUrl ? { publicUrl: addrInfo.publicUrl } : {}),
+      },
+    };
   }
 }
 ```
 
 ---
 
-## 7. Verification & Conformance Checklist
+## 6. Implementation Checklist by Scope Card
 
-| Requirement | Implementation Target | Verification Method |
-|---|---|---|
-| `sessionToken` removed from `Player` and `RoomState` | `shared/src/contracts/models.ts` | Typecheck `tsc -b` + Unit test asserting `sessionToken` does not exist on broadcast payloads |
-| Private session registry | `apps/server/src/features/rooms/` | Unit test proving `sessionToken` is stored in registry and returned ONLY in acknowledgement callback |
-| Ingress Zod schemas | `shared/src/contracts/schemas.ts` | Unit tests rejecting empty names, illegal squares, out-of-range strings, and malformed room codes |
-| 4xx to WARN / 500 to ERROR | `socket_logging_middleware.ts` | Test inspecting logger mock verifying log level on `InvalidMoveError` vs unhandled `Error` |
-| 500 error sanitization | `socket_logging_middleware.ts` | Test checking `res.error.message` equals `"An internal server error occurred"` on thrown TypeError |
-| Dual error routing | `socket_logging_middleware.ts` | Test verifying callback receives error when present, and `socket.emit('error')` fires when callback is missing |
-| Security headers (CSP, HSTS) | `apps/server/src/platform/http/` | Contract test asserting all 6 security headers are returned on GET / |
-| Production CORS allowlist | `http_server.ts`, `cloud_run.tf` | Unit test ensuring wildcard `*` throws or is blocked when `NODE_ENV === 'production'` |
-| Client `IApiClient` timeout | `apps/client/src/platform/api/` | Unit test with fake timers asserting fetch aborts after 3000ms |
+### `SC-1-SHARED` (@backend-engineer)
+- [ ] Add `ERR_CONFLICT` to `ErrorCode` union in `shared/src/contracts/errors.ts`.
+- [ ] Export `OptimisticLockConflictError` from `shared/src/contracts/errors.ts`.
+- [ ] Add acknowledgement callback signature to `ClientToServerEvents["room:leave"]` in `shared/src/contracts/events.ts`.
+- [ ] Update `ClientToServerEvents["room:reconnect"]` acknowledgement callback with `roomStatus: RoomStatus`.
+- [ ] Update `ServerToClientEvents["room:player_reconnected"]` with `roomStatus: RoomStatus`.
+- [ ] Update `ServerToClientEvents["room:reconnected"]` with `roomStatus: RoomStatus`.
+- [ ] Add `LivenessHealthResponseSchema` and `DetailedHealthResponseSchema` to `shared/src/contracts/schemas.ts`.
+- [ ] Export updated types from `shared/src/contracts/index.ts` and `shared/src/index.ts`.
+
+### `SC-2-SERVER` (@tech-lead[server])
+- [ ] Update `handleLeave` in `apps/server/src/features/rooms/room.socket_handler.ts` to return `{ success: true }`.
+- [ ] Update `handleReconnect` to include `roomStatus: result.room.status` in `room:player_reconnected` broadcast.
+- [ ] Implement `formatHttpError` and `formatHttpErrorFromException` in `apps/server/src/platform/http/http_server.ts`.
+- [ ] Route `404`, `429`, and `500` through `formatHttpError`.
+- [ ] Implement `getLiveness()` and `getDetailedHealth()` on `HealthController`.
+- [ ] Route `/health` and `/api/health` to `getLiveness()`; route `/metrics` and `/health/detail` to `getDetailedHealth()`.
+
+### `SC-3-CLIENT-CORE` (@tech-lead[client-core])
+- [ ] Update `leaveRoom` in `apps/client/src/composables/useSocket.ts` to consume the typed `room:leave` ack callback without casts.
+- [ ] Remove hardcoded test backdoor `'shared_socket_456'` in `useSocket.ts` (CRIT-003).
+- [ ] Update `handlePlayerReconnected` in `useSocket.ts` to reconcile `currentRoom.value.status = data.roomStatus`.
+- [ ] Update `handleRoomReconnected` in `useSocket.ts` to re-hydrate `drawOfferedBy` and `rematchRequestedBy` (CRIT-003).

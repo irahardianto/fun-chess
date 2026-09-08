@@ -1,642 +1,1058 @@
 # Frozen Project Conventions & Architecture Standards: Fun Chess Remediation
 
-**Status**: FROZEN CONTRACT
-**Author**: @architect (System Architecture)
-**Date**: 2026-09-07
-**Scope**: Full Codebase Remediation (Findings CRIT-002, CRIT-003, CRIT-004, CRIT-006, CRIT-007, MAJ-004, MAJ-005, MAJ-006, MAJ-007, MAJ-008, MAJ-009, MAJ-010, MAJ-011, MAJ-012, MAJ-013, MAJ-014, MAJ-017, MAJ-019, MAJ-025, MIN-005, MIN-010, MIN-015, MIN-016, ENH-004, ENH-006, ENH-008, ENH-011)
-**Target Locations**: Monorepo Root, `@fun-chess/shared`, `apps/server`, `apps/client`, `apps/e2e`, `tests`
+**Status**: FROZEN CONTRACT  
+**Author**: @architect (System Architecture)  
+**Date**: 2026-09-08  
+**Scope**: Monorepo Architecture & Coding Conventions (Remediation 2026-09-08: MAJ-009, MAJ-010, MAJ-012, MAJ-013, MAJ-014, MAJ-015, MAJ-017, MAJ-019, MAJ-020, MAJ-021, MAJ-022, MAJ-023, MAJ-024, MIN-012, MIN-013, MIN-014)  
+**Target Locations**: Monorepo Root, `shared/**`, `apps/server/**`, `apps/client/**`
 
 ---
 
-## 1. Executive Summary & Principles
+## 1. Executive Architecture Summary
 
-This document establishes the frozen coding, organization, and architectural conventions for all builders executing Scope Cards 1 through 7.
+This document establishes the frozen coding, organization, and architectural conventions for all builders and tech leads executing Scope Cards 1 through 5. Every engineer must follow these rules without deviation.
 
 ### Core Architectural Laws:
-1. **Rule 1: I/O Isolation** — All I/O boundaries (browser storage, HTTP fetch, WebSockets, Web Audio, camera hardware, timers, network interfaces) MUST be abstracted behind interfaces with both production and test double implementations.
-2. **Rule 2: Pure Business Logic** — Chess engine calculations, move validations, rating updates, and scenario step checks MUST remain pure functions (`state + input -> nextState + outcome`). Multimedia side effects (audio, haptics, confetti) MUST be triggered exclusively by UI presenter components in response to returned outcomes.
-3. **Rule 3: Dependency Direction** — Dependencies point strictly inward toward business logic. Infrastructure implements interfaces defined by domain/application contracts. Dependencies are injected via constructors and wired at application entry points (Composition Roots).
+1. **Rule 1: I/O Isolation** — All I/O boundaries (browser storage, HTTP fetch, WebSockets, Web Audio, camera streams, WebRTC, timers, and ID/time generation) MUST be abstracted behind interfaces with both production and test double implementations.
+2. **Rule 2: Pure Business Logic** — State transitions, color assignments, chess engine rules, rating updates, and progress diffing MUST reside in pure functions following the **Fetch → Calculate → Persist** sequence. Never execute I/O or mutate shared state inside pure functions.
+3. **Rule 3: Dependency Direction** — Dependencies point strictly inward toward business logic. Domain features depend only on interface contracts defined in the domain or shared layer. Infrastructure implements interfaces defined by the domain layer. All dependencies are injected via constructor DI and wired at Composition Roots.
 4. **Strict Module Encapsulation** — Every feature and platform package MUST expose its public API strictly through a single root `index.ts`. Deep imports bypassing `index.ts` are strictly forbidden.
-5. **Zero Silent Failures** — Empty `catch {}` blocks are rejected. Every exception must be either wrapped and rethrown, handled with a safe fallback and structured warning log, or reflected into observable UI state.
+5. **Universal Observability** — Every operation entry point MUST implement 3-point structured logging with a correlation ID. Invariant message templates are mandatory. Direct `console.*` calls in feature code are strictly prohibited.
 
 ---
 
-## 2. Directory Layout Conventions
+## 2. Directory Layout & Barrel Export Standards (`index.ts`)
 
-The monorepo follows a strict **Context → Feature → Layer** vertical slice hierarchy per `project-structure.md`.
+### 2.1 Monorepo Layout (`project-structure.md`)
 
 ```
 fun-chess/
-├── apps/
-│   ├── server/                         # Node.js HTTP + Socket.IO Backend
-│   │   ├── src/
-│   │   │   ├── index.ts                # Server Composition Root & Bootstrap
-│   │   │   ├── features/               # Vertical business slices
-│   │   │   │   ├── rooms/              # Room creation, matchmaking & sessions
-│   │   │   │   ├── game/               # Move validation & chess engine bridge
-│   │   │   │   └── lan/                # Network topology & Cloud Relay discovery
-│   │   │   └── platform/               # Infrastructure & cross-cutting adapters
-│   │   │       ├── config/             # Zod environment parsing & fail-fast
-│   │   │       ├── http/               # HTTP server, routing & static file handler
-│   │   │       ├── socket/             # Socket.IO setup, rate limiting & logging middleware
-│   │   │       └── logger/             # Pino structured logger adapter
-│   │   └── package.json
-│   ├── client/                         # Vue 3 + Vite Frontend
-│   │   ├── src/
-│   │   │   ├── main.ts                 # Client Composition Root & Mount
-│   │   │   ├── App.vue                 # Lightweight root shell (<200 lines)
-│   │   │   ├── components/             # Decomposed shell components
-│   │   │   │   ├── AppViewRouter.vue   # View switching router
-│   │   │   │   ├── AppToastManager.vue # Toast notification container
-│   │   │   │   └── AppModalContainer.vue # Modal presentation layer
-│   │   │   ├── features/               # Client vertical slices
-│   │   │   │   ├── lobby/              # Multiplayer lobby & match setup
-│   │   │   │   ├── board/              # Board rendering & selection state machine
-│   │   │   │   ├── ai/                 # Solo AI bot engine & arena
-│   │   │   │   ├── puzzles/            # Daily puzzle runner & theme mastery
-│   │   │   │   ├── scenarios/          # Interactive academy & mini-games
-│   │   │   │   ├── portability/        # QR sync, import/export & backup codecs
-│   │   │   │   ├── pwa/                # Service worker & network connectivity
-│   │   │   │   ├── hud/                # Captured pieces, clocks & move history
-│   │   │   │   └── modals/             # Matchmaking & settings dialogs
-│   │   │   ├── platform/               # Browser I/O abstractions
-│   │   │   │   ├── api/                # IApiClient & FetchApiClient (3s timeout)
-│   │   │   │   ├── storage/            # KeyValueStorage & safe LocalStorage adapter
-│   │   │   │   ├── audio/              # IAudioService & WebAudioSynthesizer
-│   │   │   │   └── socket/             # Typed Socket.IO client factory
-│   │   │   └── composables/            # Cross-cutting UI composables
-│   │   │       ├── useTheme.ts         # Theme switching & CSS vars
-│   │   │       ├── useNotification.ts  # Reactive toast queue
-│   │   │       └── useSocket.ts        # Singleton multiplayer connection state
-│   │   └── package.json
-│   └── e2e/                            # Playwright End-to-End Test Suite
-│       ├── tests/
-│       │   ├── multiplayer.e2e.spec.ts
-│       │   ├── ai_match.e2e.spec.ts
-│       │   └── portability.e2e.spec.ts
-│       ├── playwright.config.ts
-│       └── package.json
-├── shared/                             # @fun-chess/shared Core Package
+├── shared/                                 # @fun-chess/shared Core Package
 │   ├── src/
-│   │   ├── index.ts                    # Public shared export
-│   │   ├── contracts/                  # Wire models, Zod schemas & error types
-│   │   │   ├── models.ts
-│   │   │   ├── schemas.ts
-│   │   │   ├── events.ts
-│   │   │   ├── errors.ts
-│   │   │   └── api.ts
-│   │   └── utils/                      # Pure algorithms & deterministic utilities
-│   │       ├── chess_evaluation.ts     # Material advantage & captured pieces
-│   │       ├── progress_codec.ts       # Canonical sorted JSON & CRC-32 checksums
-│   │       ├── progress_merger/        # Decomposed sub-domain mergers
-│   │       └── schema_validator.ts     # Declarative Zod validators
+│   │   ├── index.ts                        # Root package barrel export
+│   │   ├── contracts/                      # Wire models, Zod schemas, errors, system interfaces
+│   │   │   ├── index.ts                    # Contracts barrel
+│   │   │   ├── models.ts                   # Domain entities (Player, RoomState, GameState)
+│   │   │   ├── schemas.ts                  # Zod validation schemas
+│   │   │   ├── events.ts                   # Socket.IO client-server event contracts
+│   │   │   ├── errors.ts                   # AppError hierarchy & ErrorCode enum
+│   │   │   ├── system.ts                   # IClock, IIdGenerator abstractions (MAJ-014)
+│   │   │   └── api.ts                      # HTTP response types
+│   │   └── utils/                          # Pure business logic & algorithms
+│   │       ├── index.ts                    # Utils barrel
+│   │       ├── chess_factory.ts            # Chess instance factory
+│   │       ├── dictionary_mapper.ts        # Compact dictionary encoding (deterministic time)
+│   │       ├── progress_merger/            # Decomposed domain mergers (MIN-022)
+│   │       ├── star_calculator.ts          # Centralized scoring calculations (MIN-023)
+│   │       └── schema_validator.ts         # Runtime schema validation helpers
 │   └── package.json
-├── tests/                              # Monorepo Integration & Contract Test Suite
-│   ├── contracts/                      # Socket & HTTP protocol contract tests
-│   ├── integration/                    # Multi-client game integration tests
-│   └── helpers/
-│       └── test_server.ts              # Real server test harness factory
-├── infra/                              # Terraform & Deployment manifests
-└── vitest.config.ts                    # Root Vitest configuration with @vitest/coverage-v8
+│
+├── apps/
+│   ├── server/                             # Node.js HTTP + Socket.IO Backend
+│   │   ├── src/
+│   │   │   ├── index.ts                    # Server Composition Root & Bootstrap
+│   │   │   ├── features/                   # Vertical business slices
+│   │   │   │   ├── rooms/                  # Room lifecycle, matchmaking & sessions
+│   │   │   │   │   ├── index.ts            # Rooms feature public API barrel
+│   │   │   │   │   ├── room.logic.ts       # Pure room state transition functions (MAJ-015)
+│   │   │   │   │   ├── room.service.ts     # RoomService implementation
+│   │   │   │   │   ├── room.interface.ts   # IRoomService & IRoomGameAdapter contracts
+│   │   │   │   │   ├── room.store.ts       # RoomStore abstract interface
+│   │   │   │   │   ├── in_memory_room.store.ts # Production in-memory room store adapter
+│   │   │   │   │   ├── mock_room.store.ts  # Test double store adapter
+│   │   │   │   │   ├── session_registry.ts # Session registry interface
+│   │   │   │   │   ├── in_memory_session_registry.ts # Session storage
+│   │   │   │   │   ├── disconnect_timer_registry.ts # Abandonment timer registry
+│   │   │   │   │   ├── room.socket_handler.ts # Socket event listeners
+│   │   │   │   │   ├── room.errors.ts      # Feature error re-exports & custom errors
+│   │   │   │   │   └── __tests__/          # Co-located unit & integration tests
+│   │   │   │   ├── game/                   # Move validation, turns & match rules
+│   │   │   │   │   ├── index.ts            # Game feature public API barrel
+│   │   │   │   │   ├── game.service.ts     # GameService implementation (MAJ-017)
+│   │   │   │   │   ├── game.interface.ts   # IGameService contract
+│   │   │   │   │   ├── chess_engine.ts     # Chess rules engine adapter
+│   │   │   │   │   ├── game.socket_handler.ts # Game socket event listeners
+│   │   │   │   │   └── __tests__/          # Co-located tests
+│   │   │   │   └── lan/                    # Relay addressing & network discovery
+│   │   │   │       ├── index.ts            # LAN feature public API barrel
+│   │   │   │       ├── relay_address.service.ts # Production IP & QR resolver
+│   │   │   │       ├── lan_info.controller.ts # HTTP LAN discovery controller
+│   │   │   │       └── __tests__/          # Co-located tests
+│   │   │   └── platform/                   # Infrastructure & platform adapters
+│   │   │       ├── index.ts                # Platform public API barrel
+│   │   │       ├── config/                 # Zod environment parsing & validation
+│   │   │       ├── http/                   # HTTP server, routing, error envelope
+│   │   │       ├── socket/                 # Socket.io setup, rate limiting, logging
+│   │   │       ├── logger/                 # Structured Pino logger adapter
+│   │   │       ├── time/                   # SystemClock & UuidGenerator (MAJ-014)
+│   │   │       └── lifecycle/              # Graceful shutdown coordinator
+│   │   └── package.json
+│   │
+│   └── client/                             # Vue 3 + Vite Frontend
+│       ├── src/
+│       │   ├── main.ts                     # Client Composition Root & Bootstrap
+│       │   ├── App.vue                     # Shell root component
+│       │   ├── platform/                   # Browser I/O abstractions
+│       │   │   ├── di/                     # Vue DI tokens & useInject* helpers (MAJ-009)
+│       │   │   ├── api/                    # IApiClient & FetchApiClient
+│       │   │   ├── storage/                # KeyValueStorage & safe LocalStorage (CRIT-001)
+│       │   │   ├── audio/                  # IAudioService & WebAudioSynthesizer
+│       │   │   ├── telemetry/              # ILogger & ClientLogger
+│       │   │   ├── socket/                 # Typed Socket.IO client factory
+│       │   │   ├── hardware/               # Browser API abstractions (MAJ-012)
+│       │   │   │   ├── file_downloader.ts  # IFileDownloader
+│       │   │   │   ├── haptics.ts          # IHapticsService
+│       │   │   │   └── webrtc_discovery.ts # IWebRtcDiscovery
+│       │   │   └── index.ts                # Platform public barrel
+│       │   ├── features/                   # Client vertical slices
+│       │   │   ├── lobby/                  # Multiplayer lobby
+│       │   │   ├── board/                  # Chess board rendering & interactions
+│       │   │   ├── ai/                     # Bot engine & worker runner
+│       │   │   ├── puzzles/                # Daily puzzle runner & training
+│       │   │   ├── scenarios/              # Academy scenario runner
+│       │   │   ├── portability/            # QR sync, export/import
+│       │   │   └── pwa/                    # PWA installation & network status
+│       │   └── composables/                # Cross-cutting UI composables
+│       │       ├── useSocket.ts            # Socket lifecycle & multiplayer coordination
+│       │       ├── useChessGame.ts         # Shared reactive chess state
+│       │       ├── useTheme.ts             # Dark/Light theme switching
+│       │       └── useNotification.ts      # Toast notifications
+│       └── package.json
+```
+
+### 2.2 Barrel Export Rules & Enforcement (MAJ-010, MAJ-024)
+
+1. **Strict Single Entry Point**: Every feature and platform package MUST export its public symbols through `index.ts`.
+2. **Prohibition of Deep Imports**:
+   ```typescript
+   // ❌ FORBIDDEN: Deep imports into feature internals
+   import { registerRoomSocketHandlers } from "./features/rooms/room.socket_handler.js";
+   import { InMemoryRoomStore } from "./features/rooms/in_memory_room.store.js";
+   import { safeLocalStorage } from "@/platform/storage/safe_local_storage";
+
+   // ✅ MANDATORY: Import exclusively through public barrels
+   import { registerRoomSocketHandlers, InMemoryRoomStore } from "./features/rooms/index.js";
+   import { safeLocalStorage } from "@/platform/storage";
+   ```
+3. **Dead Code Elimination (MAJ-024)**:
+   - Deprecated `apps/server/src/features/lan/lan.service.ts` and its test suite are deleted.
+   - `apps/server/src/features/lan/index.ts` exports only `RelayAddressService`, `IRelayAddressService`, and `LanInfoController`.
+4. **Server Composition Root Standard**:
+   - `apps/server/src/index.ts` imports all dependencies from feature and platform barrels only:
+   ```typescript
+   import { loadServerConfig, ServerEnv } from "./platform/config/index.js";
+   import { PinoLogger, Logger } from "./platform/logger/index.js";
+   import { SystemClock, UuidGenerator } from "./platform/time/index.js";
+   import { RoomService, InMemoryRoomStore, registerRoomSocketHandlers } from "./features/rooms/index.js";
+   import { GameService, registerGameSocketHandlers } from "./features/game/index.js";
+   import { RelayAddressService, LanInfoController } from "./features/lan/index.js";
+   import { createHttpServer } from "./platform/http/index.js";
+   ```
+
+---
+
+## 3. System Abstractions: Time (`IClock`) & ID Generation (`IIdGenerator`) (MAJ-013, MAJ-014)
+
+### 3.1 Problem Analysis
+1. `apps/server/src/features/rooms/clock.ts` re-exported `SystemClock` and `UuidGenerator` from `platform/time/index.js`, violating Rule 3 (Dependency Direction: domain features importing platform infrastructure).
+2. Domain utility functions (`DefaultDictionaryMapper`, `mergeUnifiedProgress`) called `Date.now()` internally without accepting an explicit timestamp, causing non-deterministic outputs and varying CRC32 checksums (MAJ-013).
+
+### 3.2 Canonical Interface Contracts (`shared/src/contracts/system.ts`)
+
+```typescript
+/**
+ * Time abstraction for isolating system clock I/O.
+ * Enables deterministic testing of timeouts, TTLs, and timestamps.
+ */
+export interface IClock {
+  /** Returns the current timestamp in milliseconds since Unix epoch */
+  now(): number;
+}
+
+/**
+ * ID and randomness abstraction for isolating non-deterministic generation.
+ */
+export interface IIdGenerator {
+  /** Generates a unique string identifier (e.g. UUIDv4) */
+  generateId(): string;
+  /** Generates a pseudo-random integer between min (inclusive) and max (exclusive) */
+  generateRandomInt?(min: number, max: number): number;
+}
+```
+
+Both interfaces are exported directly from `@fun-chess/shared`:
+```typescript
+// shared/src/index.ts
+export * from "./contracts/system.js";
+```
+
+### 3.3 Platform Implementations (`apps/server/src/platform/time/clock.ts`)
+
+```typescript
+import { randomUUID, randomInt } from "node:crypto";
+import type { IClock, IIdGenerator } from "@fun-chess/shared";
+
+/**
+ * Production clock adapter backed by Date.now().
+ */
+export class SystemClock implements IClock {
+  public now(): number {
+    return Date.now();
+  }
+}
+
+/**
+ * Production ID generator adapter backed by node:crypto.
+ */
+export class UuidGenerator implements IIdGenerator {
+  public generateId(): string {
+    return randomUUID();
+  }
+
+  public generateRandomInt(min: number, max: number): number {
+    return randomInt(min, max);
+  }
+}
+```
+
+### 3.4 Test Doubles (`apps/server/src/platform/time/mock_clock.ts`)
+
+```typescript
+import type { IClock, IIdGenerator } from "@fun-chess/shared";
+
+export class MockClock implements IClock {
+  private currentTime: number;
+
+  constructor(initialTime: number = 1700000000000) {
+    this.currentTime = initialTime;
+  }
+
+  public now(): number {
+    return this.currentTime;
+  }
+
+  public advance(ms: number): void {
+    this.currentTime += ms;
+  }
+
+  public set(time: number): void {
+    this.currentTime = time;
+  }
+}
+
+export class MockIdGenerator implements IIdGenerator {
+  private counter: number = 0;
+  private predefinedIds: string[] = [];
+
+  constructor(predefinedIds: string[] = []) {
+    this.predefinedIds = predefinedIds;
+  }
+
+  public generateId(): string {
+    if (this.predefinedIds.length > 0) {
+      return this.predefinedIds.shift()!;
+    }
+    this.counter += 1;
+    return `test-id-${this.counter}`;
+  }
+
+  public generateRandomInt(min: number, _max: number): number {
+    return min;
+  }
+}
+```
+
+### 3.5 Pure Function Determinism Contract (MAJ-013)
+Pure utility and mapping functions in `@fun-chess/shared` must NEVER invoke `Date.now()` or `Math.random()`. The caller service must pass explicit timestamps:
+
+```typescript
+// ✅ MANDATORY: Explicit now timestamp passed as argument
+export function toCompact(payload: ExportPayload, now: number): CompactExport {
+  return {
+    v: payload.version,
+    t: now,
+    d: payload.data,
+  };
+}
+
+export function mergeUnifiedProgress(
+  local: UnifiedProgress,
+  remote: UnifiedProgress,
+  now: number,
+): MergeResult {
+  // Pure, deterministic computation
+}
 ```
 
 ---
 
-## 3. File Naming & Module Boundary Conventions
+## 4. RoomService / GameService Boundary Pattern (MAJ-017)
 
-### 3.1 File Naming Standards
-- **Interfaces / Contracts**: `{domain}.interface.ts` (e.g. `room.store.ts`, `api_client.interface.ts`, `audio.interface.ts`).
-- **Domain Services**: `{domain}.service.ts` (e.g. `room.service.ts`, `game.service.ts`).
-- **Store Implementations**: `in_memory_{domain}.store.ts` (server), `local_storage_{domain}.store.ts` (client).
-- **Socket Handlers**: `{domain}.socket_handler.ts` (e.g. `room.socket_handler.ts`).
-- **Vue Composables**: `use{Feature}.ts` in camelCase (e.g. `useBoardSelection.ts`, `useSocket.ts`).
-- **Vue Components**: `PascalCase.vue` (e.g. `AppViewRouter.vue`, `ChessBoard.vue`).
-- **Unit Tests**: `{name}.spec.ts` located adjacent to source file.
-- **Contract Tests**: `{name}.contract.spec.ts` in `tests/contracts/`.
-- **E2E Tests**: `{name}.e2e.spec.ts` in `apps/e2e/tests/`.
+### 4.1 Problem Analysis
+`GameService` in `apps/server/src/features/game/game.service.ts` directly accepted `RoomStore` in its constructor and performed raw store mutations (`this.store.mutate(...)`), bypassing `RoomService` boundaries and encapsulations.
 
-### 3.2 Module Boundary Encapsulation (MAJ-011)
-- **Public API Rule**: Every directory under `features/` and `platform/` MUST export an `index.ts`.
-- **No Deep Cross-Module Imports**:
-  ```typescript
-  // ❌ ILLEGAL: Bypassing feature public API (Causes circular dependencies & fragility)
-  import { ChessEngine } from "../game/chess_engine.js";
-  import { RoomStore } from "../rooms/room.store.js";
-  import { useConfetti } from "../../composables/useConfetti.js";
+### 4.2 Architectural Decoupling: Room Mutation Adapter Contract
 
-  // ✅ CORRECT: Importing strictly from module public entry point
-  import { ChessEngine } from "../game/index.js";
-  import { type RoomStore } from "../rooms/index.js";
-  import { useConfetti } from "@/platform/confetti/index.js";
-  ```
-- **Shared Package Independence**: `@fun-chess/shared` must never import from `apps/server` or `apps/client`.
-- **Server Features Independence (MAJ-004)**: `features/rooms` and `features/game` must not cross-import concrete classes. Shared concepts (`ChessEngine`, `AppError`, `RoomState`) belong in `@fun-chess/shared` or interact via defined service interfaces.
+```
+┌────────────────────────────────┐         ┌────────────────────────────────┐
+│          Game Feature          │         │         Rooms Feature          │
+│                                │         │                                │
+│  ┌──────────────────────────┐  │         │  ┌──────────────────────────┐  │
+│  │       GameService        │  │         │  │       RoomService        │  │
+│  │                          │  │         │  │                          │  │
+│  │  1. Validates chess move │  │         │  │ 1. Coordinates lock      │  │
+│  │  2. Calculates game state│──┼─────────┼─▶│ 2. Runs room.logic.ts    │  │
+│  │  3. Calls IRoomGame-     │  │  Calls  │  │ 3. Mutates RoomStore     │  │
+│  │     Adapter methods      │  │         │  │                          │  │
+│  └──────────────────────────┘  │         │  └─────────────┬────────────┘  │
+│                                │         │                │               │
+└────────────────────────────────┘         │                ▼               │
+                                           │  ┌──────────────────────────┐  │
+                                           │  │        RoomStore         │  │
+                                           │  └──────────────────────────┘  │
+                                           └────────────────────────────────┘
+```
 
----
-
-## 4. Interface Patterns
-
-### 4.1 Store / Repository Interface Pattern
-All data stores must be asynchronous and abstract away storage mechanisms.
+### 4.3 Interface Contract: `IRoomGameAdapter` (`apps/server/src/features/rooms/room.interface.ts`)
 
 ```typescript
-// apps/server/src/features/rooms/room.store.ts
-import type { RoomState, Player } from "@fun-chess/shared";
+import type { RoomState, GameOverPayload, GameState } from "@fun-chess/shared";
 
-export interface RoomStore {
-  /** Retrieves room by 4-letter code. Returns null if non-existent. */
-  findByCode(roomCode: string): Promise<RoomState | null>;
+/**
+ * Explicit contract exposed by the Rooms feature for Game execution.
+ * Prevents GameService from touching RoomStore directly (MAJ-017).
+ */
+export interface IRoomGameAdapter {
+  /**
+   * Retrieves a read-only snapshot of current room state.
+   */
+  getRoom(roomCode: string): Promise<RoomState>;
 
-  /** Saves or updates room state. Must support atomic concurrency control. */
-  save(room: RoomState): Promise<void>;
+  /**
+   * Applies an executed chess move and state update to the room under exclusive lock.
+   */
+  applyGameMove(
+    roomCode: string,
+    nextGameState: GameState,
+    gameOverPayload?: GameOverPayload,
+  ): Promise<RoomState>;
 
-  /** Deletes a room by code. */
-  delete(roomCode: string): Promise<boolean>;
+  /**
+   * Finalizes a match with an explicit game-over payload (resignation, timeout, draw).
+   */
+  finalizeGame(
+    roomCode: string,
+    gameOverPayload: GameOverPayload,
+  ): Promise<RoomState>;
 
-  /** Looks up room and player by active socketId. */
-  findBySocketId(socketId: string): Promise<{ room: RoomState; player: Player } | null>;
+  /**
+   * Records a proposed draw offer or response in the room state.
+   */
+  updateDrawOffer(
+    roomCode: string,
+    drawOffer: RoomState["drawOffer"],
+  ): Promise<RoomState>;
 
-  /** Returns total count of active rooms. */
-  count(): Promise<number>;
-
-  /** Prunes abandoned rooms older than maxAgeMs. */
-  pruneAbandonedRooms(maxAgeMs: number): Promise<string[]>;
-
-  /** Executes an isolated mutation inside a per-room async lock (CRIT-006) */
-  withRoomLock<T>(roomCode: string, action: (room: RoomState) => Promise<T>): Promise<T>;
+  /**
+   * Records a rematch proposal or acceptance in the room state.
+   */
+  updateRematch(
+    roomCode: string,
+    rematch: RoomState["rematch"],
+    newGameState?: GameState,
+  ): Promise<RoomState>;
 }
 ```
 
-### 4.2 Safe Key-Value Browser Storage Pattern (MAJ-006, CRIT-003)
-Isolates browser storage against Safari private mode exceptions and quota failures.
+### 4.4 `RoomService` Implementation of `IRoomGameAdapter`
+
+`RoomService` implements `IRoomGameAdapter`, ensuring all mutations pass through room lock management and version increments:
 
 ```typescript
-// apps/client/src/platform/storage/storage.interface.ts
-export interface KeyValueStorage {
-  getItem(key: string): Promise<string | null>;
-  setItem(key: string, value: string): Promise<void>;
-  removeItem(key: string): Promise<void>;
-  clear(): Promise<void>;
-}
+export class RoomService implements IRoomService, IRoomGameAdapter {
+  // ...
 
-// apps/client/src/platform/storage/browser_storage_adapter.ts
-export class BrowserStorageAdapter implements KeyValueStorage {
-  constructor(private readonly storageType: "localStorage" | "sessionStorage") {}
-
-  private get store(): Storage | null {
-    try {
-      if (typeof window === "undefined") return null;
-      return window[this.storageType];
-    } catch {
-      return null; // Restricted environment (Safari Private, cross-origin iframe)
-    }
-  }
-
-  async getItem(key: string): Promise<string | null> {
-    try {
-      return this.store?.getItem(key) ?? null;
-    } catch {
-      return null;
-    }
-  }
-
-  async setItem(key: string, value: string): Promise<void> {
-    try {
-      this.store?.setItem(key, value);
-    } catch (err) {
-      if (err instanceof DOMException && (err.name === "QuotaExceededError" || err.code === 22)) {
-        throw new StorageQuotaExceededError(`Storage quota exceeded for ${this.storageType}`, { cause: err });
-      }
-      throw new StorageUnavailableError(`Failed to access ${this.storageType}`, { cause: err });
-    }
-  }
-
-  async removeItem(key: string): Promise<void> {
-    try {
-      this.store?.removeItem(key);
-    } catch {
-      // Safe no-op
-    }
-  }
-
-  async clear(): Promise<void> {
-    try {
-      this.store?.clear();
-    } catch {
-      // Safe no-op
-    }
-  }
-}
-```
-
-### 4.3 Audio Service Interface Pattern (MAJ-008, MAJ-009)
-Abstracts Web Audio API so modules can be imported and tested without browser DOM side effects.
-
-```typescript
-// apps/client/src/platform/audio/audio.interface.ts
-export interface IAudioService {
-  /** Plays tactical game move sound effect */
-  playMove(): void;
-  /** Plays capture sound effect */
-  playCapture(): void;
-  /** Plays check alert sound */
-  playCheck(): void;
-  /** Plays game victory fanfare */
-  playVictory(): void;
-  /** Plays defeat sound */
-  playDefeat(): void;
-  /** Toggles global audio mute */
-  toggleMute(): boolean;
-  /** Audio mute status */
-  isMuted(): boolean;
-}
-
-// apps/client/src/platform/audio/null_audio_service.ts
-export class NullAudioService implements IAudioService {
-  playMove(): void {}
-  playCapture(): void {}
-  playCheck(): void {}
-  playVictory(): void {}
-  playDefeat(): void {}
-  toggleMute(): boolean { return false; }
-  isMuted(): boolean { return true; }
-}
-```
-
----
-
-## 5. Concurrency Control Pattern (CRIT-006)
-
-To prevent lost updates between concurrent moves, resignations, draw acceptances, and disconnections, `InMemoryRoomStore` must serialize mutations per `roomCode` using a mutex queue.
-
-```typescript
-// apps/server/src/features/rooms/in_memory_room.store.ts
-export class InMemoryRoomStore implements RoomStore {
-  private readonly rooms = new Map<string, RoomState>();
-  private readonly lockQueues = new Map<string, Promise<unknown>>();
-
-  public async withRoomLock<T>(roomCode: string, action: (room: RoomState) => Promise<T>): Promise<T> {
+  public async applyGameMove(
+    roomCode: string,
+    nextGameState: GameState,
+    gameOverPayload?: GameOverPayload,
+  ): Promise<RoomState> {
     const code = roomCode.toUpperCase();
-    const currentLock = this.lockQueues.get(code) || Promise.resolve();
+    return this.store.mutate(code, async (room) => {
+      const now = this.clock.now();
+      return applyGameMoveTransition(room, nextGameState, gameOverPayload, now);
+    });
+  }
 
-    let resolveNext: () => void;
-    const nextLock = new Promise<void>((resolve) => { resolveNext = resolve; });
-    this.lockQueues.set(code, nextLock);
-
-    try {
-      await currentLock;
-      const room = await this.findByCode(code);
-      if (!room) throw new RoomNotFoundError(code);
-
-      const result = await action(room);
-      await this.save(room);
-      return result;
-    } finally {
-      resolveNext!();
-      if (this.lockQueues.get(code) === nextLock) {
-        this.lockQueues.delete(code);
-      }
-    }
+  public async finalizeGame(
+    roomCode: string,
+    gameOverPayload: GameOverPayload,
+  ): Promise<RoomState> {
+    const code = roomCode.toUpperCase();
+    return this.store.mutate(code, async (room) => {
+      const now = this.clock.now();
+      return finalizeGameTransition(room, gameOverPayload, now);
+    });
   }
 }
 ```
 
----
-
-## 6. Two-Phase Commit Storage Pattern (CRIT-003)
-
-In `LocalStorageUnifiedStore.overwriteAll`, atomic transactional integrity is required to protect against quota exhaustion and partial writes:
-
-```mermaid
-graph TD
-    A[Start overwriteAll] --> B[Phase 1: Create Backup Snapshot]
-    B --> C[Attempt Write New Scenario Progress]
-    C -->|Success| D[Attempt Write New Puzzle Progress]
-    D -->|Success| E[Attempt Write New Theme Mastery & Stats]
-    E -->|Success| F[Commit Complete: Clear Snapshot]
-    C -->|Error| R[Rollback: Restore Backup Snapshot]
-    D -->|Error| R
-    E -->|Error| R
-    R --> G[Log Warning & Re-throw StorageRollbackError]
-```
+### 4.5 `GameService` Constructor Refactoring (`apps/server/src/features/game/game.service.ts`)
 
 ```typescript
-// apps/client/src/features/portability/store/local_storage_unified.store.ts
-public async overwriteAll(progress: UnifiedProgress): Promise<void> {
-  // Phase 1: Snapshot current state before executing any destructive operations
-  const snapshot = await this.exportAll();
-
-  try {
-    // Stage updates
-    await this.scenarioStore.resetAllProgress();
-    for (const [id, item] of Object.entries(progress.scenarios)) {
-      await this.scenarioStore.saveProgress(id, item);
-    }
-    await this.puzzleStore.importAllProgress(progress.puzzles);
-    await this.saveThemeMastery(progress.themeMastery);
-    await this.saveArcadeStats(progress.arcadeStats);
-  } catch (err) {
-    // Phase 2: Rollback to snapshot on ANY failure
-    try {
-      await this.restoreFromSnapshot(snapshot);
-    } catch (rollbackErr) {
-      console.error("FATAL: Failed to restore snapshot during rollback", rollbackErr);
-    }
-    throw new StorageRollbackError("Failed to overwrite progress; rolled back to previous state", { cause: err });
-  }
-}
-```
-
----
-
-## 7. Error Handling Patterns
-
-### 7.1 Custom Domain Error Hierarchy (`shared/src/contracts/errors.ts`)
-```typescript
-import { ErrorCode } from "./errors.js";
-
-export abstract class AppError extends Error {
-  public readonly isAppError = true;
-
+export class GameService implements IGameService {
   constructor(
-    public readonly code: ErrorCode,
-    message: string,
-    public readonly statusCode: number = 400,
-    public readonly details?: Record<string, unknown>,
-    public readonly cause?: Error
-  ) {
-    super(message);
-    this.name = this.constructor.name;
-    Object.setPrototypeOf(this, new.target.prototype);
+    private readonly roomAdapter: IRoomGameAdapter,
+    private readonly clock: IClock,
+    private readonly idGenerator: IIdGenerator,
+    private readonly sessionRegistry?: SessionRegistry,
+  ) {}
+
+  public async makeMove(
+    req: MakeMoveRequest,
+    socketId: string,
+  ): Promise<MoveApplicationResult> {
+    const room = await this.roomAdapter.getRoom(req.roomCode);
+
+    if (room.status !== "playing") {
+      throw new GameNotActiveError(room.status);
+    }
+
+    const player = this.getPlayerBySocketId(room, socketId);
+    if (!player) {
+      throw new PlayerNotInRoomError(socketId);
+    }
+
+    if (player.color !== room.game.turn) {
+      throw new NotYourTurnError();
+    }
+
+    // Pure chess move validation via ChessEngine
+    const outcome = ChessEngine.validateAndApplyMove(
+      room.game.fen,
+      req.move,
+      player.color,
+      room.game.moveHistory,
+    );
+
+    if (!outcome.success) {
+      throw new InvalidMoveError(outcome.error);
+    }
+
+    // Determine game over payload if checkmate or draw
+    const gameOverPayload = this.evaluateGameOver(room, outcome.nextState, player);
+
+    // Persist through the RoomService adapter (no direct store access!)
+    const updatedRoom = await this.roomAdapter.applyGameMove(
+      room.roomCode,
+      outcome.nextState,
+      gameOverPayload,
+    );
+
+    return {
+      success: true,
+      moveResult: outcome.moveResult,
+      gameState: updatedRoom.game,
+      gameOverPayload,
+      checkInfo: this.evaluateCheck(outcome.nextState),
+    };
   }
-}
-
-export class RoomNotFoundError extends AppError {
-  constructor(roomCode: string) {
-    super("ERR_ROOM_NOT_FOUND", `Room with code '${roomCode}' does not exist`, 404, { roomCode });
-  }
-}
-
-export class RoomFullError extends AppError {
-  constructor(roomCode: string) {
-    super("ERR_ROOM_FULL", `Room '${roomCode}' already has 2 active players`, 409, { roomCode });
-  }
-}
-
-export class InvalidMoveError extends AppError {
-  constructor(reason: string, details?: Record<string, unknown>) {
-    super("ERR_INVALID_MOVE", `Illegal chess move: ${reason}`, 422, details);
-  }
-}
-
-export class RateLimitExceededError extends AppError {
-  constructor(message: string = "Rate limit exceeded. Please wait.", details?: Record<string, unknown>) {
-    super("ERR_RATE_LIMITED", message, 429, details);
-  }
-}
-
-export class UnauthorizedError extends AppError {
-  constructor(message: string = "Invalid or expired session credentials") {
-    super("ERR_UNAUTHORIZED", message, 401);
-  }
-}
-```
-
-### 7.2 Zero-Tolerance Empty Catch Block Rule (MAJ-025)
-Every `catch` block must either rethrow or record structured diagnostics:
-
-```typescript
-// ❌ REJECTED: Silent failure causes diagnostic blindness
-try {
-  const parsed = JSON.parse(data);
-} catch {}
-
-// ✅ COMPLIANT: Structured fallback with diagnostic observability
-try {
-  const parsed = JSON.parse(data);
-} catch (err) {
-  logger.warn("Failed to parse progress JSON payload, falling back to default", {
-    operation: "parse_progress",
-    error: err instanceof Error ? err.message : String(err),
-  });
-  return DEFAULT_PROGRESS;
 }
 ```
 
 ---
 
-## 8. Logging & Observability Patterns
+## 5. Pure Room State Transition Logic (`room.logic.ts`) (MAJ-015)
 
-### 8.1 Universal 3-Point Operation Logging Mandate
-Every operation entry point (Socket event, HTTP route, background job) MUST log 3 points:
-1. **Start**: `{ operation, correlationId, [userId/socketId], payload }`
-2. **Success**: `{ operation, correlationId, duration, status: "success" }`
-3. **Failure**: `{ operation, correlationId, duration, status: "failed", error }`
+### 5.1 Architecture: Fetch → Calculate → Persist
 
-### 8.2 Background Job Logging Helper (MAJ-017)
+In accordance with Rule 2 (Pure Business Logic), all room state transitions, player color assignments, spectator promotions, and status mutations are extracted from `RoomService` into `apps/server/src/features/rooms/room.logic.ts`.
+
+```
+                  ┌─────────────────────────────────────┐
+                  │ 1. FETCH: RoomService acquires      │
+                  │    RoomState from RoomStore under   │
+                  │    exclusive lock                   │
+                  └──────────────────┬──────────────────┘
+                                     │
+                                     ▼
+                  ┌─────────────────────────────────────┐
+                  │ 2. CALCULATE: Pure function in      │
+                  │    room.logic.ts calculates         │
+                  │    nextRoom without side effects    │
+                  └──────────────────┬──────────────────┘
+                                     │
+                                     ▼
+                  ┌─────────────────────────────────────┐
+                  │ 3. PERSIST: RoomService commits     │
+                  │    nextRoom to RoomStore & triggers │
+                  │    events/timers                    │
+                  └─────────────────────────────────────┘
+```
+
+### 5.2 Characteristics of `room.logic.ts`:
+- **100% Pure Functions**: No `async`, no `Promise`, no I/O, no network, no database/store access.
+- **Deterministic**: Accepts all timestamps (`now: number`), generated IDs, and player inputs as arguments.
+- **Immutable Updates**: Returns a new `RoomState` object without mutating the input state.
+- **Zero Platform Dependencies**: Imports domain types strictly from `@fun-chess/shared`.
+
+### 5.3 Pure Function Specifications (`apps/server/src/features/rooms/room.logic.ts`)
+
 ```typescript
-// apps/server/src/platform/logger/job_runner.ts
-export async function runLoggedJob<T>(
-  logger: Logger,
-  operation: string,
-  jobFn: (correlationId: string) => Promise<T>
-): Promise<T> {
-  const correlationId = randomUUID();
-  const startTime = performance.now();
+import {
+  RoomState,
+  Player,
+  PieceColor,
+  GameOverPayload,
+  createInitialGameState,
+  createGameOverPayload,
+  RoomFullError,
+  UnauthorizedError,
+  PlayerNotInRoomError,
+} from "@fun-chess/shared";
 
-  logger.info(`Background job started: ${operation}`, {
-    operation,
-    correlationId,
-    timestamp: new Date().toISOString(),
-  });
-
-  try {
-    const result = await jobFn(correlationId);
-    const duration = Math.round(performance.now() - startTime);
-
-    logger.info(`Background job succeeded: ${operation}`, {
-      operation,
-      correlationId,
-      duration,
-      status: "success",
-      result: typeof result === "object" ? result : { count: result },
-    });
-
-    return result;
-  } catch (err: unknown) {
-    const duration = Math.round(performance.now() - startTime);
-
-    logger.error(`Background job failed: ${operation}`, {
-      operation,
-      correlationId,
-      duration,
-      status: "failed",
-      error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
-    });
-
-    throw err;
-  }
+/**
+ * Creates initial RoomState for a new host player.
+ */
+export function createInitialRoomState(params: {
+  roomCode: string;
+  hostPlayer: Player;
+  createdAt: number;
+}): RoomState {
+  return {
+    roomCode: params.roomCode,
+    status: "lobby",
+    hostId: params.hostPlayer.id,
+    createdAt: params.createdAt,
+    lastActivityAt: params.createdAt,
+    version: 1,
+    whitePlayer: params.hostPlayer.color === "w" ? params.hostPlayer : null,
+    blackPlayer: params.hostPlayer.color === "b" ? params.hostPlayer : null,
+    spectators: [],
+    game: createInitialGameState(),
+    drawOffer: null,
+    rematch: null,
+  };
 }
-```
 
-### 8.3 Context Standardization (MIN-015)
-- Execution time field is named **`duration`** (in integer milliseconds). Do NOT use `durationMs` or `timeTaken`.
-- Authenticated user ID is mapped to **`userId`**.
+/**
+ * Evaluates player color preference and assigns colors for a new room.
+ */
+export function assignPlayerColors(preferredColor?: PieceColor | "random", randomInt?: number): {
+  hostColor: PieceColor;
+  guestColor: PieceColor;
+} {
+  if (preferredColor === "w") return { hostColor: "w", guestColor: "b" };
+  if (preferredColor === "b") return { hostColor: "b", guestColor: "w" };
+  
+  const isWhite = (randomInt ?? 0) % 2 === 0;
+  return isWhite
+    ? { hostColor: "w", guestColor: "b" }
+    : { hostColor: "b", guestColor: "w" };
+}
 
----
+/**
+ * Pure transition adding a player or spectator to an existing room.
+ */
+export function addPlayerToRoom(
+  room: RoomState,
+  player: Player,
+  asSpectator: boolean,
+  now: number,
+): { nextRoom: RoomState; assignedColor?: PieceColor; isSpectator: boolean } {
+  if (asSpectator) {
+    return {
+      nextRoom: {
+        ...room,
+        spectators: [...room.spectators, player],
+        lastActivityAt: now,
+      },
+      isSpectator: true,
+    };
+  }
 
-## 9. Dependency Injection & Composition Root Patterns
+  // Active player joining
+  if (room.whitePlayer && room.blackPlayer) {
+    throw new RoomFullError(room.roomCode);
+  }
 
-### 9.1 Rules of Dependency Injection
-1. **Pure Constructor Injection**: All classes accept dependencies via constructors as interfaces (`RoomStore`, `Logger`, `IApiClient`).
-2. **No Default Constructor Parameters**: Default parameters (`store = new InMemoryRoomStore()`) hide coupling and cause state leakage between test runs.
-3. **No Mutable Module Singletons (MAJ-010)**: Eliminate exported mutable module-level instances.
-4. **Composition Root Wires Main**: `apps/server/src/index.ts` and `apps/client/src/main.ts` are the ONLY files permitted to instantiate concrete classes and wire them together.
+  let assignedColor: PieceColor;
+  let nextWhite = room.whitePlayer;
+  let nextBlack = room.blackPlayer;
 
-### 9.2 Server Composition Root (`apps/server/src/index.ts`)
-```typescript
-// Step 1: Validate Environment
-const env = loadServerConfig(process.env);
+  if (!nextWhite) {
+    assignedColor = "w";
+    nextWhite = { ...player, color: "w" };
+  } else {
+    assignedColor = "b";
+    nextBlack = { ...player, color: "b" };
+  }
 
-// Step 2: Initialize Logger
-const logger = new PinoLogger(env.LOG_LEVEL);
-
-// Step 3: Instantiate Stores & Registries
-const roomStore = new InMemoryRoomStore();
-const sessionRegistry = new InMemorySessionRegistry();
-const rateLimiter = new SocketRateLimiter(60_000, 100);
-
-// Step 4: Instantiate Services
-const addressService = new RelayAddressService(env);
-const gameService = new GameService(roomStore);
-const roomService = new RoomService(roomStore, sessionRegistry);
-
-// Step 5: Wire Ingress Infrastructure
-const { server, handleRequest } = createHttpServer({
-  port: env.PORT,
-  logger,
-  roomStore,
-  addressService,
-  allowedOrigins: resolveAllowedOrigins(env),
-});
-
-const io = createSocketServer({
-  server,
-  roomService,
-  gameService,
-  logger,
-  rateLimiter,
-  allowedOrigins: resolveAllowedOrigins(env),
-});
-
-// Step 6: Process Crash Guards (CRIT-002)
-server.on("error", (err: Error) => {
-  logger.fatal("HTTP server fatal socket error", { error: { name: err.name, message: err.message, stack: err.stack } });
-  process.exit(1);
-});
-
-process.on("unhandledRejection", (reason: unknown) => {
-  logger.error("Unhandled promise rejection", { error: reason instanceof Error ? { name: reason.name, message: reason.message, stack: reason.stack } : { raw: reason } });
-});
-
-process.on("uncaughtException", (err: Error) => {
-  logger.fatal("Uncaught exception, initiating emergency shutdown", { error: { name: err.name, message: err.message, stack: err.stack } });
-  process.exit(1);
-});
-```
-
-### 9.3 Test Harness Server Wiring (`tests/helpers/test_server.ts`) (CRIT-004)
-The shadow server is eliminated. `createTestServer` instantiates and wires real production classes with an ephemeral port (`port: 0`):
-
-```typescript
-export async function createTestServer(): Promise<TestServerInstance> {
-  const logger = new NullLogger();
-  const roomStore = new InMemoryRoomStore();
-  const sessionRegistry = new InMemorySessionRegistry();
-  const rateLimiter = new SocketRateLimiter(60_000, 1000);
-  const addressService = new RelayAddressService({ NODE_ENV: "test", PORT: 0 });
-  const gameService = new GameService(roomStore);
-  const roomService = new RoomService(roomStore, sessionRegistry);
-
-  const { server } = createHttpServer({
-    port: 0,
-    logger,
-    roomStore,
-    addressService,
-    allowedOrigins: ["*"],
-  });
-
-  const io = createSocketServer({
-    server,
-    roomService,
-    gameService,
-    logger,
-    rateLimiter,
-    allowedOrigins: ["*"],
-  });
-
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address() as net.AddressInfo;
-  const port = address.port;
-  const url = `http://127.0.0.1:${port}`;
+  const bothPlayersPresent = nextWhite !== null && nextBlack !== null;
+  const nextStatus = bothPlayersPresent && room.status === "lobby" ? "playing" : room.status;
 
   return {
-    server,
-    io,
-    port,
-    url,
-    roomStore,
-    close: async () => {
-      io.close();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+    nextRoom: {
+      ...room,
+      status: nextStatus,
+      whitePlayer: nextWhite,
+      blackPlayer: nextBlack,
+      lastActivityAt: now,
     },
+    assignedColor,
+    isSpectator: false,
+  };
+}
+
+/**
+ * Pure transition updating room state when a player disconnects.
+ */
+export function disconnectPlayerTransition(
+  room: RoomState,
+  playerId: string,
+  now: number,
+): { nextRoom: RoomState; paused: boolean } {
+  let paused = false;
+  let nextStatus = room.status;
+  let nextWhite = room.whitePlayer;
+  let nextBlack = room.blackPlayer;
+
+  if (nextWhite?.id === playerId) {
+    nextWhite = { ...nextWhite, isConnected: false };
+    if (room.status === "playing") {
+      nextStatus = "paused_disconnect";
+      paused = true;
+    }
+  } else if (nextBlack?.id === playerId) {
+    nextBlack = { ...nextBlack, isConnected: false };
+    if (room.status === "playing") {
+      nextStatus = "paused_disconnect";
+      paused = true;
+    }
+  }
+
+  return {
+    nextRoom: {
+      ...room,
+      status: nextStatus,
+      whitePlayer: nextWhite,
+      blackPlayer: nextBlack,
+      spectators: room.spectators.filter((s) => s.id !== playerId),
+      lastActivityAt: now,
+    },
+    paused,
+  };
+}
+
+/**
+ * Pure transition reconnecting an authenticated player with a new socket ID.
+ */
+export function reconnectPlayerTransition(
+  room: RoomState,
+  playerId: string,
+  newSocketId: string,
+  now: number,
+): { nextRoom: RoomState; unpaused: boolean } {
+  let unpaused = false;
+  let nextWhite = room.whitePlayer;
+  let nextBlack = room.blackPlayer;
+
+  if (nextWhite?.id === playerId) {
+    nextWhite = { ...nextWhite, socketId: newSocketId, isConnected: true };
+  } else if (nextBlack?.id === playerId) {
+    nextBlack = { ...nextBlack, socketId: newSocketId, isConnected: true };
+  } else {
+    throw new PlayerNotInRoomError(newSocketId);
+  }
+
+  let nextStatus = room.status;
+  if (
+    room.status === "paused_disconnect" &&
+    nextWhite?.isConnected &&
+    nextBlack?.isConnected
+  ) {
+    nextStatus = "playing";
+    unpaused = true;
+  }
+
+  return {
+    nextRoom: {
+      ...room,
+      status: nextStatus,
+      whitePlayer: nextWhite,
+      blackPlayer: nextBlack,
+      lastActivityAt: now,
+    },
+    unpaused,
+  };
+}
+
+/**
+ * Pure transition removing a leaving player from the room.
+ */
+export function leaveRoomTransition(
+  room: RoomState,
+  playerId: string,
+  now: number,
+): {
+  nextRoom: RoomState;
+  shouldDelete: boolean;
+  gameOverPayload?: GameOverPayload;
+} {
+  const isWhite = room.whitePlayer?.id === playerId;
+  const isBlack = room.blackPlayer?.id === playerId;
+
+  if (!isWhite && !isBlack) {
+    return {
+      nextRoom: {
+        ...room,
+        spectators: room.spectators.filter((s) => s.id !== playerId),
+        lastActivityAt: now,
+      },
+      shouldDelete: false,
+    };
+  }
+
+  // Active game in progress: resigning player forfeits match
+  if (room.status === "playing" || room.status === "paused_disconnect") {
+    const winnerColor: PieceColor = isWhite ? "b" : "w";
+    const winnerPlayer = isWhite ? room.blackPlayer : room.whitePlayer;
+
+    const gameOverPayload = createGameOverPayload({
+      winner: winnerColor,
+      winnerName: winnerPlayer?.name || (winnerColor === "w" ? "White" : "Black"),
+      reason: "resignation",
+      finalFen: room.game.fen,
+      totalMoves: room.game.moveCount,
+      startTimeMs: room.createdAt,
+    });
+
+    return {
+      nextRoom: {
+        ...room,
+        status: "game_over",
+        whitePlayer: isWhite ? null : room.whitePlayer,
+        blackPlayer: isBlack ? null : room.blackPlayer,
+        lastActivityAt: now,
+      },
+      shouldDelete: false,
+      gameOverPayload,
+    };
+  }
+
+  // In lobby or game over: check if room is completely empty
+  const remainingPlayer = isWhite ? room.blackPlayer : room.whitePlayer;
+  const shouldDelete = remainingPlayer === null && room.spectators.length === 0;
+
+  return {
+    nextRoom: {
+      ...room,
+      whitePlayer: isWhite ? null : room.whitePlayer,
+      blackPlayer: isBlack ? null : room.blackPlayer,
+      lastActivityAt: now,
+    },
+    shouldDelete,
   };
 }
 ```
 
 ---
 
-## 10. Skeleton Feature Directory Reference
+## 6. Logging Conventions & Observability Mandate
 
-Below is the standard blueprint for a vertical feature module (`features/rooms`):
+### 6.1 Mandatory 3-Point Structured Logging Pattern
+
+Every operation entry point (HTTP handler, Socket handler, client action, background job, database transaction) MUST include three structured log events:
 
 ```
-features/rooms/
-├── index.ts                     # Public API exports ONLY
-├── room.interface.ts            # Public feature contracts & interfaces
-├── room.service.ts              # Business logic & room lifecycle orchestrator
-├── room.store.ts                # Storage abstraction contract
-├── in_memory_room.store.ts      # Concrete in-memory store implementation
-├── session.registry.ts          # Private session credential registry
-├── room.socket_handler.ts       # Socket event registration & dispatch
-└── __tests__/
-    ├── room.service.spec.ts     # Unit tests with MockRoomStore
-    └── in_memory_room.store.spec.ts # Concurrency & lock unit tests
+[Start Entry Point]  ──▶  info/debug: operation, correlationId, actor/ip
+        │
+   [Execution]
+        │
+   ┌────┴──────────────────────────┐
+   ▼                               ▼
+[Success]                       [Failure]
+info: operation, correlationId, error/warn: operation, correlationId,
+duration, durationMs, result    duration, error object (stack, code)
 ```
 
-### Reference Implementation Code:
+### 6.2 Invariant Message Templates (MIN-012)
 
-#### `room.interface.ts`
+Log messages MUST be static string templates. NEVER interpolate dynamic variables into the message string:
+
 ```typescript
-import type { RoomState, CreateRoomRequest, JoinRoomRequest, Player } from "@fun-chess/shared";
+// ❌ REJECTED: High-cardinality dynamic message string
+logger.info(`Player ${playerId} joined room ${roomCode} with color ${color}`);
 
-export interface IRoomService {
-  createRoom(req: CreateRoomRequest, socketId: string): Promise<{ room: RoomState; sessionToken: string; player: Player }>;
-  joinRoom(req: JoinRoomRequest, socketId: string): Promise<{ room: RoomState; sessionToken: string; player: Player }>;
-  reconnect(roomCode: string, playerId: string, sessionToken: string, newSocketId: string): Promise<{ room: RoomState; player: Player }>;
-  leaveRoom(roomCode: string, socketId: string): Promise<{ room: RoomState; leftPlayer: Player }>;
+// ✅ APPROVED: Static invariant message template + structured context object
+logger.info("Player joined room", {
+  operation: "room_player_joined",
+  correlationId,
+  roomCode,
+  playerId,
+  color,
+  duration,
+});
+```
+
+### 6.3 Mandatory Context Fields
+
+| Field | Type | Description | Mandatory On |
+|---|---|---|---|
+| `operation` | `string` | Lowercase snake_case identifier (e.g. `room_create`, `socket_move`) | All 3 points |
+| `correlationId` | `string` | UUID tracing identifier across services | All 3 points |
+| `duration` | `number` | Elapsed time in milliseconds (`Math.round(performance.now() - start)`) | Success & Failure |
+| `userId` / `playerId` | `string` | Authenticated actor identifier | When available |
+| `clientIp` | `string` | Remote network IP address | Ingress handlers |
+| `error` | `object` | Sanitized error object with `message`, `code`, and `stack` | Failure point |
+
+### 6.4 Client Socket Action 3-Point Instrumentation (MAJ-019, MIN-014)
+
+Every public method in `apps/client/src/composables/useSocket.ts` (`createRoom`, `joinRoom`, `makeMove`, `resign`, `offerDraw`, `respondDraw`, `leaveRoom`, `requestRematch`) MUST log start, success, and failure with a correlation ID:
+
+```typescript
+export async function makeMove(move: string): Promise<boolean> {
+  const correlationId = generateCorrelationId();
+  const startTime = performance.now();
+  const logger = useInjectLogger();
+
+  logger.debug("Executing client socket move", {
+    operation: "client_socket_make_move",
+    correlationId,
+    roomCode: currentRoom.value?.roomCode,
+    move,
+  });
+
+  try {
+    const result = await emitWithTimeout<MakeMoveRequest, MakeMoveResponse>(
+      "game:move",
+      { roomCode: currentRoom.value!.roomCode, move },
+      8000,
+      correlationId,
+    );
+
+    const duration = Math.round(performance.now() - startTime);
+    logger.info("Client socket move succeeded", {
+      operation: "client_socket_make_move",
+      correlationId,
+      roomCode: currentRoom.value?.roomCode,
+      duration,
+      durationMs: duration,
+    });
+
+    return true;
+  } catch (err) {
+    const duration = Math.round(performance.now() - startTime);
+    logger.warn("Client socket move failed", {
+      operation: "client_socket_make_move",
+      correlationId,
+      roomCode: currentRoom.value?.roomCode,
+      duration,
+      durationMs: duration,
+      error: err instanceof Error ? { message: err.message } : { raw: err },
+    });
+    return false;
+  }
 }
 ```
 
-#### `index.ts`
+### 6.5 Zero Direct Console Logging Mandate (MAJ-023)
+
+Direct invocations of `console.log`, `console.warn`, `console.info`, and `console.error` in production feature code are strictly prohibited. All log emissions must route through `ILogger`.
+
 ```typescript
-/**
- * Public API for features/rooms.
- * Cross-module callers must import exclusively from this file.
- */
-export type { IRoomService } from "./room.interface.js";
-export type { RoomStore } from "./room.store.js";
-export { RoomService } from "./room.service.js";
-export { InMemoryRoomStore } from "./in_memory_room.store.js";
-export { registerRoomSocketHandlers } from "./room.socket_handler.js";
+// ❌ REJECTED: Direct console call
+console.warn("WebRTC discovery failed", error);
+
+// ✅ APPROVED: Structured logger call
+logger.warn("WebRTC discovery failed", {
+  operation: "lan_webrtc_discovery",
+  error: error instanceof Error ? error.message : String(error),
+});
 ```
+
+### 6.6 Telemetry Sanitization & PII Scrubbing (MAJ-021, MAJ-022, ENH-007)
+
+1. **URL Query String Stripping (MAJ-021)**: In `FetchApiClient`, URLs must have their query strings stripped before emitting log records:
+   ```typescript
+   const sanitizedUrl = fullUrl.split("?")[0];
+   logger.info("HTTP request completed", {
+     operation: "http_request",
+     url: sanitizedUrl,
+     status: response.status,
+     duration,
+   });
+   ```
+2. **Background Job Result Sanitization (MAJ-022)**: All job results passed to `runLoggedJob` must be scrubbed using `sanitizePayload`:
+   ```typescript
+   const sanitizedResult = sanitizePayload(result);
+   logger.info("Background job completed", {
+     operation: jobName,
+     duration,
+     result: sanitizedResult,
+   });
+   ```
+3. **Sensitive Key Expansion (ENH-007)**: Redaction regular expression in `ClientLogger` and `PinoLogger` must include:
+   ```typescript
+   export const SENSITIVE_KEY_REGEX =
+     /password|token|sessionToken|secret|key|authorization|bearer|cookie|apiKey|credential/i;
+   ```
+
+---
+
+## 7. Client Dependency Injection Pattern (`useInject*`) (MAJ-009, MAJ-012)
+
+### 7.1 Problem Analysis
+Components (`App.vue`) and composables previously directly imported module-level singletons (`apiClient`, `safeLocalStorage`, `audioSynthesizer`, `logger`), bypassing Vue's `provide`/`inject` system and forcing unit tests to employ `vi.mock` monkey-patching.
+
+### 7.2 Injection Token Registry (`apps/client/src/platform/di/tokens.ts`)
+
+```typescript
+import type { InjectionKey } from "vue";
+import type { IApiClient } from "../api/api_client.interface";
+import type { KeyValueStorage } from "../storage/key_value_storage";
+import type { IAudioService } from "../audio/audio.interface";
+import type { ILogger } from "../telemetry";
+import type { IFileDownloader, IHapticsService, IWebRtcDiscovery } from "../hardware";
+import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from "@fun-chess/shared";
+
+export const API_CLIENT_KEY: InjectionKey<IApiClient> = Symbol("API_CLIENT");
+export const STORAGE_KEY: InjectionKey<KeyValueStorage> = Symbol("STORAGE");
+export const SESSION_STORAGE_KEY: InjectionKey<KeyValueStorage> = Symbol("SESSION_STORAGE");
+export const AUDIO_SERVICE_KEY: InjectionKey<IAudioService> = Symbol("AUDIO_SERVICE");
+export const LOGGER_KEY: InjectionKey<ILogger> = Symbol("LOGGER");
+export const SCENARIO_STORE_KEY: InjectionKey<ScenarioProgressStore> = Symbol("SCENARIO_STORE");
+export const PUZZLE_STORE_KEY: InjectionKey<PuzzleProgressStore> = Symbol("PUZZLE_STORE");
+export const PROGRESS_STORAGE_KEY: InjectionKey<ProgressStorage> = Symbol("PROGRESS_STORAGE");
+
+// Hardware & Browser API tokens (MAJ-012)
+export const FILE_DOWNLOADER_KEY: InjectionKey<IFileDownloader> = Symbol("FILE_DOWNLOADER");
+export const HAPTICS_KEY: InjectionKey<IHapticsService> = Symbol("HAPTICS");
+export const WEBRTC_DISCOVERY_KEY: InjectionKey<IWebRtcDiscovery> = Symbol("WEBRTC_DISCOVERY");
+```
+
+### 7.3 Injection Helpers with Fallbacks (`apps/client/src/platform/di/index.ts`)
+
+Every service provides a `useInjectX(fallback?: IX): IX` helper. If no dependency was provided upstream via `app.provide()`, the helper defaults to the platform singleton:
+
+```typescript
+import { inject } from "vue";
+import {
+  API_CLIENT_KEY,
+  STORAGE_KEY,
+  SESSION_STORAGE_KEY,
+  AUDIO_SERVICE_KEY,
+  LOGGER_KEY,
+  FILE_DOWNLOADER_KEY,
+  HAPTICS_KEY,
+  WEBRTC_DISCOVERY_KEY,
+} from "./tokens";
+import { apiClient as defaultApiClient } from "../api";
+import { safeLocalStorage, safeSessionStorage } from "../storage";
+import { audioSynthesizer as defaultAudioSynthesizer } from "../audio/audio_synthesizer";
+import { logger as defaultLogger } from "../telemetry";
+import { defaultFileDownloader, defaultHapticsService, defaultWebRtcDiscovery } from "../hardware";
+
+export function useInjectApiClient(fallback?: IApiClient): IApiClient {
+  return inject(API_CLIENT_KEY, fallback ?? defaultApiClient);
+}
+
+export function useInjectStorage(fallback?: KeyValueStorage): KeyValueStorage {
+  return inject(STORAGE_KEY, fallback ?? safeLocalStorage);
+}
+
+export function useInjectSessionStorage(fallback?: KeyValueStorage): KeyValueStorage {
+  return inject(SESSION_STORAGE_KEY, fallback ?? safeSessionStorage);
+}
+
+export function useInjectAudioService(fallback?: IAudioService): IAudioService {
+  return inject(AUDIO_SERVICE_KEY, fallback ?? defaultAudioSynthesizer);
+}
+
+export function useInjectLogger(fallback?: ILogger): ILogger {
+  return inject(LOGGER_KEY, fallback ?? defaultLogger);
+}
+
+export function useInjectFileDownloader(fallback?: IFileDownloader): IFileDownloader {
+  return inject(FILE_DOWNLOADER_KEY, fallback ?? defaultFileDownloader);
+}
+
+export function useInjectHaptics(fallback?: IHapticsService): IHapticsService {
+  return inject(HAPTICS_KEY, fallback ?? defaultHapticsService);
+}
+
+export function useInjectWebRtcDiscovery(fallback?: IWebRtcDiscovery): IWebRtcDiscovery {
+  return inject(WEBRTC_DISCOVERY_KEY, fallback ?? defaultWebRtcDiscovery);
+}
+```
+
+### 7.4 Consumer Rule for Components & Composables
+
+Components and composables MUST consume services exclusively through `useInject*`:
+
+```typescript
+// ❌ REJECTED: Direct singleton import
+import { safeLocalStorage } from "@/platform/storage";
+import { audioSynthesizer } from "@/platform/audio/audio_synthesizer";
+
+// ✅ APPROVED: Injected dependency with optional parameter override for tests
+export function useChessAudio(injectedAudio?: IAudioService) {
+  const audio = useInjectAudioService(injectedAudio);
+  
+  function playMoveSound() {
+    audio.play("move");
+  }
+  return { playMoveSound };
+}
+```
+
+---
+
+## 8. Reference Skeleton Feature Directory Layout
+
+The following skeleton serves as the gold standard for all vertical feature slices in `apps/server/src/features/`:
+
+```
+apps/server/src/features/example_feature/
+├── index.ts                     # Public API barrel (re-exports only public interfaces & services)
+├── example.interface.ts         # Domain contracts (IExampleService, IExampleStore)
+├── example.logic.ts             # 100% pure state transition functions (Fetch → Calculate → Persist)
+├── example.service.ts           # Orchestration service (DI constructor, I/O coordination)
+├── example.store.ts             # Store abstraction interface
+├── in_memory_example.store.ts   # Production store adapter
+├── mock_example.store.ts        # Test double store adapter
+├── example.socket_handler.ts    # Socket.IO ingress event registration
+├── example.errors.ts            # Domain error classes inheriting from AppError
+└── __tests__/                   # Co-located unit and integration tests
+    ├── example.logic.spec.ts    # Pure unit tests for logic functions (0 mocks, blazing fast)
+    ├── example.service.spec.ts  # Service tests with MockStore & MockClock
+    └── example.socket.spec.ts   # Socket integration tests
+```
+
+---
+
+## 9. Implementation Checklist by Scope Card
+
+### `SC-1-SHARED` (@backend-engineer)
+- [ ] Define `IClock` and `IIdGenerator` in `shared/src/contracts/system.ts`.
+- [ ] Ensure pure utilities (`toCompact`, `mergeUnifiedProgress`) take explicit `now: number` timestamps.
+
+### `SC-2-SERVER` (@tech-lead[server])
+- [ ] Extract pure transition functions from `RoomService` into `apps/server/src/features/rooms/room.logic.ts`.
+- [ ] Define `IRoomGameAdapter` in `apps/server/src/features/rooms/room.interface.ts`.
+- [ ] Implement `IRoomGameAdapter` on `RoomService`.
+- [ ] Refactor `GameService` to consume `IRoomGameAdapter` instead of `RoomStore`.
+- [ ] Delete deprecated `apps/server/src/features/lan/lan.service.ts` and update `lan/index.ts`.
+- [ ] Enforce barrel exports on `apps/server/src/index.ts`.
+- [ ] Co-locate unit tests for `platform/time` and feature logic.
+
+### `SC-3-CLIENT-CORE` (@tech-lead[client-core])
+- [ ] Expand DI tokens and helpers in `apps/client/src/platform/di` for hardware services (`IFileDownloader`, `IHapticsService`, `IWebRtcDiscovery`).
+- [ ] Instrument public actions in `useSocket.ts` with 3-point structured logging and correlation IDs.
+- [ ] Replace direct `console.*` calls across `useLanDiscovery.ts`, `useProgressSync.ts`, and core composables with `ILogger`.
+- [ ] Strip query strings in `FetchApiClient` before logging URLs.
+- [ ] Expand sensitive key redaction in `ClientLogger`.
+
+### `SC-4-CLIENT-FEATURES` (@tech-lead[client-features])
+- [ ] Refactor feature components and composables (`App.vue`, `usePuzzleRunner`, `useScenarioRunner`) to consume dependencies via `useInject*`.
+- [ ] Remove hardcoded singleton imports in features.
