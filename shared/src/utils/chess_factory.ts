@@ -7,11 +7,26 @@ export const DEFAULT_CHESS_FEN =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 /**
+ * Structured metadata accompanying ChessLogger warnings (ENH-008).
+ */
+export interface ChessLoggerMetadata {
+  readonly operation?: string;
+  readonly fen?: string;
+  readonly error?: string;
+  readonly [key: string]: unknown;
+}
+
+/**
  * Injectable logger interface for Chess factory and FEN loaders.
  * Adheres to Architectural Patterns Rule 1: I/O Isolation.
+ * Supports structured metadata parameter on warn (ENH-008).
  */
 export interface ChessLogger {
-  warn(message: string, ...args: unknown[]): void;
+  warn(
+    message: string,
+    meta?: ChessLoggerMetadata,
+    ...args: unknown[]
+  ): void;
 }
 
 /**
@@ -69,15 +84,27 @@ export function createSafeChess(
   try {
     const validation = validateFen(trimmed);
     if (!validation.ok) {
+      const errorMsg = validation.error ?? "Malformed position";
       logger?.warn(
-        `[createSafeChess] Invalid FEN "${trimmed}": ${validation.error ?? "Malformed position"}. Falling back to standard starting position.`,
+        `[createSafeChess] Invalid FEN "${trimmed}": ${errorMsg}. Falling back to standard starting position.`,
+        {
+          operation: "create_safe_chess",
+          fen: trimmed,
+          error: errorMsg,
+        },
       );
       return new Chess();
     }
     return new Chess(trimmed);
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     logger?.warn(
-      `[createSafeChess] Failed to initialize position "${trimmed}": ${err instanceof Error ? err.message : String(err)}. Falling back to standard starting position.`,
+      `[createSafeChess] Failed to initialize position "${trimmed}": ${errorMsg}. Falling back to standard starting position.`,
+      {
+        operation: "create_safe_chess",
+        fen: trimmed,
+        error: errorMsg,
+      },
     );
     return new Chess();
   }
@@ -102,7 +129,11 @@ export function safeLoadFen(
     return false;
   }
   if (!isValidFen(fen)) {
-    logger?.warn(`[safeLoadFen] Invalid FEN "${fen}".`);
+    logger?.warn(`[safeLoadFen] Invalid FEN "${fen}".`, {
+      operation: "safe_load_fen",
+      fen,
+      error: "Invalid FEN syntax or board state",
+    });
     return false;
   }
 
@@ -111,8 +142,14 @@ export function safeLoadFen(
     chess.load(fen.trim());
     return true;
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     logger?.warn(
-      `[safeLoadFen] Failed to load FEN "${fen}": ${err instanceof Error ? err.message : String(err)}.`,
+      `[safeLoadFen] Failed to load FEN "${fen}": ${errorMsg}.`,
+      {
+        operation: "safe_load_fen",
+        fen,
+        error: errorMsg,
+      },
     );
     // Restore previous state if possible
     try {

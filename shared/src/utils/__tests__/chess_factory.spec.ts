@@ -123,7 +123,7 @@ describe("Safe Chess Factory & FEN Validator", () => {
       expect(console.warn).toHaveBeenCalled();
     });
 
-    it("invokes injectable mockLogger.warn when provided an invalid FEN", () => {
+    it("invokes injectable mockLogger.warn with structured metadata when provided an invalid FEN (ENH-008)", () => {
       const mockLogger: ChessLogger = {
         warn: vi.fn(),
       };
@@ -132,7 +132,14 @@ describe("Safe Chess Factory & FEN Validator", () => {
 
       expect(chess).toBeInstanceOf(Chess);
       expect(chess.fen()).toBe(DEFAULT_CHESS_FEN);
-      expect(mockLogger.warn).toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[createSafeChess] Invalid FEN"),
+        expect.objectContaining({
+          operation: "create_safe_chess",
+          fen: badFen,
+        }),
+      );
     });
 
     it("safely operates without crashing when no logger is passed", () => {
@@ -163,7 +170,7 @@ describe("Safe Chess Factory & FEN Validator", () => {
       expect(chess.fen()).toBe(initialFen);
     });
 
-    it("invokes injectable mockLogger.warn when loading an invalid FEN", () => {
+    it("invokes injectable mockLogger.warn with structured metadata when loading an invalid FEN (ENH-008)", () => {
       const chess = new Chess();
       const mockLogger: ChessLogger = {
         warn: vi.fn(),
@@ -172,7 +179,14 @@ describe("Safe Chess Factory & FEN Validator", () => {
 
       const result = safeLoadFen(chess, badFen, mockLogger);
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[safeLoadFen] Invalid FEN"),
+        expect.objectContaining({
+          operation: "safe_load_fen",
+          fen: badFen,
+        }),
+      );
     });
 
     it("safely operates without crashing when no logger is passed", () => {

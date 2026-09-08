@@ -13,6 +13,7 @@ export * from "./contracts/puzzle_engine.js";
 export * from "./contracts/rating_engine.js";
 export * from "./contracts/sync.js";
 export * from "./contracts/avatar.js";
+export * from "./contracts/system.js";
 
 // Sync Codec & Algorithm Utilities
 export * from "./utils/checksum_crc32.js";
@@ -25,3 +26,4 @@ export * from "./utils/chess_factory.js";
 export * from "./utils/chess_evaluation.js";
 export * from "./utils/uci.js";
 export * from "./utils/game_over.js";
+export * from "./utils/star_calculator.js";

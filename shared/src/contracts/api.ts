@@ -1,6 +1,8 @@
 import type {
   LanInfoResponse,
   HealthCheckResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
 } from "./schemas.js";
 
 /**
@@ -9,6 +11,10 @@ import type {
 export type { LanInfoResponse };
 
 /**
- * Re-exporting validated health check telemetry response type inferred from HealthCheckResponseSchema.
+ * Re-exporting validated health check telemetry response types.
  */
-export type { HealthCheckResponse };
+export type {
+  HealthCheckResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
+};

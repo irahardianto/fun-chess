@@ -35,8 +35,12 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
    * @param payload - Full domain progress payload
    * @returns Minified compact progress transfer object
    */
-  public toCompact(payload: UnifiedProgressPayload): CompactProgressDto {
-    const exportedSec = Math.floor((payload.exportedAt || Date.now()) / 1000);
+  public toCompact(
+    payload: UnifiedProgressPayload,
+    now: number = payload.exportedAt || Date.now(),
+  ): CompactProgressDto {
+    const referenceNow = now;
+    const exportedSec = Math.floor((payload.exportedAt || referenceNow) / 1000);
 
     // Map scenarios sorted deterministically by scenarioId
     const scenarioEntries = Object.entries(payload.scenarios || {}).sort(
@@ -49,10 +53,10 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
         Math.max(0, Math.floor(sc.attemptsCount || 0)),
         Math.max(0, Math.floor(sc.hintsUsedTotal || 0)),
         Math.floor(
-          (sc.firstCompletedAt || payload.exportedAt || Date.now()) / 1000,
+          (sc.firstCompletedAt || payload.exportedAt || referenceNow) / 1000,
         ),
         Math.floor(
-          (sc.lastCompletedAt || payload.exportedAt || Date.now()) / 1000,
+          (sc.lastCompletedAt || payload.exportedAt || referenceNow) / 1000,
         ),
       ],
     );
@@ -79,7 +83,7 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
         Math.max(0, Math.floor(tm.solved || 0)),
         Math.max(0, Math.floor(tm.starsEarned || 0)),
         Math.floor(
-          (tm.lastPracticedAt || payload.exportedAt || Date.now()) / 1000,
+          (tm.lastPracticedAt || payload.exportedAt || referenceNow) / 1000,
         ),
       ],
     );
@@ -101,15 +105,17 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
       ([id, sp]) => [
         id,
         sp.stars === 3 ? 3 : sp.stars === 2 ? 2 : 1,
-        Math.floor((sp.solvedAt || payload.exportedAt || Date.now()) / 1000),
+        Math.floor(
+          (sp.solvedAt || payload.exportedAt || referenceNow) / 1000,
+        ),
       ],
     );
 
     const createdSec = Math.floor(
-      (payload.puzzles?.createdAt || payload.exportedAt || Date.now()) / 1000,
+      (payload.puzzles?.createdAt || payload.exportedAt || referenceNow) / 1000,
     );
     const lastActiveSec = Math.floor(
-      (payload.puzzles?.lastActiveAt || payload.exportedAt || Date.now()) /
+      (payload.puzzles?.lastActiveAt || payload.exportedAt || referenceNow) /
         1000,
     );
 
@@ -288,9 +294,13 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
    * @param compact - Minified compact progress transfer object
    * @returns Restored full domain progress payload
    */
-  public fromCompact(compact: CompactProgressDto): UnifiedProgressPayload {
+  public fromCompact(
+    compact: CompactProgressDto,
+    now: number = Date.now(),
+  ): UnifiedProgressPayload {
+    const referenceNowSec = Math.floor(now / 1000);
     const version = compact.v || 1;
-    const exportedAt = (compact.t || Math.floor(Date.now() / 1000)) * 1000;
+    const exportedAt = (compact.t || referenceNowSec) * 1000;
     const clientVersion = compact.c;
 
     const scenarios = this.restoreScenarios(compact.sc);
@@ -300,9 +310,9 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
     const solvedPuzzles = this.restoreSolvedPuzzles(compact.pz?.sp);
 
     const createdAt =
-      (compact.pz?.ca ?? compact.t ?? Math.floor(Date.now() / 1000)) * 1000;
+      (compact.pz?.ca ?? compact.t ?? referenceNowSec) * 1000;
     const lastActiveAt =
-      (compact.pz?.la ?? compact.t ?? Math.floor(Date.now() / 1000)) * 1000;
+      (compact.pz?.la ?? compact.t ?? referenceNowSec) * 1000;
 
     const puzzles: PuzzleProgress = {
       ratingProfile,
@@ -334,8 +344,9 @@ export const dictionaryMapper = defaultDictionaryMapper;
  */
 export function toCompactProgress(
   payload: UnifiedProgressPayload,
+  now?: number,
 ): CompactProgressDto {
-  return defaultDictionaryMapper.toCompact(payload);
+  return defaultDictionaryMapper.toCompact(payload, now);
 }
 
 /**
@@ -343,6 +354,7 @@ export function toCompactProgress(
  */
 export function fromCompactProgress(
   compact: CompactProgressDto,
+  now?: number,
 ): UnifiedProgressPayload {
-  return defaultDictionaryMapper.fromCompact(compact);
+  return defaultDictionaryMapper.fromCompact(compact, now);
 }

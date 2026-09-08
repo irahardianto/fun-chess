@@ -64,6 +64,11 @@ import type {
   UnifiedProgressEnvelope,
   SyncMergeStrategy,
   ProgressDiffPreview,
+  IClock,
+  IIdGenerator,
+  ClientToServerEvents,
+  ServerToClientEvents,
+  RoomLeavePayload,
 } from "../index.js";
 import {
   FUN_CHESS_PAYLOAD_MAGIC_PREFIX,
@@ -78,6 +83,7 @@ import {
   InvalidMoveError,
   RateLimitExceededError,
   UnauthorizedError,
+  OptimisticLockConflictError,
   // Schemas
   RoomCodeSchema,
   PlayerNameSchema,
@@ -87,6 +93,8 @@ import {
   ReconnectRequestSchema,
   MovePayloadSchema,
   ServerEnvSchema,
+  LivenessHealthResponseSchema,
+  DetailedHealthResponseSchema,
 } from "../index.js";
 
 describe("Shared Contracts & Data Model Specification", () => {
@@ -247,6 +255,18 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(unauthorized.statusCode).toBe(401);
       expect(unauthorized.message).toContain("Unauthorized");
       expect(unauthorized).toBeInstanceOf(AppError);
+
+      const conflict = new OptimisticLockConflictError("ABCD", 1, 2);
+      expect(conflict.isAppError).toBe(true);
+      expect(conflict.code).toBe("ERR_CONFLICT");
+      expect(conflict.statusCode).toBe(409);
+      expect(conflict.message).toContain("State conflict for room 'ABCD'");
+      expect(conflict.details).toEqual({
+        roomCode: "ABCD",
+        expectedVersion: 1,
+        actualVersion: 2,
+      });
+      expect(conflict).toBeInstanceOf(AppError);
     });
   });
 
@@ -879,4 +899,165 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(PLAYER_AVATARS).toContain(customAvatar);
     });
   });
+
+  describe("System Abstraction Contracts (system.ts)", () => {
+    it("satisfies IClock interface contract", () => {
+      const clock: IClock = {
+        now: () => 1700000000000,
+      };
+      expect(clock.now()).toBe(1700000000000);
+    });
+
+    it("satisfies IIdGenerator interface contract", () => {
+      const idGen: IIdGenerator = {
+        generateId: () => "mock-uuid-456",
+        generateRandomInt: (min, _max) => min,
+      };
+      expect(idGen.generateId()).toBe("mock-uuid-456");
+      expect(idGen.generateRandomInt?.(1, 10)).toBe(1);
+    });
+  });
+
+  describe("Health Check Telemetry Schemas", () => {
+    it("validates lightweight liveness probe schema (LivenessHealthResponseSchema)", () => {
+      const valid = {
+        status: "ok",
+        uptimeSeconds: 42.5,
+        timestamp: "2026-09-08T07:45:00.000Z",
+      };
+      const parsed = LivenessHealthResponseSchema.parse(valid);
+      expect(parsed.status).toBe("ok");
+      expect(parsed.uptimeSeconds).toBe(42.5);
+
+      expect(() =>
+        LivenessHealthResponseSchema.parse({
+          status: "unknown",
+          uptimeSeconds: -5,
+          timestamp: "not-a-datetime",
+        }),
+      ).toThrow();
+    });
+
+    it("validates detailed operational health schema (DetailedHealthResponseSchema)", () => {
+      const valid = {
+        status: "ok",
+        uptimeSeconds: 120.0,
+        timestamp: "2026-09-08T07:45:00.000Z",
+        activeRooms: 3,
+        activeSockets: 6,
+        memoryUsageMb: {
+          rss: 48.2,
+          heapTotal: 24.5,
+          heapUsed: 18.3,
+        },
+        relay: {
+          mode: "lan" as const,
+        },
+      };
+      const parsed = DetailedHealthResponseSchema.parse(valid);
+      expect(parsed.activeRooms).toBe(3);
+      expect(parsed.activeSockets).toBe(6);
+      expect(parsed.memoryUsageMb.rss).toBe(48.2);
+      expect(parsed.relay?.mode).toBe("lan");
+
+      expect(() =>
+        DetailedHealthResponseSchema.parse({
+          status: "ok",
+          uptimeSeconds: 10,
+          timestamp: "2026-09-08T07:45:00.000Z",
+          activeRooms: -1,
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("Socket Event Contracts (MAJ-026, MAJ-027)", () => {
+    it("verifies room:leave acknowledgement callback signature", () => {
+      const mockLeaveHandler: ClientToServerEvents["room:leave"] = (
+        req,
+        callback,
+      ) => {
+        expect(req.roomCode).toBe("ABCD");
+        callback?.({ success: true });
+        callback?.({ success: false, error: "Player not found" });
+      };
+
+      let callbackCount = 0;
+      mockLeaveHandler({ roomCode: "ABCD" }, (res) => {
+        callbackCount++;
+        expect(typeof res.success).toBe("boolean");
+      });
+      expect(callbackCount).toBe(2);
+    });
+
+    it("verifies room:leave acknowledgement callback with SocketErrorPayload and RoomLeavePayload", () => {
+      const mockLeaveHandler: ClientToServerEvents["room:leave"] = (
+        req,
+        callback,
+      ) => {
+        expect(req.roomCode).toBe("XYZW");
+        callback?.({
+          success: false,
+          error: {
+            code: "ERR_ROOM_NOT_FOUND",
+            message: "Room not found",
+            roomCode: "XYZW",
+          },
+        });
+      };
+
+      const payload: RoomLeavePayload = { roomCode: "XYZW" };
+      let invoked = false;
+      mockLeaveHandler(payload, (res) => {
+        invoked = true;
+        if (!res.success) {
+          expect(typeof res.error).toBe("object");
+          if (typeof res.error === "object") {
+            expect(res.error.code).toBe("ERR_ROOM_NOT_FOUND");
+          }
+        }
+      });
+      expect(invoked).toBe(true);
+    });
+
+    it("verifies room:reconnect acknowledgement with optional roomStatus", () => {
+      const mockReconnectHandler: ClientToServerEvents["room:reconnect"] = (
+        req,
+        callback,
+      ) => {
+        expect(req.roomCode).toBe("ABCD");
+        callback?.({
+          success: true,
+          room: {} as RoomState,
+          player: {} as Player,
+          roomStatus: "playing",
+        });
+      };
+
+      mockReconnectHandler(
+        { roomCode: "ABCD", playerId: "p1", sessionToken: "t1" },
+        (res) => {
+          if (res.success) {
+            expect(res.roomStatus).toBe("playing");
+          }
+        },
+      );
+    });
+
+    it("verifies room:player_reconnected broadcast payload contains authoritative roomStatus", () => {
+      const mockPlayerReconnected: ServerToClientEvents["room:player_reconnected"] =
+        (data) => {
+          expect(data.playerId).toBe("p1");
+          expect(data.playerName).toBe("Alex");
+          expect(data.roomStatus).toBe("playing");
+        };
+
+      mockPlayerReconnected({
+        playerId: "p1",
+        playerName: "Alex",
+        roomStatus: "playing",
+      });
+    });
+  });
 });
+

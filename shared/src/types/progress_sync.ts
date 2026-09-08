@@ -241,14 +241,16 @@ export interface DictionaryMapper {
   /**
    * Compresses a full domain UnifiedProgressPayload into a CompactProgressDto.
    * Converts millisecond timestamps to second granularity to reduce integer digit width.
+   * Accepts pure deterministic now timestamp parameter (MAJ-013).
    */
-  toCompact(payload: UnifiedProgressPayload): CompactProgressDto;
+  toCompact(payload: UnifiedProgressPayload, now?: number): CompactProgressDto;
 
   /**
    * Expands a CompactProgressDto back into the full domain UnifiedProgressPayload.
    * Reconstitutes millisecond timestamps and full object models.
+   * Accepts pure deterministic now timestamp parameter (MAJ-013).
    */
-  fromCompact(compact: CompactProgressDto): UnifiedProgressPayload;
+  fromCompact(compact: CompactProgressDto, now?: number): UnifiedProgressPayload;
 }
 
 /**

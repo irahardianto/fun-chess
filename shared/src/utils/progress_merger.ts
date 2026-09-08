@@ -7,6 +7,7 @@ import type {
 import { UNIFIED_PROGRESS_SCHEMA_VERSION } from "../types/progress_sync.js";
 import type { ScenarioProgressMap, StarRating } from "../contracts/scenario.js";
 import {
+  type PuzzleProgress,
   type PuzzleTheme,
   type ThemeMasteryProgress,
   type SolvedPuzzleRecord,
@@ -319,28 +320,36 @@ export function mergeUnifiedProgress(
 }
 
 /**
- * Calculates itemized statistical differences between local and incoming progress.
- * Consumed by UI components for conflict resolution previews.
- *
- * @param local - Current local progress state
- * @param incoming - Incoming progress package
- * @param clockSkewToleranceMs - Tolerance buffer for clock skew comparison (default: 60,000ms)
- * @returns ProgressDiffPreview summary
+ * Sub-diff helper calculating Academy scenario progress differences.
  */
-export function calculateProgressDiff(
-  local: UnifiedProgressPayload,
-  incoming: UnifiedProgressPayload,
-  clockSkewToleranceMs: number = 60_000,
-): ProgressDiffPreview {
-  const localScenarios = local.scenarios || {};
-  const incomingScenarios = incoming.scenarios || {};
+export interface AcademyDiffResult {
+  readonly localCompletedCount: number;
+  readonly incomingCompletedCount: number;
+  readonly mergedCompletedCount: number;
+  readonly localTotalStars: number;
+  readonly incomingTotalStars: number;
+  readonly mergedTotalStars: number;
+  readonly newCompletedScenarios: readonly string[];
+  readonly starUpgrades: readonly {
+    readonly scenarioId: string;
+    readonly fromStars: StarRating;
+    readonly toStars: StarRating;
+  }[];
+}
 
-  const localScIds = Object.keys(localScenarios);
-  const incomingScIds = Object.keys(incomingScenarios);
+export function diffAcademyProgress(
+  localScenarios?: ScenarioProgressMap | null,
+  incomingScenarios?: ScenarioProgressMap | null,
+): AcademyDiffResult {
+  const local = localScenarios || {};
+  const incoming = incomingScenarios || {};
+
+  const localScIds = Object.keys(local);
+  const incomingScIds = Object.keys(incoming);
   const unionScIds = new Set([...localScIds, ...incomingScIds]);
 
   const newCompletedScenarios = incomingScIds.filter(
-    (id) => !(id in localScenarios),
+    (id) => !(id in local),
   );
   const starUpgrades: {
     scenarioId: string;
@@ -349,19 +358,19 @@ export function calculateProgressDiff(
   }[] = [];
 
   let localTotalStars = 0;
-  for (const sc of Object.values(localScenarios)) {
+  for (const sc of Object.values(local)) {
     localTotalStars += sc.starsEarned;
   }
 
   let incomingTotalStars = 0;
-  for (const sc of Object.values(incomingScenarios)) {
+  for (const sc of Object.values(incoming)) {
     incomingTotalStars += sc.starsEarned;
   }
 
   let mergedTotalStars = 0;
   for (const id of unionScIds) {
-    const locStars = localScenarios[id]?.starsEarned ?? 0;
-    const incStars = incomingScenarios[id]?.starsEarned ?? 0;
+    const locStars = local[id]?.starsEarned ?? 0;
+    const incStars = incoming[id]?.starsEarned ?? 0;
     const maxStars = Math.max(locStars, incStars) as StarRating;
     mergedTotalStars += maxStars;
 
@@ -374,16 +383,50 @@ export function calculateProgressDiff(
     }
   }
 
-  // Puzzles diff
-  const localPuz = local.puzzles?.solvedPuzzles || {};
-  const incomingPuz = incoming.puzzles?.solvedPuzzles || {};
+  return {
+    localCompletedCount: localScIds.length,
+    incomingCompletedCount: incomingScIds.length,
+    mergedCompletedCount: unionScIds.size,
+    localTotalStars,
+    incomingTotalStars,
+    mergedTotalStars,
+    newCompletedScenarios,
+    starUpgrades,
+  };
+}
+
+/** Alias for diffAcademyProgress */
+export const diffScenarios = diffAcademyProgress;
+
+/**
+ * Sub-diff helper calculating Puzzle Hub progress differences.
+ */
+export interface PuzzleDiffResult {
+  readonly localSolvedCount: number;
+  readonly incomingSolvedCount: number;
+  readonly mergedSolvedCount: number;
+  readonly localRating: number;
+  readonly incomingRating: number;
+  readonly mergedRating: number;
+  readonly localPeakRating: number;
+  readonly incomingPeakRating: number;
+  readonly mergedPeakRating: number;
+  readonly newPuzzlesSolvedCount: number;
+}
+
+export function diffPuzzleProgress(
+  localPuzzles?: PuzzleProgress | null,
+  incomingPuzzles?: PuzzleProgress | null,
+): PuzzleDiffResult {
+  const localPuz = localPuzzles?.solvedPuzzles || {};
+  const incomingPuz = incomingPuzzles?.solvedPuzzles || {};
   const localPuzIds = Object.keys(localPuz);
   const incomingPuzIds = Object.keys(incomingPuz);
   const unionPuzIds = new Set([...localPuzIds, ...incomingPuzIds]);
   const newPuzzlesSolved = incomingPuzIds.filter((id) => !(id in localPuz));
 
-  const locRp = local.puzzles?.ratingProfile;
-  const incRp = incoming.puzzles?.ratingProfile;
+  const locRp = localPuzzles?.ratingProfile;
+  const incRp = incomingPuzzles?.ratingProfile;
 
   const localRating = locRp?.rating ?? 800;
   const incomingRating = incRp?.rating ?? 800;
@@ -397,25 +440,76 @@ export function calculateProgressDiff(
     mergedRating,
   );
 
-  // Arcade diff
-  const locArc = local.puzzles?.arcadeStats;
-  const incArc = incoming.puzzles?.arcadeStats;
+  return {
+    localSolvedCount: localPuzIds.length,
+    incomingSolvedCount: incomingPuzIds.length,
+    mergedSolvedCount: unionPuzIds.size,
+    localRating,
+    incomingRating,
+    mergedRating,
+    localPeakRating,
+    incomingPeakRating,
+    mergedPeakRating,
+    newPuzzlesSolvedCount: newPuzzlesSolved.length,
+  };
+}
 
-  const localRushHighScore = locArc?.puzzleRushHighScore ?? 0;
-  const incomingRushHighScore = incArc?.puzzleRushHighScore ?? 0;
+/**
+ * Sub-diff helper calculating Arcade mode statistics differences.
+ */
+export interface ArcadeDiffResult {
+  readonly localRushHighScore: number;
+  readonly incomingRushHighScore: number;
+  readonly mergedRushHighScore: number;
+  readonly localSurvivorHighScore: number;
+  readonly incomingSurvivorHighScore: number;
+  readonly mergedSurvivorHighScore: number;
+}
+
+export function diffArcadeProgress(
+  localArcade?: PuzzleArcadeStats | null,
+  incomingArcade?: PuzzleArcadeStats | null,
+): ArcadeDiffResult {
+  const localRushHighScore = localArcade?.puzzleRushHighScore ?? 0;
+  const incomingRushHighScore = incomingArcade?.puzzleRushHighScore ?? 0;
   const mergedRushHighScore = Math.max(
     localRushHighScore,
     incomingRushHighScore,
   );
 
-  const localSurvivorHighScore = locArc?.streakSurvivorHighScore ?? 0;
-  const incomingSurvivorHighScore = incArc?.streakSurvivorHighScore ?? 0;
+  const localSurvivorHighScore = localArcade?.streakSurvivorHighScore ?? 0;
+  const incomingSurvivorHighScore =
+    incomingArcade?.streakSurvivorHighScore ?? 0;
   const mergedSurvivorHighScore = Math.max(
     localSurvivorHighScore,
     incomingSurvivorHighScore,
   );
 
-  // Metadata
+  return {
+    localRushHighScore,
+    incomingRushHighScore,
+    mergedRushHighScore,
+    localSurvivorHighScore,
+    incomingSurvivorHighScore,
+    mergedSurvivorHighScore,
+  };
+}
+
+/**
+ * Sub-diff helper calculating metadata and freshness comparison.
+ */
+export interface MetadataDiffResult {
+  readonly localLastActiveAt: number;
+  readonly incomingLastActiveAt: number;
+  readonly incomingExportedAt: number;
+  readonly isIncomingNewer: boolean;
+}
+
+export function diffMetadataProgress(
+  local: UnifiedProgressPayload,
+  incoming: UnifiedProgressPayload,
+  clockSkewToleranceMs: number = 60_000,
+): MetadataDiffResult {
   const localLastActiveAt = local.puzzles?.lastActiveAt || 0;
   const incomingLastActiveAt = incoming.puzzles?.lastActiveAt || 0;
   const incomingExportedAt = incoming.exportedAt || 0;
@@ -423,67 +517,97 @@ export function calculateProgressDiff(
     incomingExportedAt > (local.exportedAt || 0) + clockSkewToleranceMs ||
     incomingLastActiveAt > localLastActiveAt + clockSkewToleranceMs;
 
-  // Upgrades detection
-  const hasUpgrades =
-    incomingRating > localRating ||
-    incomingPeakRating > localPeakRating ||
-    incomingRushHighScore > localRushHighScore ||
-    incomingSurvivorHighScore > localSurvivorHighScore ||
-    newCompletedScenarios.length > 0 ||
-    starUpgrades.length > 0 ||
-    newPuzzlesSolved.length > 0;
+  return {
+    localLastActiveAt,
+    incomingLastActiveAt,
+    incomingExportedAt,
+    isIncomingNewer,
+  };
+}
 
-  // Differences detection
+/**
+ * Sub-diff helper detecting differences and upgrade flags between payloads.
+ */
+export interface DiffFlagsResult {
+  readonly hasDifferences: boolean;
+  readonly hasUpgrades: boolean;
+}
+
+export function detectProgressDiffFlags(
+  local: UnifiedProgressPayload,
+  incoming: UnifiedProgressPayload,
+  academy: AcademyDiffResult,
+  puzzles: PuzzleDiffResult,
+  arcade: ArcadeDiffResult,
+): DiffFlagsResult {
+  const localScIds = Object.keys(local.scenarios || {});
+  const incomingScIds = Object.keys(incoming.scenarios || {});
+  const localPuzIds = Object.keys(local.puzzles?.solvedPuzzles || {});
+  const incomingPuzIds = Object.keys(incoming.puzzles?.solvedPuzzles || {});
+
+  const hasUpgrades =
+    puzzles.incomingRating > puzzles.localRating ||
+    puzzles.incomingPeakRating > puzzles.localPeakRating ||
+    arcade.incomingRushHighScore > arcade.localRushHighScore ||
+    arcade.incomingSurvivorHighScore > arcade.localSurvivorHighScore ||
+    academy.newCompletedScenarios.length > 0 ||
+    academy.starUpgrades.length > 0 ||
+    puzzles.newPuzzlesSolvedCount > 0;
+
   const hasDifferences =
     hasUpgrades ||
     localScIds.length !== incomingScIds.length ||
     localPuzIds.length !== incomingPuzIds.length ||
-    localRating !== incomingRating ||
-    localPeakRating !== incomingPeakRating ||
-    localRushHighScore !== incomingRushHighScore ||
-    localSurvivorHighScore !== incomingSurvivorHighScore ||
+    puzzles.localRating !== puzzles.incomingRating ||
+    puzzles.localPeakRating !== puzzles.incomingPeakRating ||
+    arcade.localRushHighScore !== arcade.incomingRushHighScore ||
+    arcade.localSurvivorHighScore !== arcade.incomingSurvivorHighScore ||
     JSON.stringify(local.scenarios ?? {}) !==
       JSON.stringify(incoming.scenarios ?? {}) ||
     JSON.stringify(local.puzzles?.solvedPuzzles ?? {}) !==
       JSON.stringify(incoming.puzzles?.solvedPuzzles ?? {});
 
   return {
-    academy: {
-      localCompletedCount: localScIds.length,
-      incomingCompletedCount: incomingScIds.length,
-      mergedCompletedCount: unionScIds.size,
-      localTotalStars,
-      incomingTotalStars,
-      mergedTotalStars,
-      newCompletedScenarios,
-      starUpgrades,
-    },
-    puzzles: {
-      localSolvedCount: localPuzIds.length,
-      incomingSolvedCount: incomingPuzIds.length,
-      mergedSolvedCount: unionPuzIds.size,
-      localRating,
-      incomingRating,
-      mergedRating,
-      localPeakRating,
-      incomingPeakRating,
-      mergedPeakRating,
-      newPuzzlesSolvedCount: newPuzzlesSolved.length,
-    },
-    arcade: {
-      localRushHighScore,
-      incomingRushHighScore,
-      mergedRushHighScore,
-      localSurvivorHighScore,
-      incomingSurvivorHighScore,
-      mergedSurvivorHighScore,
-    },
-    metadata: {
-      localLastActiveAt,
-      incomingLastActiveAt,
-      incomingExportedAt,
-      isIncomingNewer,
-    },
+    hasDifferences,
+    hasUpgrades,
+  };
+}
+
+/**
+ * Calculates itemized statistical differences between local and incoming progress.
+ * Consumed by UI components for conflict resolution previews.
+ * Decomposed into focused sub-diff helpers (MIN-022).
+ *
+ * @param local - Current local progress state
+ * @param incoming - Incoming progress package
+ * @param clockSkewToleranceMs - Tolerance buffer for clock skew comparison (default: 60,000ms)
+ * @returns ProgressDiffPreview summary
+ */
+export function calculateProgressDiff(
+  local: UnifiedProgressPayload,
+  incoming: UnifiedProgressPayload,
+  clockSkewToleranceMs: number = 60_000,
+): ProgressDiffPreview {
+  const academy = diffAcademyProgress(local.scenarios, incoming.scenarios);
+  const puzzles = diffPuzzleProgress(local.puzzles, incoming.puzzles);
+  const arcade = diffArcadeProgress(
+    local.puzzles?.arcadeStats,
+    incoming.puzzles?.arcadeStats,
+  );
+  const metadata = diffMetadataProgress(local, incoming, clockSkewToleranceMs);
+  const { hasDifferences, hasUpgrades } = detectProgressDiffFlags(
+    local,
+    incoming,
+    academy,
+    puzzles,
+    arcade,
+  );
+
+  return {
+    academy,
+    puzzles,
+    arcade,
+    metadata,
     hasDifferences,
     hasUpgrades,
   };

@@ -5,6 +5,7 @@ import {
   PieceColor,
   Player,
   RoomState,
+  RoomStatus,
 } from "./models.js";
 import { SocketErrorPayload } from "./errors.js";
 import {
@@ -12,6 +13,7 @@ import {
   JoinRoomRequest,
   ReconnectRequest,
   LeaveRoomRequest,
+  RoomLeavePayload,
   MakeMoveRequest,
   ResignRequest,
   OfferDrawRequest,
@@ -25,6 +27,7 @@ export type {
   JoinRoomRequest,
   ReconnectRequest,
   LeaveRoomRequest,
+  RoomLeavePayload,
   MakeMoveRequest,
   ResignRequest,
   OfferDrawRequest,
@@ -54,20 +57,20 @@ export interface ServerToClientEvents {
     playerId?: string;
     player?: Player;
     gracePeriodMs?: number;
-    roomStatus?: string;
+    roomStatus?: RoomStatus;
     disconnectedAt?: number;
   }) => void;
   /** Broadcast when a previously disconnected player successfully re-establishes connection */
   "room:player_reconnected": (data: {
     playerId: string;
     playerName: string;
-    roomStatus?: string;
+    roomStatus: RoomStatus;
   }) => void;
   /** Emitted to the reconnecting client upon successful reconnection */
   "room:reconnected": (data: {
     room: RoomState;
     player: Player;
-    roomStatus?: string;
+    roomStatus?: RoomStatus;
   }) => void;
   /** Broadcast when a match begins */
   "game:started": (gameState: GameState) => void;
@@ -132,12 +135,24 @@ export interface ClientToServerEvents {
     req: ReconnectRequest,
     callback?: (
       res:
-        | { success: true; room: RoomState; player: Player }
+        | {
+            success: true;
+            room: RoomState;
+            player: Player;
+            roomStatus?: RoomStatus;
+          }
         | { success: false; error: SocketErrorPayload },
     ) => void,
   ) => void;
   /** Voluntarily leaves a room */
-  "room:leave": (req: LeaveRoomRequest) => void;
+  "room:leave": (
+    req: LeaveRoomRequest | RoomLeavePayload,
+    callback?: (
+      res:
+        | { success: true }
+        | { success: false; error: SocketErrorPayload | string },
+    ) => void,
+  ) => void;
   /** Executes a chess move in an active match */
   "game:move": (
     req: MakeMoveRequest,

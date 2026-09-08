@@ -5,6 +5,12 @@ import {
   defaultProgressMergeEngine,
   mergeUnifiedProgress,
   calculateProgressDiff,
+  diffAcademyProgress,
+  diffScenarios,
+  diffPuzzleProgress,
+  diffArcadeProgress,
+  diffMetadataProgress,
+  detectProgressDiffFlags,
 } from "../progress_merger.js";
 
 describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => {
@@ -641,4 +647,87 @@ describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => 
       expect(merged.puzzles.solvedPuzzles["toString"]?.stars).toBe(3);
     });
   });
+
+  describe("Decomposed Sub-Diff Helpers (MIN-022)", () => {
+    it("diffAcademyProgress (and diffScenarios alias) correctly computes scenario differences and star upgrades", () => {
+      const local = createLocalPayload().scenarios;
+      const incoming = createIncomingPayload().scenarios;
+
+      const diff = diffAcademyProgress(local, incoming);
+      expect(diff.localCompletedCount).toBe(2);
+      expect(diff.incomingCompletedCount).toBe(2);
+      expect(diff.mergedCompletedCount).toBe(3);
+      expect(diff.newCompletedScenarios).toContain("lesson-3");
+      expect(diff.starUpgrades).toEqual([
+        { scenarioId: "lesson-1", fromStars: 2, toStars: 3 },
+      ]);
+
+      const aliasDiff = diffScenarios(local, incoming);
+      expect(aliasDiff).toEqual(diff);
+    });
+
+    it("diffPuzzleProgress computes puzzle count and rating diffs", () => {
+      const local = createLocalPayload().puzzles;
+      const incoming = createIncomingPayload().puzzles;
+
+      const diff = diffPuzzleProgress(local, incoming);
+      expect(diff.localRating).toBe(1100);
+      expect(diff.incomingRating).toBe(1300);
+      expect(diff.mergedRating).toBe(1300);
+      expect(diff.mergedPeakRating).toBe(1350);
+      expect(diff.newPuzzlesSolvedCount).toBe(1);
+    });
+
+    it("diffArcadeProgress computes arcade mode score diffs", () => {
+      const local = createLocalPayload().puzzles?.arcadeStats;
+      const incoming = createIncomingPayload().puzzles?.arcadeStats;
+
+      const diff = diffArcadeProgress(local, incoming);
+      expect(diff.localRushHighScore).toBe(15);
+      expect(diff.incomingRushHighScore).toBe(22);
+      expect(diff.mergedRushHighScore).toBe(22);
+      expect(diff.mergedSurvivorHighScore).toBe(10);
+    });
+
+    it("diffMetadataProgress assesses timestamp ordering and clock skew", () => {
+      const local = createLocalPayload();
+      const incoming = createIncomingPayload();
+
+      const diff = diffMetadataProgress(local, incoming, 60_000);
+      expect(diff.localLastActiveAt).toBe(1699995000000);
+      expect(diff.incomingLastActiveAt).toBe(1700000000000);
+      expect(diff.incomingExportedAt).toBe(1700001000000);
+      expect(diff.isIncomingNewer).toBe(true); // 1700001000000 > 1700000000000 + 60_000
+
+      // When skew tolerance is larger than difference (difference in lastActiveAt is 5,000,000ms):
+      const diffBuffered = diffMetadataProgress(local, incoming, 10_000_000);
+      expect(diffBuffered.isIncomingNewer).toBe(false);
+    });
+
+    it("detectProgressDiffFlags detects upgrade and difference presence", () => {
+      const local = createLocalPayload();
+      const incoming = createIncomingPayload();
+
+      const academy = diffAcademyProgress(local.scenarios, incoming.scenarios);
+      const puzzles = diffPuzzleProgress(local.puzzles, incoming.puzzles);
+      const arcade = diffArcadeProgress(local.puzzles?.arcadeStats, incoming.puzzles?.arcadeStats);
+
+      const flags = detectProgressDiffFlags(local, incoming, academy, puzzles, arcade);
+      expect(flags.hasDifferences).toBe(true);
+      expect(flags.hasUpgrades).toBe(true);
+    });
+  });
+
+  describe("Deterministic Time Parameter (MAJ-013)", () => {
+    it("uses explicit now: number for exportedAt and timestamps", () => {
+      const local = createLocalPayload();
+      const incoming = createIncomingPayload();
+      const fixedNow = 1900000000000;
+
+      const merged = mergeUnifiedProgress(local, incoming, "smart_merge", fixedNow);
+      expect(merged.exportedAt).toBe(fixedNow);
+      expect(merged.puzzles.lastActiveAt).toBe(fixedNow);
+    });
+  });
 });
+

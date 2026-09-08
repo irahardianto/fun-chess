@@ -538,4 +538,31 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
       expect(Object.keys(restored.puzzles.solvedPuzzles)).toEqual(["puz_valid"]);
     });
   });
+
+  describe("Deterministic Time Parameter (MAJ-013)", () => {
+    it("produces strictly identical compact outputs across repeated calls when given explicit now: number", () => {
+      const payload = createFullPayload({ exportedAt: 0 });
+      const fixedNow = 1750000000000;
+
+      const run1 = mapper.toCompact(payload, fixedNow);
+      const run2 = mapper.toCompact(payload, fixedNow);
+
+      expect(run1).toEqual(run2);
+      expect(JSON.stringify(run1)).toBe(JSON.stringify(run2));
+      expect(run1.t).toBe(1750000000);
+    });
+
+    it("propagates explicit now: number via toCompactProgress and fromCompactProgress helpers", () => {
+      const payload = createFullPayload({ exportedAt: 0 });
+      const fixedNow = 1800000000000;
+
+      const compact = toCompactProgress(payload, fixedNow);
+      expect(compact.t).toBe(1800000000);
+
+      const compactWithoutT = { ...compact, t: 0 };
+      const restored = fromCompactProgress(compactWithoutT, fixedNow);
+      expect(restored.exportedAt).toBe(1800000000000);
+    });
+  });
 });
+

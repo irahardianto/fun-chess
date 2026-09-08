@@ -99,6 +99,9 @@ export const LeaveRoomRequestSchema = z.object({
 });
 export type LeaveRoomRequest = z.infer<typeof LeaveRoomRequestSchema>;
 
+export const RoomLeavePayloadSchema = LeaveRoomRequestSchema;
+export type RoomLeavePayload = LeaveRoomRequest;
+
 /**
  * Chess move coordinate and promotion payload schema.
  */
@@ -176,18 +179,28 @@ export const LanInfoResponseSchema = z.object({
 export type LanInfoResponse = z.infer<typeof LanInfoResponseSchema>;
 
 /**
- * HTTP response schema for health check endpoints (`/health`, `/api/health`).
+ * Public lightweight liveness/readiness probe schema (/health, /api/health).
  */
-export const HealthCheckResponseSchema = z.object({
+export const LivenessHealthResponseSchema = z.object({
+  status: z.enum(["ok", "degraded"]),
+  uptimeSeconds: z.number().nonnegative(),
+  timestamp: z.string().datetime(),
+});
+export type LivenessHealthResponse = z.infer<typeof LivenessHealthResponseSchema>;
+
+/**
+ * Deep operational telemetry health schema (/metrics, /health/detail).
+ */
+export const DetailedHealthResponseSchema = z.object({
   status: z.enum(["ok", "degraded"]),
   uptimeSeconds: z.number().nonnegative(),
   timestamp: z.string().datetime(),
   activeRooms: z.number().int().nonnegative(),
   activeSockets: z.number().int().nonnegative(),
   memoryUsageMb: z.object({
-    rss: z.number(),
-    heapTotal: z.number(),
-    heapUsed: z.number(),
+    rss: z.number().nonnegative(),
+    heapTotal: z.number().nonnegative(),
+    heapUsed: z.number().nonnegative(),
   }),
   relay: z
     .object({
@@ -196,7 +209,14 @@ export const HealthCheckResponseSchema = z.object({
     })
     .optional(),
 });
-export type HealthCheckResponse = z.infer<typeof HealthCheckResponseSchema>;
+export type DetailedHealthResponse = z.infer<typeof DetailedHealthResponseSchema>;
+
+/**
+ * HTTP response schema for health check endpoints (`/health`, `/api/health`).
+ * Kept for backwards compatibility.
+ */
+export const HealthCheckResponseSchema = DetailedHealthResponseSchema;
+export type HealthCheckResponse = DetailedHealthResponse;
 
 const emptyStringToUndefined = (val: unknown): unknown =>
   typeof val === "string" && val.trim() === "" ? undefined : val;
