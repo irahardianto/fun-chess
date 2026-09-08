@@ -12,7 +12,7 @@ const workspaceRoot = path.resolve(__dirname, '../../../');
 export default defineConfig({
   ...baseConfig,
   testDir: '.',
-  testMatch: '**/*.api.spec.ts',
+  testMatch: ['**/*.api.spec.ts', '**/*.api.e2e.test.ts'],
   webServer: {
     command: 'pnpm --filter @fun-chess/server dev',
     url: 'http://localhost:3000/health',

@@ -1,2 +1,5 @@
-export { SystemClock, UuidGenerator } from "../../platform/time/index.js";
-export type { IClock, IIdGenerator } from "../../platform/time/index.js";
+/**
+ * Game feature clock and UUID adapters.
+ * Re-exported from platform/time to eliminate duplication (DRY).
+ */
+export * from "../../platform/time/clock.js";

@@ -227,10 +227,12 @@ describe("Game Completion Integration Tests", () => {
   });
 
   it("should prevent a player from accepting their own draw offer", async () => {
-    // Arrange: White offers draw
+    // Arrange: White offers draw and wait for it to be processed
+    const drawOfferedPromise = waitForEvent(blackClient, "game:draw_offered");
     whiteClient.emit("game:offer_draw", {
       roomCode: activeRoomCode,
     } as OfferDrawRequest);
+    await drawOfferedPromise;
 
     // Act: White tries to accept their own draw offer
     const errorPromise = waitForEvent<SocketErrorPayload>(

@@ -162,6 +162,123 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     loadStep(initialStepIdx);
   }
 
+  function handleFailedPlayerMove(): void {
+    mistakesCurrentAttempt.value++;
+    isShaking.value = true;
+    feedbackMessage.value = 'Not quite! Look for the goal square or tap 💡 Hint for a clue.';
+
+    // Auto-hint reveal after 2 mistakes (SC-4 UX Polish)
+    if (mistakesCurrentAttempt.value >= 2 && !activeHint.value) {
+      revealHint();
+    }
+
+    if (shakeTimer) clearTimeout(shakeTimer);
+    shakeTimer = setTimeout(() => {
+      isShaking.value = false;
+    }, 400);
+
+    boardSelection.clearSelection();
+  }
+
+  function executePlayerMoveOnEngine(
+    step: TutorialStep,
+    move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }
+  ): { isCheckmate: boolean } {
+    const promoChar = move.promotion ? (move.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n') : 'q';
+    const isPromo = checkIsPromotionMove(move.from, move.to);
+    let res: Move | null = null;
+
+    try {
+      res = chess.move({
+        from: move.from as unknown as import('chess.js').Square,
+        to: move.to as unknown as import('chess.js').Square,
+        promotion: isPromo ? promoChar : undefined,
+      });
+    } catch (err) {
+      console.warn('[useScenarioRunner] chess.move error, using fallback board mutation:', err);
+      res = null;
+    }
+
+    if (!res) {
+      // Fallback for tutorial board state
+      const p = chess.get(move.from as unknown as import('chess.js').Square);
+      if (p) {
+        chess.remove(move.from as unknown as import('chess.js').Square);
+        chess.put(
+          { type: isPromo ? (promoChar as PieceType) : p.type, color: p.color },
+          move.to as unknown as import('chess.js').Square
+        );
+      }
+    }
+
+    currentFen.value = chess.fen();
+    lastMove.value = { from: move.from, to: move.to };
+    isStepSuccess.value = true;
+    feedbackMessage.value = chess.isCheckmate()
+      ? 'Checkmate! Beautiful finish! 🏆'
+      : step.explanationOnSuccess;
+    boardSelection.clearSelection();
+
+    return { isCheckmate: chess.isCheckmate() };
+  }
+
+  function scheduleOpponentReply(opp: NonNullable<TutorialStep['opponentResponse']>): void {
+    isWaitingForBotResponse.value = true;
+    const delay = opp.delayMs ?? 500;
+
+    botTimer = setTimeout(() => {
+      let oppMoveSuccess = false;
+      try {
+        const oppPromo = opp.promotion
+          ? (opp.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n')
+          : undefined;
+        let oppRes: Move | null = null;
+
+        try {
+          oppRes = chess.move({
+            from: opp.from as unknown as import('chess.js').Square,
+            to: opp.to as unknown as import('chess.js').Square,
+            promotion: oppPromo,
+          });
+        } catch (err) {
+          console.warn('[useScenarioRunner] Bot response chess.move error, using fallback mutation:', err);
+          oppRes = null;
+        }
+
+        if (!oppRes) {
+          const oppP = chess.get(opp.from as unknown as import('chess.js').Square);
+          if (oppP) {
+            chess.remove(opp.from as unknown as import('chess.js').Square);
+            chess.put(
+              { type: (oppPromo as PieceType) ?? oppP.type, color: oppP.color },
+              opp.to as unknown as import('chess.js').Square
+            );
+            oppMoveSuccess = true;
+          } else {
+            console.warn('[useScenarioRunner] Opponent move failed: piece not found at', opp.from);
+            oppMoveSuccess = false;
+          }
+        } else {
+          oppMoveSuccess = true;
+        }
+
+        if (oppMoveSuccess) {
+          currentFen.value = chess.fen();
+          lastMove.value = { from: opp.from, to: opp.to };
+        }
+      } catch (err) {
+        console.warn('[useScenarioRunner] Bot response execution failed:', err);
+        oppMoveSuccess = false;
+      } finally {
+        isWaitingForBotResponse.value = false;
+        // MAJ-025: Only advance step if move succeeded!
+        if (oppMoveSuccess) {
+          advanceOrCompleteStep();
+        }
+      }
+    }, delay);
+  }
+
   function applyPlayerMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }): boolean {
     if (!currentStep.value || isWaitingForBotResponse.value || isCompleted.value) {
       return false;
@@ -171,125 +288,23 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     const isValidForStep = validateStepMove(step, move, chess);
 
     if (!isValidForStep) {
-      // Wrong move attempted! Non-punitive feedback
-      mistakesCurrentAttempt.value++;
-      isShaking.value = true;
-      feedbackMessage.value = 'Not quite! Look for the goal square or tap 💡 Hint for a clue.';
-
-      // Auto-hint reveal after 2 mistakes (SC-4 UX Polish)
-      if (mistakesCurrentAttempt.value >= 2 && !activeHint.value) {
-        revealHint();
-      }
-
-      if (shakeTimer) clearTimeout(shakeTimer);
-      shakeTimer = setTimeout(() => {
-        isShaking.value = false;
-      }, 400);
-
-      boardSelection.clearSelection();
+      handleFailedPlayerMove();
       return false;
     }
 
     // Move is valid for this tutorial step! Execute move
     try {
-      const promoChar = move.promotion ? (move.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n') : 'q';
-      const isPromo = checkIsPromotionMove(move.from, move.to);
-      let res: Move | null = null;
-
-      try {
-        res = chess.move({
-          from: move.from as unknown as import('chess.js').Square,
-          to: move.to as unknown as import('chess.js').Square,
-          promotion: isPromo ? promoChar : undefined,
-        });
-      } catch (err) {
-        console.warn('[useScenarioRunner] chess.move error, using fallback board mutation:', err);
-        res = null;
-      }
-
-      if (!res) {
-        // Fallback for tutorial board state
-        const p = chess.get(move.from as unknown as import('chess.js').Square);
-        if (p) {
-          chess.remove(move.from as unknown as import('chess.js').Square);
-          chess.put(
-            { type: isPromo ? (promoChar as PieceType) : p.type, color: p.color },
-            move.to as unknown as import('chess.js').Square
-          );
-        }
-      }
-
-      currentFen.value = chess.fen();
-      lastMove.value = { from: move.from, to: move.to };
-      isStepSuccess.value = true;
-      feedbackMessage.value = chess.isCheckmate()
-        ? 'Checkmate! Beautiful finish! 🏆'
-        : step.explanationOnSuccess;
-      boardSelection.clearSelection();
+      const { isCheckmate } = executePlayerMoveOnEngine(step, move);
 
       // Sound alternative checkmate: if move delivers sound checkmate, accept immediately!
-      if (chess.isCheckmate()) {
+      if (isCheckmate) {
         advanceOrCompleteStep();
         return true;
       }
 
       // Check if there is an automated opponent response
       if (step.opponentResponse) {
-        const opp = step.opponentResponse;
-        isWaitingForBotResponse.value = true;
-        const delay = opp.delayMs ?? 500;
-
-        botTimer = setTimeout(() => {
-          let oppMoveSuccess = false;
-          try {
-            const oppPromo = opp.promotion
-              ? (opp.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n')
-              : undefined;
-            let oppRes: Move | null = null;
-
-            try {
-              oppRes = chess.move({
-                from: opp.from as unknown as import('chess.js').Square,
-                to: opp.to as unknown as import('chess.js').Square,
-                promotion: oppPromo,
-              });
-            } catch (err) {
-              console.warn('[useScenarioRunner] Bot response chess.move error, using fallback mutation:', err);
-              oppRes = null;
-            }
-
-            if (!oppRes) {
-              const oppP = chess.get(opp.from as unknown as import('chess.js').Square);
-              if (oppP) {
-                chess.remove(opp.from as unknown as import('chess.js').Square);
-                chess.put(
-                  { type: (oppPromo as PieceType) ?? oppP.type, color: oppP.color },
-                  opp.to as unknown as import('chess.js').Square
-                );
-                oppMoveSuccess = true;
-              } else {
-                console.warn('[useScenarioRunner] Opponent move failed: piece not found at', opp.from);
-                oppMoveSuccess = false;
-              }
-            } else {
-              oppMoveSuccess = true;
-            }
-
-            if (oppMoveSuccess) {
-              currentFen.value = chess.fen();
-              lastMove.value = { from: opp.from, to: opp.to };
-            }
-          } catch (err) {
-            console.warn('[useScenarioRunner] Bot response execution failed:', err);
-            oppMoveSuccess = false;
-          } finally {
-            isWaitingForBotResponse.value = false;
-            // MAJ-025: Only advance step if move succeeded!
-            if (oppMoveSuccess) {
-              advanceOrCompleteStep();
-            }
-          }
-        }, delay);
+        scheduleOpponentReply(step.opponentResponse);
       } else {
         advanceOrCompleteStep();
       }

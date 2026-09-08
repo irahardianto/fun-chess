@@ -1,11 +1,11 @@
-import type {
-  PuzzleProgress,
-  PuzzleProgressStore,
-  AdaptiveRatingState,
-  PuzzleTheme,
-  PuzzleAttemptResult,
-  StarRating,
-  SolvedPuzzleRecord,
+import {
+  sanitizeAndValidateProgress,
+  type PuzzleProgress,
+  type PuzzleProgressStore,
+  type AdaptiveRatingState,
+  type PuzzleTheme,
+  type PuzzleAttemptResult,
+  type StarRating,
 } from '@fun-chess/shared';
 import {
   PUZZLE_PROGRESS_STORAGE_KEY,
@@ -50,103 +50,37 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return { ...DEFAULT_PUZZLE_PROGRESS };
     }
-    const data = raw as Record<string, any>;
 
-    const rawProfile = data.ratingProfile;
-    const ratingProfile: AdaptiveRatingState = {
-      rating:
-        typeof rawProfile?.rating === 'number' && !isNaN(rawProfile.rating)
-          ? Math.max(500, Math.round(rawProfile.rating))
-          : 800,
-      ratingDeviation:
-        typeof rawProfile?.ratingDeviation === 'number' && !isNaN(rawProfile.ratingDeviation)
-          ? Math.max(50, Math.round(rawProfile.ratingDeviation))
-          : 350,
-      peakRating:
-        typeof rawProfile?.peakRating === 'number' && !isNaN(rawProfile.peakRating)
-          ? Math.max(500, Math.round(rawProfile.peakRating))
-          : 800,
-      totalAttempted:
-        typeof rawProfile?.totalAttempted === 'number' && rawProfile.totalAttempted >= 0
-          ? Math.round(rawProfile.totalAttempted)
-          : 0,
-      totalSolved:
-        typeof rawProfile?.totalSolved === 'number' && rawProfile.totalSolved >= 0
-          ? Math.round(rawProfile.totalSolved)
-          : 0,
-      bestStreak:
-        typeof rawProfile?.bestStreak === 'number' && rawProfile.bestStreak >= 0
-          ? Math.round(rawProfile.bestStreak)
-          : 0,
-      ratingHistory: Array.isArray(rawProfile?.ratingHistory) ? rawProfile.ratingHistory : [],
-    };
+    const payload =
+      'puzzles' in (raw as object) &&
+      typeof (raw as any).puzzles === 'object' &&
+      (raw as any).puzzles !== null &&
+      !Array.isArray((raw as any).puzzles)
+        ? raw
+        : { puzzles: raw };
 
-    const rawThemeMastery = data.themeMastery;
-    const themeMastery: Record<string, any> = {};
-    if (typeof rawThemeMastery === 'object' && rawThemeMastery !== null && !Array.isArray(rawThemeMastery)) {
-      for (const [key, val] of Object.entries(rawThemeMastery)) {
-        if (val && typeof val === 'object') {
-          const tVal = val as Record<string, any>;
-          themeMastery[key] = {
-            theme: key,
-            attempted: typeof tVal.attempted === 'number' ? Math.max(0, tVal.attempted) : 0,
-            solved: typeof tVal.solved === 'number' ? Math.max(0, tVal.solved) : 0,
-            starsEarned: typeof tVal.starsEarned === 'number' ? Math.max(0, tVal.starsEarned) : 0,
-            masteryLevel:
-              tVal.masteryLevel === 'master' || tVal.masteryLevel === 'apprentice'
-                ? tVal.masteryLevel
-                : 'novice',
-            lastPracticedAt:
-              typeof tVal.lastPracticedAt === 'number' ? tVal.lastPracticedAt : Date.now(),
-          };
+    const validationResult = sanitizeAndValidateProgress(payload);
+    if (validationResult.success && validationResult.data?.puzzles) {
+      const sanitized = validationResult.data.puzzles;
+      const rawThemes = (payload as any).puzzles?.themeMastery;
+      if (rawThemes && typeof rawThemes === 'object') {
+        for (const [key, val] of Object.entries(rawThemes)) {
+          if (val && typeof val === 'object' && 'masteryLevel' in (val as object)) {
+            const ml = (val as any).masteryLevel;
+            const existing = sanitized.themeMastery[key];
+            if ((ml === 'master' || ml === 'apprentice' || ml === 'novice') && existing) {
+              sanitized.themeMastery[key] = {
+                ...existing,
+                masteryLevel: ml,
+              };
+            }
+          }
         }
       }
+      return sanitized;
     }
 
-    const rawArcade = data.arcadeStats;
-    const arcadeStats = {
-      puzzleRushHighScore:
-        typeof rawArcade?.puzzleRushHighScore === 'number'
-          ? Math.max(0, Math.round(rawArcade.puzzleRushHighScore))
-          : 0,
-      puzzleRushBestStreak:
-        typeof rawArcade?.puzzleRushBestStreak === 'number'
-          ? Math.max(0, Math.round(rawArcade.puzzleRushBestStreak))
-          : 0,
-      streakSurvivorHighScore:
-        typeof rawArcade?.streakSurvivorHighScore === 'number'
-          ? Math.max(0, Math.round(rawArcade.streakSurvivorHighScore))
-          : 0,
-      totalRushRuns:
-        typeof rawArcade?.totalRushRuns === 'number'
-          ? Math.max(0, Math.round(rawArcade.totalRushRuns))
-          : 0,
-    };
-
-    const rawSolved = data.solvedPuzzles;
-    const solvedPuzzles: Record<string, SolvedPuzzleRecord> = {};
-    if (typeof rawSolved === 'object' && rawSolved !== null && !Array.isArray(rawSolved)) {
-      for (const [key, val] of Object.entries(rawSolved)) {
-        if (val && typeof val === 'object') {
-          const sVal = val as Record<string, any>;
-          const stars = sVal.stars === 3 ? 3 : sVal.stars === 2 ? 2 : 1;
-          solvedPuzzles[key] = {
-            stars,
-            solvedAt: typeof sVal.solvedAt === 'number' ? sVal.solvedAt : Date.now(),
-          };
-        }
-      }
-    }
-
-    const now = Date.now();
-    return {
-      ratingProfile,
-      themeMastery,
-      arcadeStats,
-      solvedPuzzles,
-      createdAt: typeof data.createdAt === 'number' ? data.createdAt : now,
-      lastActiveAt: typeof data.lastActiveAt === 'number' ? data.lastActiveAt : now,
-    };
+    return { ...DEFAULT_PUZZLE_PROGRESS };
   }
 
   public async getProgress(): Promise<PuzzleProgress> {

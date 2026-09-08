@@ -5,7 +5,7 @@ import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
 import { extractClientIp } from "./static_handler.js";
 import { IFileStorage } from "./file_storage.js";
-import { LanInfoResponse } from "@fun-chess/shared";
+import { LanInfoResponse, AppError } from "@fun-chess/shared";
 import { isOriginAllowed, resolveAllowedOrigins, type ServerEnv } from "../config/index.js";
 import { HttpRateLimiter } from "./http_rate_limiter.js";
 import {
@@ -59,8 +59,78 @@ const SECURITY_HEADERS: Record<string, string> = {
 
 // --- Extracted HTTP Helpers (MAJ-038) ---
 
-function applySecurityHeaders(res: ServerResponse, correlationId: string): void {
+export interface HttpErrorResponse {
+  code: number;
+  error: string;
+  message: string;
+  correlationId?: string;
+  timestamp: number;
+}
+
+export type HttpErrorEnvelope = HttpErrorResponse;
+
+export function formatHttpError(
+  code: number,
+  error: string,
+  message: string,
+  correlationId?: string,
+  timestamp: number = Date.now(),
+): HttpErrorResponse {
+  return {
+    code,
+    error,
+    message,
+    ...(correlationId ? { correlationId } : {}),
+    timestamp,
+  };
+}
+
+export function formatHttpErrorFromException(
+  err: unknown,
+  correlationId?: string,
+  timestamp: number = Date.now(),
+): { statusCode: number; payload: HttpErrorResponse } {
+  if (err instanceof AppError) {
+    return {
+      statusCode: err.statusCode,
+      payload: formatHttpError(
+        err.statusCode,
+        err.code,
+        err.message,
+        correlationId,
+        timestamp,
+      ),
+    };
+  }
+
+  // Generic unhandled exception: sanitized to never leak internal details or exceptions
+  return {
+    statusCode: 500,
+    payload: formatHttpError(
+      500,
+      "ERR_INTERNAL_SERVER",
+      "Internal server error",
+      correlationId,
+      timestamp,
+    ),
+  };
+}
+
+function applySecurityHeaders(
+  res: ServerResponse,
+  correlationId: string,
+  req?: IncomingMessage,
+  _isProduction?: boolean,
+): void {
   for (const [headerKey, headerVal] of Object.entries(SECURITY_HEADERS)) {
+    if (headerKey === "Strict-Transport-Security") {
+      const isHttps =
+        Boolean((req?.socket as any)?.encrypted) ||
+        req?.headers["x-forwarded-proto"] === "https";
+      if (!isHttps) {
+        continue;
+      }
+    }
     res.setHeader(headerKey, headerVal);
   }
   res.setHeader("X-Correlation-ID", correlationId);
@@ -142,7 +212,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     roomStore,
     logger,
     port = config.env?.PORT ?? 3000,
-    distPath = path.resolve(process.cwd(), "../client/dist"),
+    distPath = config.distPath ?? config.env?.CLIENT_DIST_PATH ?? path.resolve(process.cwd(), "../client/dist"),
     fileStorage,
     env = config.env,
     allowedOrigins: configuredAllowedOrigins,
@@ -210,7 +280,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     const clientIp = extractClientIp(req, env?.TRUST_PROXY);
 
     // 1. Security Headers (SEC-02, MAJ-001)
-    applySecurityHeaders(res, correlationId);
+    applySecurityHeaders(res, correlationId, req, isProduction);
 
     // 2. CORS Handling (MAJ-005)
     const { origin, isOriginPermitted } = applyCorsHeaders(
@@ -326,7 +396,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     try {
       // 5. GET / HEAD /healthz - Container Liveness & Readiness Probe
       if ((method === "GET" || method === "HEAD") && pathname === "/healthz") {
-        sendTextResponse(200, healthController.getLiveness());
+        sendTextResponse(200, "OK");
         return;
       }
 
@@ -340,24 +410,45 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
           method,
         });
 
-        sendJsonResponse(429, {
-          status: "error",
-          error: {
-            code: "ERR_RATE_LIMITED",
-            message: "Rate limit exceeded. Please wait before retrying.",
-          },
-          correlationId,
-        });
+        const maxReq = config.env?.RATE_LIMIT_MAX_REQUESTS ?? 100;
+        const windowSec = Math.round(
+          (config.env?.RATE_LIMIT_WINDOW_MS ?? 10_000) / 1000,
+        );
+        const rawDesc =
+          rateLimiter?.getLimitDescription?.() ||
+          `Maximum ${maxReq} requests per ${windowSec} seconds allowed.`;
+        const limitDesc = rawDesc.includes("Rate limit exceeded")
+          ? rawDesc
+          : `Rate limit exceeded. ${rawDesc}`;
+        sendJsonResponse(
+          429,
+          formatHttpError(
+            429,
+            "ERR_RATE_LIMITED",
+            limitDesc,
+            correlationId,
+          ),
+        );
         return;
       }
 
-      // 7. GET / HEAD /health & /api/health - Operational Telemetry Health Check
+      // 7. GET / HEAD /health & /api/health - Public lightweight LivenessHealthResponse (ENH-003)
       if (
         (method === "GET" || method === "HEAD") &&
         (pathname === "/health" || pathname === "/api/health")
       ) {
-        const health = await healthController.getHealth();
-        sendJsonResponse(200, health);
+        const liveness = healthController.getLiveness();
+        sendJsonResponse(200, liveness);
+        return;
+      }
+
+      // GET / HEAD /metrics & /health/detail - Operational DetailedHealthResponse (ENH-003)
+      if (
+        (method === "GET" || method === "HEAD") &&
+        (pathname === "/metrics" || pathname === "/health/detail")
+      ) {
+        const detailed = await healthController.getDetailedHealth();
+        sendJsonResponse(200, detailed);
         return;
       }
 
@@ -388,14 +479,15 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       }
 
       // 10. Unhandled 404 with standardized error envelope (MIN-032)
-      sendJsonResponse(404, {
-        status: "error",
-        error: {
-          code: "ERR_NOT_FOUND",
-          message: `Cannot ${method} ${pathname}`,
-        },
-        correlationId,
-      });
+      sendJsonResponse(
+        404,
+        formatHttpError(
+          404,
+          "ERR_NOT_FOUND",
+          `Cannot ${method} ${pathname}`,
+          correlationId,
+        ),
+      );
     } catch (err) {
       const duration = Math.round(performance.now() - startTime);
       const errorObj =
@@ -415,15 +507,11 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       });
 
       if (!res.headersSent) {
-        sendJsonResponse(500, {
-          status: "error",
-          error: {
-            code: "ERR_INTERNAL_SERVER",
-            message: "Internal server error",
-            correlationId,
-          },
+        const { statusCode, payload } = formatHttpErrorFromException(
+          err,
           correlationId,
-        });
+        );
+        sendJsonResponse(statusCode, payload);
       }
     }
   };

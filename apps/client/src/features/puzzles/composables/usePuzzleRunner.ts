@@ -6,6 +6,7 @@ import type {
   PieceColor,
   StarRating,
   PlayerMoveAction,
+  MoveValidationOutcome,
   PlayerMistakeRefutation,
   PuzzleAttemptResult,
   PuzzleAnalysisResult,
@@ -16,6 +17,7 @@ import { analyzePuzzleSolution } from '../engine/puzzle_analysis_engine';
 import { usePuzzleHints } from './usePuzzleHints';
 import { usePuzzleReplay, type ReplayStep } from './usePuzzleReplay';
 import { useAudio } from '../../../composables/useAudio';
+import { logger } from '../../../platform/telemetry/index.js';
 
 export type { ReplayStep };
 
@@ -125,7 +127,13 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
       const chess = new Chess(fenStr);
       const moves = chess.moves({ square: sq as ChessSquare, verbose: true });
       return moves.map((m) => m.to as Square);
-    } catch {
+    } catch (err) {
+      logger.warn('Failed to calculate legal moves from FEN', {
+        operation: 'puzzle_runner_recalculate_legal_moves',
+        fenStr,
+        square: sq,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return [];
     }
   }
@@ -177,13 +185,122 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
         selectedSquare.value = null;
         legalMoves.value = [];
       }
-    } catch {
+    } catch (err) {
+      logger.warn('Failed to inspect square on board', {
+        operation: 'puzzle_runner_select_square',
+        square: sq,
+        error: err instanceof Error ? err.message : String(err),
+      });
       selectedSquare.value = null;
       legalMoves.value = [];
     }
   }
 
-  function applyPlayerMove(move: PlayerMoveAction) {
+  function handleFailedPuzzleMove(outcome: MoveValidationOutcome): void {
+    mistakesCount.value += 1;
+    isShaking.value = true;
+    feedbackMessage.value = outcome.feedback;
+    lastMistakeRefutation.value = outcome.refutation ?? null;
+    selectedSquare.value = null;
+    legalMoves.value = [];
+    if (autoAudio) audio.playError();
+
+    if (shakeTimer) {
+      clearTimeout(shakeTimer);
+      shakeTimer = null;
+    }
+    shakeTimer = setTimeout(() => {
+      isShaking.value = false;
+      shakeTimer = null;
+    }, 400);
+
+    // Non-punitive: auto-reveal Tier 1 nudge if child makes 2 mistakes
+    if (currentPuzzle.value) {
+      hints.checkAutoNudge(
+        mistakesCount.value,
+        currentPuzzle.value,
+        currentMoveIndex.value,
+        currentFen.value
+      );
+      options.onMistake?.(currentPuzzle.value, mistakesCount.value);
+      options.onFailed?.(currentPuzzle.value, mistakesCount.value);
+    }
+  }
+
+  function finalizePuzzleSuccess(outcome: MoveValidationOutcome): void {
+    if (!currentPuzzle.value) return;
+
+    currentFen.value = outcome.nextFen;
+    currentMoveIndex.value = outcome.nextMoveIndex;
+    isCompleted.value = true;
+    isSolvedSuccessfully.value = true;
+    replay.completeReplay();
+
+    const hintsUsed = hints.hintsUsedCount.value;
+    if (hintsUsed === 0 && mistakesCount.value === 0) {
+      attemptResult.value = 'solved_first_try';
+    } else if (hintsUsed > 0) {
+      attemptResult.value = 'solved_with_hints';
+    } else {
+      attemptResult.value = 'solved_with_retries';
+    }
+
+    if (autoAudio) audio.playVictory();
+
+    const callback = options.onSolved || options.onSolve;
+    callback?.(
+      currentPuzzle.value,
+      calculatedStars.value,
+      hintsUsed,
+      mistakesCount.value
+    );
+  }
+
+  function scheduleOpponentReply(outcome: MoveValidationOutcome): void {
+    // Advance to interim FEN immediately so player sees their piece move without visual lag
+    if (outcome.intermediateFen) {
+      currentFen.value = outcome.intermediateFen;
+    }
+    isWaitingForBot.value = true;
+    if (botTimer) {
+      clearTimeout(botTimer);
+      botTimer = null;
+    }
+    botTimer = setTimeout(() => {
+      botTimer = null;
+      if (!currentPuzzle.value) return;
+      currentFen.value = outcome.nextFen;
+      currentMoveIndex.value = outcome.nextMoveIndex;
+      if (outcome.botReplyMove) {
+        lastMove.value = { from: outcome.botReplyMove.from, to: outcome.botReplyMove.to };
+        if (autoAudio) audio.playMove();
+      }
+      isWaitingForBot.value = false;
+
+      // Reset progressive hint for next user ply
+      hints.resetHints();
+    }, 450);
+  }
+
+  function handleSuccessfulPlayerMove(
+    move: PlayerMoveAction,
+    outcome: MoveValidationOutcome
+  ): void {
+    selectedSquare.value = null;
+    legalMoves.value = [];
+    lastMove.value = { from: move.from, to: move.to };
+    feedbackMessage.value = outcome.feedback;
+    lastMistakeRefutation.value = null;
+    if (autoAudio) audio.playMove();
+
+    if (outcome.isPuzzleComplete) {
+      finalizePuzzleSuccess(outcome);
+    } else if (outcome.botReplyMove) {
+      scheduleOpponentReply(outcome);
+    }
+  }
+
+  function applyPlayerMove(move: PlayerMoveAction): void {
     if (!currentPuzzle.value || isCompleted.value || isWaitingForBot.value) return;
 
     const outcome = validatePuzzleMove(
@@ -194,94 +311,11 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     );
 
     if (!outcome.isCorrect) {
-      mistakesCount.value += 1;
-      isShaking.value = true;
-      feedbackMessage.value = outcome.feedback;
-      lastMistakeRefutation.value = outcome.refutation ?? null;
-      selectedSquare.value = null;
-      legalMoves.value = [];
-      if (autoAudio) audio.playError();
-
-      if (shakeTimer) {
-        clearTimeout(shakeTimer);
-        shakeTimer = null;
-      }
-      shakeTimer = setTimeout(() => {
-        isShaking.value = false;
-        shakeTimer = null;
-      }, 400);
-
-      // Non-punitive: auto-reveal Tier 1 nudge if child makes 2 mistakes
-      hints.checkAutoNudge(
-        mistakesCount.value,
-        currentPuzzle.value,
-        currentMoveIndex.value,
-        currentFen.value
-      );
-
-      options.onMistake?.(currentPuzzle.value, mistakesCount.value);
-      options.onFailed?.(currentPuzzle.value, mistakesCount.value);
+      handleFailedPuzzleMove(outcome);
       return;
     }
 
-    // Move is correct!
-    selectedSquare.value = null;
-    legalMoves.value = [];
-    lastMove.value = { from: move.from, to: move.to };
-    feedbackMessage.value = outcome.feedback;
-    lastMistakeRefutation.value = null;
-    if (autoAudio) audio.playMove();
-
-    if (outcome.isPuzzleComplete) {
-      currentFen.value = outcome.nextFen;
-      currentMoveIndex.value = outcome.nextMoveIndex;
-      isCompleted.value = true;
-      isSolvedSuccessfully.value = true;
-      replay.completeReplay();
-
-      const hintsUsed = hints.hintsUsedCount.value;
-      if (hintsUsed === 0 && mistakesCount.value === 0) {
-        attemptResult.value = 'solved_first_try';
-      } else if (hintsUsed > 0) {
-        attemptResult.value = 'solved_with_hints';
-      } else {
-        attemptResult.value = 'solved_with_retries';
-      }
-
-      if (autoAudio) audio.playVictory();
-
-      const callback = options.onSolved || options.onSolve;
-      callback?.(
-        currentPuzzle.value,
-        calculatedStars.value,
-        hintsUsed,
-        mistakesCount.value
-      );
-    } else if (outcome.botReplyMove) {
-      // Advance to interim FEN immediately so player sees their piece move without visual lag
-      if (outcome.intermediateFen) {
-        currentFen.value = outcome.intermediateFen;
-      }
-      isWaitingForBot.value = true;
-      if (botTimer) {
-        clearTimeout(botTimer);
-        botTimer = null;
-      }
-      botTimer = setTimeout(() => {
-        botTimer = null;
-        if (!currentPuzzle.value) return;
-        currentFen.value = outcome.nextFen;
-        currentMoveIndex.value = outcome.nextMoveIndex;
-        if (outcome.botReplyMove) {
-          lastMove.value = { from: outcome.botReplyMove.from, to: outcome.botReplyMove.to };
-          if (autoAudio) audio.playMove();
-        }
-        isWaitingForBot.value = false;
-
-        // Reset progressive hint for next user ply
-        hints.resetHints();
-      }, 450);
-    }
+    handleSuccessfulPlayerMove(move, outcome);
   }
 
   function revealNextHint() {

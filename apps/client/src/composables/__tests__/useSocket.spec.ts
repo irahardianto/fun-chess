@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useSocket, resetSocketState, SESSION_STORAGE_KEY } from '../useSocket';
+import { logger } from '@/platform/telemetry';
 import type { GameState, MoveResult, Player, RoomState } from '@fun-chess/shared';
 
 const UUID_P1 = '11111111-1111-4111-8111-111111111111';
@@ -999,7 +1000,7 @@ describe('useSocket composable', () => {
 
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Draw offer timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Draw offer timed out.' }),
       });
     });
 
@@ -1012,7 +1013,7 @@ describe('useSocket composable', () => {
 
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Draw response timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Draw response timed out.' }),
       });
     });
 
@@ -1025,7 +1026,7 @@ describe('useSocket composable', () => {
 
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch request timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch request timed out.' }),
       });
     });
 
@@ -1038,7 +1039,7 @@ describe('useSocket composable', () => {
 
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch response timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch response timed out.' }),
       });
     });
 
@@ -1051,7 +1052,7 @@ describe('useSocket composable', () => {
 
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Resign timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Resign timed out.' }),
       });
     });
   });
@@ -1240,7 +1241,7 @@ describe('useSocket composable', () => {
       expect(callback).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Draw offer timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Draw offer timed out.' }),
       });
 
       // Late ack arrives
@@ -1268,7 +1269,7 @@ describe('useSocket composable', () => {
       expect(callback).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Draw response timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Draw response timed out.' }),
       });
 
       // Late ack arrives
@@ -1296,7 +1297,7 @@ describe('useSocket composable', () => {
       expect(callback).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch request timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch request timed out.' }),
       });
 
       // Late ack arrives
@@ -1323,7 +1324,7 @@ describe('useSocket composable', () => {
       expect(callback).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch response timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch response timed out.' }),
       });
 
       // Late ack arrives
@@ -1350,7 +1351,7 @@ describe('useSocket composable', () => {
       expect(callback).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Resign timed out.' },
+        error: expect.objectContaining({ code: 'ERR_SOCKET_TIMEOUT', message: 'Resign timed out.' }),
       });
 
       // Late ack arrives
@@ -1765,6 +1766,101 @@ describe('useSocket composable', () => {
       expect(currentRoom.value).toEqual(targetRoom);
       expect(currentPlayer.value).toEqual(targetPlayer);
     });
+
+    it('properly re-hydrates drawOfferedBy and rematchRequestedBy on room:reconnected [CRIT-003]', () => {
+      const { currentRoom, currentPlayer, drawOfferedBy, rematchRequestedBy } = useSocket(mockSocket);
+
+      const hostPlayer: Player = {
+        id: 'p1',
+        socketId: 's1',
+        name: 'White Host',
+        color: 'w',
+        isHost: true,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+
+      const guestPlayer: Player = {
+        id: 'p2',
+        socketId: 's2',
+        name: 'Black Opponent',
+        color: 'b',
+        isHost: false,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+
+      // Case 1: Reconnecting as White (p1) while Black (p2) has active draw and rematch offers
+      const roomWithIncomingOffers: RoomState = {
+        roomCode: 'REHY',
+        status: 'playing',
+        hostId: 'p1',
+        whitePlayer: hostPlayer,
+        blackPlayer: guestPlayer,
+        spectators: [],
+        game: {} as GameState,
+        drawOffer: {
+          offeredBy: 'p2',
+          offeredAt: 2000,
+        },
+        rematch: {
+          requestedBy: 'p2',
+          requestedAt: 2000,
+          status: 'pending',
+        },
+        createdAt: 1000,
+        lastActivityAt: 2000,
+      };
+
+      eventHandlers['room:reconnected']({
+        room: roomWithIncomingOffers,
+        player: hostPlayer,
+        roomStatus: 'playing',
+      });
+
+      expect(currentRoom.value).toEqual(roomWithIncomingOffers);
+      expect(currentPlayer.value).toEqual(hostPlayer);
+      expect(drawOfferedBy.value).toEqual({
+        fromPlayerId: 'p2',
+        fromPlayerName: 'Black Opponent',
+      });
+      expect(rematchRequestedBy.value).toEqual({
+        requestedBy: 'p2',
+        requesterName: 'Black Opponent',
+      });
+
+      // Case 2: Reconnecting as White when White offered the draw/rematch (should not show response prompt)
+      const roomWithSelfOffers: RoomState = {
+        ...roomWithIncomingOffers,
+        drawOffer: { offeredBy: 'p1', offeredAt: 2000 },
+        rematch: { requestedBy: 'p1', requestedAt: 2000, status: 'pending' },
+      };
+
+      eventHandlers['room:reconnected']({
+        room: roomWithSelfOffers,
+        player: hostPlayer,
+        roomStatus: 'playing',
+      });
+
+      expect(drawOfferedBy.value).toBeNull();
+      expect(rematchRequestedBy.value).toBeNull();
+
+      // Case 3: Reconnecting when no offers are active
+      const roomWithNoOffers: RoomState = {
+        ...roomWithIncomingOffers,
+        drawOffer: null,
+        rematch: null,
+      };
+
+      eventHandlers['room:reconnected']({
+        room: roomWithNoOffers,
+        player: hostPlayer,
+        roomStatus: 'playing',
+      });
+
+      expect(drawOfferedBy.value).toBeNull();
+      expect(rematchRequestedBy.value).toBeNull();
+    });
   });
 
   describe('Client Socket Actions Zod Schema Validation Before Transmission (MIN-030)', () => {
@@ -1867,14 +1963,47 @@ describe('useSocket composable', () => {
       expect(callback).toHaveBeenCalledWith({ success: true });
     });
 
-    it('should handle leaveRoom with shared_socket_456 test harness shim', async () => {
+    it('should handle leaveRoom with typed ack callback and remove shared_socket_456 backdoor [CRIT-003 & MAJ-026]', async () => {
       const { leaveRoom } = useSocket(mockSocket);
       mockSocket.id = 'shared_socket_456';
       mockSocket.connected = true;
 
+      mockSocket.emit.mockImplementation((event: string, _payload: any, cb?: Function) => {
+        if (event === 'room:leave' && cb) {
+          cb({ success: true });
+        }
+      });
+
       const callback = vi.fn();
-      await leaveRoom('LEAV', callback);
+      const result = await leaveRoom('LEAV', callback);
+      expect(result).toBe(true);
       expect(callback).toHaveBeenCalledWith({ success: true });
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        'room:leave',
+        expect.objectContaining({ roomCode: 'LEAV' }),
+        expect.any(Function)
+      );
+    });
+
+    it('should handle leaveRoom fallback timeout when server does not respond [MAJ-026]', async () => {
+      vi.useFakeTimers();
+      const { leaveRoom } = useSocket(mockSocket);
+      mockSocket.id = 'regular_sock';
+      mockSocket.connected = true;
+
+      // Server does not call callback (emulating hanging network or no ack)
+      mockSocket.emit.mockImplementation(() => {});
+
+      const callback = vi.fn();
+      const leavePromise = leaveRoom('LEAV', callback);
+
+      // Advance timers to trigger fallback timeout
+      await vi.advanceTimersByTimeAsync(2500);
+
+      const result = await leavePromise;
+      expect(result).toBe(true);
+      expect(callback).toHaveBeenCalledWith({ success: true });
+      vi.useRealTimers();
     });
 
     it('should handle leaveRoom when server responds with success: false', async () => {
@@ -2006,8 +2135,8 @@ describe('useSocket composable', () => {
       }).not.toThrow();
 
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[useSocket] Failed to parse saved session from storage:'),
-        expect.any(Error)
+        expect.stringMatching(/Failed to parse saved session from storage/),
+        expect.anything()
       );
 
       warnSpy.mockRestore();
@@ -2064,5 +2193,83 @@ describe('useSocket composable', () => {
       expect(sock).toBeDefined();
     });
   });
-});
 
+  describe('Structured 3-Point Logging for Client Socket Actions (MAJ-019)', () => {
+    it('emits start and success logs with correlationId and duration for createRoom', async () => {
+      const debugSpy = vi.spyOn(logger, 'debug');
+      const infoSpy = vi.spyOn(logger, 'info');
+
+      mockSocket.emit.mockImplementation((event: string, _payload: any, cb?: Function) => {
+        if (event === 'room:create' && cb) {
+          cb({
+            success: true,
+            room: {
+              roomCode: 'LOG1',
+              status: 'lobby',
+              hostId: 'p1',
+              whitePlayer: { id: 'p1', name: 'Alice', color: 'w', isHost: true },
+              blackPlayer: null,
+              spectators: [],
+              game: {},
+            },
+            player: { id: 'p1', name: 'Alice', color: 'w', isHost: true },
+            sessionToken: 'tok_log1',
+          });
+        }
+      });
+
+      const { createRoom } = useSocket(mockSocket);
+      const res = await createRoom('Alice');
+      expect(res.success).toBe(true);
+
+      // Verify start log
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('room'),
+        expect.objectContaining({
+          operation: expect.stringMatching(/room_create|socket/),
+          correlationId: expect.any(String),
+        })
+      );
+
+      // Verify completion log
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('succeeded'),
+        expect.objectContaining({
+          operation: expect.stringMatching(/room_create|socket/),
+          correlationId: expect.any(String),
+          duration: expect.any(Number),
+        })
+      );
+    });
+
+    it('emits failure logs with correlationId and error context when socket action fails', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn');
+
+      mockSocket.emit.mockImplementation((event: string, _payload: any, cb?: Function) => {
+        if (event === 'room:join' && cb) {
+          cb({
+            success: false,
+            error: {
+              code: 'ERR_ROOM_NOT_FOUND',
+              message: 'Room DOESNOTEXIST not found',
+            },
+          });
+        }
+      });
+
+      const { joinRoom } = useSocket(mockSocket);
+      const res = await joinRoom('DOESNOTEXIST', 'Bob');
+      expect(res.success).toBe(false);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed'),
+        expect.objectContaining({
+          operation: expect.stringMatching(/room_join|socket/),
+          correlationId: expect.any(String),
+          duration: expect.any(Number),
+          error: expect.anything(),
+        })
+      );
+    });
+  });
+});

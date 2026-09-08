@@ -72,6 +72,7 @@ const emit = defineEmits<{
   replay: [];
   retry: [];
   backToHub: [];
+  close: [];
 }>();
 
 const { celebrate } = useConfetti();
@@ -381,6 +382,18 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown);
 });
+
+function handleModalClose() {
+  emit('update:modelValue', false);
+  emit('close');
+}
+
+function handleModalUpdateModelValue(val: boolean) {
+  emit('update:modelValue', val);
+  if (!val) {
+    emit('close');
+  }
+}
 </script>
 
 <template>
@@ -392,7 +405,8 @@ onUnmounted(() => {
       size="md"
       title="🎉 Puzzle Solved! 🎉"
       data-testid="puzzle-completion-modal"
-      @close="emit('update:modelValue', false)"
+      @close="handleModalClose"
+      @update:model-value="handleModalUpdateModelValue"
     >
       <div class="completion-modal-body">
         <PuzzleCelebrationHeader

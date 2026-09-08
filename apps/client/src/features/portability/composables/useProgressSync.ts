@@ -21,6 +21,7 @@ import {
   ProgressFileService,
   defaultProgressFileService,
 } from '../services/progress_file.service';
+import { logger } from '@/platform/telemetry';
 
 export interface UseProgressSyncOptions {
   storage?: ProgressStorage;
@@ -56,7 +57,10 @@ function unwrapPayload(val: UnifiedProgressPayload): UnifiedProgressPayload {
   try {
     return JSON.parse(JSON.stringify(toRaw(val)));
   } catch (err) {
-    console.warn('[FC_PROGRESS_SYNC] Failed to deep-clone payload', err);
+    logger.warn('Failed to deep-clone payload', {
+      operation: 'progress_sync_unwrap',
+      error: err instanceof Error ? err.message : String(err),
+    });
     return val;
   }
 }
@@ -89,7 +93,10 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
     isSyncModalOpen.value = true;
     clearError();
     loadCurrentProgress().catch((err) => {
-      console.warn('[FC_PROGRESS_SYNC] Failed to refresh current progress on open', err);
+      logger.warn('Failed to refresh current progress on open', {
+        operation: 'progress_sync_open_modal',
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
   }
 
@@ -114,7 +121,10 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       currentProgress.value = payload;
       return payload;
     } catch (err: any) {
-      console.error('[FC_PROGRESS_SYNC] Failed to load unified progress', err);
+      logger.error('Failed to load unified progress', {
+        operation: 'progress_sync_load',
+        error: err instanceof Error ? err.message : String(err),
+      });
       syncError.value = 'Unable to load progress. Refresh the page to try again.';
       throw err;
     } finally {
@@ -138,7 +148,10 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       fileService.downloadProgressFile(envelopeJson, filename);
       return envelopeJson;
     } catch (err: any) {
-      console.error('[FC_PROGRESS_SYNC] Failed to export JSON backup', err);
+      logger.error('Failed to export JSON backup', {
+        operation: 'progress_sync_export_json',
+        error: err instanceof Error ? err.message : String(err),
+      });
       syncError.value = err?.message || 'Unable to export backup file. Check storage permissions and try again.';
       throw err;
     } finally {
@@ -161,7 +174,10 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       const qrString = await codec.encodeToQrString(rawPayload);
       return qrString;
     } catch (err: any) {
-      console.error('[FC_PROGRESS_SYNC] Failed to generate QR code payload', err);
+      logger.error('Failed to generate QR code payload', {
+        operation: 'progress_sync_export_qr',
+        error: err instanceof Error ? err.message : String(err),
+      });
       syncError.value = err?.message || 'Failed to generate QR code.';
       throw err;
     } finally {
@@ -194,7 +210,10 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
           const parsed = JSON.parse(trimmed);
           decoded = validator.assertValid(parsed);
         } catch (parseErr) {
-          console.warn('[FC_PROGRESS_SYNC] JSON parse failed on import payload', parseErr);
+          logger.warn('JSON parse failed on import payload', {
+            operation: 'progress_sync_import_parse',
+            error: parseErr instanceof Error ? parseErr.message : String(parseErr),
+          });
           throw new Error('Invalid JSON format in save data.');
         }
       } else {
@@ -223,7 +242,11 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
         return true;
       }
     } catch (err: any) {
-      console.error('[FC_PROGRESS_SYNC] Import validation failed', err);
+      // MIN-016: Log user validation rejections at WARN level instead of ERROR
+      logger.warn('Import validation failed', {
+        operation: 'progress_sync_import',
+        error: err instanceof Error ? err.message : String(err),
+      });
       syncError.value = err?.message || 'Failed to import save data. Check your QR code or save file.';
       return false;
     } finally {
@@ -232,6 +255,9 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
   }
 
   async function executeMerge(strategy: SyncMergeStrategy): Promise<UnifiedProgressPayload> {
+    if (isLoading.value && currentProgress.value) {
+      return currentProgress.value;
+    }
     isLoading.value = true;
     clearError();
 
@@ -244,6 +270,13 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
 
       const incoming = incomingPayload.value;
       if (!incoming && strategy !== 'keep_local') {
+        if (local) {
+          logger.warn('No incoming progress payload found; returning existing local progress', {
+            operation: 'progress_sync_merge',
+            strategy,
+          });
+          return local;
+        }
         throw new Error('No incoming progress data to merge.');
       }
 
@@ -268,13 +301,19 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
             options.confetti.celebrateVictory();
           }
         } catch (celebrationErr) {
-          console.warn('[FC_PROGRESS_SYNC] Celebration trigger failed', celebrationErr);
+          logger.warn('Celebration trigger failed', {
+            operation: 'progress_sync_celebration',
+            error: celebrationErr instanceof Error ? celebrationErr.message : String(celebrationErr),
+          });
         }
       }
 
       return merged;
     } catch (err: any) {
-      console.error('[FC_PROGRESS_SYNC] Failed to execute merge strategy', err);
+      logger.error('Failed to execute merge strategy', {
+        operation: 'progress_sync_merge',
+        error: err instanceof Error ? err.message : String(err),
+      });
       syncError.value = err?.message || 'Failed to save merged progress.';
       throw err;
     } finally {

@@ -4,6 +4,7 @@ import {
   RoomNotFoundError,
   OptimisticLockConflictError,
   LockTimeoutError,
+  LockExecutionTimeoutError,
 } from "./room.errors.js";
 import {
   IClock,
@@ -26,7 +27,10 @@ export class InMemoryRoomStore implements RoomStore {
   private readonly lockQueues = new Map<string, LockEntry>();
   // PERF: Reverse index from socketId -> { roomCode, playerId } for O(1) disconnect lookups (HIGH-006)
   private readonly socketIndex = new Map<string, { roomCode: string; playerId: string }>();
-  private readonly LOCK_TIMEOUT_MS = 5000;
+  // PERF: Reverse index from roomCode -> Set<socketId> for O(k) cleanup instead of O(N) scan
+  private readonly roomSockets = new Map<string, Set<string>>();
+  public readonly LOCK_TIMEOUT_MS = 5000;
+  public readonly EXECUTION_TIMEOUT_MS = 5000;
 
   constructor(
     private readonly clock: IClock = new SystemClock(),
@@ -35,27 +39,38 @@ export class InMemoryRoomStore implements RoomStore {
 
   private indexSockets(room: RoomState): void {
     const code = room.roomCode.toUpperCase();
+    this.unindexSockets(code);
+
+    const sockets = new Set<string>();
     if (room.whitePlayer?.socketId) {
       this.socketIndex.set(room.whitePlayer.socketId, { roomCode: code, playerId: room.whitePlayer.id });
+      sockets.add(room.whitePlayer.socketId);
     }
     if (room.blackPlayer?.socketId) {
       this.socketIndex.set(room.blackPlayer.socketId, { roomCode: code, playerId: room.blackPlayer.id });
+      sockets.add(room.blackPlayer.socketId);
     }
     if (room.spectators) {
       for (const s of room.spectators) {
         if (s.socketId) {
           this.socketIndex.set(s.socketId, { roomCode: code, playerId: s.id });
+          sockets.add(s.socketId);
         }
       }
+    }
+    if (sockets.size > 0) {
+      this.roomSockets.set(code, sockets);
     }
   }
 
   private unindexSockets(roomCode: string): void {
     const code = roomCode.toUpperCase();
-    for (const [socketId, entry] of this.socketIndex.entries()) {
-      if (entry.roomCode === code) {
+    const sockets = this.roomSockets.get(code);
+    if (sockets) {
+      for (const socketId of sockets) {
         this.socketIndex.delete(socketId);
       }
+      this.roomSockets.delete(code);
     }
   }
 
@@ -82,6 +97,13 @@ export class InMemoryRoomStore implements RoomStore {
         }
       }
       this.socketIndex.delete(socketId);
+      const sockets = this.roomSockets.get(indexed.roomCode);
+      if (sockets) {
+        sockets.delete(socketId);
+        if (sockets.size === 0) {
+          this.roomSockets.delete(indexed.roomCode);
+        }
+      }
     }
 
     // Fallback scan across active rooms
@@ -125,25 +147,36 @@ export class InMemoryRoomStore implements RoomStore {
       () => currentLock,
     );
 
-    let timer: NodeJS.Timeout | undefined;
+    let acquireTimer: NodeJS.Timeout | undefined;
+    let executionTimer: NodeJS.Timeout | undefined;
     let acquired = false;
     try {
-      // PERF: Cancel timeout timer once lock acquired to prevent event loop timer leaks (HIGH-001)
+      // 1. Lock Acquisition Race (5000ms acquisition timeout)
       await Promise.race([
         prevTail,
         new Promise((_, reject) => {
-          timer = setTimeout(
+          acquireTimer = setTimeout(
             () => reject(new LockTimeoutError(code, this.LOCK_TIMEOUT_MS)),
             this.LOCK_TIMEOUT_MS,
           );
         }),
       ]);
       acquired = true;
-      if (timer) clearTimeout(timer);
+      if (acquireTimer) clearTimeout(acquireTimer);
 
-      return await action();
+      // 2. Lock Execution Race (5000ms execution timeout) — MAJ-005
+      const actionPromise = action();
+      const executionTimeoutPromise = new Promise<never>((_, reject) => {
+        executionTimer = setTimeout(
+          () => reject(new LockExecutionTimeoutError(code, this.EXECUTION_TIMEOUT_MS)),
+          this.EXECUTION_TIMEOUT_MS,
+        );
+      });
+
+      return await Promise.race([actionPromise, executionTimeoutPromise]);
     } finally {
-      if (timer) clearTimeout(timer);
+      if (acquireTimer) clearTimeout(acquireTimer);
+      if (executionTimer) clearTimeout(executionTimer);
       if (acquired) {
         releaseLock();
         const currentEntry = this.lockQueues.get(code);
@@ -269,6 +302,7 @@ export class InMemoryRoomStore implements RoomStore {
   public async clear(): Promise<void> {
     this.lockQueues.clear();
     this.socketIndex.clear();
+    this.roomSockets.clear();
     this.rooms.clear();
   }
 }

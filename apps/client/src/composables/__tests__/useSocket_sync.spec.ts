@@ -126,7 +126,7 @@ describe('useSocket reactive ref synchronization across multiple instances (MAJ-
     expect(instanceB.sessionToken.value).toBe('secret_token_123');
   });
 
-  it('resets state across all instances when instanceB calls leaveRoom', () => {
+  it('resets state across all instances when instanceB calls leaveRoom', async () => {
     const instanceA = useSocket(mockSocket);
     const instanceB = useSocket();
 
@@ -146,7 +146,13 @@ describe('useSocket reactive ref synchronization across multiple instances (MAJ-
 
     expect(instanceB.currentRoom.value?.roomCode).toBe('QUIT');
 
-    instanceB.leaveRoom('QUIT');
+    mockSocket.emit.mockImplementation((event: string, _payload: any, ack?: Function) => {
+      if (event === 'room:leave' && typeof ack === 'function') {
+        ack({ success: true });
+      }
+    });
+
+    await instanceB.leaveRoom('QUIT');
 
     expect(instanceA.currentRoom.value).toBeNull();
     expect(instanceB.currentRoom.value).toBeNull();

@@ -242,5 +242,28 @@ describe('useAudio composable', () => {
       expect(unsubCheck).toHaveBeenCalledTimes(1);
       expect(unsubGameOver).toHaveBeenCalledTimes(1);
     });
+
+    it('executes all unsubscribe callbacks even if one throws an error [MIN-007]', () => {
+      const { attachGameEventListeners } = useAudio(mockSynth);
+
+      const faultyUnsub = vi.fn(() => {
+        throw new Error('Listener cleanup exploded');
+      });
+      const healthyUnsub1 = vi.fn();
+      const healthyUnsub2 = vi.fn();
+
+      const mockSource = {
+        onOpponentMove: vi.fn(() => faultyUnsub),
+        onGameCheck: vi.fn(() => healthyUnsub1),
+        onGameOver: vi.fn(() => healthyUnsub2),
+      };
+
+      const cleanup = attachGameEventListeners(mockSource);
+
+      expect(() => cleanup()).not.toThrow();
+      expect(faultyUnsub).toHaveBeenCalledTimes(1);
+      expect(healthyUnsub1).toHaveBeenCalledTimes(1);
+      expect(healthyUnsub2).toHaveBeenCalledTimes(1);
+    });
   });
 });

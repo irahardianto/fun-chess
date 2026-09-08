@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   loadServerConfig,
+  validateServerConfig,
   resolveAllowedOrigins,
   isOriginAllowed,
   safeParseUrl,
@@ -103,18 +104,30 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       expect(config.HOST_IP).toBe("10.0.0.5");
     });
 
-    it("parses CLIENT_URL and RATE_LIMIT_* options", () => {
+    it("parses CLIENT_URL, CLIENT_DIST_PATH, and RATE_LIMIT_* options", () => {
       const config = loadServerConfig({
         CLIENT_URL: "https://chess.fun.app",
+        CLIENT_DIST_PATH: "/var/www/dist",
         RATE_LIMIT_WINDOW_MS: "15000",
         RATE_LIMIT_MAX_REQUESTS: "10",
         RATE_LIMIT_MAX_KEYS: "25000",
       });
 
       expect(config.CLIENT_URL).toBe("https://chess.fun.app");
+      expect(config.CLIENT_DIST_PATH).toBe("/var/www/dist");
       expect(config.RATE_LIMIT_WINDOW_MS).toBe(15000);
       expect(config.RATE_LIMIT_MAX_REQUESTS).toBe(10);
       expect(config.RATE_LIMIT_MAX_KEYS).toBe(25000);
+    });
+
+    it("validateServerConfig validates and returns configuration identically to loadServerConfig", () => {
+      const config = validateServerConfig({
+        PORT: "4000",
+        CLIENT_DIST_PATH: "/custom/dist",
+      });
+
+      expect(config.PORT).toBe(4000);
+      expect(config.CLIENT_DIST_PATH).toBe("/custom/dist");
     });
 
     it("treats empty string environment variables as undefined", () => {
@@ -383,6 +396,8 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       expect(isOriginAllowed("http://localhost:5173", allowed)).toBe(true);
       // Trailing slash tolerance
       expect(isOriginAllowed("https://fun-chess.com/", allowed)).toBe(true);
+      // Case-insensitive tolerance
+      expect(isOriginAllowed("HTTPS://FUN-CHESS.COM", allowed)).toBe(true);
     });
 
     it("returns false when origin is not in allowedOrigins", () => {

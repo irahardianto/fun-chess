@@ -127,11 +127,17 @@ export class ShutdownCoordinator {
 
     // 5. Close Socket.io server and HTTP server concurrently
     const closeServers = Promise.all([
-      new Promise<void>((resolve) => {
-        this.io.close(() => resolve());
+      new Promise<void>((resolve, reject) => {
+        this.io.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       }),
-      new Promise<void>((resolve) => {
-        this.server.close(() => resolve());
+      new Promise<void>((resolve, reject) => {
+        this.server.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       }),
     ]);
 

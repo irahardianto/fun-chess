@@ -149,6 +149,10 @@ describe('useProgressSync Composable', () => {
     expect(merged.scenarios['lesson-1']?.starsEarned).toBe(3);
     expect(merged.scenarios['lesson-2']?.starsEarned).toBe(3);
     expect(currentProgress.value?.puzzles.ratingProfile.rating).toBe(1250);
+
+    // Calling executeMerge again after incomingPayload is consumed should be idempotent and not throw
+    const secondCallResult = await executeMerge('smart_merge');
+    expect(secondCallResult).toEqual(merged);
   });
 
   it('handles corrupted or invalid inputs with kid-friendly error', async () => {

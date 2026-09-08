@@ -24,6 +24,9 @@ import {
   Player,
   RoomState,
   SocketErrorPayload,
+  LeaveRoomRequest,
+  ReconnectRequest,
+  RoomStatus,
 } from "@fun-chess/shared";
 
 describe("Socket.io Lifecycle Contracts", () => {
@@ -299,6 +302,129 @@ describe("Socket.io Lifecycle Contracts", () => {
       expect(response.success).toBe(false);
       if (response.success) return;
       expect(response.error.code).toBe("ERR_INVALID_MOVE");
+    });
+  });
+
+  describe("room:leave Contract (MAJ-026)", () => {
+    it("should acknowledge room:leave with { success: true } and notify peers with game:over on active game forfeit", async () => {
+      // Arrange: Host creates room, Joiner joins (transitions to 'playing')
+      const createRes = await emitAck<
+        CreateRoomRequest,
+        { success: true; room: RoomState; sessionToken: string }
+      >(hostClient, "room:create", {
+        playerName: "Alice",
+        preferredColor: "w",
+        avatar: "🦁",
+      });
+      expect(createRes.success).toBe(true);
+      const roomCode = createRes.room.roomCode;
+
+      const joinRes = await emitAck<
+        JoinRoomRequest,
+        { success: true; room: RoomState; player: Player; sessionToken: string }
+      >(joinerClient, "room:join", {
+        roomCode,
+        playerName: "Bob",
+        avatar: "🦁",
+      });
+      expect(joinRes.success).toBe(true);
+
+      // Act: Joiner voluntarily leaves active game with acknowledgement callback
+      const hostGameOverPromise = waitForEvent<GameOverPayload>(
+        hostClient,
+        "game:over",
+      );
+
+      const leaveRes = await emitAck<
+        LeaveRoomRequest,
+        | { success: true }
+        | { success: false; error: SocketErrorPayload }
+      >(joinerClient, "room:leave", { roomCode });
+
+      // Assert: Acknowledgement callback returns { success: true }
+      expect(leaveRes.success).toBe(true);
+
+      // Assert: Peer received game:over notification due to forfeit/abandonment
+      const gameOver = await hostGameOverPromise;
+      expect(gameOver.reason).toBe("abandonment");
+      expect(gameOver.winner).toBe("w"); // Alice wins by abandonment
+    });
+  });
+
+  describe("room:reconnect Contract (MAJ-027)", () => {
+    it("should acknowledge room:reconnect with { success: true, room, player, roomStatus } and broadcast roomStatus to peer", async () => {
+      // Arrange: Host creates room, Joiner joins
+      const createRes = await emitAck<
+        CreateRoomRequest,
+        { success: true; room: RoomState; sessionToken: string }
+      >(hostClient, "room:create", {
+        playerName: "Alice",
+        preferredColor: "w",
+        avatar: "🦁",
+      });
+      expect(createRes.success).toBe(true);
+      const roomCode = createRes.room.roomCode;
+
+      const joinRes = await emitAck<
+        JoinRoomRequest,
+        { success: true; room: RoomState; player: Player; sessionToken: string }
+      >(joinerClient, "room:join", {
+        roomCode,
+        playerName: "Bob",
+        avatar: "🦁",
+      });
+      expect(joinRes.success).toBe(true);
+
+      const bobPlayerId = joinRes.player.id;
+      const bobSessionToken = joinRes.sessionToken;
+
+      // Disconnect joiner socket to simulate network blip
+      joinerClient.disconnect();
+
+      // Create a fresh socket client for reconnection
+      const reconnectingClient = await createConnectedSocketClient(
+        serverInstance.url,
+      );
+
+      try {
+        const peerReconnectedPromise = waitForEvent<{
+          playerId: string;
+          playerName: string;
+          roomStatus?: RoomStatus;
+        }>(hostClient, "room:player_reconnected");
+
+        // Act: Reconnect using stored credentials
+        const reconnectRes = await emitAck<
+          ReconnectRequest,
+          | {
+              success: true;
+              room: RoomState;
+              player: Player;
+              roomStatus: RoomStatus;
+            }
+          | { success: false; error: SocketErrorPayload }
+        >(reconnectingClient, "room:reconnect", {
+          roomCode,
+          playerId: bobPlayerId,
+          sessionToken: bobSessionToken,
+        });
+
+        // Assert acknowledgement contains roomStatus
+        expect(reconnectRes.success).toBe(true);
+        if (!reconnectRes.success) return;
+
+        expect(reconnectRes.room.roomCode).toBe(roomCode);
+        expect(reconnectRes.player.id).toBe(bobPlayerId);
+        expect(reconnectRes.roomStatus).toBeDefined();
+
+        // Assert peer broadcast received by host includes roomStatus
+        const peerBroadcast = await peerReconnectedPromise;
+        expect(peerBroadcast.playerId).toBe(bobPlayerId);
+        expect(peerBroadcast.playerName).toBe("Bob");
+        expect(peerBroadcast.roomStatus).toBeDefined();
+      } finally {
+        reconnectingClient.disconnect();
+      }
     });
   });
 });

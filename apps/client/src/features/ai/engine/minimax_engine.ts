@@ -18,6 +18,14 @@ import {
   type EvaluatedCandidateMove,
 } from './blunder_generator.js';
 
+declare module '@fun-chess/shared' {
+  interface AiSearchConfig {
+    readonly timeoutMs?: number;
+    readonly deadlineMs?: number;
+    readonly maxNodes?: number;
+  }
+}
+
 interface TranspositionEntry {
   depth: number;
   score: number;
@@ -27,6 +35,32 @@ interface TranspositionEntry {
 interface SearchState {
   nodesEvaluated: number;
   tt?: Map<string, TranspositionEntry>;
+  deadline?: number;
+  maxNodes?: number;
+  aborted?: boolean;
+}
+
+/**
+ * Checks if search limits (deadline or max nodes) have been reached.
+ */
+function checkSearchAborted(state: SearchState): boolean {
+  if (state.aborted) {
+    return true;
+  }
+  if (state.maxNodes !== undefined && state.nodesEvaluated >= state.maxNodes) {
+    state.aborted = true;
+    return true;
+  }
+  if (state.deadline !== undefined) {
+    // Check periodically every 32 nodes or on the initial node to bound performance.now() overhead
+    if ((state.nodesEvaluated & 31) === 0 || state.nodesEvaluated === 1) {
+      if (performance.now() >= state.deadline) {
+        state.aborted = true;
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 const DEFAULT_QUIESCENCE_MAX_DEPTH = 3;
@@ -94,6 +128,10 @@ function quiescenceSearch(
 ): number {
   state.nodesEvaluated++;
 
+  if (checkSearchAborted(state)) {
+    return evaluateBoard(chess, usePst);
+  }
+
   // PERF: Checkmate is only possible if in check; avoids expensive moves() generation in leaf states
   const inCheck = chess.inCheck();
   if (inCheck && chess.isCheckmate()) {
@@ -134,6 +172,10 @@ function quiescenceSearch(
       );
       chess.undo();
 
+      if (state.aborted) {
+        break;
+      }
+
       if (score >= beta) return beta;
       localAlpha = Math.max(localAlpha, score);
     }
@@ -166,6 +208,10 @@ function quiescenceSearch(
       );
       chess.undo();
 
+      if (state.aborted) {
+        break;
+      }
+
       if (score <= alpha) return alpha;
       localBeta = Math.min(localBeta, score);
     }
@@ -186,6 +232,10 @@ function minimax(
   state: SearchState,
 ): number {
   state.nodesEvaluated++;
+
+  if (checkSearchAborted(state)) {
+    return evaluateBoard(chess, config.usePst);
+  }
 
   // PERF: Transposition table lookup
   const fenKey = state.tt ? chess.fen() : '';
@@ -249,6 +299,10 @@ function minimax(
       );
       chess.undo();
 
+      if (state.aborted) {
+        break;
+      }
+
       maxEval = Math.max(maxEval, evaluation);
       localAlpha = Math.max(localAlpha, evaluation);
       if (beta <= localAlpha) {
@@ -272,6 +326,10 @@ function minimax(
         state,
       );
       chess.undo();
+
+      if (state.aborted) {
+        break;
+      }
 
       minEval = Math.min(minEval, evaluation);
       localBeta = Math.min(localBeta, evaluation);
@@ -309,10 +367,20 @@ export class MinimaxEngine implements ChessAiEngine {
    */
   async findBestMove(fen: string, config: AiSearchConfig): Promise<AiMoveEvaluation> {
     const startTime = performance.now();
+    const deadline =
+      config.deadlineMs !== undefined
+        ? config.deadlineMs
+        : config.timeoutMs !== undefined
+          ? startTime + config.timeoutMs
+          : undefined;
+
     const chess = createSafeChess(fen);
     const state: SearchState = {
       nodesEvaluated: 0,
       tt: new Map<string, TranspositionEntry>(),
+      deadline,
+      maxNodes: config.maxNodes,
+      aborted: false,
     };
     const turn = chess.turn(); // 'w' or 'b'
     const isMaximizing = turn === 'w';
@@ -351,6 +419,10 @@ export class MinimaxEngine implements ChessAiEngine {
         score,
         aiScore,
       });
+
+      if (state.aborted && candidateMoves.length > 0) {
+        break;
+      }
     }
 
     const { selected, isBlunder } = chooseFinalMove(candidateMoves, config);

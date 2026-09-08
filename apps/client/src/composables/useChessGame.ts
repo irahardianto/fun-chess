@@ -1,6 +1,7 @@
 /**
  * Client-side Chess game state and rules engine composable.
  * Uses chess.js for optimistic moves, legal move calculation, and local validation.
+ * Delegates core board state to useChessBoard per [MIN-024].
  */
 import { ref, computed } from 'vue';
 import type {
@@ -11,91 +12,43 @@ import type {
   MoveResult,
 } from '@fun-chess/shared';
 import {
-  createSafeChess,
   safeLoadFen,
-  calculateMaterialAndCaptures,
   isPawnPromotion,
 } from '@fun-chess/shared';
+import { useChessBoard } from './useChessBoard';
 import { useBoardSelection } from '../features/board/index';
+import { logger } from '@/platform/telemetry/index.js';
 
 export function useChessGame(initialFen?: string) {
-  const chess = createSafeChess(initialFen);
+  const board = useChessBoard(initialFen);
+  const {
+    chess,
+    fen,
+    turn,
+    orientation,
+    isCheck,
+    isCheckmate,
+    isDraw,
+    isStalemate,
+    isGameOver,
+    capturedWhite,
+    capturedBlack,
+    materialAdvantage,
+    kingInCheckSquare,
+    updateLocalState,
+    getSquarePiece,
+    getLegalMoves,
+    flipBoard,
+  } = board;
 
-  const fen = ref(chess.fen());
-  const turn = ref<PieceColor>(chess.turn() as PieceColor);
-  const orientation = ref<PieceColor>('w');
-  const isCheck = ref(chess.inCheck());
-  const isCheckmate = ref(chess.isCheckmate());
-  const isDraw = ref(chess.isDraw());
-  const isStalemate = ref(chess.isStalemate());
-  const isGameOver = ref(chess.isGameOver());
   const moveHistory = ref<MoveResult[]>([]);
   const lastMove = ref<{ from: string; to: string } | null>(null);
   const myColor = ref<PieceColor | null>(null);
-
-  const capturedWhite = ref<PieceType[]>([]);
-  const capturedBlack = ref<PieceType[]>([]);
-  const materialAdvantage = ref<{ white: number; black: number }>({ white: 0, black: 0 });
 
   const isMyTurn = computed(() => {
     if (!myColor.value) return true;
     return turn.value === myColor.value;
   });
-
-  const kingInCheckSquare = computed<Square | null>(() => {
-    if (!isCheck.value) return null;
-    const board = chess.board();
-    const checkedColor = turn.value;
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const piece = board[r]?.[c];
-        if (piece && piece.type === 'k' && piece.color === checkedColor) {
-          return piece.square as Square;
-        }
-      }
-    }
-    return null;
-  });
-
-  function updateLocalState(): void {
-    fen.value = chess.fen();
-    turn.value = chess.turn() as PieceColor;
-    isCheck.value = chess.inCheck();
-    isCheckmate.value = chess.isCheckmate();
-    isDraw.value = chess.isDraw();
-    isStalemate.value = chess.isStalemate();
-    isGameOver.value = chess.isGameOver();
-
-    // Use shared material & capture calculation (MIN-009)
-    const evaluation = calculateMaterialAndCaptures(chess);
-    capturedWhite.value = evaluation.capturedWhite;
-    capturedBlack.value = evaluation.capturedBlack;
-    materialAdvantage.value = evaluation.materialAdvantage;
-  }
-
-  function getSquarePiece(square: Square): { type: PieceType; color: PieceColor } | null {
-    try {
-      const piece = chess.get(square as unknown as import('chess.js').Square);
-      if (!piece) return null;
-      return {
-        type: piece.type as PieceType,
-        color: piece.color as PieceColor,
-      };
-    } catch (err) {
-      console.warn('[useChessGame] getSquarePiece error:', err);
-      return null;
-    }
-  }
-
-  function getLegalMoves(square: Square): Square[] {
-    try {
-      const moves = chess.moves({ square: square as unknown as import('chess.js').Square, verbose: true });
-      return moves.map((m) => m.to as Square);
-    } catch (err) {
-      console.warn('[useChessGame] getLegalMoves error:', err);
-      return [];
-    }
-  }
 
   function isCapturableTarget(square: Square): boolean {
     if (!boardSelection.isLegalTarget(square)) return false;
@@ -161,7 +114,12 @@ export function useChessGame(initialFen?: string) {
       updateLocalState();
       return true;
     } catch (err) {
-      console.warn('[useChessGame] applyLocalMove error:', err);
+      logger.warn('Failed to apply local move', {
+        operation: 'apply_local_move',
+        from,
+        to,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return false;
     }
   }
@@ -224,7 +182,10 @@ export function useChessGame(initialFen?: string) {
       }
       boardSelection.clearSelection();
     } catch (err) {
-      console.warn('[useChessGame] syncGameState error:', err);
+      logger.warn('Failed to sync game state', {
+        operation: 'sync_game_state',
+        error: err instanceof Error ? err.message : String(err),
+      });
       updateLocalState();
     }
   }
@@ -241,16 +202,9 @@ export function useChessGame(initialFen?: string) {
     updateLocalState();
   }
 
-  function flipBoard(): void {
-    orientation.value = orientation.value === 'w' ? 'b' : 'w';
-  }
-
   function setPlayerColor(color: PieceColor | null): void {
     myColor.value = color;
   }
-
-  // Initialize
-  updateLocalState();
 
   return {
     chess,

@@ -8,16 +8,25 @@ import {
   SCENARIO_STORE_KEY,
   PUZZLE_STORE_KEY,
   PROGRESS_STORAGE_KEY,
+  FILE_DOWNLOADER_KEY,
+  HAPTICS_KEY,
+  WEBRTC_DISCOVERY_KEY,
 } from './tokens';
 import type { IApiClient } from '../api/api_client.interface';
 import type { KeyValueStorage } from '../storage/key_value_storage';
 import type { IAudioService } from '../audio/audio.interface';
 import type { ILogger } from '../telemetry';
+import type { IFileDownloader, IHapticsService, IWebRtcDiscovery } from '../hardware';
 import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
 import { apiClient as defaultApiClient } from '../api';
 import { safeLocalStorage, safeSessionStorage } from '../storage';
 import { audioSynthesizer as defaultAudioSynthesizer } from '../audio/audio_synthesizer';
 import { logger as defaultLogger } from '../telemetry';
+import {
+  defaultFileDownloader,
+  defaultHapticsService,
+  defaultWebRtcDiscovery,
+} from '../hardware';
 
 export * from './tokens';
 
@@ -77,5 +86,17 @@ export function useInjectProgressStorage(fallback?: ProgressStorage): ProgressSt
     throw new Error('ProgressStorage not provided and no default registered');
   }
   return storage;
+}
+
+export function useInjectFileDownloader(fallback?: IFileDownloader): IFileDownloader {
+  return inject(FILE_DOWNLOADER_KEY, fallback ?? defaultFileDownloader);
+}
+
+export function useInjectHaptics(fallback?: IHapticsService): IHapticsService {
+  return inject(HAPTICS_KEY, fallback ?? defaultHapticsService);
+}
+
+export function useInjectWebRtcDiscovery(fallback?: IWebRtcDiscovery): IWebRtcDiscovery {
+  return inject(WEBRTC_DISCOVERY_KEY, fallback ?? defaultWebRtcDiscovery);
 }
 

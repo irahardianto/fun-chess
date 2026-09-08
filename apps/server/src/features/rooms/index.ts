@@ -2,7 +2,8 @@
  * Public API for features/rooms.
  * Cross-module callers must import exclusively from this entry point.
  */
-export type { IRoomService } from "./room.interface.js";
+export type { IRoomService, IRoomGameAdapter } from "./room.interface.js";
+export * from "./room.logic.js";
 export type { RoomStore, RoomMutator } from "./room.store.js";
 export type { SessionRecord, SessionRegistry } from "./session_registry.js";
 export { InMemorySessionRegistry } from "./in_memory_session_registry.js";
@@ -44,4 +45,5 @@ export {
   RateLimitExceededError,
   OptimisticLockConflictError,
   LockTimeoutError,
+  LockExecutionTimeoutError,
 } from "./room.errors.js";

@@ -29,12 +29,12 @@ export default defineConfig({
     {
       name: 'api',
       testDir: './api',
-      testMatch: '**/*.api.spec.ts',
+      testMatch: ['**/*.api.spec.ts', '**/*.api.e2e.test.ts'],
     },
     {
       name: 'ui',
       testDir: './ui',
-      testMatch: '**/*.spec.ts',
+      testMatch: ['**/*.e2e.test.ts', '**/*.spec.ts'],
       use: {
         ...devices['Desktop Chrome'],
         channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',

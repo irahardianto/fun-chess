@@ -49,36 +49,40 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
       });
     });
 
-    it("catches unhandled exception in /health handler, logs structured error, and returns 500 JSON", async () => {
+    it("catches unhandled exception in /metrics handler, logs structured error, and returns 500 JSON", async () => {
       // Arrange: Force roomStore.count to throw an unexpected database/runtime error
       vi.spyOn(mockStore, "count").mockRejectedValue(
         new Error("Fatal connection pool failure in storage layer"),
       );
 
       // Act
-      const res = await fetch(`http://127.0.0.1:${port}/health`);
+      const res = await fetch(`http://127.0.0.1:${port}/metrics`);
 
       // Assert: HTTP Status & Response Sanitization (never leak raw error or stack)
       expect(res.status).toBe(500);
       expect(res.headers.get("content-type")).toContain("application/json");
 
       const body = (await res.json()) as {
-        error: { code: string; message: string; correlationId: string };
+        code: number;
+        error: string;
+        message: string;
+        correlationId?: string;
+        timestamp: number;
       };
 
-      expect(body.error).toBeDefined();
-      expect(body.error.code).toBe("ERR_INTERNAL_SERVER");
-      expect(body.error.message).toBe("Internal server error");
-      expect(body.error.correlationId).toBeDefined();
+      expect(body.code).toBe(500);
+      expect(body.error).toBe("ERR_INTERNAL_SERVER");
+      expect(body.message).toBe("Internal server error");
+      expect(body.correlationId).toBeDefined();
 
       // Assert: Structured 3-point error logging (logging-and-observability-mandate)
       const errorLog = logger.errorLogs.find(
         (l) => l.context?.operation === "http_error",
       );
       expect(errorLog).toBeDefined();
-      expect(errorLog?.context?.correlationId).toBe(body.error.correlationId);
+      expect(errorLog?.context?.correlationId).toBe(body.correlationId);
       expect(errorLog?.context?.method).toBe("GET");
-      expect(errorLog?.context?.path).toBe("/health");
+      expect(errorLog?.context?.path).toBe("/metrics");
       expect(errorLog?.context?.duration).toBeGreaterThanOrEqual(0);
       expect((errorLog?.context?.error as { message?: string })?.message).toBe(
         "Fatal connection pool failure in storage layer",
@@ -97,11 +101,16 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
       // Assert
       expect(res.status).toBe(500);
       const body = (await res.json()) as {
-        error: { code: string; message: string; correlationId: string };
+        code: number;
+        error: string;
+        message: string;
+        correlationId?: string;
+        timestamp: number;
       };
 
-      expect(body.error.code).toBe("ERR_INTERNAL_SERVER");
-      expect(body.error.message).toBe("Internal server error");
+      expect(body.code).toBe(500);
+      expect(body.error).toBe("ERR_INTERNAL_SERVER");
+      expect(body.message).toBe("Internal server error");
 
       const errorLog = logger.errorLogs.find(
         (l) => l.context?.operation === "http_error",
@@ -216,6 +225,57 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
       expect(
         (fatalLog?.context?.error as { message?: string })?.message,
       ).toContain("EIO: Socket close I/O failure");
+    });
+
+    it("handles callback error from server.close during shutdown and exits with 1 (MAJ-004)", async () => {
+      mockServer.close = vi.fn((cb?: (err?: Error) => void) => {
+        if (cb) cb(new Error("EIO: async socket close callback failure"));
+        return mockServer as HttpServer;
+      });
+
+      const coordinator = new ShutdownCoordinator({
+        server: mockServer as HttpServer,
+        io: mockIo as TypedSocketServer,
+        logger,
+        timeoutMs: 3000,
+        onExit: (code) => exitCodes.push(code),
+      });
+
+      await coordinator.shutdown("SIGTERM");
+
+      expect(exitCodes).toEqual([1]);
+      const fatalLog = logger.fatalLogs.find(
+        (l) => l.context?.operation === "server_shutdown_error",
+      );
+      expect(fatalLog).toBeDefined();
+      expect(
+        (fatalLog?.context?.error as { message?: string })?.message,
+      ).toContain("EIO: async socket close callback failure");
+    });
+
+    it("handles callback error from io.close during shutdown and exits with 1 (MAJ-004)", async () => {
+      mockIo.close = vi.fn((cb?: (err?: any) => void) => {
+        if (cb) cb(new Error("Socket.IO adapter close error"));
+      });
+
+      const coordinator = new ShutdownCoordinator({
+        server: mockServer as HttpServer,
+        io: mockIo as TypedSocketServer,
+        logger,
+        timeoutMs: 3000,
+        onExit: (code) => exitCodes.push(code),
+      });
+
+      await coordinator.shutdown("SIGTERM");
+
+      expect(exitCodes).toEqual([1]);
+      const fatalLog = logger.fatalLogs.find(
+        (l) => l.context?.operation === "server_shutdown_error",
+      );
+      expect(fatalLog).toBeDefined();
+      expect(
+        (fatalLog?.context?.error as { message?: string })?.message,
+      ).toContain("Socket.IO adapter close error");
     });
 
     it("clears forceExitTimer and exits 1 on shutdown error", async () => {

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
+import fs from 'fs';
+import path from 'path';
 import JoinCard from '../JoinCard.vue';
 
 describe('JoinCard.vue (Accessibility & Error Binding)', () => {
@@ -13,6 +15,7 @@ describe('JoinCard.vue (Accessibility & Error Binding)', () => {
     const nicknameInput = wrapper.find('[data-testid="join-nickname-input"]');
     expect(nicknameInput.exists()).toBe(true);
     expect(nicknameInput.find('label').text()).toBe('Your Nickname');
+    expect(nicknameInput.find('input').attributes('placeholder')).toBe('e.g. ShadowBishop');
 
     const roomCodeInput = wrapper.find('[data-testid="join-room-code-input"]');
     expect(roomCodeInput.exists()).toBe(true);
@@ -131,5 +134,48 @@ describe('JoinCard.vue (Accessibility & Error Binding)', () => {
         playerName: 'FastKnight ⚡',
       },
     ]);
+  });
+
+  it('clears nickname error message when user types into nickname input', async () => {
+    const wrapper = mount(JoinCard);
+
+    const joinBtn = wrapper.find('[data-testid="join-game-btn"]');
+    await joinBtn.trigger('click');
+
+    const inputGroup = wrapper.find('[data-testid="join-nickname-input"]');
+    expect(inputGroup.find('.base-input-error').exists()).toBe(true);
+
+    const input = inputGroup.find('input');
+    await input.setValue('Bishop');
+    await wrapper.vm.$nextTick();
+
+    expect(inputGroup.find('.base-input-error').exists()).toBe(false);
+  });
+
+  it('clears local error on room code when user types into room code input', async () => {
+    const wrapper = mount(JoinCard);
+
+    const nicknameInput = wrapper.find('[data-testid="join-nickname-input"] input');
+    await nicknameInput.setValue('ShadowBishop');
+
+    const roomInput = wrapper.find('[data-testid="join-room-code-input"] input');
+    await roomInput.setValue('AB');
+
+    const joinBtn = wrapper.find('[data-testid="join-game-btn"]');
+    await joinBtn.trigger('click');
+
+    const roomGroup = wrapper.find('[data-testid="join-room-code-input"]');
+    expect(roomGroup.find('.base-input-error').exists()).toBe(true);
+
+    await roomInput.setValue('ABCD');
+    await wrapper.vm.$nextTick();
+
+    expect(roomGroup.find('.base-input-error').exists()).toBe(false);
+  });
+
+  it('uses --color-accent-text token for .card-badge style in JoinCard.vue', () => {
+    const sfcPath = path.resolve(__dirname, '../JoinCard.vue');
+    const content = fs.readFileSync(sfcPath, 'utf-8');
+    expect(content).toMatch(/\.card-badge\s*\{[^}]*color:\s*var\(--color-accent-text\)/s);
   });
 });

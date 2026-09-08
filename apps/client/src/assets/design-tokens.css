@@ -495,6 +495,9 @@
   --text-main:          hsl(220, 20%, 96%);
   --text-muted:         hsl(220, 14%, 68%);
   --text-faint:         hsl(220, 14%, 60%);
+  --color-primary:        hsl(255, 85%, 72%);
+  --color-primary-hover:  hsl(255, 85%, 66%);
+  --color-primary-active: hsl(255, 85%, 60%);
   --color-primary-text: hsl(255 95% 78%);
   --color-accent-text:  hsl(42 100% 75%);
   --color-success-text: #34d399;

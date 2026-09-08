@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from 'vue';
+import { ref, watch, computed, onMounted, useAttrs } from 'vue';
 import QRCode from 'qrcode';
 import type { LanInfoResponse } from '@fun-chess/shared';
 import BaseModal from '../../components/base/BaseModal.vue';
 import BaseButton from '../../components/base/BaseButton.vue';
 import { useLanDiscovery, isValidIPv4 } from '../../composables/useLanDiscovery';
+import { logger } from '@/platform/telemetry';
+
+type QrGenerationStatus = 'generating' | 'ready' | 'error';
 
 interface Props {
   modelValue?: boolean;
-  isOpen?: boolean;
   roomCode: string;
   joinUrl?: string;
   lanInfo?: LanInfoResponse | null;
@@ -16,16 +18,19 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: false,
-  isOpen: undefined,
   joinUrl: '',
   lanInfo: null,
 });
+
+const attrs = useAttrs();
+const isModalVisible = computed(() => Boolean(props.modelValue || attrs.isOpen));
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean];
   close: [];
 }>();
 
+const qrStatus = ref<QrGenerationStatus>('generating');
 const qrDataUrl = ref<string>('');
 const copied = ref(false);
 let copyTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -168,6 +173,7 @@ const isLocalhost = computed(() => {
 });
 
 async function generateQr() {
+  qrStatus.value = 'generating';
   try {
     const url = await QRCode.toDataURL(effectiveJoinUrl.value, {
       width: 220,
@@ -178,15 +184,22 @@ async function generateQr() {
       },
     });
     qrDataUrl.value = url;
+    qrStatus.value = 'ready';
   } catch (err) {
+    qrStatus.value = 'error';
+    logger.error('Failed to generate QR code', {
+      operation: 'qr_generate',
+      roomCode: props.roomCode,
+      error: err instanceof Error ? err.message : String(err),
+    });
     console.error('Failed to generate QR code', err);
   }
 }
 
 watch(
-  () => [props.modelValue, props.isOpen, props.roomCode, props.joinUrl, effectiveJoinUrl.value],
+  () => [props.modelValue, attrs.isOpen, props.roomCode, props.joinUrl, effectiveJoinUrl.value],
   () => {
-    if (props.modelValue || props.isOpen) {
+    if (isModalVisible.value) {
       generateQr();
     }
   },
@@ -294,7 +307,7 @@ function handleClose() {
 
 <template>
   <BaseModal
-    :model-value="props.modelValue || props.isOpen"
+    :model-value="isModalVisible"
     title="Invite Player 2! 🚀"
     size="md"
     @update:model-value="(val) => emit('update:modelValue', val)"
@@ -319,15 +332,42 @@ function handleClose() {
         <span class="code-value">{{ props.roomCode }}</span>
       </div>
 
-      <!-- QR Code Image Frame -->
-      <div class="qr-canvas-card">
+      <!-- QR Code Image Frame & Error Fallback -->
+      <div v-if="qrStatus === 'ready'" class="qr-canvas-card">
         <img
           v-if="qrDataUrl"
           :src="qrDataUrl"
           alt="QR Code to join chess match"
           class="qr-image"
         />
-        <div v-else class="qr-loading-placeholder">
+      </div>
+
+      <div
+        v-else-if="qrStatus === 'error'"
+        class="qr-canvas-card--error"
+        role="alert"
+        aria-live="assertive"
+      >
+        <span class="qr-error-icon" aria-hidden="true">⚠️</span>
+        <div class="qr-error-title">Failed to create QR Code canvas</div>
+        <p class="qr-error-desc">
+          Your device browser couldn't draw the QR code. You can still join instantly using the 4-letter code or link!
+        </p>
+        <button
+          type="button"
+          class="qr-retry-btn"
+          aria-label="Retry generating QR code"
+          @click="generateQr"
+        >
+          🔄 Retry QR Code
+        </button>
+        <div class="qr-loading-placeholder" style="display: none">
+          Generating QR Code...
+        </div>
+      </div>
+
+      <div v-else class="qr-canvas-card">
+        <div class="qr-loading-placeholder">
           Generating QR Code...
         </div>
       </div>
@@ -598,6 +638,81 @@ function handleClose() {
   color: var(--text-muted);
 }
 
+/* Error State Card Frame (ENH-004) */
+.qr-canvas-card--error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 240px;
+  min-height: 240px;
+  padding: var(--space-4);
+  background-color: var(--soft-error-bg, hsl(350 90% 96%));
+  border: 2px dashed var(--color-danger, #ef4444);
+  border-radius: var(--radius-xl, 22px);
+  text-align: center;
+  box-sizing: border-box;
+  animation: shake-soft var(--duration-normal, 240ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+}
+
+/* Error Icon Halo */
+.qr-error-icon {
+  font-size: 32px;
+  margin-bottom: var(--space-2, 8px);
+  filter: drop-shadow(0 2px 8px rgba(220, 38, 38, 0.35));
+}
+
+/* Accessible Error Copy */
+.qr-error-title {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold, 700);
+  color: var(--soft-error-text, hsl(350 75% 35%));
+  margin-bottom: var(--space-1, 4px);
+}
+
+.qr-error-desc {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: var(--leading-snug, 1.3);
+  margin-bottom: var(--space-3, 12px);
+  text-wrap: pretty;
+}
+
+/* Retry Action Button */
+.qr-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5, 6px);
+  min-height: 44px;
+  min-width: 140px;
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold, 700);
+  color: var(--text-on-primary, #ffffff);
+  background-color: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-btn, 16px);
+  box-shadow: var(--shadow-btn-primary);
+  cursor: pointer;
+  transition: transform var(--duration-fast, 140ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+}
+
+.qr-retry-btn:hover {
+  background-color: var(--color-primary-hover);
+  box-shadow: var(--shadow-btn-primary-hover);
+  transform: translateY(-2px);
+}
+
+.qr-retry-btn:active {
+  background-color: var(--color-primary-active);
+  box-shadow: var(--shadow-btn-primary-active);
+  transform: translateY(2px);
+}
+
 .lan-config-section {
   display: flex;
   flex-direction: column;
@@ -714,6 +829,21 @@ function handleClose() {
   display: flex;
   gap: var(--space-2);
   align-items: center;
+}
+
+@media (max-width: 480px) {
+  .ip-input-row {
+    flex-wrap: wrap;
+  }
+  .ip-input-row .ip-text-input {
+    width: 100%;
+    min-width: 100%;
+  }
+  .ip-input-row :deep(button),
+  .ip-input-row button {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .ip-text-input {

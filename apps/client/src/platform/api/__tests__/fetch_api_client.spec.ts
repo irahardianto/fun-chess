@@ -213,6 +213,137 @@ describe('FetchApiClient', () => {
     expect(response.status).toBe(204);
     expect(response.data).toBeNull();
   });
+
+  it('safely parses non-JSON response body without stream consumption errors [MIN-008]', async () => {
+    const malformedBody = '<html>Internal Server Error</html>';
+    const mockResponse = new Response(malformedBody, {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    const client = new FetchApiClient('http://localhost:3000');
+    const result = await client.get<string>('/api/broken-endpoint');
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(500);
+    expect(result.data).toBe(malformedBody);
+  });
+
+  it('strips query strings from URLs in telemetry logging for GET requests [MAJ-021]', async () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({ success: true }),
+      json: async () => ({ success: true }),
+    });
+
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as any);
+    await client.get('/api/rooms?status=waiting&token=superSecret123');
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'HTTP request started',
+      expect.objectContaining({
+        url: 'http://localhost:3000/api/rooms',
+      })
+    );
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'HTTP request completed',
+      expect.objectContaining({
+        url: 'http://localhost:3000/api/rooms',
+      })
+    );
+
+    for (const call of mockLogger.info.mock.calls) {
+      const meta = call[1];
+      if (meta?.url) {
+        expect(meta.url).not.toContain('superSecret123');
+        expect(meta.url).not.toContain('?');
+      }
+    }
+  });
+
+  it('strips query strings from URLs in telemetry logging on HTTP failure [MAJ-021]', async () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network failure'));
+
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as any);
+    await expect(client.get('/api/users?apiKey=xyz789&filter=active')).rejects.toThrow();
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'HTTP request failed',
+      expect.objectContaining({
+        url: 'http://localhost:3000/api/users',
+      })
+    );
+
+    for (const call of mockLogger.error.mock.calls) {
+      const meta = call[1];
+      if (meta?.url) {
+        expect(meta.url).not.toContain('xyz789');
+        expect(meta.url).not.toContain('?');
+      }
+    }
+  });
+
+  it('strips query strings from URLs in telemetry logging for POST requests [MAJ-021]', async () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({ created: true }),
+      json: async () => ({ created: true }),
+    });
+
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as any);
+    await client.post('/api/action?sensitiveToken=abc456', { test: true });
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'HTTP request started',
+      expect.objectContaining({
+        url: 'http://localhost:3000/api/action',
+      })
+    );
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'HTTP request completed',
+      expect.objectContaining({
+        url: 'http://localhost:3000/api/action',
+      })
+    );
+  });
 });
 
 describe('MockApiClient & Default Singleton', () => {

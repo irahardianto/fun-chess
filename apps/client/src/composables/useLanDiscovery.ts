@@ -2,79 +2,22 @@ import { ref, onMounted, getCurrentInstance } from 'vue';
 import type { LanInfoResponse } from '@fun-chess/shared';
 import { safeLocalStorage, createSafeStorage, type KeyValueStorage } from '../platform/storage';
 import { apiClient, type IApiClient } from '../platform/api';
+import { logger } from '../platform/telemetry';
+import {
+  type IWebRtcDiscovery,
+  defaultWebRtcDiscovery,
+} from '../platform/hardware';
 
 const STORAGE_KEY = 'fun_chess_lan_ip';
 
 /**
  * Attempts to detect local IPv4 address via WebRTC ICE candidate gathering.
+ * Delegates to IWebRtcDiscovery hardware abstraction (Rule 1: I/O Isolation).
  */
-export async function detectWebRtcLanIp(): Promise<string | null> {
-  if (typeof window === 'undefined' || typeof RTCPeerConnection === 'undefined') {
-    return null;
-  }
-
-  return new Promise((resolve) => {
-    try {
-      const pc = new RTCPeerConnection({ iceServers: [] });
-      let resolved = false;
-
-      const timer = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          try {
-            pc.close();
-          } catch (err) {
-            console.warn('[useLanDiscovery] Failed to close RTCPeerConnection on timeout:', err);
-          }
-          resolve(null);
-        }
-      }, 800);
-
-      pc.createDataChannel('');
-      pc.createOffer()
-        .then((offer) => pc.setLocalDescription(offer))
-        .catch((err) => {
-          console.warn('[useLanDiscovery] Failed to set WebRTC local description:', err);
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timer);
-            try {
-              pc.close();
-            } catch (closeErr) {
-              console.warn('[useLanDiscovery] Failed to close RTCPeerConnection on offer error:', closeErr);
-            }
-            resolve(null);
-          }
-        });
-
-      pc.onicecandidate = (event) => {
-        if (!event || !event.candidate || !event.candidate.candidate) {
-          return;
-        }
-
-        const candidate = event.candidate.candidate;
-        // Search for private IPv4 patterns (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-        const match = candidate.match(
-          /\b(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b/
-        );
-        if (match && match[0]) {
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timer);
-            try {
-              pc.close();
-            } catch (err) {
-              console.warn('[useLanDiscovery] Failed to close RTCPeerConnection on candidate found:', err);
-            }
-            resolve(match[0]);
-          }
-        }
-      };
-    } catch (err) {
-      console.warn('[useLanDiscovery] Failed to initialize WebRTC LAN discovery:', err);
-      resolve(null);
-    }
-  });
+export async function detectWebRtcLanIp(
+  discovery: IWebRtcDiscovery = defaultWebRtcDiscovery
+): Promise<string | null> {
+  return discovery.discoverLocalIp();
 }
 
 export function isValidIPv4(ip: string): boolean {
@@ -90,6 +33,7 @@ export function isValidIPv4(ip: string): boolean {
 export interface LanDiscoveryOptions {
   storage?: KeyValueStorage;
   apiClient?: IApiClient;
+  webRtcDiscovery?: IWebRtcDiscovery;
 }
 
 export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
@@ -97,6 +41,7 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
     options.storage ??
     (safeLocalStorage.isAvailable() ? safeLocalStorage : createSafeStorage('localStorage'));
   const client = options.apiClient ?? apiClient;
+  const webRtc = options.webRtcDiscovery ?? defaultWebRtcDiscovery;
 
   const serverLanInfo = ref<LanInfoResponse | null>(null);
   const activeLanIp = ref<string>('');
@@ -112,7 +57,10 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
         activeLanIp.value = saved;
       }
     } catch (err) {
-      console.warn('[useLanDiscovery] Failed to read saved LAN IP from storage:', err);
+      logger.warn('Failed to read saved LAN IP from storage', {
+        operation: 'lan_storage_read',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // 2. Fetch server LAN discovery
@@ -128,19 +76,25 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
         activeLanIp.value = data.lanIp;
       }
     } catch (err) {
-      console.warn('[useLanDiscovery] Failed to fetch server LAN info (offline mode):', err);
+      logger.warn('Failed to fetch server LAN info (offline mode)', {
+        operation: 'lan_fetch_info',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // 3. If still localhost/empty, attempt WebRTC client discovery
     if (!activeLanIp.value || activeLanIp.value === '127.0.0.1') {
-      const webrtcIp = await detectWebRtcLanIp();
+      const webrtcIp = await detectWebRtcLanIp(webRtc);
       if (webrtcIp) {
         detectedWebRtcIp.value = webrtcIp;
         activeLanIp.value = webrtcIp;
         try {
           storage.setItem(STORAGE_KEY, webrtcIp);
         } catch (err) {
-          console.warn('[useLanDiscovery] Failed to cache WebRTC LAN IP to storage:', err);
+          logger.warn('Failed to cache WebRTC LAN IP to storage', {
+            operation: 'lan_storage_cache',
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     }
@@ -158,7 +112,10 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
         storage.removeItem(STORAGE_KEY);
       }
     } catch (err) {
-      console.warn('[useLanDiscovery] Failed to persist LAN IP in storage:', err);
+      logger.warn('Failed to persist LAN IP in storage', {
+        operation: 'lan_storage_persist',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

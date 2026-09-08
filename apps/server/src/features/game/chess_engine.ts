@@ -8,6 +8,7 @@ import {
   Square,
   calculateMaterialAndCaptures,
 } from "@fun-chess/shared";
+import { logger } from "../../platform/logger/index.js";
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
@@ -55,7 +56,12 @@ export class ChessEngine {
     let chess: Chess;
     try {
       chess = new Chess(currentFen);
-    } catch {
+    } catch (err: unknown) {
+      logger.warn("Invalid board FEN string in chess engine move validation", {
+        operation: "chess_engine_validate_move_fen",
+        currentFen,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return { success: false, error: "Invalid board FEN string" };
     }
 
@@ -308,5 +314,17 @@ export class ChessEngine {
       }
     }
     return null;
+  }
+
+  /**
+   * Locates the square of the king from a FEN string.
+   */
+  public static findKingSquare(fen: string, color: PieceColor): Square | null {
+    try {
+      const chess = new Chess(fen);
+      return this.getKingSquare(chess, color);
+    } catch {
+      return null;
+    }
   }
 }

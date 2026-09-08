@@ -2,7 +2,6 @@
  * Public API for features/lan.
  * Cross-module callers must import exclusively from this entry point.
  */
-export { LanService } from "./lan.service.js";
 export {
   RelayAddressService,
   MockRelayAddressService,

@@ -114,6 +114,7 @@ function handlePromotionCancel() {
 // --- 4. Timer & Completion State ---
 const solveStartTime = ref<number>(Date.now());
 const elapsedSeconds = ref<number>(0);
+const isCompletionDismissed = ref<boolean>(false);
 
 onMounted(() => {
   solveStartTime.value = Date.now();
@@ -124,10 +125,19 @@ watch(
   () => activeRunner.value.isCompleted.value,
   (completed) => {
     if (completed && activeRunner.value.isSolvedSuccessfully.value) {
+      isCompletionDismissed.value = false;
       elapsedSeconds.value = Math.max(1, Math.round((Date.now() - solveStartTime.value) / 1000));
       const stars = activeRunner.value.calculatedStars.value;
       emit('completed', stars);
     }
+  }
+);
+
+// Reset completion dismissal when active puzzle changes
+watch(
+  () => activePuzzle.value,
+  () => {
+    isCompletionDismissed.value = false;
   }
 );
 
@@ -136,6 +146,7 @@ watch(
   () => props.initialTheme,
   (newTheme) => {
     if (newTheme && props.mode === 'themed_drills') {
+      isCompletionDismissed.value = false;
       themedDrills.setTheme(newTheme);
       if (themedDrills.currentPuzzle.value) {
         drillsRunner.loadPuzzle(themedDrills.currentPuzzle.value);
@@ -151,6 +162,7 @@ watch(
   () => themedDrills.currentPuzzle.value,
   (newPuzzle) => {
     if (newPuzzle && props.mode === 'themed_drills') {
+      isCompletionDismissed.value = false;
       drillsRunner.loadPuzzle(newPuzzle);
       solveStartTime.value = Date.now();
       elapsedSeconds.value = 0;
@@ -168,12 +180,14 @@ function handleRequestHint() {
 }
 
 function handleRetry() {
+  isCompletionDismissed.value = false;
   activeRunner.value.resetCurrentPuzzle();
   solveStartTime.value = Date.now();
   elapsedSeconds.value = 0;
 }
 
 function handleNextPuzzle() {
+  isCompletionDismissed.value = false;
   solveStartTime.value = Date.now();
   elapsedSeconds.value = 0;
   if (isLadderMode.value) {
@@ -187,6 +201,7 @@ function handleNextPuzzle() {
 }
 
 function handleSkip() {
+  isCompletionDismissed.value = false;
   if (isLadderMode.value) {
     if (activePuzzle.value) {
       adaptiveLadder.handleSkipOrFail(activePuzzle.value);
@@ -377,7 +392,7 @@ function handleBack() {
 
     <!-- Puzzle Completion Celebratory Modal & Replay Controller -->
     <PuzzleCompletionModal
-      :model-value="activeRunner.isCompleted.value && activeRunner.isSolvedSuccessfully.value"
+      :model-value="!isCompletionDismissed && activeRunner.isCompleted.value && activeRunner.isSolvedSuccessfully.value"
       :puzzle="activePuzzle"
       :analysis="activeRunner.analysis.value"
       :stars="activeRunner.calculatedStars.value"
@@ -392,6 +407,8 @@ function handleBack() {
       :current-replay-san="activeRunner.currentReplaySan.value"
       :current-step-explanation="activeRunner.currentStepExplanation.value?.explanation || activeRunner.currentReplayStep.value?.explanation"
       :is-inspecting-board="activeRunner.isInspectingBoard.value"
+      @update:model-value="(val: boolean) => { if (!val) isCompletionDismissed = true; }"
+      @close="isCompletionDismissed = true"
       @replay-step="activeRunner.setReplayStep"
       @replay-start="activeRunner.stepReplayStart"
       @replay-prev="activeRunner.stepReplayPrev"

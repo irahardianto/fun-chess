@@ -264,6 +264,89 @@ describe('PuzzleArena.vue', () => {
       expect(completionModal.props('modelValue')).toBe(false);
     });
 
+    it('dismisses PuzzleCompletionModal when modal emits close (UX-WARN-03)', async () => {
+      const store = new InMemoryPuzzleProgressStore();
+      const wrapper = mount(PuzzleArena, {
+        props: {
+          mode: 'themed_drills',
+          initialTheme: 'fork',
+          customStore: store,
+        },
+        global: {
+          stubs: {
+            teleport: true,
+          },
+        },
+      });
+
+      // Solve first puzzle: b5c7 -> e8d8 -> c7a8
+      const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
+      boardWrapper.vm.$emit('move', { from: 'b5', to: 'c7' });
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(500);
+      await wrapper.vm.$nextTick();
+      boardWrapper.vm.$emit('move', { from: 'c7', to: 'a8' });
+      await wrapper.vm.$nextTick();
+
+      const completionModal = wrapper.findComponent(PuzzleCompletionModal);
+      expect(completionModal.props('modelValue')).toBe(true);
+
+      // Dismiss dialog via @close event (e.g. clicking the (X) button)
+      completionModal.vm.$emit('close');
+      await wrapper.vm.$nextTick();
+
+      expect(completionModal.props('modelValue')).toBe(false);
+
+      // Reset position restores attempt and resets isCompletionDismissed
+      const resetBtn = wrapper.find('[data-testid="puzzle-reset-btn"]');
+      await resetBtn.trigger('click');
+      await wrapper.vm.$nextTick();
+
+      // Solve again
+      boardWrapper.vm.$emit('move', { from: 'b5', to: 'c7' });
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(500);
+      await wrapper.vm.$nextTick();
+      boardWrapper.vm.$emit('move', { from: 'c7', to: 'a8' });
+      await wrapper.vm.$nextTick();
+
+      expect(completionModal.props('modelValue')).toBe(true);
+    });
+
+    it('dismisses PuzzleCompletionModal when modal emits update:model-value with false (UX-WARN-03)', async () => {
+      const store = new InMemoryPuzzleProgressStore();
+      const wrapper = mount(PuzzleArena, {
+        props: {
+          mode: 'themed_drills',
+          initialTheme: 'fork',
+          customStore: store,
+        },
+        global: {
+          stubs: {
+            teleport: true,
+          },
+        },
+      });
+
+      // Solve first puzzle: b5c7 -> e8d8 -> c7a8
+      const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
+      boardWrapper.vm.$emit('move', { from: 'b5', to: 'c7' });
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(500);
+      await wrapper.vm.$nextTick();
+      boardWrapper.vm.$emit('move', { from: 'c7', to: 'a8' });
+      await wrapper.vm.$nextTick();
+
+      const completionModal = wrapper.findComponent(PuzzleCompletionModal);
+      expect(completionModal.props('modelValue')).toBe(true);
+
+      // Dismiss dialog via @update:model-value false
+      completionModal.vm.$emit('update:modelValue', false);
+      await wrapper.vm.$nextTick();
+
+      expect(completionModal.props('modelValue')).toBe(false);
+    });
+
     it('resets attempt when reset position button is clicked', async () => {
       const store = new InMemoryPuzzleProgressStore();
       const wrapper = mount(PuzzleArena, {

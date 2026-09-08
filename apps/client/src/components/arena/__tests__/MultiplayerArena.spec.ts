@@ -304,4 +304,69 @@ describe('MultiplayerArena.vue', () => {
     const resignBtn = wrapper.find('[data-testid="resign-action"]');
     expect(resignBtn.attributes('disabled')).toBeDefined();
   });
+
+  describe('UX-MAJ-01 & UX-MAJ-02: Banner in-flow layout and text wrapping', () => {
+    it('renders disconnect-warning-banner in-flow before top-hud to push down opponent HUD without overlapping', () => {
+      const pausedRoom: RoomState = {
+        ...mockRoom,
+        status: 'paused_disconnect',
+      };
+
+      const wrapper = mount(MultiplayerArena, {
+        props: {
+          ...defaultProps,
+          currentRoom: pausedRoom,
+        },
+        global: globalConfig,
+      });
+
+      const container = wrapper.find('.game-arena-container');
+      const children = container.element.children;
+      const bannerIndex = Array.from(children).findIndex((el) => el.classList.contains('disconnect-warning-banner'));
+      const topHudIndex = Array.from(children).findIndex((el) => el.classList.contains('top-hud'));
+
+      expect(bannerIndex).toBeGreaterThanOrEqual(0);
+      expect(topHudIndex).toBeGreaterThan(bannerIndex);
+    });
+
+    it('renders draw-offer-banner in-flow before top-hud to push down opponent HUD without overlapping', () => {
+      const wrapper = mount(MultiplayerArena, {
+        props: {
+          ...defaultProps,
+          drawOfferedBy: {
+            fromPlayerId: 'p2',
+            fromPlayerName: 'Player Two',
+          },
+        },
+        global: globalConfig,
+      });
+
+      const container = wrapper.find('.game-arena-container');
+      const children = container.element.children;
+      const bannerIndex = Array.from(children).findIndex((el) => el.classList.contains('draw-offer-banner'));
+      const topHudIndex = Array.from(children).findIndex((el) => el.classList.contains('top-hud'));
+
+      expect(bannerIndex).toBeGreaterThanOrEqual(0);
+      expect(topHudIndex).toBeGreaterThan(bannerIndex);
+    });
+
+    it('verifies MultiplayerArena.vue styles enforce responsive text wrapping and remove absolute positioning', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const sfcPath = path.resolve(__dirname, '../../../features/multiplayer/MultiplayerArena.vue');
+      const sfcContent = fs.readFileSync(sfcPath, 'utf-8');
+
+      // UX-MAJ-01: Disconnect warning banner text wrapping
+      expect(sfcContent).toMatch(/\.disconnect-warning-banner\s*\{[^}]*text-wrap:\s*balance;/);
+      expect(sfcContent).toMatch(/\.disconnect-warning-banner\s*\{[^}]*word-break:\s*break-word;/);
+      expect(sfcContent).toMatch(/\.disconnect-warning-banner\s*\{[^}]*line-height:\s*1\.4;/);
+      expect(sfcContent).toMatch(/\.disconnect-warning-banner\s*\{[^}]*width:\s*100%;/);
+      expect(sfcContent).toMatch(/\.disconnect-warning-banner\s*\{[^}]*box-sizing:\s*border-box;/);
+
+      // UX-MAJ-02: Ensure position: absolute is removed from both banners in MultiplayerArena.vue
+      expect(sfcContent).not.toMatch(/\.disconnect-warning-banner\s*\{[^}]*position:\s*absolute;/);
+      expect(sfcContent).not.toMatch(/\.draw-offer-banner\s*\{[^}]*position:\s*absolute;/);
+      expect(sfcContent).toMatch(/\.draw-offer-banner\s*\{[^}]*width:\s*100%;/);
+    });
+  });
 });

@@ -2,13 +2,17 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import http, { Server } from "node:http";
 import { createHttpServer } from "../http_server.js";
 import { MockRoomStore } from "../../../features/rooms/mock_room.store.js";
-import { LanService } from "../../../features/lan/lan.service.js";
 import {
   RelayAddressService,
   MockRelayAddressService,
 } from "../../../features/lan/relay_address.service.js";
 import { NullLogger } from "../../logger/null_logger.js";
-import { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
+import {
+  LanInfoResponse,
+  HealthCheckResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
+} from "@fun-chess/shared";
 
 describe("createHttpServer", () => {
   let server: Server;
@@ -19,7 +23,6 @@ describe("createHttpServer", () => {
   beforeAll(async () => {
     store = new MockRoomStore();
     logger = new NullLogger();
-    const lanService = new LanService();
     const relayAddressService = new RelayAddressService({
       lanIp: "192.168.1.50",
       port: 3000,
@@ -27,7 +30,6 @@ describe("createHttpServer", () => {
 
     const handler = createHttpServer({
       roomStore: store,
-      lanService,
       relayAddressService,
       logger,
       port: 3000,
@@ -61,12 +63,39 @@ describe("createHttpServer", () => {
     expect(body).toBe("OK");
   });
 
-  it("responds to GET /health with full operational telemetry", async () => {
+  it("responds to GET /health with lightweight liveness probe (ENH-003)", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/health`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
 
-    const data = (await res.json()) as HealthCheckResponse;
+    const data = (await res.json()) as LivenessHealthResponse;
+    expect(data.status).toBe("ok");
+    expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(data.timestamp).toBeDefined();
+    expect((data as any).activeRooms).toBeUndefined();
+    expect((data as any).activeSockets).toBeUndefined();
+    expect((data as any).memoryUsageMb).toBeUndefined();
+  });
+
+  it("responds to GET /api/health with lightweight liveness JSON (alias)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/health`);
+    expect(res.status).toBe(200);
+
+    const data = (await res.json()) as LivenessHealthResponse;
+    expect(data.status).toBe("ok");
+    expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(data.timestamp).toBeDefined();
+    expect((data as any).activeRooms).toBeUndefined();
+    expect((data as any).activeSockets).toBeUndefined();
+    expect((data as any).memoryUsageMb).toBeUndefined();
+  });
+
+  it("responds to GET /health/detail and /metrics with full operational telemetry (ENH-003)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/health/detail`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+
+    const data = (await res.json()) as DetailedHealthResponse;
     expect(data.status).toBe("ok");
     expect(data.activeSockets).toBe(2);
     expect(data.activeRooms).toBe(0);
@@ -76,17 +105,12 @@ describe("createHttpServer", () => {
     expect(data.timestamp).toBeDefined();
     expect(data.relay).toBeDefined();
     expect(data.relay?.mode).toBe("lan");
-  });
 
-  it("responds to GET /api/health with health statistics JSON (alias)", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/health`);
-    expect(res.status).toBe(200);
-
-    const data = (await res.json()) as HealthCheckResponse;
-    expect(data.status).toBe("ok");
-    expect(data.activeSockets).toBe(2);
-    expect(data.memoryUsageMb.heapUsed).toBeGreaterThan(0);
-    expect(data.timestamp).toBeDefined();
+    const metricsRes = await fetch(`http://127.0.0.1:${port}/metrics`);
+    expect(metricsRes.status).toBe(200);
+    const metricsData = (await metricsRes.json()) as DetailedHealthResponse;
+    expect(metricsData.status).toBe("ok");
+    expect(metricsData.activeSockets).toBe(2);
   });
 
   it("responds to GET /api/lan-info with valid LAN info JSON and relay mode metadata", async () => {
@@ -293,14 +317,18 @@ describe("createHttpServer", () => {
     );
     expect(res.status).toBe(404);
     const json = (await res.json()) as {
-      status: string;
-      error: { code: string; message: string };
-      correlationId: string;
+      code: number;
+      error: string;
+      message: string;
+      correlationId?: string;
+      timestamp: number;
     };
-    expect(json.status).toBe("error");
-    expect(json.error.code).toBe("ERR_NOT_FOUND");
-    expect(json.error.message).toContain("Cannot POST /api/non-existent-endpoint");
+    expect(json.code).toBe(404);
+    expect(json.error).toBe("ERR_NOT_FOUND");
+    expect(json.message).toContain("Cannot POST /api/non-existent-endpoint");
     expect(json.correlationId).toBeDefined();
+    expect(typeof json.timestamp).toBe("number");
+    expect(json.timestamp).toBeGreaterThan(0);
   });
 
   it("enforces rate limiting on native HTTP endpoints (MIN-002)", async () => {
@@ -337,14 +365,15 @@ describe("createHttpServer", () => {
       const res3 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
       expect(res3.status).toBe(429);
       const data = (await res3.json()) as any;
-      expect(data.status).toBe("error");
-      expect(data.error?.code).toBe("ERR_RATE_LIMITED");
+      expect(data.code).toBe(429);
+      expect(data.error).toBe("ERR_RATE_LIMITED");
+      expect(typeof data.timestamp).toBe("number");
     } finally {
       await new Promise<void>((resolve) => rlServer.close(() => resolve()));
     }
   });
 
-  it("redacts process memory telemetry on /health in production mode (MIN-001)", async () => {
+  it("redacts process memory telemetry on /health/detail in production mode (MIN-001)", async () => {
     const prodHandler = createHttpServer({
       roomStore: store,
       logger: new NullLogger(),
@@ -368,9 +397,9 @@ describe("createHttpServer", () => {
     );
 
     try {
-      const res = await fetch(`http://127.0.0.1:${prodPort}/health`);
+      const res = await fetch(`http://127.0.0.1:${prodPort}/health/detail`);
       expect(res.status).toBe(200);
-      const data = (await res.json()) as HealthCheckResponse;
+      const data = (await res.json()) as DetailedHealthResponse;
       expect(data.status).toBe("ok");
       // Memory telemetry must be redacted in production
       expect(data.memoryUsageMb).toEqual({
@@ -424,10 +453,10 @@ describe("createHttpServer", () => {
       });
     });
 
-    it("returns cloud relay mode in /health endpoint", async () => {
-      const res = await fetch(`http://127.0.0.1:${cloudPort}/health`);
+    it("returns cloud relay mode in /health/detail endpoint", async () => {
+      const res = await fetch(`http://127.0.0.1:${cloudPort}/health/detail`);
       expect(res.status).toBe(200);
-      const data = (await res.json()) as HealthCheckResponse;
+      const data = (await res.json()) as DetailedHealthResponse;
       expect(data.relay?.mode).toBe("cloud");
       expect(data.relay?.publicUrl).toBe("https://fun-chess-prod.a.run.app");
     });

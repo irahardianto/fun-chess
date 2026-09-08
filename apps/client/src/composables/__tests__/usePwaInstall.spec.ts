@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { effectScope } from 'vue';
-import { usePwaInstall, SNOOZE_STORAGE_KEY, BeforeInstallPromptEvent } from '../usePwaInstall';
+import { usePwaInstall, resetPwaInstallState, SNOOZE_STORAGE_KEY, BeforeInstallPromptEvent } from '../usePwaInstall';
 
 describe('usePwaInstall composable', () => {
   let mockStorage: Record<string, string> = {};
@@ -325,5 +325,32 @@ describe('usePwaInstall composable', () => {
     expect(pwa?.isInstalled.value).toBe(true);
     expect(pwa?.canInstall.value).toBe(false);
     scope.stop();
+  });
+
+  describe('resetPwaInstallState hook [MAJ-011]', () => {
+    it('resets all module-level reactive state and listeners cleanly', () => {
+      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+      const pwa = usePwaInstall();
+
+      // Trigger appinstalled to change state
+      window.dispatchEvent(new Event('appinstalled'));
+      expect(pwa.isInstalled.value).toBe(true);
+
+      expect(typeof resetPwaInstallState).toBe('function');
+      resetPwaInstallState();
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        'beforeinstallprompt',
+        expect.any(Function)
+      );
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        'appinstalled',
+        expect.any(Function)
+      );
+
+      const freshPwa = usePwaInstall();
+      expect(freshPwa.isInstalled.value).toBe(false);
+      expect(freshPwa.hasInstallPrompt.value).toBe(false);
+    });
   });
 });

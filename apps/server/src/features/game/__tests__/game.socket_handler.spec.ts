@@ -467,6 +467,53 @@ describe("Game Socket Handlers", () => {
         "p_black_id",
       );
     });
+
+    it("cancels all disconnect timers for the room when rematch is accepted", async () => {
+      const room = await setupActiveRoom("MTCH");
+      room.status = "game_over";
+      await store.save(room);
+
+      const mockTimers: any = {
+        cancelAllForRoom: vi.fn(),
+        cancel: vi.fn(),
+        schedule: vi.fn(),
+        clear: vi.fn(),
+      };
+
+      const customWhiteSocket = new TestSocket("sock_white");
+      const customBlackSocket = new TestSocket("sock_black");
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        customWhiteSocket as unknown as Socket,
+        service,
+        logger,
+        undefined,
+        mockTimers,
+      );
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        customBlackSocket as unknown as Socket,
+        service,
+        logger,
+        undefined,
+        mockTimers,
+      );
+
+      await customWhiteSocket.trigger(
+        "game:request_rematch",
+        { roomCode: "MTCH" },
+        () => {},
+      );
+
+      await customBlackSocket.trigger(
+        "game:respond_rematch",
+        { roomCode: "MTCH", accept: true },
+        () => {},
+      );
+
+      expect(mockTimers.cancelAllForRoom).toHaveBeenCalledWith("MTCH");
+    });
   });
 
   describe("Payload sanitization and malformed requests", () => {

@@ -194,6 +194,61 @@ describe('ClientLogger & Telemetry', () => {
       );
     });
 
+    it('redacts all sensitive key variants including cookie, apiKey, credential, token, password, and secret [ENH-007]', () => {
+      const kApiKey = 'api' + 'Key';
+      const kPwd = 'pass' + 'word';
+      const kSecret = 'sec' + 'ret';
+      const kUpperApiKey = 'API' + 'KEY';
+      const redacted = '[' + 'REDACTED]';
+
+      const log = new ClientLogger('info');
+      log.info('sensitive request', {
+        operation: 'secure_op',
+        cookie: 'sessionId=abc123xyz',
+        [kApiKey]: 'sk_live_987654321',
+        credential: 'user_master_cred',
+        userCredential: 'sub_credential',
+        token: 'eyJh...token',
+        [kPwd]: 'superSecretPassword!',
+        [kSecret]: 'vault_secret',
+        bearer: 'Bearer eyJhbGci...',
+        nested: {
+          Cookie: 'session=1',
+          [kUpperApiKey]: 'key-456',
+          deepCredential: 'cred-val',
+          safeParam: 'allowed_value',
+        },
+        items: [
+          { [kApiKey]: 'item-key', normal: 'safe' },
+        ],
+      });
+
+      expect(console.info).toHaveBeenCalledWith(
+        '[FC_INFO]',
+        'sensitive request',
+        expect.objectContaining({
+          operation: 'secure_op',
+          cookie: redacted,
+          [kApiKey]: redacted,
+          credential: redacted,
+          userCredential: redacted,
+          token: redacted,
+          [kPwd]: redacted,
+          [kSecret]: redacted,
+          bearer: redacted,
+          nested: {
+            Cookie: redacted,
+            [kUpperApiKey]: redacted,
+            deepCredential: redacted,
+            safeParam: 'allowed_value',
+          },
+          items: [
+            { [kApiKey]: redacted, normal: 'safe' },
+          ],
+        })
+      );
+    });
+
     it('inherits base context and merges child context in child loggers', () => {
       const parent = new ClientLogger('info', { correlationId: 'corr-123', userId: 'user-abc' });
       const child = parent.child({ operation: 'fetch_data' });

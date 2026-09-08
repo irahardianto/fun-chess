@@ -389,6 +389,52 @@ describe('PuzzleCompletionModal.vue Component', () => {
     });
   });
 
+  describe('Modal Close Handling (UX-WARN-03)', () => {
+    it('emits close and update:modelValue false when BaseModal emits close', async () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: true,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+        },
+        global: {
+          stubs: { teleport: true },
+        },
+      });
+
+      const baseModal = wrapper.findComponent({ name: 'BaseModal' });
+      expect(baseModal.exists()).toBe(true);
+
+      baseModal.vm.$emit('close');
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.emitted('close')).toHaveLength(1);
+      expect(wrapper.emitted('update:modelValue')).toEqual([[false]]);
+    });
+
+    it('emits close and update:modelValue false when BaseModal emits update:modelValue with false', async () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: true,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+        },
+        global: {
+          stubs: { teleport: true },
+        },
+      });
+
+      const baseModal = wrapper.findComponent({ name: 'BaseModal' });
+      expect(baseModal.exists()).toBe(true);
+
+      baseModal.vm.$emit('update:modelValue', false);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.emitted('close')).toHaveLength(1);
+      expect(wrapper.emitted('update:modelValue')).toEqual([[false]]);
+    });
+  });
+
   describe('Move Replay Controller & Ply Stepping Interactions', () => {
     it('renders replay controller with correct total plies and step counter', () => {
       const wrapper = mount(PuzzleCompletionModal, {

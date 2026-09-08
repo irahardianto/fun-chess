@@ -149,8 +149,13 @@ export class BrowserStorageAdapter implements KeyValueStorage {
     if (storage) {
       try {
         return storage.key(index);
-      } catch {
-        // Fall back below
+      } catch (err) {
+        logger.debug('Failed to inspect storage key at index', {
+          operation: 'storage_key',
+          storageType: this.storageType,
+          index,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
     return Array.from(this.fallback.keys())[index] ?? null;
@@ -161,8 +166,12 @@ export class BrowserStorageAdapter implements KeyValueStorage {
     if (storage) {
       try {
         return storage.length;
-      } catch {
-        // Fall back below
+      } catch (err) {
+        logger.debug('Failed to inspect storage length', {
+          operation: 'storage_length',
+          storageType: this.storageType,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
     return this.fallback.size;

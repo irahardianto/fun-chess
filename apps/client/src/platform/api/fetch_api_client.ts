@@ -77,37 +77,34 @@ export class FetchApiClient implements IApiClient {
   }
 
   private async parseResponseBody<T>(response: Response): Promise<T> {
-    if (!response) {
-      return null as T;
-    }
-    if (response.status === 204) {
+    if (!response || response.status === 204) {
       return null as T;
     }
 
     const contentType = response.headers?.get?.('content-type') ?? '';
-    const hasContentType = Boolean(contentType);
-    const isJson = contentType.includes('json');
+    const isJson = !contentType || contentType.includes('json');
 
-    if (hasContentType && !isJson) {
-      const text = typeof response.text === 'function' ? await response.text() : null;
-      return (text ? (text as unknown as T) : (null as T));
+    if (typeof response.text === 'function') {
+      const text = await response.text();
+      if (!text) {
+        return null as T;
+      }
+      if (isJson) {
+        try {
+          return JSON.parse(text) as T;
+        } catch {
+          return text as unknown as T;
+        }
+      }
+      return text as unknown as T;
     }
 
     if (typeof response.json === 'function') {
       try {
         return await response.json();
       } catch {
-        if (typeof response.text === 'function') {
-          const text = await response.text();
-          return (text ? (text as unknown as T) : (null as T));
-        }
         return null as T;
       }
-    }
-
-    if (typeof response.text === 'function') {
-      const text = await response.text();
-      return (text ? (text as unknown as T) : (null as T));
     }
 
     return null as T;
@@ -118,11 +115,12 @@ export class FetchApiClient implements IApiClient {
     const correlationId = options.correlationId ?? generateCorrelationId();
     const startTime = Date.now();
     const fullUrl = this.resolveUrl(url);
+    const sanitizedUrl = fullUrl.split('?')[0]!;
 
     this.logger.info('HTTP request started', {
       operation: 'http_request',
       method: 'GET',
-      url: fullUrl,
+      url: sanitizedUrl,
       correlationId,
     });
 
@@ -141,7 +139,7 @@ export class FetchApiClient implements IApiClient {
       this.logger.info('HTTP request completed', {
         operation: 'http_request',
         method: 'GET',
-        url: fullUrl,
+        url: sanitizedUrl,
         status: response?.status ?? 0,
         correlationId,
         duration: Date.now() - startTime,
@@ -152,7 +150,7 @@ export class FetchApiClient implements IApiClient {
       this.logger.error('HTTP request failed', {
         operation: 'http_request',
         method: 'GET',
-        url: fullUrl,
+        url: sanitizedUrl,
         correlationId,
         duration: Date.now() - startTime,
         error: err instanceof Error ? err.message : String(err),
@@ -168,11 +166,12 @@ export class FetchApiClient implements IApiClient {
     const correlationId = options.correlationId ?? generateCorrelationId();
     const startTime = Date.now();
     const fullUrl = this.resolveUrl(url);
+    const sanitizedUrl = fullUrl.split('?')[0]!;
 
     this.logger.info('HTTP request started', {
       operation: 'http_request',
       method: 'POST',
-      url: fullUrl,
+      url: sanitizedUrl,
       correlationId,
     });
 
@@ -193,7 +192,7 @@ export class FetchApiClient implements IApiClient {
       this.logger.info('HTTP request completed', {
         operation: 'http_request',
         method: 'POST',
-        url: fullUrl,
+        url: sanitizedUrl,
         status: response?.status ?? 0,
         correlationId,
         duration: Date.now() - startTime,
@@ -204,7 +203,7 @@ export class FetchApiClient implements IApiClient {
       this.logger.error('HTTP request failed', {
         operation: 'http_request',
         method: 'POST',
-        url: fullUrl,
+        url: sanitizedUrl,
         correlationId,
         duration: Date.now() - startTime,
         error: err instanceof Error ? err.message : String(err),
@@ -234,10 +233,11 @@ export class FetchApiClient implements IApiClient {
     const { signal, cleanup } = this.createTimeoutSignal(options.timeoutMs ?? 2000, options.signal);
     const correlationId = options.correlationId ?? generateCorrelationId();
     const startTime = Date.now();
+    const sanitizedProbeUrl = probeUrl.split('?')[0]!;
 
     this.logger.info('Connectivity probe started', {
       operation: 'check_connectivity',
-      probeUrl,
+      probeUrl: sanitizedProbeUrl,
       correlationId,
     });
 
@@ -255,7 +255,7 @@ export class FetchApiClient implements IApiClient {
 
       this.logger.info('Connectivity probe completed', {
         operation: 'check_connectivity',
-        probeUrl,
+        probeUrl: sanitizedProbeUrl,
         correlationId,
         ok: res.ok,
         duration: Date.now() - startTime,
@@ -265,7 +265,7 @@ export class FetchApiClient implements IApiClient {
     } catch (err) {
       this.logger.warn('Connectivity probe failed', {
         operation: 'check_connectivity',
-        probeUrl,
+        probeUrl: sanitizedProbeUrl,
         correlationId,
         duration: Date.now() - startTime,
         error: err instanceof Error ? err.message : String(err),

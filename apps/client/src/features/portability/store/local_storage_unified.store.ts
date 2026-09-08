@@ -56,47 +56,38 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
 
   /**
    * Two-phase commit overwrite with pre-write snapshot and rollback on write failure.
+   * Remediates MAJ-020: 3-point structured logging on overwriteAll (start, success, failure) with correlationId and duration.
    */
   public async overwriteAll(payload: UnifiedProgressPayload): Promise<void> {
-    // Phase 0: Validate payload structure against authoritative schema
-    if (!payload || typeof payload !== 'object' || !payload.scenarios || !payload.puzzles) {
-      throw new Error('Invalid payload: missing scenarios or puzzles data');
-    }
-    const validatedPayload = assertValidProgress(payload);
+    const correlationId = generateCorrelationId();
+    const startTime = performance.now();
 
-    // Phase 1: Capture pre-write snapshot
-    const snapshot: StorageSnapshot = {
-      scenarios: structuredClone(await this.scenarioStore.getProgressMap()),
-      puzzles: structuredClone(await this.puzzleStore.getProgress()),
-    };
+    logger.info('Starting unified progress overwrite', {
+      operation: 'unified_store_overwrite_all',
+      correlationId,
+    });
 
-    // Phase 2: Staged write
     try {
-      // 2a. Reset and restore scenario records
-      if (typeof this.scenarioStore.restoreProgressMap === 'function') {
-        await this.scenarioStore.restoreProgressMap(validatedPayload.scenarios);
-      } else {
-        await this.scenarioStore.resetAllProgress();
-        for (const [id, progress] of Object.entries(validatedPayload.scenarios)) {
-          await this.scenarioStore.saveProgress(
-            id,
-            progress.starsEarned,
-            progress.hintsUsedTotal
-          );
-        }
+      // Phase 0: Validate payload structure against authoritative schema
+      if (!payload || typeof payload !== 'object' || !payload.scenarios || !payload.puzzles) {
+        throw new Error('Invalid payload: missing scenarios or puzzles data');
       }
+      const validatedPayload = assertValidProgress(payload);
 
-      // 2b. Write full puzzle state (including themeMastery & arcadeStats)
-      await this.puzzleStore.restoreProgress(validatedPayload.puzzles);
-    } catch (writeErr) {
-      // Compensating Rollback: restore from snapshot
-      let rollbackSucceeded = false;
+      // Phase 1: Capture pre-write snapshot
+      const snapshot: StorageSnapshot = {
+        scenarios: structuredClone(await this.scenarioStore.getProgressMap()),
+        puzzles: structuredClone(await this.puzzleStore.getProgress()),
+      };
+
+      // Phase 2: Staged write
       try {
+        // 2a. Reset and restore scenario records
         if (typeof this.scenarioStore.restoreProgressMap === 'function') {
-          await this.scenarioStore.restoreProgressMap(snapshot.scenarios);
+          await this.scenarioStore.restoreProgressMap(validatedPayload.scenarios);
         } else {
           await this.scenarioStore.resetAllProgress();
-          for (const [id, progress] of Object.entries(snapshot.scenarios)) {
+          for (const [id, progress] of Object.entries(validatedPayload.scenarios)) {
             await this.scenarioStore.saveProgress(
               id,
               progress.starsEarned,
@@ -104,39 +95,79 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
             );
           }
         }
-        await this.puzzleStore.restoreProgress(snapshot.puzzles);
-        rollbackSucceeded = true;
-      } catch (rollbackErr) {
-        const correlationId = generateCorrelationId();
-        logger.fatal('FATAL: Two-phase commit rollback failed', {
-          operation: 'unified_store_rollback',
-          correlationId,
-          error:
-            rollbackErr instanceof Error
-              ? { name: rollbackErr.name, message: rollbackErr.message, stack: rollbackErr.stack }
-              : { raw: rollbackErr },
-        });
-        rollbackSucceeded = false;
+
+        // 2b. Write full puzzle state (including themeMastery & arcadeStats)
+        await this.puzzleStore.restoreProgress(validatedPayload.puzzles);
+      } catch (writeErr) {
+        // Compensating Rollback: restore from snapshot
+        let rollbackSucceeded = false;
+        try {
+          if (typeof this.scenarioStore.restoreProgressMap === 'function') {
+            await this.scenarioStore.restoreProgressMap(snapshot.scenarios);
+          } else {
+            await this.scenarioStore.resetAllProgress();
+            for (const [id, progress] of Object.entries(snapshot.scenarios)) {
+              await this.scenarioStore.saveProgress(
+                id,
+                progress.starsEarned,
+                progress.hintsUsedTotal
+              );
+            }
+          }
+          await this.puzzleStore.restoreProgress(snapshot.puzzles);
+          rollbackSucceeded = true;
+        } catch (rollbackErr) {
+          logger.fatal('FATAL: Two-phase commit rollback failed', {
+            operation: 'unified_store_rollback',
+            correlationId,
+            error:
+              rollbackErr instanceof Error
+                ? { name: rollbackErr.name, message: rollbackErr.message, stack: rollbackErr.stack }
+                : { raw: rollbackErr },
+          });
+          rollbackSucceeded = false;
+        }
+
+        // Check quota error & emit alert
+        if (isQuotaExceededError(writeErr)) {
+          storageAlertDispatcher.notify({
+            type: 'STORAGE_QUOTA_EXCEEDED',
+            store: 'unified',
+            attemptedAction: 'overwrite',
+            timestamp: Date.now(),
+            message: 'Storage quota exceeded while importing progress. Local state was preserved.',
+            suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+          });
+        }
+
+        throw new StorageCommitError(
+          rollbackSucceeded
+            ? 'Failed to save unified progress. Existing progress was safely restored.'
+            : 'CRITICAL: Progress save failed and partial rollback failed.',
+          { cause: writeErr, rolledBack: rollbackSucceeded }
+        );
       }
 
-      // Check quota error & emit alert
-      if (isQuotaExceededError(writeErr)) {
-        storageAlertDispatcher.notify({
-          type: 'STORAGE_QUOTA_EXCEEDED',
-          store: 'unified',
-          attemptedAction: 'overwrite',
-          timestamp: Date.now(),
-          message: 'Storage quota exceeded while importing progress. Local state was preserved.',
-          suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
-        });
-      }
-
-      throw new StorageCommitError(
-        rollbackSucceeded
-          ? 'Failed to save unified progress. Existing progress was safely restored.'
-          : 'CRITICAL: Progress save failed and partial rollback failed.',
-        { cause: writeErr, rolledBack: rollbackSucceeded }
-      );
+      const duration = Math.round(performance.now() - startTime);
+      logger.info('Unified progress overwrite succeeded', {
+        operation: 'unified_store_overwrite_all',
+        correlationId,
+        duration,
+        durationMs: duration,
+      });
+    } catch (err) {
+      const duration = Math.round(performance.now() - startTime);
+      logger.error('Unified progress overwrite failed', {
+        operation: 'unified_store_overwrite_all',
+        correlationId,
+        duration,
+        durationMs: duration,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message, stack: err.stack }
+            : { raw: err },
+      });
+      throw err;
     }
   }
 }

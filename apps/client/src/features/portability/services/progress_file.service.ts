@@ -1,4 +1,5 @@
 import { logger as defaultLogger, type ILogger } from '../../../platform/telemetry';
+import { defaultFileDownloader, type IFileDownloader } from '../../../platform/hardware';
 
 /**
  * Maximum progress backup file size (2MB).
@@ -18,7 +19,10 @@ export interface IProgressFileService {
  * Adheres to Rule 1 (I/O Isolation) and Defensive Programming Mandates.
  */
 export class ProgressFileService implements IProgressFileService {
-  constructor(private readonly logger: ILogger = defaultLogger) {}
+  constructor(
+    private readonly logger: ILogger = defaultLogger,
+    private readonly downloader: IFileDownloader = defaultFileDownloader,
+  ) {}
 
   /**
    * Triggers client-side browser download of progress JSON envelope file.
@@ -30,22 +34,8 @@ export class ProgressFileService implements IProgressFileService {
     envelopeJson: string,
     filename: string = 'funchess-save.json'
   ): void {
-    if (typeof window === 'undefined' || typeof document === 'undefined') {
-      return;
-    }
-
-    let url: string | undefined;
-    let link: HTMLAnchorElement | undefined;
     try {
-      const blob = new Blob([envelopeJson], { type: 'application/json;charset=utf-8' });
-      url = URL.createObjectURL(blob);
-      link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.style.display = 'none';
-
-      document.body.appendChild(link);
-      link.click();
+      this.downloader.download(envelopeJson, filename, 'application/json;charset=utf-8');
     } catch (err) {
       this.logger.error('Failed to initiate file download', {
         operation: 'progress_file_download',
@@ -53,13 +43,6 @@ export class ProgressFileService implements IProgressFileService {
         error: err instanceof Error ? err.message : String(err),
       });
       throw new Error('Unable to download backup file');
-    } finally {
-      if (link && link.parentNode) {
-        link.parentNode.removeChild(link);
-      }
-      if (url) {
-        URL.revokeObjectURL(url);
-      }
     }
   }
 

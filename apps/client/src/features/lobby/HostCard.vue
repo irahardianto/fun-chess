@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { BaseButton, BaseCard, BaseInput } from '@/components/base';
 
 defineProps<{
@@ -13,6 +13,12 @@ const emit = defineEmits<{
 const hostNickname = ref('');
 const preferredColor = ref<'w' | 'b' | 'random'>('random');
 const errorMsg = ref('');
+
+watch(hostNickname, () => {
+  if (errorMsg.value) {
+    errorMsg.value = '';
+  }
+});
 
 const colorOptions: readonly ('w' | 'random' | 'b')[] = ['w', 'random', 'b'];
 
@@ -73,7 +79,7 @@ function onHostSubmit() {
       <BaseInput
         v-model="hostNickname"
         label="Your nickname"
-        placeholder="e.g. MasterKnight 🦁"
+        placeholder="e.g. MasterKnight"
         :error="errorMsg"
         clearable
         data-testid="host-nickname-input"
@@ -174,7 +180,7 @@ function onHostSubmit() {
 .card-badge {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   background-color: var(--color-primary-subtle);
   padding: 2px 8px;
   border-radius: var(--radius-pill);

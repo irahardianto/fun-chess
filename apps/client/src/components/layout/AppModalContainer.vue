@@ -79,98 +79,77 @@ const emit = defineEmits<{
   'update:isInstallModalOpen': [value: boolean];
   'update:showConfirmModal': [value: boolean];
   'confirm-proceed': [];
-  confirmProceed: [];
   'confirm-cancel': [];
-  confirmCancel: [];
   'promotion-select': [piece: 'q' | 'r' | 'b' | 'n'];
-  promotionSelect: [piece: 'q' | 'r' | 'b' | 'n'];
   'promotion-cancel': [];
-  promotionCancel: [];
   'request-rematch': [];
-  rematch: [];
   'leave-room': [];
-  lobby: [];
   'accept-rematch': [];
-  acceptRematch: [];
   'decline-rematch': [];
-  declineRematch: [];
   'resolve-conflict': [strategy: 'smart_merge' | 'replace_local' | 'keep_local'];
-  resolveConflict: [strategy: 'smart_merge' | 'replace_local' | 'keep_local'];
-  resolve: [strategy: 'smart_merge' | 'replace_local' | 'keep_local'];
   'cancel-conflict': [];
-  cancelConflict: [];
-  cancel: [];
   'prompt-install': [];
-  install: [];
   'snooze-prompt': [];
-  'dismiss-banner': [];
-  dismiss: [];
   notify: [payload: { message: string; type: 'error' | 'info' | 'success'; durationMs?: number }];
 }>();
 
 function handleConfirmProceed() {
   emit('update:showConfirmModal', false);
   emit('confirm-proceed');
-  emit('confirmProceed');
 }
 
 function handleConfirmCancel() {
   emit('update:showConfirmModal', false);
   emit('confirm-cancel');
-  emit('confirmCancel');
 }
 
 function handlePromotionSelect(piece: 'q' | 'r' | 'b' | 'n') {
   emit('promotion-select', piece);
-  emit('promotionSelect', piece);
 }
 
 function handlePromotionCancel() {
   emit('promotion-cancel');
-  emit('promotionCancel');
 }
 
 function handleRequestRematch() {
   emit('request-rematch');
-  emit('rematch');
 }
 
 function handleLeaveRoom() {
   emit('leave-room');
-  emit('lobby');
 }
 
 function handleAcceptRematch() {
   emit('accept-rematch');
-  emit('acceptRematch');
 }
 
 function handleDeclineRematch() {
   emit('decline-rematch');
-  emit('declineRematch');
 }
 
+let lastResolvedStrategy: string | null = null;
+let lastResolvedTime = 0;
+
 function handleResolveConflict(strategy: 'smart_merge' | 'replace_local' | 'keep_local') {
+  const now = Date.now();
+  if (lastResolvedStrategy === strategy && now - lastResolvedTime < 250) {
+    return;
+  }
+  lastResolvedStrategy = strategy;
+  lastResolvedTime = now;
   emit('resolve-conflict', strategy);
-  emit('resolveConflict', strategy);
-  emit('resolve', strategy);
 }
 
 function handleCancelConflict() {
   emit('cancel-conflict');
-  emit('cancelConflict');
-  emit('cancel');
 }
 
 function handlePromptInstall() {
   emit('prompt-install');
-  emit('install');
 }
 
 function handleSnoozePrompt() {
   emit('snooze-prompt');
-  emit('dismiss-banner');
-  emit('dismiss');
 }
 
 function handleKeydown(event: KeyboardEvent) {

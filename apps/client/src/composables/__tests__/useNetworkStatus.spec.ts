@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { effectScope } from 'vue';
-import { useNetworkStatus } from '../useNetworkStatus';
+import { useNetworkStatus, resetNetworkStatusState } from '../useNetworkStatus';
 
 describe('useNetworkStatus composable', () => {
   let originalOnLine: boolean;
@@ -128,5 +128,27 @@ describe('useNetworkStatus composable', () => {
     const lastOnline = status?.isOnline.value;
     window.dispatchEvent(new Event('offline'));
     expect(status?.isOnline.value).toBe(lastOnline);
+  });
+
+  describe('resetNetworkStatusState hook [MAJ-011]', () => {
+    it('cleans up state and removes global window listeners between tests', () => {
+      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+      const status1 = useNetworkStatus();
+
+      // Trigger offline event
+      window.dispatchEvent(new Event('offline'));
+      expect(status1.isOnline.value).toBe(false);
+
+      // Invoke reset hook
+      expect(typeof resetNetworkStatusState).toBe('function');
+      resetNetworkStatusState();
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('online', expect.any(Function));
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('offline', expect.any(Function));
+
+      // After reset, fresh composable picks up navigator.onLine
+      const status2 = useNetworkStatus();
+      expect(status2.isOnline.value).toBe(true);
+    });
   });
 });

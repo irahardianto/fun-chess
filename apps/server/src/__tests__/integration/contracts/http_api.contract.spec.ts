@@ -1,7 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createTestServer, TestServerInstance } from "../helpers/test_server.js";
-import { fetchLanInfo, fetchHealth } from "../helpers/http_client_helper.js";
-import { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
+import {
+  fetchLanInfo,
+  fetchHealth,
+  fetchMetrics,
+  fetchHealthDetail,
+} from "../helpers/http_client_helper.js";
+import type {
+  LanInfoResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
+} from "@fun-chess/shared";
 import { HttpRateLimiter } from "../../../platform/http/http_rate_limiter.js";
 
 describe("HTTP API Contracts", () => {
@@ -44,25 +53,72 @@ describe("HTTP API Contracts", () => {
     });
   });
 
-  describe("GET /health", () => {
-    it("should return 200 OK with valid HealthCheckResponse schema at root /health", async () => {
+  describe("GET /health & /api/health (ENH-003)", () => {
+    it("should return 200 OK with valid LivenessHealthResponse schema at root /health", async () => {
       // Arrange & Act
       const res = await fetch(`${serverInstance.url}/health`);
-      const data = (await res.json()) as HealthCheckResponse;
+      const data = (await res.json()) as LivenessHealthResponse;
 
       // Assert
       expect(res.status).toBe(200);
       expect(data.status).toBe("ok");
-      expect(data.activeRooms).toBe(0);
-      expect(data.activeSockets).toBe(0);
-      expect(data.relay).toBeDefined();
+      expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
+      expect(data.timestamp).toBeDefined();
+      expect(new Date(data.timestamp).getTime()).not.toBeNaN();
+
+      // Operational metrics must NOT be leaked on public liveness endpoint (ENH-003)
+      expect((data as any).activeRooms).toBeUndefined();
+      expect((data as any).activeSockets).toBeUndefined();
+      expect((data as any).memoryUsageMb).toBeUndefined();
     });
 
-    it("should return 200 OK with valid HealthCheckResponse via fetchHealth helper", async () => {
+    it("should return 200 OK with valid LivenessHealthResponse via fetchHealth helper", async () => {
       const { status, data } = await fetchHealth(serverInstance.url);
       expect(status).toBe(200);
       expect(data.status).toBe("ok");
       expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
+      expect(data.timestamp).toBeDefined();
+      expect((data as any).activeRooms).toBeUndefined();
+      expect((data as any).activeSockets).toBeUndefined();
+      expect((data as any).memoryUsageMb).toBeUndefined();
+    });
+  });
+
+  describe("GET /metrics & GET /health/detail (ENH-003)", () => {
+    it("should return 200 OK with valid DetailedHealthResponse at /metrics", async () => {
+      const { status, data } = await fetchMetrics(serverInstance.url);
+      expect(status).toBe(200);
+      expect(data.status).toBe("ok");
+      expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
+      expect(data.timestamp).toBeDefined();
+      expect(typeof data.activeRooms).toBe("number");
+      expect(typeof data.activeSockets).toBe("number");
+      expect(data.memoryUsageMb).toBeDefined();
+      expect(typeof data.memoryUsageMb.rss).toBe("number");
+      expect(typeof data.memoryUsageMb.heapTotal).toBe("number");
+      expect(typeof data.memoryUsageMb.heapUsed).toBe("number");
+      expect(data.relay).toBeDefined();
+    });
+
+    it("should return 200 OK with valid DetailedHealthResponse at /health/detail", async () => {
+      const { status, data } = await fetchHealthDetail(serverInstance.url);
+      expect(status).toBe(200);
+      expect(data.status).toBe("ok");
+      expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
+      expect(typeof data.activeRooms).toBe("number");
+      expect(typeof data.activeSockets).toBe("number");
+      expect(data.memoryUsageMb).toBeDefined();
+      expect(data.relay).toBeDefined();
+    });
+
+    it("should respond to HEAD /metrics with 200 OK, headers, and empty body", async () => {
+      const res = await fetch(`${serverInstance.url}/metrics`, {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("application/json");
+      const body = await res.text();
+      expect(body).toBe("");
     });
   });
 
@@ -87,6 +143,49 @@ describe("HTTP API Contracts", () => {
       expect(res.headers.get("referrer-policy")).toBe(
         "strict-origin-when-cross-origin",
       );
+    });
+  });
+
+  describe("Conditional Strict-Transport-Security (MIN-003, SEC-RT-002)", () => {
+    it("should omit Strict-Transport-Security on plain HTTP requests", async () => {
+      const res = await fetch(`${serverInstance.url}/healthz`);
+      expect(res.headers.get("strict-transport-security")).toBeNull();
+    });
+
+    it("should include Strict-Transport-Security when x-forwarded-proto is https", async () => {
+      const res = await fetch(`${serverInstance.url}/healthz`, {
+        headers: {
+          "x-forwarded-proto": "https",
+        },
+      });
+      expect(res.headers.get("strict-transport-security")).toBe(
+        "max-age=31536000; includeSubDomains; preload",
+      );
+    });
+
+    it("should omit Strict-Transport-Security on plain HTTP requests even in production mode (SEC-RT-002)", async () => {
+      const prodServer = await createTestServer({
+        env: {
+          NODE_ENV: "production",
+          CORS_ORIGIN: "https://fun-chess.example.com",
+        } as any,
+      });
+
+      try {
+        const plainRes = await fetch(`${prodServer.url}/healthz`);
+        expect(plainRes.headers.get("strict-transport-security")).toBeNull();
+
+        const httpsRes = await fetch(`${prodServer.url}/healthz`, {
+          headers: {
+            "x-forwarded-proto": "https",
+          },
+        });
+        expect(httpsRes.headers.get("strict-transport-security")).toBe(
+          "max-age=31536000; includeSubDomains; preload",
+        );
+      } finally {
+        await prodServer.close();
+      }
     });
   });
 
@@ -124,7 +223,7 @@ describe("HTTP API Contracts", () => {
     });
   });
 
-  describe("OPTIONS Preflight & Standardized 404 Routing (MIN-032)", () => {
+  describe("OPTIONS Preflight & Standardized 404 Routing (MIN-032, MAJ-028)", () => {
     it("should handle OPTIONS preflight request with 204 No Content", async () => {
       const res = await fetch(`${serverInstance.url}/api/lan-info`, {
         method: "OPTIONS",
@@ -132,24 +231,29 @@ describe("HTTP API Contracts", () => {
       expect(res.status).toBe(204);
     });
 
-    it("should return 404 for unknown API endpoints with standardized error envelope (MIN-032)", async () => {
+    it("should return 404 for unknown API endpoints with standardized error envelope (MIN-032, MAJ-028)", async () => {
       const res = await fetch(`${serverInstance.url}/api/nonexistent-route`);
       expect(res.status).toBe(404);
       const data = (await res.json()) as {
-        status: string;
-        error: { code: string; message: string };
+        code: number;
+        error: string;
+        message: string;
         correlationId: string;
+        timestamp: number;
       };
-      expect(data.status).toBe("error");
-      expect(data.error?.code).toBe("ERR_NOT_FOUND");
-      expect(data.error?.message).toContain("Cannot GET /api/nonexistent-route");
+      expect(data.code).toBe(404);
+      expect(data.error).toBe("ERR_NOT_FOUND");
+      expect(data.message).toContain("Cannot GET /api/nonexistent-route");
       expect(data.correlationId).toBeDefined();
       expect(typeof data.correlationId).toBe("string");
+      expect(data.timestamp).toBeDefined();
+      expect(typeof data.timestamp).toBe("number");
+      expect(data.timestamp).toBeGreaterThan(0);
       expect(res.headers.get("x-correlation-id")).toBe(data.correlationId);
     });
   });
 
-  describe("GET /health Redaction in Production Mode (MIN-001)", () => {
+  describe("Operational Metrics Redaction in Production Mode (MIN-001 & ENH-003)", () => {
     let prodServerInstance: TestServerInstance;
 
     beforeAll(async () => {
@@ -166,10 +270,10 @@ describe("HTTP API Contracts", () => {
       await prodServerInstance.close();
     });
 
-    it("should redact memoryUsageMb to zeros when NODE_ENV === 'production'", async () => {
-      const res = await fetch(`${prodServerInstance.url}/health`);
+    it("should redact memoryUsageMb to zeros on /metrics when NODE_ENV === 'production'", async () => {
+      const res = await fetch(`${prodServerInstance.url}/metrics`);
       expect(res.status).toBe(200);
-      const data = (await res.json()) as HealthCheckResponse;
+      const data = (await res.json()) as DetailedHealthResponse;
 
       expect(data.status).toBe("ok");
       expect(data.memoryUsageMb).toEqual({
@@ -179,10 +283,10 @@ describe("HTTP API Contracts", () => {
       });
     });
 
-    it("should also redact memoryUsageMb at /api/health when in production mode", async () => {
-      const res = await fetch(`${prodServerInstance.url}/api/health`);
+    it("should also redact memoryUsageMb at /health/detail when in production mode", async () => {
+      const res = await fetch(`${prodServerInstance.url}/health/detail`);
       expect(res.status).toBe(200);
-      const data = (await res.json()) as HealthCheckResponse;
+      const data = (await res.json()) as DetailedHealthResponse;
 
       expect(data.status).toBe("ok");
       expect(data.memoryUsageMb).toEqual({
@@ -193,7 +297,7 @@ describe("HTTP API Contracts", () => {
     });
   });
 
-  describe("OPTIONS Preflight Logging & Response (MAJ-014)", () => {
+  describe("OPTIONS Preflight Logging & Response (MAJ-014, ENH-001)", () => {
     let corsServerInstance: TestServerInstance;
 
     beforeAll(async () => {
@@ -233,6 +337,18 @@ describe("HTTP API Contracts", () => {
       expect(preflightLog?.context?.durationMs).toBeGreaterThanOrEqual(0);
     });
 
+    it("should permit CORS origin case-insensitively according to RFC 6454 (ENH-001)", async () => {
+      const res = await fetch(`${corsServerInstance.url}/api/lan-info`, {
+        headers: {
+          Origin: "https://FUN-CHESS.example.com",
+        },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("access-control-allow-origin")).toBe(
+        "https://FUN-CHESS.example.com",
+      );
+    });
+
     it("should reject unpermitted origin with 403 and log preflight rejection", async () => {
       corsServerInstance.logger.clear();
 
@@ -260,7 +376,7 @@ describe("HTTP API Contracts", () => {
     });
   });
 
-  describe("HTTP Rate Limiting on API and Static Endpoints (MIN-002)", () => {
+  describe("HTTP Rate Limiting on API and Static Endpoints (MIN-002, MAJ-028)", () => {
     let rateLimitedServerInstance: TestServerInstance;
     let testRateLimiter: HttpRateLimiter;
 
@@ -286,21 +402,26 @@ describe("HTTP API Contracts", () => {
       }
     });
 
-    it("should return 429 with standardized error envelope once limit is exceeded", async () => {
+    it("should return 429 with standardized error envelope once limit is exceeded (MAJ-028)", async () => {
       const res = await fetch(`${rateLimitedServerInstance.url}/api/lan-info`);
       expect(res.status).toBe(429);
       expect(res.headers.get("content-type")).toContain("application/json");
 
       const body = (await res.json()) as {
-        status: string;
-        error: { code: string; message: string };
+        code: number;
+        error: string;
+        message: string;
         correlationId: string;
+        timestamp: number;
       };
 
-      expect(body.status).toBe("error");
-      expect(body.error.code).toBe("ERR_RATE_LIMITED");
-      expect(body.error.message).toContain("Rate limit exceeded");
+      expect(body.code).toBe(429);
+      expect(body.error).toBe("ERR_RATE_LIMITED");
+      expect(body.message).toContain("Rate limit exceeded");
       expect(body.correlationId).toBeDefined();
+      expect(body.timestamp).toBeDefined();
+      expect(typeof body.timestamp).toBe("number");
+      expect(body.timestamp).toBeGreaterThan(0);
 
       const rateLimitLog = rateLimitedServerInstance.logger.warnLogs.find(
         (l) => l.context?.operation === "http_rate_limited",
@@ -313,10 +434,11 @@ describe("HTTP API Contracts", () => {
       const res = await fetch(`${rateLimitedServerInstance.url}/some-page`);
       expect(res.status).toBe(429);
       const body = (await res.json()) as {
-        status: string;
-        error: { code: string };
+        code: number;
+        error: string;
       };
-      expect(body.error.code).toBe("ERR_RATE_LIMITED");
+      expect(body.code).toBe(429);
+      expect(body.error).toBe("ERR_RATE_LIMITED");
     });
 
     it("should allow container probe /healthz even when rate limited", async () => {

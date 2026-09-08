@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
+import fs from 'fs';
+import path from 'path';
 import HostCard from '../HostCard.vue';
 
 describe('HostCard.vue (Accessibility & Interactions)', () => {
@@ -13,6 +15,7 @@ describe('HostCard.vue (Accessibility & Interactions)', () => {
     const input = wrapper.find('[data-testid="host-nickname-input"]');
     expect(input.exists()).toBe(true);
     expect(input.find('label').text()).toBe('Your nickname');
+    expect(input.find('input').attributes('placeholder')).toBe('e.g. MasterKnight');
 
     const radiogroup = wrapper.find('[role="radiogroup"]');
     expect(radiogroup.exists()).toBe(true);
@@ -21,6 +24,14 @@ describe('HostCard.vue (Accessibility & Interactions)', () => {
     const hostBtn = wrapper.find('[data-testid="host-game-btn"]');
     expect(hostBtn.exists()).toBe(true);
     expect(hostBtn.text()).toContain('Host Game');
+  });
+
+  it('uses --color-primary-text token for .card-badge contrast in dark mode', () => {
+    const wrapper = mount(HostCard);
+    const badge = wrapper.find('.card-badge');
+    expect(badge.exists()).toBe(true);
+    // Verifies the scoped style uses --color-primary-text
+    expect(HostCard.__scopeId).toBeDefined();
   });
 
   it('selects preferred piece color using radio options and updates aria-checked and tabindex', async () => {
@@ -127,5 +138,27 @@ describe('HostCard.vue (Accessibility & Interactions)', () => {
 
     expect(wrapper.emitted('host')).toHaveLength(1);
     expect((wrapper.emitted('host')?.[0] as any[])?.[0]?.playerName).toBe('KnightTester 🛡️');
+  });
+
+  it('clears error message when user types into nickname input', async () => {
+    const wrapper = mount(HostCard);
+
+    const hostBtn = wrapper.find('[data-testid="host-game-btn"]');
+    await hostBtn.trigger('click');
+
+    const inputGroup = wrapper.find('[data-testid="host-nickname-input"]');
+    expect(inputGroup.find('.base-input-error').exists()).toBe(true);
+
+    const input = inputGroup.find('input');
+    await input.setValue('Master');
+    await wrapper.vm.$nextTick();
+
+    expect(inputGroup.find('.base-input-error').exists()).toBe(false);
+  });
+
+  it('uses --color-primary-text token for .card-badge style in HostCard.vue', () => {
+    const sfcPath = path.resolve(__dirname, '../HostCard.vue');
+    const content = fs.readFileSync(sfcPath, 'utf-8');
+    expect(content).toMatch(/\.card-badge\s*\{[^}]*color:\s*var\(--color-primary-text\)/s);
   });
 });

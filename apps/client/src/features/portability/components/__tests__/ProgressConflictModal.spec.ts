@@ -152,7 +152,101 @@ describe('ProgressConflictModal.vue', () => {
     expect(wrapper.text()).toContain('1350 Elo');
   });
 
-  it('emits resolve with smart_merge on clicking Smart Merge button', async () => {
+  it('binds stats directly to props.diffPreview values rather than recalculating', () => {
+    const customDiffPreview: ProgressDiffPreview = {
+      academy: {
+        localCompletedCount: 5,
+        incomingCompletedCount: 10,
+        mergedCompletedCount: 12,
+        localTotalStars: 15,
+        incomingTotalStars: 28,
+        mergedTotalStars: 30,
+        newCompletedScenarios: ['lesson-3', 'lesson-4'],
+        starUpgrades: [{ scenarioId: 'lesson-1', fromStars: 1, toStars: 3 }],
+      },
+      puzzles: {
+        localSolvedCount: 42,
+        incomingSolvedCount: 88,
+        mergedSolvedCount: 95,
+        localRating: 1200,
+        incomingRating: 1650,
+        mergedRating: 1650,
+        localPeakRating: 1250,
+        incomingPeakRating: 1700,
+        mergedPeakRating: 1700,
+        newPuzzlesSolvedCount: 53,
+      },
+      arcade: {
+        localRushHighScore: 12,
+        incomingRushHighScore: 25,
+        mergedRushHighScore: 25,
+        localSurvivorHighScore: 8,
+        incomingSurvivorHighScore: 19,
+        mergedSurvivorHighScore: 19,
+      },
+      metadata: {
+        localLastActiveAt: 1000,
+        incomingLastActiveAt: 2000,
+        incomingExportedAt: 2000,
+        isIncomingNewer: true,
+      },
+      hasDifferences: true,
+      hasUpgrades: true,
+    };
+
+    // Mount with null payloads to verify strict reliance on diffPreview values
+    const wrapper = mount(ProgressConflictModal, {
+      props: {
+        modelValue: true,
+        currentProgress: null,
+        incomingProgress: null,
+        diffPreview: customDiffPreview,
+      },
+      global: {
+        stubs: {
+          Teleport: true,
+        },
+      },
+    });
+
+    const text = wrapper.text();
+    expect(text).toContain('⭐ 15 Stars');
+    expect(text).toContain('⭐ 28 Stars');
+    expect(text).toContain('🎯 1200 Elo');
+    expect(text).toContain('🎯 1650 Elo');
+    expect(text).toContain('🧩 42 Solved');
+    expect(text).toContain('🧩 88 Solved');
+  });
+
+  it('renders projected smart merge outcome card (.merge-outcome-callout) with summary pills', () => {
+    const wrapper = mount(ProgressConflictModal, {
+      props: {
+        modelValue: true,
+        currentProgress,
+        incomingProgress,
+        diffPreview,
+      },
+      global: {
+        stubs: {
+          Teleport: true,
+        },
+      },
+    });
+
+    const outcomeCard = wrapper.find('.merge-outcome-callout');
+    expect(outcomeCard.exists()).toBe(true);
+    expect(outcomeCard.find('.merge-outcome-title').text()).toContain('Projected Smart Merge Outcome');
+    expect(outcomeCard.find('.merge-outcome-badge').text()).toBe('Safe Union');
+
+    const cardText = outcomeCard.text();
+    expect(cardText).toContain('⭐ 6');
+    expect(cardText).toContain('+1 upgraded');
+    expect(cardText).toContain('🎯 1350');
+    expect(cardText).toContain('🧩 2');
+    expect(cardText).toContain('+1 new');
+  });
+
+  it('emits canonical resolve-conflict with smart_merge on clicking Smart Merge button', async () => {
     const wrapper = mount(ProgressConflictModal, {
       props: {
         modelValue: true,
@@ -171,11 +265,13 @@ describe('ProgressConflictModal.vue', () => {
     expect(smartMergeBtn).toBeDefined();
 
     await smartMergeBtn?.trigger('click');
+    expect(wrapper.emitted('resolve-conflict')?.[0]).toEqual(['smart_merge']);
     expect(wrapper.emitted('resolve')?.[0]).toEqual(['smart_merge']);
+    expect(wrapper.emitted('merge')?.[0]).toEqual(['smart_merge']);
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false]);
   });
 
-  it('emits resolve with replace_local on Replace button click and displays clear overwrite warning subtext', async () => {
+  it('emits canonical resolve-conflict with replace_local on Replace button click and displays clear overwrite warning subtext', async () => {
     const wrapper = mount(ProgressConflictModal, {
       props: {
         modelValue: true,
@@ -198,10 +294,13 @@ describe('ProgressConflictModal.vue', () => {
     expect(replaceBtn).toBeDefined();
 
     await replaceBtn?.trigger('click');
+    expect(wrapper.emitted('resolve-conflict')?.[0]).toEqual(['replace_local']);
     expect(wrapper.emitted('resolve')?.[0]).toEqual(['replace_local']);
+    expect(wrapper.emitted('replace')?.[0]).toEqual(['replace_local']);
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false]);
   });
 
-  it('emits resolve with keep_local on Keep current progress button click', async () => {
+  it('emits canonical resolve-conflict with keep_local and cancel-conflict on Keep current progress button click', async () => {
     const wrapper = mount(ProgressConflictModal, {
       props: {
         modelValue: true,
@@ -220,6 +319,35 @@ describe('ProgressConflictModal.vue', () => {
     expect(keepBtn).toBeDefined();
 
     await keepBtn?.trigger('click');
+    expect(wrapper.emitted('resolve-conflict')?.[0]).toEqual(['keep_local']);
+    expect(wrapper.emitted('cancel-conflict')).toBeTruthy();
     expect(wrapper.emitted('resolve')?.[0]).toEqual(['keep_local']);
+    expect(wrapper.emitted('cancel')).toBeTruthy();
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false]);
+  });
+
+  it('emits cancel-conflict, close, and closed when closed from BaseModal close event', async () => {
+    const wrapper = mount(ProgressConflictModal, {
+      props: {
+        modelValue: true,
+        currentProgress,
+        incomingProgress,
+        diffPreview,
+      },
+      global: {
+        stubs: {
+          Teleport: true,
+        },
+      },
+    });
+
+    const baseModal = wrapper.findComponent({ name: 'BaseModal' });
+    expect(baseModal.exists()).toBe(true);
+
+    await baseModal.vm.$emit('close');
+    expect(wrapper.emitted('cancel-conflict')).toBeTruthy();
+    expect(wrapper.emitted('close')).toBeTruthy();
+    expect(wrapper.emitted('closed')).toBeTruthy();
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false]);
   });
 });

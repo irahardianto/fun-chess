@@ -2,7 +2,12 @@ import { describe, it, expect, afterEach } from "vitest";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import { startServer, type ServerInstance } from "../index.js";
 import { NullLogger } from "../platform/logger/null_logger.js";
-import type { HealthCheckResponse, LanInfoResponse } from "@fun-chess/shared";
+import type {
+  HealthCheckResponse,
+  LanInfoResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
+} from "@fun-chess/shared";
 
 describe("Server Bootstrap Integration (MAJ-033)", () => {
   let instance: ServerInstance | undefined;
@@ -32,7 +37,7 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     expect(instance.server.listening).toBe(true);
   });
 
-  it("responds to /health with 200 and expected status object", async () => {
+  it("responds to /health with 200 and expected status object (ENH-003)", async () => {
     // Arrange
     instance = await startServer(createOptions());
 
@@ -43,17 +48,26 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
 
-    const data = (await res.json()) as HealthCheckResponse;
+    const data = (await res.json()) as LivenessHealthResponse;
     expect(data.status).toBe("ok");
     expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(data.timestamp).toBeDefined();
     expect(new Date(data.timestamp).getTime()).not.toBeNaN();
-    expect(data.activeRooms).toBe(0);
-    expect(data.activeSockets).toBe(0);
-    expect(data.memoryUsageMb).toBeDefined();
-    expect(data.memoryUsageMb.rss).toBeGreaterThan(0);
-    expect(data.memoryUsageMb.heapTotal).toBeGreaterThan(0);
-    expect(data.memoryUsageMb.heapUsed).toBeGreaterThan(0);
+    expect((data as any).activeRooms).toBeUndefined();
+    expect((data as any).activeSockets).toBeUndefined();
+    expect((data as any).memoryUsageMb).toBeUndefined();
+
+    // Act: Deep operational telemetry on /metrics
+    const metricsRes = await fetch(`${instance.url}/metrics`);
+    expect(metricsRes.status).toBe(200);
+    const metricsData = (await metricsRes.json()) as DetailedHealthResponse;
+    expect(metricsData.status).toBe("ok");
+    expect(metricsData.activeRooms).toBe(0);
+    expect(metricsData.activeSockets).toBe(0);
+    expect(metricsData.memoryUsageMb).toBeDefined();
+    expect(metricsData.memoryUsageMb.rss).toBeGreaterThan(0);
+    expect(metricsData.memoryUsageMb.heapTotal).toBeGreaterThan(0);
+    expect(metricsData.memoryUsageMb.heapUsed).toBeGreaterThan(0);
   });
 
   it("responds to /api/lan-info with 200 and network interface metadata", async () => {
@@ -210,5 +224,64 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     await expect(
       fetch(`${targetUrl}/health`, { signal: AbortSignal.timeout(1000) }),
     ).rejects.toThrow();
+  });
+
+  it("rejects invalid programmatic options by validating configuration (MAJ-001)", async () => {
+    // Assert invalid port throws
+    await expect(
+      startServer(
+        createOptions({
+          port: -1,
+        }),
+      ),
+    ).rejects.toThrow();
+
+    // Assert invalid log level throws
+    await expect(
+      startServer({
+        port: 0,
+        logger: undefined,
+        config: {
+          LOG_LEVEL: "invalid_log_level" as any,
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("merges raw config dictionaries before validateServerConfig (SEC-RT-003)", async () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalCors = process.env.CORS_ORIGIN;
+    const originalPublic = process.env.PUBLIC_URL;
+    try {
+      process.env.NODE_ENV = "production";
+      delete process.env.CORS_ORIGIN;
+      delete process.env.PUBLIC_URL;
+
+      // With options.config supplying CORS_ORIGIN, validation succeeds without throwing on process.env
+      instance = await startServer({
+        port: 0,
+        logger: new NullLogger(),
+        config: {
+          NODE_ENV: "production",
+          CORS_ORIGIN: "https://valid.example.com",
+        },
+      });
+
+      expect(instance).toBeDefined();
+      expect(instance.config.NODE_ENV).toBe("production");
+      expect(instance.config.CORS_ORIGIN).toBe("https://valid.example.com");
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      if (originalCors !== undefined) {
+        process.env.CORS_ORIGIN = originalCors;
+      } else {
+        delete process.env.CORS_ORIGIN;
+      }
+      if (originalPublic !== undefined) {
+        process.env.PUBLIC_URL = originalPublic;
+      } else {
+        delete process.env.PUBLIC_URL;
+      }
+    }
   });
 });

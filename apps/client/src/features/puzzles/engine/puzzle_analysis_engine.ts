@@ -16,6 +16,7 @@ import {
   parseUciMove,
   formatPlayerMoveToUci,
 } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry/index.js';
 
 /**
  * Centipawn values for chess pieces.
@@ -377,6 +378,163 @@ export function getSquaresAttackedByPiece(
 }
 
 /**
+ * Detects checkmate motif (smothered mate, back-rank mate, or mate in 1).
+ */
+export function detectCheckmateMotif(
+  chessAfter: Chess,
+  pieceType: PieceType,
+  oppColor: PieceColor,
+  to: Square,
+): { theme: PuzzleTheme; confidence: number; explanation: string } | null {
+  if (!chessAfter.isCheckmate()) return null;
+
+  if (pieceType === 'n') {
+    return {
+      theme: 'smothered_mate',
+      confidence: 0.95,
+      explanation: 'Smothered mate! The King is trapped by its own pieces.',
+    };
+  }
+
+  const kingRank = oppColor === 'b' ? '8' : '1';
+  if (to.charAt(1) === kingRank && (pieceType === 'r' || pieceType === 'q')) {
+    return {
+      theme: 'back_rank_mate',
+      confidence: 0.95,
+      explanation: 'Back rank mate! The trapped King had no escape squares.',
+    };
+  }
+
+  return {
+    theme: 'mate_in_1',
+    confidence: 0.95,
+    explanation: 'Checkmate! The enemy King is defeated.',
+  };
+}
+
+/**
+ * Detects discovered check or double check motif.
+ */
+export function detectDiscoveredCheckMotif(
+  chessAfter: Chess,
+  moverColor: PieceColor,
+  oppColor: PieceColor,
+  to: Square,
+  pieceType: PieceType,
+): { theme: PuzzleTheme; confidence: number; explanation: string } | null {
+  if (!chessAfter.inCheck()) return null;
+
+  const boardAfter = chessAfter.board();
+  let attackersCount = 0;
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const p = boardAfter[r]?.[c];
+      if (p && p.color === moverColor) {
+        const fChar = String.fromCharCode(97 + c);
+        const sq = `${fChar}${8 - r}` as Square;
+        const attacks = getSquaresAttackedByPiece(boardAfter, sq, p.type as PieceType, moverColor);
+        const kingSq = findKingSquare(boardAfter, oppColor);
+        if (kingSq && attacks.includes(kingSq)) {
+          attackersCount++;
+        }
+      }
+    }
+  }
+
+  if (attackersCount >= 2) {
+    return {
+      theme: 'double_check',
+      confidence: 0.95,
+      explanation: 'Double check! Two pieces attack the King simultaneously.',
+    };
+  }
+
+  const kingSq = findKingSquare(boardAfter, oppColor);
+  const destAttacks = getSquaresAttackedByPiece(boardAfter, to, pieceType, moverColor);
+  if (kingSq && !destAttacks.includes(kingSq)) {
+    return {
+      theme: 'discovered_check',
+      confidence: 0.90,
+      explanation: 'Discovered check! Moving uncovered an attack on the enemy King.',
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Detects fork / double attack motif against high-value targets.
+ */
+export function detectForkMotif(
+  boardAfter: ({ type: string; color: string } | null)[][],
+  to: Square,
+  pieceType: PieceType,
+  moverColor: PieceColor,
+  oppColor: PieceColor,
+): { theme: PuzzleTheme; confidence: number; explanation: string } | null {
+  const attackedSquares = getSquaresAttackedByPiece(boardAfter, to, pieceType, moverColor);
+  const attackedHighPieces: { type: PieceType; square: Square }[] = [];
+
+  for (const sq of attackedSquares) {
+    const file = sq.charCodeAt(0) - 97;
+    const rank = parseInt(sq.charAt(1), 10) - 1;
+    const targetPiece = boardAfter[7 - rank]?.[file];
+    if (targetPiece && targetPiece.color === oppColor) {
+      if (
+        targetPiece.type === 'k' ||
+        targetPiece.type === 'q' ||
+        targetPiece.type === 'r' ||
+        targetPiece.type === 'b' ||
+        targetPiece.type === 'n'
+      ) {
+        attackedHighPieces.push({ type: targetPiece.type as PieceType, square: sq });
+      }
+    }
+  }
+
+  if (attackedHighPieces.length >= 2) {
+    return {
+      theme: 'fork',
+      confidence: 0.90,
+      explanation: `Fork! The ${PIECE_DISPLAY_NAMES[pieceType]} attacks multiple high-value pieces simultaneously.`,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Detects pin or skewer along sliding piece rays.
+ */
+export function detectPinOrSkewerMotif(
+  boardAfter: ({ type: string; color: string } | null)[][],
+  to: Square,
+  pieceType: PieceType,
+  moverColor: PieceColor,
+  oppColor: PieceColor,
+): { theme: PuzzleTheme; confidence: number; explanation: string } | null {
+  if (pieceType !== 'b' && pieceType !== 'r' && pieceType !== 'q') {
+    return null;
+  }
+  return detectPinOrSkewer(boardAfter, to, pieceType, moverColor, oppColor);
+}
+
+/**
+ * Default fallback hanging piece motif.
+ */
+export function detectHangingPieceMotif(): {
+  theme: PuzzleTheme;
+  confidence: number;
+  explanation: string;
+} {
+  return {
+    theme: 'hanging_piece',
+    confidence: 0.70,
+    explanation: 'Tactical strike winning material.',
+  };
+}
+
+/**
  * Classifies the primary tactical motif executed in a move or sequence.
  */
 export function classifyTacticalMotif(
@@ -408,68 +566,12 @@ export function classifyTacticalMotif(
   const pieceType = (promotion ? 'q' : movingPiece?.type ?? 'p') as PieceType;
 
   // 1. Checkmate
-  if (chessAfter.isCheckmate()) {
-    // Check if smothered mate
-    if (pieceType === 'n') {
-      return {
-        theme: 'smothered_mate',
-        confidence: 0.95,
-        explanation: 'Smothered mate! The King is trapped by its own pieces.',
-      };
-    }
-    // Check if back rank mate
-    const kingRank = oppColor === 'b' ? '8' : '1';
-    if (to.charAt(1) === kingRank && (pieceType === 'r' || pieceType === 'q')) {
-      return {
-        theme: 'back_rank_mate',
-        confidence: 0.95,
-        explanation: 'Back rank mate! The trapped King had no escape squares.',
-      };
-    }
-    return {
-      theme: 'mate_in_1',
-      confidence: 0.95,
-      explanation: 'Checkmate! The enemy King is defeated.',
-    };
-  }
+  const mate = detectCheckmateMotif(chessAfter, pieceType, oppColor, to as Square);
+  if (mate) return mate;
 
   // 2. Discovered Check / Double Check
-  if (chessAfter.inCheck()) {
-    const boardAfter = chessAfter.board();
-    let attackersCount = 0;
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const p = boardAfter[r]?.[c];
-        if (p && p.color === moverColor) {
-          const fChar = String.fromCharCode(97 + c);
-          const sq = `${fChar}${8 - r}` as Square;
-          const attacks = getSquaresAttackedByPiece(boardAfter, sq, p.type as PieceType, moverColor);
-          const kingSq = findKingSquare(boardAfter, oppColor);
-          if (kingSq && attacks.includes(kingSq)) {
-            attackersCount++;
-          }
-        }
-      }
-    }
-
-    if (attackersCount >= 2) {
-      return {
-        theme: 'double_check',
-        confidence: 0.95,
-        explanation: 'Double check! Two pieces attack the King simultaneously.',
-      };
-    }
-
-    const kingSq = findKingSquare(boardAfter, oppColor);
-    const destAttacks = getSquaresAttackedByPiece(boardAfter, to, pieceType, moverColor);
-    if (kingSq && !destAttacks.includes(kingSq)) {
-      return {
-        theme: 'discovered_check',
-        confidence: 0.90,
-        explanation: 'Discovered check! Moving uncovered an attack on the enemy King.',
-      };
-    }
-  }
+  const discCheck = detectDiscoveredCheckMotif(chessAfter, moverColor, oppColor, to as Square, pieceType);
+  if (discCheck) return discCheck;
 
   // 3. Pawn Promotion
   if (promotion || (pieceType === 'p' && (to.charAt(1) === '8' || to.charAt(1) === '1'))) {
@@ -482,35 +584,12 @@ export function classifyTacticalMotif(
 
   // 4. Fork / Double Attack
   const boardAfter = chessAfter.board();
-  const attackedSquares = getSquaresAttackedByPiece(boardAfter, to, pieceType, moverColor);
-  const attackedHighPieces: { type: PieceType; square: Square }[] = [];
-
-  for (const sq of attackedSquares) {
-    const file = sq.charCodeAt(0) - 97;
-    const rank = parseInt(sq.charAt(1), 10) - 1;
-    const targetPiece = boardAfter[7 - rank]?.[file];
-    if (targetPiece && targetPiece.color === oppColor) {
-      if (targetPiece.type === 'k' || targetPiece.type === 'q' || targetPiece.type === 'r' || targetPiece.type === 'b' || targetPiece.type === 'n') {
-        attackedHighPieces.push({ type: targetPiece.type as PieceType, square: sq });
-      }
-    }
-  }
-
-  if (attackedHighPieces.length >= 2) {
-    return {
-      theme: 'fork',
-      confidence: 0.90,
-      explanation: `Fork! The ${PIECE_DISPLAY_NAMES[pieceType]} attacks multiple high-value pieces simultaneously.`,
-    };
-  }
+  const fork = detectForkMotif(boardAfter, to as Square, pieceType, moverColor, oppColor);
+  if (fork) return fork;
 
   // 5. Pin / Skewer Detection (along rays from destination)
-  if (pieceType === 'b' || pieceType === 'r' || pieceType === 'q') {
-    const pinOrSkewer = detectPinOrSkewer(boardAfter, to, pieceType, moverColor, oppColor);
-    if (pinOrSkewer) {
-      return pinOrSkewer;
-    }
-  }
+  const pinOrSkewer = detectPinOrSkewerMotif(boardAfter, to as Square, pieceType, moverColor, oppColor);
+  if (pinOrSkewer) return pinOrSkewer;
 
   // 6. Greek Gift Check
   if (pieceType === 'b' && (to === 'h7' || to === 'h2') && movingPiece?.type === 'b') {
@@ -521,11 +600,7 @@ export function classifyTacticalMotif(
     };
   }
 
-  return {
-    theme: 'hanging_piece',
-    confidence: 0.70,
-    explanation: 'Tactical strike winning material.',
-  };
+  return detectHangingPieceMotif();
 }
 
 function findKingSquare(board: ({ type: string; color: string } | null)[][], color: PieceColor): Square | null {
@@ -845,7 +920,13 @@ export function analyzePuzzleSolution(puzzle: Puzzle): PuzzleAnalysisResult {
   try {
     chessInit = new Chess(puzzle.fen);
     chessSim = new Chess(puzzle.fen);
-  } catch {
+  } catch (err) {
+    logger.warn('Corrupted or invalid puzzle FEN string during analysis', {
+      operation: 'puzzle_analyze_solution',
+      puzzleId: puzzle.id,
+      fen: puzzle.fen,
+      error: err instanceof Error ? err.message : String(err),
+    });
     const fallbackMat = { white: 0, black: 0, net: 0 };
     return {
       initialMaterial: fallbackMat,
@@ -881,8 +962,14 @@ export function analyzePuzzleSolution(puzzle: Puzzle): PuzzleAnalysisResult {
         to: to as unknown as import('chess.js').Square,
         promotion,
       });
-    } catch {
-      // Continue simulation
+    } catch (err) {
+      logger.error('Invalid move in puzzle simulation', {
+        operation: 'puzzle_analysis_sim_move',
+        puzzleId: puzzle.id,
+        moveUci,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      break;
     }
   }
 

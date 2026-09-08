@@ -1,17 +1,17 @@
-import { randomUUID, randomInt } from "node:crypto";
+import { randomInt } from "node:crypto";
 import {
   CreateRoomRequest,
   GameOverPayload,
+  GameState,
   JoinRoomRequest,
   PieceColor,
   Player,
   ReconnectRequest,
   RoomState,
-  createInitialGameState,
   createGameOverPayload,
 } from "@fun-chess/shared";
 import { RoomStore } from "./room.store.js";
-import { IRoomService } from "./room.interface.js";
+import { IRoomService, IRoomGameAdapter } from "./room.interface.js";
 import { SessionRegistry } from "./session_registry.js";
 import { InMemorySessionRegistry } from "./in_memory_session_registry.js";
 import {
@@ -23,24 +23,36 @@ import {
 import {
   type IDisconnectTimerRegistry,
   defaultDisconnectTimerRegistry,
-  cancelAllDisconnectTimersForRoom,
 } from "./disconnect_timer_registry.js";
 import {
   RoomNotFoundError,
-  RoomFullError,
   InvalidRoomCodeError,
   UnauthorizedError,
   PlayerNotInRoomError,
   InvalidPayloadError,
 } from "./room.errors.js";
+import {
+  createInitialRoomState,
+  assignPlayerColors,
+  addPlayerToRoom,
+  disconnectPlayerTransition,
+  reconnectPlayerTransition,
+  leaveRoomTransition,
+  applyGameMoveTransition,
+  finalizeGameTransition,
+  updateDrawOfferTransition,
+  updateRematchTransition,
+} from "./room.logic.js";
 
 const ROOM_CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Excludes 0, O, 1, I
 const ROOM_CODE_LENGTH = 4;
 
 /**
  * Service coordinating room creation, player joining, reconnection, and session lifecycle.
+ * Implements IRoomService for socket/HTTP ingress and IRoomGameAdapter for game engine integration (MAJ-016, MAJ-017).
+ * Pure state transitions are delegated to room.logic.ts (MAJ-015).
  */
-export class RoomService implements IRoomService {
+export class RoomService implements IRoomService, IRoomGameAdapter {
   constructor(
     private readonly store: RoomStore,
     private readonly sessionRegistry: SessionRegistry = new InMemorySessionRegistry(),
@@ -73,13 +85,13 @@ export class RoomService implements IRoomService {
     const roomCode = await this.generateUniqueRoomCode();
     const playerId = this.idGenerator.generateId();
 
-    let hostColor: PieceColor;
-    if (req.preferredColor === "random" || !req.preferredColor) {
-      hostColor = (this.idGenerator.generateRandomInt ? this.idGenerator.generateRandomInt(0, 2) : randomInt(0, 2)) === 0 ? "w" : "b";
-    } else {
-      hostColor = req.preferredColor;
-    }
+    const randomIntVal = this.idGenerator.generateRandomInt
+      ? this.idGenerator.generateRandomInt(0, 2)
+      : randomInt(0, 2);
 
+    const { hostColor } = assignPlayerColors(req.preferredColor, randomIntVal);
+
+    const now = this.clock.now();
     const hostPlayer: Player = {
       id: playerId,
       socketId,
@@ -88,25 +100,14 @@ export class RoomService implements IRoomService {
       color: hostColor,
       isHost: true,
       isConnected: true,
-      connectedAt: this.clock.now(),
+      connectedAt: now,
     };
 
-    const initialGameState = createInitialGameState();
-
-    const newRoom: RoomState = {
+    const newRoom = createInitialRoomState({
       roomCode,
-      version: 1,
-      status: "lobby",
-      hostId: playerId,
-      whitePlayer: hostColor === "w" ? hostPlayer : null,
-      blackPlayer: hostColor === "b" ? hostPlayer : null,
-      spectators: [],
-      game: initialGameState,
-      rematch: null,
-      drawOffer: null,
-      createdAt: this.clock.now(),
-      lastActivityAt: this.clock.now(),
-    };
+      hostPlayer,
+      createdAt: now,
+    });
 
     await this.store.save(newRoom);
 
@@ -148,37 +149,37 @@ export class RoomService implements IRoomService {
     }
 
     const playerId = this.idGenerator.generateId();
+    const now = this.clock.now();
+
+    const playerCandidate: Player = {
+      id: playerId,
+      socketId,
+      name: rawName,
+      avatar: req.avatar || "🦁",
+      color: "b", // assigned by addPlayerToRoom
+      isHost: false,
+      isConnected: true,
+      connectedAt: now,
+    };
 
     const result = await this.store.mutate(normalizedCode, async (room) => {
-      if (room.whitePlayer && room.blackPlayer) {
-        throw new RoomFullError(normalizedCode);
-      }
+      const { nextRoom, assignedColor } = addPlayerToRoom(
+        room,
+        playerCandidate,
+        false,
+        this.clock.now(),
+      );
 
-      const assignedColor: PieceColor = room.whitePlayer ? "b" : "w";
-
-      const player: Player = {
-        id: playerId,
-        socketId,
-        name: rawName,
-        avatar: req.avatar || "🦁",
-        color: assignedColor,
-        isHost: false,
-        isConnected: true,
-        connectedAt: this.clock.now(),
-      };
-
-      if (assignedColor === "w") {
-        room.whitePlayer = player;
-      } else {
-        room.blackPlayer = player;
-      }
-
-      room.status = "playing";
-      room.lastActivityAt = this.clock.now();
+      const assignedPlayer =
+        assignedColor === "w" ? nextRoom.whitePlayer! : nextRoom.blackPlayer!;
 
       return {
-        updatedRoom: room,
-        result: { room, player, assignedColor },
+        updatedRoom: nextRoom,
+        result: {
+          room: nextRoom,
+          player: assignedPlayer,
+          assignedColor: assignedColor!,
+        },
       };
     });
 
@@ -220,34 +221,16 @@ export class RoomService implements IRoomService {
     }
 
     const result = await this.store.mutate(normalizedCode, async (room) => {
-      let targetPlayer: Player | null = null;
-      if (room.whitePlayer?.id === req.playerId) {
-        targetPlayer = room.whitePlayer;
-      } else if (room.blackPlayer?.id === req.playerId) {
-        targetPlayer = room.blackPlayer;
-      } else {
-        targetPlayer =
-          room.spectators.find((s) => s.id === req.playerId) || null;
-      }
+      const { nextRoom, player } = reconnectPlayerTransition(
+        room,
+        req.playerId,
+        socketId,
+        this.clock.now(),
+      );
 
-      if (!targetPlayer) {
-        throw new UnauthorizedError("Player not found in room");
-      }
-
-      targetPlayer.socketId = socketId;
-      targetPlayer.isConnected = true;
-
-      // If game was paused waiting for disconnect, resume if both players now connected
-      if (room.status === "paused_disconnect") {
-        if (room.whitePlayer?.isConnected && room.blackPlayer?.isConnected) {
-          room.status = "playing";
-        }
-      }
-
-      room.lastActivityAt = this.clock.now();
       return {
-        updatedRoom: room,
-        result: { room, player: targetPlayer },
+        updatedRoom: nextRoom,
+        result: { room: nextRoom, player },
       };
     });
 
@@ -276,69 +259,36 @@ export class RoomService implements IRoomService {
       }
 
       let leavingPlayer: Player | null = null;
-      let isPlayingPlayer = false;
       if (room.whitePlayer?.socketId === socketId) {
         leavingPlayer = room.whitePlayer;
-        room.whitePlayer = null;
-        isPlayingPlayer = true;
       } else if (room.blackPlayer?.socketId === socketId) {
         leavingPlayer = room.blackPlayer;
-        room.blackPlayer = null;
-        isPlayingPlayer = true;
       } else {
-        const idx = room.spectators.findIndex((s) => s.socketId === socketId);
-        if (idx !== -1 && room.spectators[idx]) {
-          leavingPlayer = room.spectators[idx];
-          room.spectators.splice(idx, 1);
-        }
+        leavingPlayer =
+          room.spectators.find((s) => s.socketId === socketId) ?? null;
       }
 
       if (!leavingPlayer) {
         throw new PlayerNotInRoomError(socketId);
       }
 
-      if (
-        isPlayingPlayer &&
-        (room.status === "playing" || room.status === "paused_disconnect")
-      ) {
-        const remainingPlayer =
-          leavingPlayer.color === "w" ? room.blackPlayer : room.whitePlayer;
-        if (remainingPlayer) {
-          room.status = "game_over";
-          room.lastActivityAt = this.clock.now();
-          const gameOverPayload: GameOverPayload = createGameOverPayload({
-            winner: remainingPlayer.color,
-            winnerName: remainingPlayer.name,
-            loserName: leavingPlayer.name,
-            reason: "abandonment",
-            message: `${leavingPlayer.name} left the game. ${remainingPlayer.name} won by abandonment!`,
-            finalFen: room.game.fen,
-            totalMoves: room.game.moveCount,
-            startTimeMs: room.createdAt,
-          });
-          await this.store.save(room);
-          return {
-            room,
-            player: leavingPlayer,
-            shouldDelete: false,
-            gameOverPayload,
-          };
-        }
-      }
-
-      const shouldDelete =
-        leavingPlayer.isHost ||
-        (!room.whitePlayer && !room.blackPlayer);
+      const now = this.clock.now();
+      const { nextRoom, shouldDelete, gameOverPayload } =
+        leaveRoomTransition(room, leavingPlayer.id, now);
 
       if (shouldDelete) {
         await this.store.delete(normalizedCode);
         await this.sessionRegistry.deleteSessionsForRoom(normalizedCode);
       } else {
-        room.lastActivityAt = this.clock.now();
-        await this.store.save(room);
+        await this.store.save(nextRoom);
       }
 
-      return { room, player: leavingPlayer, shouldDelete };
+      return {
+        room: nextRoom,
+        player: leavingPlayer,
+        shouldDelete,
+        gameOverPayload,
+      };
     });
   }
 
@@ -359,41 +309,17 @@ export class RoomService implements IRoomService {
       const room = await this.store.findByCode(matchedRoom.roomCode);
       if (!room) return null;
 
-      let droppedPlayer: Player | null = null;
-      let isSpectator = false;
-
-      if (room.whitePlayer?.id === playerId) {
-        room.whitePlayer.isConnected = false;
-        droppedPlayer = room.whitePlayer;
-      } else if (room.blackPlayer?.id === playerId) {
-        room.blackPlayer.isConnected = false;
-        droppedPlayer = room.blackPlayer;
-      } else {
-        const spectator = room.spectators.find((s) => s.id === playerId);
-        if (spectator) {
-          spectator.isConnected = false;
-          droppedPlayer = spectator;
-          isSpectator = true;
-        }
-      }
+      const now = this.clock.now();
+      const { nextRoom, paused, droppedPlayer } = disconnectPlayerTransition(
+        room,
+        playerId,
+        now,
+      );
 
       if (!droppedPlayer) return null;
 
-      const isActivePlayer = !isSpectator;
-      let wasActiveGame = false;
-
-      if (
-        isActivePlayer &&
-        (room.status === "playing" || room.status === "paused_disconnect")
-      ) {
-        wasActiveGame = true;
-        room.status = "paused_disconnect";
-      }
-
-      room.lastActivityAt = this.clock.now();
-      await this.store.save(room);
-
-      return { room, player: droppedPlayer, wasActiveGame };
+      await this.store.save(nextRoom);
+      return { room: nextRoom, player: droppedPlayer, wasActiveGame: paused };
     });
   }
 
@@ -501,6 +427,82 @@ export class RoomService implements IRoomService {
    */
   public async cleanupExpiredSessions(): Promise<number> {
     return this.sessionRegistry.cleanupExpiredSessions();
+  }
+
+  // --- IRoomGameAdapter Implementation (MAJ-016 & MAJ-017) ---
+
+  /**
+   * Applies an executed chess move and state update to the room under exclusive lock.
+   */
+  public async applyGameMove(
+    roomCode: string,
+    nextGameState: GameState,
+    gameOverPayload?: GameOverPayload,
+  ): Promise<RoomState> {
+    const code = roomCode.trim().toUpperCase();
+    return this.store.mutate(code, async (room) => {
+      const now = this.clock.now();
+      const updated = applyGameMoveTransition(
+        room,
+        nextGameState,
+        gameOverPayload,
+        now,
+      );
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  /**
+   * Finalizes a match with an explicit game-over payload (resignation, timeout, draw).
+   */
+  public async finalizeGame(
+    roomCode: string,
+    gameOverPayload: GameOverPayload,
+  ): Promise<RoomState> {
+    const code = roomCode.trim().toUpperCase();
+    return this.store.mutate(code, async (room) => {
+      const now = this.clock.now();
+      const updated = finalizeGameTransition(room, gameOverPayload, now);
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  /**
+   * Records a proposed draw offer or response in the room state.
+   */
+  public async updateDrawOffer(
+    roomCode: string,
+    drawOffer: RoomState["drawOffer"],
+  ): Promise<RoomState> {
+    const code = roomCode.trim().toUpperCase();
+    return this.store.mutate(code, async (room) => {
+      const now = this.clock.now();
+      const updated = updateDrawOfferTransition(room, drawOffer, now);
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  /**
+   * Records a rematch proposal or acceptance in the room state.
+   */
+  public async updateRematch(
+    roomCode: string,
+    rematch: RoomState["rematch"],
+    newGameState?: GameState,
+    players?: { whitePlayer: Player | null; blackPlayer: Player | null },
+  ): Promise<RoomState> {
+    const code = roomCode.trim().toUpperCase();
+    return this.store.mutate(code, async (room) => {
+      const now = this.clock.now();
+      const updated = updateRematchTransition(
+        room,
+        rematch,
+        newGameState,
+        now,
+        players,
+      );
+      return { updatedRoom: updated, result: updated };
+    });
   }
 
   /**

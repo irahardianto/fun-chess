@@ -199,21 +199,54 @@ function handleFlipBoard() { emit('flip-board'); }
   width: 100%; max-width: 580px; gap: var(--space-2, 8px); box-sizing: border-box; overflow-x: hidden;
 }
 .disconnect-warning-banner {
-  position: absolute; top: 8px; left: 50%; inset-inline-start: 50%; transform: translateX(-50%);
-  z-index: var(--z-overlay-alert, 30); width: calc(100% - 16px); max-width: 560px;
-  background-color: var(--color-danger, #dc2626); color: var(--text-on-danger, #ffffff);
-  font-family: var(--font-body); font-size: var(--text-sm, 14px); font-weight: var(--weight-bold, 700);
-  padding: var(--space-2, 8px) var(--space-4, 16px); border-radius: var(--radius-md, 12px);
-  text-align: center; box-shadow: var(--shadow-lg); box-sizing: border-box; animation: pulse-valid-dot 1.5s infinite ease-in-out;
+  width: 100%;
+  box-sizing: border-box;
+  text-wrap: balance;
+  word-break: break-word;
+  line-height: 1.4;
+  background-color: var(--color-danger, #dc2626);
+  color: var(--text-on-danger, #ffffff);
+  font-family: var(--font-body);
+  font-size: var(--text-sm, 14px);
+  font-weight: var(--weight-bold, 700);
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  border-radius: var(--radius-md, 12px);
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  animation: pulse-valid-dot 1.5s infinite ease-in-out;
 }
 .draw-offer-banner {
-  position: absolute; top: 8px; left: 50%; inset-inline-start: 50%; transform: translateX(-50%);
-  z-index: var(--z-overlay-alert, 30); width: calc(100% - 16px); max-width: 560px;
-  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  flex-wrap: wrap;
   background-color: var(--bg-surface-glass, rgba(255, 255, 255, 0.88));
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 2px solid var(--color-accent, #ffb300);
-  padding: var(--space-2, 8px) var(--space-4, 16px); border-radius: var(--radius-md, 12px);
-  color: var(--text-main, #0f172a); box-shadow: var(--shadow-lg); box-sizing: border-box; animation: banner-pop 0.24s var(--ease-spring);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 2px solid var(--color-accent, #ffb300);
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  border-radius: var(--radius-md, 12px);
+  color: var(--text-main, #0f172a);
+  box-shadow: var(--shadow-lg);
+  animation: banner-pop 0.24s var(--ease-spring);
+}
+.draw-offer-banner span {
+  text-wrap: balance;
+  word-break: break-word;
+  line-height: 1.4;
+}
+@keyframes banner-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .banner-buttons { display: flex; gap: var(--space-2, 8px); }
 .arena-turn-indicator {

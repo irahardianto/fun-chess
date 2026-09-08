@@ -139,4 +139,35 @@ describe("ShutdownCoordinator", () => {
     const completeLog = logger.infoLogs.find((l) => l.message.includes("Fun Chess server closed successfully"));
     expect(completeLog?.context?.["correlationId"]).toBe("custom-corr-id-123");
   });
+
+  it("exits with code 1 and logs error when server.close yields an error", async () => {
+    const errorServer = {
+      close: vi.fn((cb?: (err?: Error) => void) => {
+        if (cb) cb(new Error("Failed to close HTTP server socket"));
+        return errorServer as unknown as HttpServer;
+      }),
+      closeIdleConnections: vi.fn(),
+      closeAllConnections: vi.fn(),
+      on: vi.fn(),
+    };
+
+    const coordinator = new ShutdownCoordinator({
+      server: errorServer as unknown as HttpServer,
+      io: mockIo as TypedSocketServer,
+      logger,
+      onExit: (code) => exitCalls.push(code),
+    });
+
+    await coordinator.shutdown("SIGTERM");
+
+    expect(exitCalls).toEqual([1]);
+    const fatalOrError = ((logger as any).fatalLogs ?? logger.errorLogs) as Array<{
+      message: string;
+      context?: Record<string, unknown>;
+    }>;
+    const errorLog = fatalOrError.find((l) =>
+      l.message.includes("Error closing server during shutdown"),
+    );
+    expect(errorLog).toBeDefined();
+  });
 });

@@ -5,6 +5,7 @@ import {
   RoomNotFoundError,
   OptimisticLockConflictError,
   LockTimeoutError,
+  LockExecutionTimeoutError,
 } from "../room.errors.js";
 
 describe("InMemoryRoomStore", () => {
@@ -316,6 +317,23 @@ describe("InMemoryRoomStore", () => {
 
       // After all complete, lock queue is cleaned up
       expect((store as any).lockQueues.has(code)).toBe(false);
+    });
+
+    it("throws LockExecutionTimeoutError when action execution exceeds EXECUTION_TIMEOUT_MS (MAJ-005)", async () => {
+      const code = "EXECTMO";
+      (store as any).EXECUTION_TIMEOUT_MS = 30;
+
+      const hangingAction = store.withLock(code, async () => {
+        // Hang indefinitely
+        await new Promise(() => {});
+      });
+
+      await expect(hangingAction).rejects.toThrow(LockExecutionTimeoutError);
+
+      // Verify lock was released immediately: next waiter can acquire
+      (store as any).EXECUTION_TIMEOUT_MS = 5000;
+      const nextAction = await store.withLock(code, async () => "unblocked");
+      expect(nextAction).toBe("unblocked");
     });
   });
 

@@ -282,12 +282,16 @@ export function wrapSocketHandler<TReq, TRes>(
       payload: sanitizePayload(rawReq),
     });
 
-    // 1. Rate Limiting Pre-check (CRIT-001)
-    if (effectiveRateLimiter && clientIp && !effectiveRateLimiter.consume(clientIp)) {
+    // 1. Rate Limiting Pre-check (CRIT-001, MAJ-003)
+    const rateLimitKey = `${clientIp || "127.0.0.1"}:${socketId}`;
+    if (effectiveRateLimiter && !effectiveRateLimiter.consume(rateLimitKey)) {
       const duration = Math.round(performance.now() - startTime);
+      const limitDesc =
+        (effectiveRateLimiter as any).getLimitDescription?.() ||
+        "Rate limit exceeded. Please wait.";
       const errorPayload: SocketErrorPayload = {
         code: "ERR_RATE_LIMITED",
-        message: "Rate limit exceeded. Please wait.",
+        message: limitDesc,
         correlationId,
       };
 

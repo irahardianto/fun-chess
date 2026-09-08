@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
+import { mount, flushPromises, VueWrapper } from '@vue/test-utils';
+import fs from 'fs';
+import path from 'path';
 import QrCodeModal from '../QrCodeModal.vue';
 import QRCode from 'qrcode';
+import { logger } from '@/platform/telemetry';
 
 describe('QrCodeModal.vue', () => {
   let wrapper: VueWrapper;
@@ -82,9 +85,11 @@ describe('QrCodeModal.vue', () => {
       expect(document.body.querySelector('.qr-loading-placeholder')).toBeNull();
     });
 
-    it('handles QRCode.toDataURL rejection gracefully without throwing or crashing', async () => {
+    it('displays .qr-canvas-card--error error state with retry button on QRCode.toDataURL rejection without stranding user (ENH-004)', async () => {
+      const loggerErrorSpy = vi.spyOn(logger, 'error');
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      (vi.spyOn(QRCode, 'toDataURL') as any).mockRejectedValue(new Error('Canvas rendering failed'));
+      const toDataURLMock = vi.spyOn(QRCode, 'toDataURL') as any;
+      toDataURLMock.mockRejectedValueOnce(new Error('Canvas rendering failed'));
 
       wrapper = mount(QrCodeModal, {
         props: {
@@ -94,12 +99,50 @@ describe('QrCodeModal.vue', () => {
       });
 
       await wrapper.vm.$nextTick();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to generate QR code',
-        expect.any(Error)
-      );
-      // Component remains mounted and placeholder remains displayed
-      expect(document.body.querySelector('.qr-loading-placeholder')).not.toBeNull();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      const errorWasLogged =
+        loggerErrorSpy.mock.calls.some((call) =>
+          call.some((arg) => typeof arg === 'string' && arg.includes('Failed to generate QR code'))
+        ) ||
+        consoleErrorSpy.mock.calls.some((call) =>
+          call.some((arg) => typeof arg === 'string' && arg.includes('Failed to generate QR code'))
+        );
+      expect(errorWasLogged).toBe(true);
+
+      // Verify .qr-canvas-card--error error state card is displayed
+      const errorCard = document.body.querySelector('.qr-canvas-card--error');
+      expect(errorCard).not.toBeNull();
+
+      // Verify error copy and description
+      const errorTitle = document.body.querySelector('.qr-error-title');
+      expect(errorTitle?.textContent).toContain('Failed to create QR Code canvas');
+      const errorDesc = document.body.querySelector('.qr-error-desc');
+      expect(errorDesc?.textContent).toContain("couldn't draw the QR code");
+
+      // Verify retry button exists and is interactive
+      const retryBtn = document.body.querySelector('.qr-retry-btn') as HTMLButtonElement;
+      expect(retryBtn).not.toBeNull();
+      expect(retryBtn.textContent).toContain('Retry QR Code');
+
+      // Verify user is NOT stranded on visible loading placeholder in the main card
+      const normalLoadingPlaceholder = document.body.querySelector('.qr-canvas-card:not(.qr-canvas-card--error) .qr-loading-placeholder');
+      expect(normalLoadingPlaceholder).toBeNull();
+
+      // Clicking retry retriggers QR generation
+      toDataURLMock.mockResolvedValueOnce('data:image/png;base64,retriedSuccessQr');
+      retryBtn.click();
+
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      expect(toDataURLMock).toHaveBeenCalledTimes(2);
+      expect(document.body.querySelector('.qr-canvas-card--error')).toBeNull();
+      const qrImg = document.body.querySelector('.qr-image') as HTMLImageElement;
+      expect(qrImg).not.toBeNull();
+      expect(qrImg.src).toBe('data:image/png;base64,retriedSuccessQr');
     });
 
     it('regenerates QR code when props change (roomCode, joinUrl, isOpen)', async () => {
@@ -785,6 +828,34 @@ describe('QrCodeModal.vue', () => {
       const container = document.body.querySelector('.base-modal-container');
       expect(container).not.toBeNull();
       expect(QRCode.toDataURL).toHaveBeenCalledWith(expect.stringContaining('ISOP'), expect.any(Object));
+    });
+  });
+
+  describe('Responsive Design for Narrow Screens (UX-WARN-04)', () => {
+    it('defines responsive styles with flex-wrap: wrap on .ip-input-row for viewports <= 480px', () => {
+      const sfcPath = path.resolve(__dirname, '../QrCodeModal.vue');
+      const content = fs.readFileSync(sfcPath, 'utf-8');
+
+      expect(content).toContain('@media (max-width: 480px)');
+      expect(content).toMatch(/@media\s*\(max-width:\s*480px\)\s*\{[^}]*\.ip-input-row\s*\{[^}]*flex-wrap:\s*wrap;/s);
+      expect(content).toMatch(/\.ip-input-row\s+\.ip-text-input\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*100%;/s);
+      expect(content).toMatch(/\.ip-input-row\s+:deep\(button\),\s*\.ip-input-row\s+button\s*\{[^}]*width:\s*100%;[^}]*justify-content:\s*center;/s);
+    });
+
+    it('renders .ip-input-row and apply button within modal', async () => {
+      wrapper = mount(QrCodeModal, {
+        props: {
+          modelValue: true,
+          roomCode: 'RESP',
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+      const ipRow = document.body.querySelector('.ip-input-row');
+      expect(ipRow).not.toBeNull();
+      const applyBtn = ipRow?.querySelector('button');
+      expect(applyBtn).not.toBeNull();
+      expect(applyBtn?.textContent).toContain('Apply IP');
     });
   });
 });

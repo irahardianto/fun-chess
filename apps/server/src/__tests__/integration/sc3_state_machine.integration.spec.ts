@@ -34,7 +34,6 @@ import {
   SocketErrorPayload,
 } from "@fun-chess/shared";
 import {
-  defaultDisconnectTimerRegistry,
   clearAllDisconnectTimers,
   handleSocketDisconnect,
 } from "../../features/rooms/index.js";
@@ -137,7 +136,7 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
       expect(roomAfterSpectatorDrop?.blackPlayer?.isConnected).toBe(true);
 
       // c. No disconnect grace timer was scheduled for the spectator
-      const specTimer = defaultDisconnectTimerRegistry.get(roomCode, spectator.id);
+      const specTimer = serverInstance.timerRegistry.get(roomCode, spectator.id);
       expect(specTimer).toBeUndefined();
 
       // d. Match continues without interruption: White plays e4, Black plays e5
@@ -209,7 +208,7 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
       expect(roomAfterP1Drop?.whitePlayer?.isConnected).toBe(false);
 
       // Verify timer is scheduled for Player 1
-      const p1Timer = defaultDisconnectTimerRegistry.get(roomCode, p1Id);
+      const p1Timer = serverInstance.timerRegistry.get(roomCode, p1Id);
       expect(p1Timer).toBeDefined();
 
       // 4. Player 2 drops while room is already 'paused_disconnect'
@@ -221,7 +220,7 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
       expect(roomAfterBothDrop?.blackPlayer?.isConnected).toBe(false);
 
       // Verify disconnect timer is ALSO scheduled for Player 2 (CRIT-002 key invariant!)
-      const p2Timer = defaultDisconnectTimerRegistry.get(roomCode, p2Id);
+      const p2Timer = serverInstance.timerRegistry.get(roomCode, p2Id);
       expect(p2Timer).toBeDefined();
 
       // 5. Player 1 reconnects while Player 2 is still offline
@@ -244,8 +243,8 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
       expect(roomAfterP1Reconnect?.blackPlayer?.isConnected).toBe(false);
 
       // Player 1 timer cancelled, Player 2 timer still active
-      expect(defaultDisconnectTimerRegistry.get(roomCode, p1Id)).toBeUndefined();
-      expect(defaultDisconnectTimerRegistry.get(roomCode, p2Id)).toBeDefined();
+      expect(serverInstance.timerRegistry.get(roomCode, p1Id)).toBeUndefined();
+      expect(serverInstance.timerRegistry.get(roomCode, p2Id)).toBeDefined();
 
       // 6. Player 2 reconnects
       const client2Reconnected = await createConnectedSocketClient(serverInstance.url);
@@ -267,7 +266,7 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
       expect(roomFullyResumed?.blackPlayer?.isConnected).toBe(true);
 
       // Both timers cancelled
-      expect(defaultDisconnectTimerRegistry.get(roomCode, p2Id)).toBeUndefined();
+      expect(serverInstance.timerRegistry.get(roomCode, p2Id)).toBeUndefined();
 
       // 7. Verify match is playable
       const moveRes = await emitAck<
@@ -313,6 +312,8 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
         serverInstance.roomService,
         logger,
         40,
+        undefined,
+        serverInstance.timerRegistry,
       );
       await handleSocketDisconnect(
         serverInstance.io,
@@ -320,6 +321,8 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
         serverInstance.roomService,
         logger,
         40,
+        undefined,
+        serverInstance.timerRegistry,
       );
 
       // Room transitions to paused_disconnect
@@ -327,8 +330,8 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
       expect(roomPaused?.status).toBe("paused_disconnect");
 
       // Verify timers are scheduled for both
-      expect(defaultDisconnectTimerRegistry.get(roomCode, p1Id)).toBeDefined();
-      expect(defaultDisconnectTimerRegistry.get(roomCode, p2Id)).toBeDefined();
+      expect(serverInstance.timerRegistry.get(roomCode, p1Id)).toBeDefined();
+      expect(serverInstance.timerRegistry.get(roomCode, p2Id)).toBeDefined();
 
       // 3. Wait for grace timer to expire (100ms)
       await new Promise((resolve) => setTimeout(resolve, 100));

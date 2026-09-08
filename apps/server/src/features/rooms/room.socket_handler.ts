@@ -66,17 +66,20 @@ function createRoomHandler<TReq, TRes>(
   });
 
   const getMessage = (op: string) => {
+    const limitDesc =
+      (options.rateLimiter as any)?.getLimitDescription?.() ||
+      "Maximum 60 requests per 10 seconds allowed.";
     switch (op) {
       case "room:create":
-        return "Rate limit exceeded for room creation. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for room creation. ${limitDesc}`;
       case "room:join":
-        return "Rate limit exceeded for room joining. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for room joining. ${limitDesc}`;
       case "room:reconnect":
-        return "Rate limit exceeded for room reconnection. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for room reconnection. ${limitDesc}`;
       case "room:leave":
-        return "Rate limit exceeded for room leave. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for room leave. ${limitDesc}`;
       default:
-        return `Rate limit exceeded for ${op}. Maximum 5 requests per 10 seconds allowed.`;
+        return `Rate limit exceeded for ${op}. ${limitDesc}`;
     }
   };
 
@@ -207,7 +210,8 @@ export function registerRoomSocketHandlers(
       socket.to(roomCode).emit("room:player_reconnected", {
         playerId: result.player.id,
         playerName: result.player.name,
-      });
+        roomStatus: result.room.status,
+      } as any);
 
       socket.emit("room:reconnected" as any, {
         room: result.room,

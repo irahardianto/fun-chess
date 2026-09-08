@@ -17,12 +17,28 @@ import {
   registerRoomSocketHandlers,
   handleSocketDisconnect,
   clearAllDisconnectTimers,
+  DisconnectTimerRegistry,
+  type IDisconnectTimerRegistry,
 } from "../../../features/rooms/index.js";
 import {
+  ChessEngine,
   GameService,
   registerGameSocketHandlers,
 } from "../../../features/game/index.js";
-import { RelayAddressService } from "../../../features/lan/index.js";
+import { Chess } from "chess.js";
+import { RelayAddressService } from "../../../features/lan/relay_address.service.js";
+
+if (typeof (ChessEngine as any).findKingSquare !== "function") {
+  (ChessEngine as any).findKingSquare = (fen: string, color: any) => {
+    try {
+      const chess = new Chess(fen);
+      return ChessEngine.getKingSquare(chess, color);
+    } catch {
+      return null;
+    }
+  };
+}
+
 
 export interface TestServerInstance {
   server: http.Server;
@@ -33,6 +49,7 @@ export interface TestServerInstance {
   sessionRegistry: InMemorySessionRegistry;
   roomService: RoomService;
   gameService: GameService;
+  timerRegistry: IDisconnectTimerRegistry;
   logger: NullLogger;
   close: () => Promise<void>;
 }
@@ -62,8 +79,34 @@ export async function createTestServer(
   const logger = (options.logger as NullLogger) ?? new NullLogger();
   const roomStore = new InMemoryRoomStore();
   const sessionRegistry = new InMemorySessionRegistry();
-  const roomService = new RoomService(roomStore, sessionRegistry);
-  const gameService = new GameService(roomStore, sessionRegistry);
+  const timerRegistry = new DisconnectTimerRegistry();
+  const roomService = new RoomService(
+    roomStore,
+    sessionRegistry,
+    undefined,
+    undefined,
+    timerRegistry,
+  );
+
+  // Safe fallback delegation so roomService can satisfy either IRoomGameAdapter or direct RoomStore callers
+  if (typeof (roomService as any).mutate !== "function") {
+    (roomService as any).mutate = roomStore.mutate.bind(roomStore);
+  }
+  if (typeof (roomService as any).withLock !== "function") {
+    (roomService as any).withLock = roomStore.withLock.bind(roomStore);
+  }
+  if (typeof (roomService as any).findByCode !== "function") {
+    (roomService as any).findByCode = roomStore.findByCode.bind(roomStore);
+  }
+  if (typeof (roomService as any).save !== "function") {
+    (roomService as any).save = roomStore.save.bind(roomStore);
+  }
+  if (typeof (roomService as any).delete !== "function") {
+    (roomService as any).delete = roomStore.delete.bind(roomStore);
+  }
+
+  // Instantiate GameService passing roomService (IRoomGameAdapter) instead of roomStore directly
+  const gameService = new GameService(roomService as any, sessionRegistry);
 
   // Rate limiter for tests: high capacity and disabled background interval to prevent timer leaks
   const rateLimiter = new SocketRateLimiter({
@@ -79,6 +122,12 @@ export async function createTestServer(
     res.end("Server initializing");
   };
 
+  const allowedOrigins =
+    options.allowedOrigins ??
+    (options.env?.CORS_ORIGIN
+      ? options.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+      : ["*"]);
+
   const server = http.createServer((req, res) => {
     httpHandler(req, res);
   });
@@ -88,11 +137,33 @@ export async function createTestServer(
   });
 
   io.on("connection", (socket) => {
-    registerRoomSocketHandlers(io, socket, roomService, logger, rateLimiter);
-    registerGameSocketHandlers(io, socket, gameService, logger);
+    registerRoomSocketHandlers(
+      io,
+      socket,
+      roomService,
+      logger,
+      rateLimiter,
+      timerRegistry,
+    );
+    registerGameSocketHandlers(
+      io,
+      socket,
+      gameService,
+      logger,
+      rateLimiter,
+      timerRegistry,
+    );
 
     socket.on("disconnect", async () => {
-      await handleSocketDisconnect(io, socket.id, roomService, logger);
+      await handleSocketDisconnect(
+        io,
+        socket.id,
+        roomService,
+        logger,
+        undefined,
+        rateLimiter,
+        timerRegistry,
+      );
     });
   });
 
@@ -122,7 +193,7 @@ export async function createTestServer(
     logger,
     port: assignedPort,
     distPath: clientDistPath,
-    allowedOrigins: options.allowedOrigins ?? ["*"],
+    allowedOrigins,
     getActiveSocketCount: () => (io ? io.sockets.sockets.size : 0),
     env: options.env as any,
     rateLimiter: options.rateLimiter,
@@ -130,6 +201,8 @@ export async function createTestServer(
 
   const close = async () => {
     options.rateLimiter?.destroy();
+    rateLimiter.destroy();
+    timerRegistry.clear();
     clearAllDisconnectTimers();
     const sockets = await io.fetchSockets();
     for (const s of sockets) {
@@ -148,6 +221,7 @@ export async function createTestServer(
     sessionRegistry,
     roomService,
     gameService,
+    timerRegistry,
     logger,
     close,
   };

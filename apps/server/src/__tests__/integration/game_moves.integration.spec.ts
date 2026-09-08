@@ -112,16 +112,20 @@ describe("Game Moves & Rules Integration Tests", () => {
 
   it("should emit game:check when a move places the opponent king in check", async () => {
     // Move 1: White 1. e4
+    const move1Promise = waitForEvent(whiteClient, "game:moved");
     await emitAck(whiteClient, "game:move", {
       roomCode: activeRoomCode,
       move: CHECK_SEQUENCE.move1_white,
     });
+    await move1Promise;
 
     // Move 2: Black 1... f6
+    const move2Promise = waitForEvent(whiteClient, "game:moved");
     await emitAck(blackClient, "game:move", {
       roomCode: activeRoomCode,
       move: CHECK_SEQUENCE.move1_black,
     });
+    await move2Promise;
 
     // Act: White 2. Qh5+ (Gives check)
     const checkEventPromise = waitForEvent<{

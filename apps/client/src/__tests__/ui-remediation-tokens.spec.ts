@@ -29,6 +29,8 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
     expect(indexHtml).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />');
     expect(indexHtml).not.toContain('maximum-scale');
     expect(indexHtml).not.toContain('user-scalable=no');
+    expect(indexHtml).toContain('<meta name="mobile-web-app-capable" content="yes" />');
+    expect(indexHtml).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
   });
 
   it('Finding 12 & Finding 9: index.html loads Fredoka, JetBrains Mono, and Nunito fonts with correct weights including 500', () => {

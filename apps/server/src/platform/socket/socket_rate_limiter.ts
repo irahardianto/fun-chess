@@ -109,6 +109,14 @@ export class SocketRateLimiter {
   }
 
   /**
+   * Returns a human-readable limit description.
+   */
+  public getLimitDescription(): string {
+    const windowSec = Math.round(this.windowMs / 1000);
+    return `Maximum ${this.maxRequests} requests per ${windowSec} seconds allowed.`;
+  }
+
+  /**
    * Attempts to consume 1 request permit for the given key (e.g. client IP).
    * Returns true if allowed, or false if the rate limit has been exceeded.
    */

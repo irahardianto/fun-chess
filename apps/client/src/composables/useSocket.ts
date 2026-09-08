@@ -7,9 +7,14 @@ import type {
   MakeMoveRequest,
   MovePayload,
   MoveResult,
+  OfferDrawRequest,
   PieceColor,
   Player,
   ReconnectRequest,
+  RequestRematchRequest,
+  ResignRequest,
+  RespondDrawRequest,
+  RespondRematchRequest,
   RoomState,
   RoomStatus,
   SocketErrorPayload,
@@ -30,7 +35,7 @@ import {
 } from '@fun-chess/shared';
 import { createSocketClient, type TypedSocket } from '../platform/socket/socket_client';
 import { safeSessionStorage, createSafeStorage, type KeyValueStorage, STORAGE_KEYS } from '../platform/storage';
-import { generateCorrelationId } from '../platform/telemetry';
+import { generateCorrelationId, logger } from '../platform/telemetry';
 
 /** Session storage key for persisting fun-chess multiplayer sessions */
 export const SESSION_STORAGE_KEY = STORAGE_KEYS.SESSION_TOKEN;
@@ -367,6 +372,37 @@ function handleRoomReconnected(data: {
   if (data?.player) {
     currentPlayer.value = data.player;
   }
+
+  // [CRIT-003] Re-hydrate draw offer and rematch request state upon reconnection
+  if (data?.room && data?.player) {
+    const opponent =
+      data.room.whitePlayer?.id === data.player.id
+        ? data.room.blackPlayer
+        : data.room.whitePlayer;
+
+    if (opponent && data.room.drawOffer && data.room.drawOffer.offeredBy === opponent.id) {
+      drawOfferedBy.value = {
+        fromPlayerId: opponent.id,
+        fromPlayerName: opponent.name,
+      };
+    } else {
+      drawOfferedBy.value = null;
+    }
+
+    if (
+      opponent &&
+      data.room.rematch &&
+      data.room.rematch.requestedBy === opponent.id &&
+      (data.room.rematch.status ?? 'pending') === 'pending'
+    ) {
+      rematchRequestedBy.value = {
+        requestedBy: opponent.id,
+        requesterName: opponent.name,
+      };
+    } else {
+      rematchRequestedBy.value = null;
+    }
+  }
 }
 
 function handleGameStarted(gameState: GameState) {
@@ -559,11 +595,107 @@ function disconnect(): void {
   }
 }
 
+interface EmitWithTimeoutOptions<TRes extends { success: boolean; error?: SocketErrorPayload }> {
+  timeoutMs?: number;
+  timeoutMessage: string;
+  operation: string;
+  correlationId: string;
+  callback?: (res: TRes) => void;
+  onSuccess?: (res: Extract<TRes, { success: true }>) => void;
+  onError?: (err: SocketErrorPayload) => void;
+}
+
+/**
+ * Standard socket emit with timeout handling and 3-point structured logging.
+ * Supports synchronous or asynchronous acknowledgments and invokes optional callbacks immediately.
+ */
+function emitWithTimeout<TReq, TRes extends { success: boolean; error?: SocketErrorPayload }>(
+  s: TypedSocket,
+  event: any,
+  payload: TReq,
+  options: EmitWithTimeoutOptions<TRes>
+): Promise<TRes> {
+  const timeoutMs = options.timeoutMs ?? 8000;
+  const startTime = Date.now();
+  const { operation, correlationId, callback } = options;
+
+  return new Promise<TRes>((resolve) => {
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      const duration = Date.now() - startTime;
+      const err: SocketErrorPayload = {
+        code: 'ERR_SOCKET_TIMEOUT',
+        message: options.timeoutMessage,
+      };
+      lastError.value = err;
+      logger.warn(`${operation} failed: timeout`, {
+        operation,
+        correlationId,
+        duration,
+        error: err,
+      });
+      options.onError?.(err);
+      const res = { success: false, error: err } as unknown as TRes;
+      if (callback) {
+        callback(res);
+      }
+      resolve(res);
+    }, timeoutMs);
+
+    (s as any).emit(event, payload, (res: TRes) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      const duration = Date.now() - startTime;
+
+      if (res && res.success) {
+        logger.info(`${operation} succeeded`, {
+          operation,
+          correlationId,
+          duration,
+        });
+        options.onSuccess?.(res as Extract<TRes, { success: true }>);
+      } else {
+        const errPayload: SocketErrorPayload = res?.error ?? {
+          code: 'ERR_INTERNAL_SERVER',
+          message: `${operation} failed`,
+          correlationId,
+        };
+        lastError.value = errPayload;
+        logger.warn(`${operation} failed`, {
+          operation,
+          correlationId,
+          duration,
+          error: errPayload,
+        });
+        options.onError?.(errPayload);
+      }
+
+      if (callback) {
+        callback(res);
+      }
+      resolve(res);
+    });
+  });
+}
+
 async function createRoom(
   playerName: string,
   preferredColor: 'w' | 'b' | 'random' = 'random',
   avatar: string = DEFAULT_PLAYER_AVATAR
 ): Promise<{ success: true; room: RoomState; sessionToken: string } | { success: false; error: SocketErrorPayload }> {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Creating room', {
+    operation: 'socket_room_create',
+    correlationId,
+    playerName,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = CreateRoomRequestSchema.safeParse({
     playerName,
@@ -573,48 +705,42 @@ async function createRoom(
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Create room validation failed', {
+      operation: 'socket_room_create',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     return { success: false, error: err };
   }
 
   const s = socket.value || initSocket();
   if (!s.connected) s.connect();
 
-  return new Promise((resolve) => {
-    let hasTimedOut = false;
-    const payload: CreateRoomRequest = validationResult.data;
-    const timer = setTimeout(() => {
-      hasTimedOut = true;
-      const err: SocketErrorPayload = {
-        code: 'ERR_SOCKET_TIMEOUT',
-        message: 'Connection timed out. Please ensure the server is running.',
-      };
-      lastError.value = err;
-      resolve({ success: false, error: err });
-    }, 8000);
-
-    s.emit('room:create', payload, (res) => {
-      if (hasTimedOut) return;
-      clearTimeout(timer);
-      if (res.success) {
-        currentRoom.value = res.room;
-        sessionToken.value = res.sessionToken;
-        if (res.room.whitePlayer?.socketId === s.id) {
-          currentPlayer.value = res.room.whitePlayer;
-        } else if (res.room.blackPlayer?.socketId === s.id) {
-          currentPlayer.value = res.room.blackPlayer;
-        }
-        const playerId = currentPlayer.value?.id || res.room.hostId;
-        saveSession({
-          roomCode: res.room.roomCode,
-          playerId,
-          sessionToken: res.sessionToken,
-        });
-        resolve(res);
-      } else {
-        lastError.value = res.error;
-        resolve(res);
+  return emitWithTimeout<
+    CreateRoomRequest,
+    | { success: true; room: RoomState; sessionToken: string }
+    | { success: false; error: SocketErrorPayload }
+  >(s, 'room:create', validationResult.data, {
+    timeoutMs: 8000,
+    timeoutMessage: 'Connection timed out. Please ensure the server is running.',
+    operation: 'socket_room_create',
+    correlationId,
+    onSuccess: (res) => {
+      currentRoom.value = res.room;
+      sessionToken.value = res.sessionToken;
+      if (res.room.whitePlayer?.socketId === s.id) {
+        currentPlayer.value = res.room.whitePlayer;
+      } else if (res.room.blackPlayer?.socketId === s.id) {
+        currentPlayer.value = res.room.blackPlayer;
       }
-    });
+      const playerId = currentPlayer.value?.id || res.room.hostId;
+      saveSession({
+        roomCode: res.room.roomCode,
+        playerId,
+        sessionToken: res.sessionToken,
+      });
+    },
   });
 }
 
@@ -623,6 +749,16 @@ async function joinRoom(
   playerName: string,
   avatar: string = DEFAULT_PLAYER_AVATAR
 ): Promise<{ success: true; room: RoomState; player: Player; sessionToken: string } | { success: false; error: SocketErrorPayload }> {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Joining room', {
+    operation: 'socket_room_join',
+    correlationId,
+    roomCode,
+    playerName,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = JoinRoomRequestSchema.safeParse({
     roomCode,
@@ -632,43 +768,37 @@ async function joinRoom(
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Join room validation failed', {
+      operation: 'socket_room_join',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     return { success: false, error: err };
   }
 
   const s = socket.value || initSocket();
   if (!s.connected) s.connect();
 
-  return new Promise((resolve) => {
-    let hasTimedOut = false;
-    const payload: JoinRoomRequest = validationResult.data;
-    const timer = setTimeout(() => {
-      hasTimedOut = true;
-      const err: SocketErrorPayload = {
-        code: 'ERR_SOCKET_TIMEOUT',
-        message: 'Connection timed out. Please check the room code and try again.',
-      };
-      lastError.value = err;
-      resolve({ success: false, error: err });
-    }, 8000);
-
-    s.emit('room:join', payload, (res) => {
-      if (hasTimedOut) return;
-      clearTimeout(timer);
-      if (res.success) {
-        currentRoom.value = res.room;
-        currentPlayer.value = res.player;
-        sessionToken.value = res.sessionToken;
-        saveSession({
-          roomCode: res.room.roomCode,
-          playerId: res.player.id,
-          sessionToken: res.sessionToken,
-        });
-        resolve(res);
-      } else {
-        lastError.value = res.error;
-        resolve(res);
-      }
-    });
+  return emitWithTimeout<
+    JoinRoomRequest,
+    | { success: true; room: RoomState; player: Player; sessionToken: string }
+    | { success: false; error: SocketErrorPayload }
+  >(s, 'room:join', validationResult.data, {
+    timeoutMs: 8000,
+    timeoutMessage: 'Connection timed out. Please check the room code and try again.',
+    operation: 'socket_room_join',
+    correlationId,
+    onSuccess: (res) => {
+      currentRoom.value = res.room;
+      currentPlayer.value = res.player;
+      sessionToken.value = res.sessionToken;
+      saveSession({
+        roomCode: res.room.roomCode,
+        playerId: res.player.id,
+        sessionToken: res.sessionToken,
+      });
+    },
   });
 }
 
@@ -676,43 +806,58 @@ async function makeMove(
   roomCode: string,
   move: MovePayload
 ): Promise<{ success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }> {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Making move', {
+    operation: 'socket_game_move',
+    correlationId,
+    roomCode,
+    move,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = MakeMoveRequestSchema.safeParse({ roomCode, move });
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Make move validation failed', {
+      operation: 'socket_game_move',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     return { success: false, error: err };
   }
 
   const s = socket.value;
   if (!s || !s.connected) {
+    const err: SocketErrorPayload = {
+      code: 'ERR_INTERNAL_SERVER',
+      message: 'Socket not connected',
+      correlationId,
+    };
+    lastError.value = err;
+    logger.warn('Make move failed: socket not connected', {
+      operation: 'socket_game_move',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     return {
       success: false,
-      error: { code: 'ERR_INTERNAL_SERVER', message: 'Socket not connected' },
+      error: err,
     };
   }
 
-  return new Promise((resolve) => {
-    let hasTimedOut = false;
-    const payload: MakeMoveRequest = validationResult.data;
-    const timer = setTimeout(() => {
-      hasTimedOut = true;
-      const err: SocketErrorPayload = {
-        code: 'ERR_SOCKET_TIMEOUT',
-        message: 'Move submission timed out.',
-      };
-      lastError.value = err;
-      resolve({ success: false, error: err });
-    }, 8000);
-
-    s.emit('game:move', payload, (res) => {
-      if (hasTimedOut) return;
-      clearTimeout(timer);
-      if (!res.success) {
-        lastError.value = res.error;
-      }
-      resolve(res);
-    });
+  return emitWithTimeout<
+    MakeMoveRequest,
+    { success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }
+  >(s, 'game:move', validationResult.data, {
+    timeoutMs: 8000,
+    timeoutMessage: 'Move submission timed out.',
+    operation: 'socket_game_move',
+    correlationId,
   });
 }
 
@@ -721,6 +866,16 @@ async function reconnect(
   playerId: string,
   token: string
 ): Promise<{ success: true; room: RoomState; player: Player } | { success: false; error: SocketErrorPayload }> {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Reconnecting room', {
+    operation: 'socket_room_reconnect',
+    correlationId,
+    roomCode,
+    playerId,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = ReconnectRequestSchema.safeParse({
     roomCode,
@@ -730,49 +885,44 @@ async function reconnect(
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Reconnect validation failed', {
+      operation: 'socket_room_reconnect',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     return { success: false, error: err };
   }
 
   const s = socket.value || initSocket();
   if (!s.connected) s.connect();
 
-  return new Promise((resolve) => {
-    let hasTimedOut = false;
-    const payload: ReconnectRequest = validationResult.data;
-    const timer = setTimeout(() => {
-      hasTimedOut = true;
-      const err: SocketErrorPayload = {
-        code: 'ERR_SOCKET_TIMEOUT',
-        message: 'Reconnection timed out.',
-      };
-      lastError.value = err;
-      resolve({ success: false, error: err });
-    }, 8000);
-
-    s.emit('room:reconnect', payload, (res) => {
-      if (hasTimedOut) return;
-      clearTimeout(timer);
-      if (res.success) {
-        currentRoom.value = res.room;
-        currentPlayer.value = res.player;
-        sessionToken.value = token;
-        saveSession({
-          roomCode: res.room.roomCode,
-          playerId: res.player.id,
-          sessionToken: token,
-        });
-        resolve(res);
-      } else {
-        lastError.value = res.error;
-        if (
-          res.error.code === 'ERR_ROOM_NOT_FOUND' ||
-          res.error.code === 'ERR_UNAUTHORIZED'
-        ) {
-          clearSession();
-        }
-        resolve(res);
+  return emitWithTimeout<
+    ReconnectRequest,
+    { success: true; room: RoomState; player: Player } | { success: false; error: SocketErrorPayload }
+  >(s, 'room:reconnect', validationResult.data, {
+    timeoutMs: 8000,
+    timeoutMessage: 'Reconnection timed out.',
+    operation: 'socket_room_reconnect',
+    correlationId,
+    onSuccess: (res) => {
+      currentRoom.value = res.room;
+      currentPlayer.value = res.player;
+      sessionToken.value = token;
+      saveSession({
+        roomCode: res.room.roomCode,
+        playerId: res.player.id,
+        sessionToken: token,
+      });
+    },
+    onError: (err) => {
+      if (
+        err.code === 'ERR_ROOM_NOT_FOUND' ||
+        err.code === 'ERR_UNAUTHORIZED'
+      ) {
+        clearSession();
       }
-    });
+    },
   });
 }
 
@@ -780,32 +930,49 @@ function resign(
   roomCode: string,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Resigning game', {
+    operation: 'socket_game_resign',
+    correlationId,
+    roomCode,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = ResignRequestSchema.safeParse({ roomCode });
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Resign validation failed', {
+      operation: 'socket_game_resign',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     if (callback) callback({ success: false, error: err });
     return;
   }
 
   if (socket.value) {
     if (callback) {
-      let hasTimedOut = false;
-      const timer = setTimeout(() => {
-        hasTimedOut = true;
-        callback({
-          success: false,
-          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Resign timed out.' },
-        });
-      }, 8000);
-      socket.value.emit('game:resign', validationResult.data, (res) => {
-        if (hasTimedOut) return;
-        clearTimeout(timer);
-        callback(res);
+      emitWithTimeout<
+        ResignRequest,
+        { success: true } | { success: false; error: SocketErrorPayload }
+      >(socket.value, 'game:resign', validationResult.data, {
+        timeoutMs: 8000,
+        timeoutMessage: 'Resign timed out.',
+        operation: 'socket_game_resign',
+        correlationId,
+        callback,
       });
     } else {
       socket.value.emit('game:resign', validationResult.data);
+      logger.info('Resign dispatched', {
+        operation: 'socket_game_resign',
+        correlationId,
+        duration: Date.now() - startTime,
+      });
     }
   }
 }
@@ -814,32 +981,49 @@ function offerDraw(
   roomCode: string,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Offering draw', {
+    operation: 'socket_game_offer_draw',
+    correlationId,
+    roomCode,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = OfferDrawRequestSchema.safeParse({ roomCode });
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Offer draw validation failed', {
+      operation: 'socket_game_offer_draw',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     if (callback) callback({ success: false, error: err });
     return;
   }
 
   if (socket.value) {
     if (callback) {
-      let hasTimedOut = false;
-      const timer = setTimeout(() => {
-        hasTimedOut = true;
-        callback({
-          success: false,
-          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Draw offer timed out.' },
-        });
-      }, 8000);
-      socket.value.emit('game:offer_draw', validationResult.data, (res) => {
-        if (hasTimedOut) return;
-        clearTimeout(timer);
-        callback(res);
+      emitWithTimeout<
+        OfferDrawRequest,
+        { success: true } | { success: false; error: SocketErrorPayload }
+      >(socket.value, 'game:offer_draw', validationResult.data, {
+        timeoutMs: 8000,
+        timeoutMessage: 'Draw offer timed out.',
+        operation: 'socket_game_offer_draw',
+        correlationId,
+        callback,
       });
     } else {
       socket.value.emit('game:offer_draw', validationResult.data);
+      logger.info('Offer draw dispatched', {
+        operation: 'socket_game_offer_draw',
+        correlationId,
+        duration: Date.now() - startTime,
+      });
     }
   }
 }
@@ -849,32 +1033,50 @@ function respondDraw(
   accept: boolean,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Responding to draw offer', {
+    operation: 'socket_game_respond_draw',
+    correlationId,
+    roomCode,
+    accept,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = RespondDrawRequestSchema.safeParse({ roomCode, accept });
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Respond draw validation failed', {
+      operation: 'socket_game_respond_draw',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     if (callback) callback({ success: false, error: err });
     return;
   }
 
   if (socket.value) {
     if (callback) {
-      let hasTimedOut = false;
-      const timer = setTimeout(() => {
-        hasTimedOut = true;
-        callback({
-          success: false,
-          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Draw response timed out.' },
-        });
-      }, 8000);
-      socket.value.emit('game:respond_draw', validationResult.data, (res) => {
-        if (hasTimedOut) return;
-        clearTimeout(timer);
-        callback(res);
+      emitWithTimeout<
+        RespondDrawRequest,
+        { success: true } | { success: false; error: SocketErrorPayload }
+      >(socket.value, 'game:respond_draw', validationResult.data, {
+        timeoutMs: 8000,
+        timeoutMessage: 'Draw response timed out.',
+        operation: 'socket_game_respond_draw',
+        correlationId,
+        callback,
       });
     } else {
       socket.value.emit('game:respond_draw', validationResult.data);
+      logger.info('Respond draw dispatched', {
+        operation: 'socket_game_respond_draw',
+        correlationId,
+        duration: Date.now() - startTime,
+      });
     }
     drawOfferedBy.value = null;
   }
@@ -884,32 +1086,49 @@ function requestRematch(
   roomCode: string,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Requesting rematch', {
+    operation: 'socket_game_request_rematch',
+    correlationId,
+    roomCode,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = RequestRematchRequestSchema.safeParse({ roomCode });
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Request rematch validation failed', {
+      operation: 'socket_game_request_rematch',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     if (callback) callback({ success: false, error: err });
     return;
   }
 
   if (socket.value) {
     if (callback) {
-      let hasTimedOut = false;
-      const timer = setTimeout(() => {
-        hasTimedOut = true;
-        callback({
-          success: false,
-          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch request timed out.' },
-        });
-      }, 8000);
-      socket.value.emit('game:request_rematch', validationResult.data, (res) => {
-        if (hasTimedOut) return;
-        clearTimeout(timer);
-        callback(res);
+      emitWithTimeout<
+        RequestRematchRequest,
+        { success: true } | { success: false; error: SocketErrorPayload }
+      >(socket.value, 'game:request_rematch', validationResult.data, {
+        timeoutMs: 8000,
+        timeoutMessage: 'Rematch request timed out.',
+        operation: 'socket_game_request_rematch',
+        correlationId,
+        callback,
       });
     } else {
       socket.value.emit('game:request_rematch', validationResult.data);
+      logger.info('Request rematch dispatched', {
+        operation: 'socket_game_request_rematch',
+        correlationId,
+        duration: Date.now() - startTime,
+      });
     }
   }
 }
@@ -919,32 +1138,50 @@ function respondRematch(
   accept: boolean,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Responding to rematch request', {
+    operation: 'socket_game_respond_rematch',
+    correlationId,
+    roomCode,
+    accept,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = RespondRematchRequestSchema.safeParse({ roomCode, accept });
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Respond rematch validation failed', {
+      operation: 'socket_game_respond_rematch',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     if (callback) callback({ success: false, error: err });
     return;
   }
 
   if (socket.value) {
     if (callback) {
-      let hasTimedOut = false;
-      const timer = setTimeout(() => {
-        hasTimedOut = true;
-        callback({
-          success: false,
-          error: { code: 'ERR_SOCKET_TIMEOUT', message: 'Rematch response timed out.' },
-        });
-      }, 8000);
-      socket.value.emit('game:respond_rematch', validationResult.data, (res) => {
-        if (hasTimedOut) return;
-        clearTimeout(timer);
-        callback(res);
+      emitWithTimeout<
+        RespondRematchRequest,
+        { success: true } | { success: false; error: SocketErrorPayload }
+      >(socket.value, 'game:respond_rematch', validationResult.data, {
+        timeoutMs: 8000,
+        timeoutMessage: 'Rematch response timed out.',
+        operation: 'socket_game_respond_rematch',
+        correlationId,
+        callback,
       });
     } else {
       socket.value.emit('game:respond_rematch', validationResult.data);
+      logger.info('Respond rematch dispatched', {
+        operation: 'socket_game_respond_rematch',
+        correlationId,
+        duration: Date.now() - startTime,
+      });
     }
     rematchRequestedBy.value = null;
   }
@@ -957,14 +1194,29 @@ function respondRematch(
 async function leaveRoom(
   roomCode: string,
   callback?: (res: { success: boolean }) => void
-): Promise<void> {
+): Promise<boolean> {
+  const startTime = Date.now();
+  const correlationId = generateCorrelationId();
+
+  logger.debug('Leaving room', {
+    operation: 'socket_room_leave',
+    correlationId,
+    roomCode,
+  });
+
   // [MIN-030] Zod validation before transmission
   const validationResult = LeaveRoomRequestSchema.safeParse({ roomCode });
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     lastError.value = err;
+    logger.warn('Leave room validation failed', {
+      operation: 'socket_room_leave',
+      correlationId,
+      duration: Date.now() - startTime,
+      error: err,
+    });
     if (callback) callback({ success: false });
-    return;
+    return false;
   }
 
   const code = validationResult.data.roomCode;
@@ -974,36 +1226,51 @@ async function leaveRoom(
     currentPlayer.value = null;
     sessionToken.value = null;
     clearSession();
+    logger.info('Leave room succeeded (socket disconnected)', {
+      operation: 'socket_room_leave',
+      correlationId,
+      duration: Date.now() - startTime,
+    });
     if (callback) callback({ success: true });
-    return;
+    return true;
   }
 
-  return new Promise<void>((resolve) => {
+  return new Promise<boolean>((resolve) => {
     let settled = false;
     const finalize = (success: boolean) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      const duration = Date.now() - startTime;
       currentRoom.value = null;
       currentPlayer.value = null;
       sessionToken.value = null;
       clearSession();
+      if (success) {
+        logger.info('Leave room succeeded', {
+          operation: 'socket_room_leave',
+          correlationId,
+          duration,
+        });
+      } else {
+        logger.warn('Leave room failed', {
+          operation: 'socket_room_leave',
+          correlationId,
+          duration,
+          error: 'Server returned failure',
+        });
+      }
       if (callback) callback({ success });
-      resolve();
+      resolve(success);
     };
 
     const timer = setTimeout(() => {
       finalize(true);
     }, 2000);
 
-    (s as any).emit('room:leave', { roomCode: code }, (res?: { success?: boolean }) => {
+    s.emit('room:leave', { roomCode: code }, (res?: { success?: boolean }) => {
       finalize(res?.success !== false);
     });
-
-    // Compatibility shim for synchronous multi-instance test harnesses
-    if ((s as any)?.id === 'shared_socket_456') {
-      finalize(true);
-    }
   });
 }
 

@@ -34,7 +34,7 @@ describe("createSocketServer (MAJ-002, MAJ-017)", () => {
     io.close();
   });
 
-  it("respects injected env.CORS_ORIGIN without direct process.env reads (MAJ-002)", () => {
+  it("respects injected env.CORS_ORIGIN and enforces origin check on upgrades (MAJ-002, SEC-RT-001)", () => {
     const httpServer = http.createServer();
     const io = createSocketServer(httpServer, {
       env: {
@@ -46,10 +46,48 @@ describe("createSocketServer (MAJ-002, MAJ-017)", () => {
       },
     });
 
-    expect(io.opts.cors).toEqual({
-      origin: "https://fun-chess.example.com",
-      methods: ["GET", "POST"],
+    expect(io.opts.cors?.methods).toEqual(["GET", "POST"]);
+    expect(typeof io.opts.cors?.origin).toBe("function");
+
+    // Test CORS callback
+    const corsValidator = io.opts.cors?.origin as (
+      origin: string | undefined,
+      callback: (err: Error | null, success?: boolean) => void,
+    ) => void;
+
+    let allowedSuccess = false;
+    corsValidator("https://fun-chess.example.com", (err, success) => {
+      if (!err && success) allowedSuccess = true;
     });
+    expect(allowedSuccess).toBe(true);
+
+    let rejectedErr: Error | null = null;
+    corsValidator("https://evil.com", (err) => {
+      rejectedErr = err;
+    });
+    expect(rejectedErr).toBeInstanceOf(Error);
+
+    // Test allowRequest on ServerOptions (SEC-RT-001)
+    const allowRequest = io.opts.allowRequest!;
+    expect(typeof allowRequest).toBe("function");
+
+    let upgradeAllowed = false;
+    allowRequest(
+      { headers: { origin: "https://fun-chess.example.com" } } as any,
+      (err, success) => {
+        if (!err && success) upgradeAllowed = true;
+      },
+    );
+    expect(upgradeAllowed).toBe(true);
+
+    let upgradeRejected = false;
+    allowRequest(
+      { headers: { origin: "https://evil.com" } } as any,
+      (err, success) => {
+        if (err === 3 && !success) upgradeRejected = true;
+      },
+    );
+    expect(upgradeRejected).toBe(true);
 
     io.close();
   });

@@ -50,21 +50,24 @@ function createGameHandler<TReq, TRes>(
   });
 
   const getMessage = (op: string) => {
+    const limitDesc =
+      (options.rateLimiter as any)?.getLimitDescription?.() ||
+      "Maximum 60 requests per 10 seconds allowed.";
     switch (op) {
       case "game:move":
-        return "Rate limit exceeded for game moves. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for game moves. ${limitDesc}`;
       case "game:resign":
-        return "Rate limit exceeded for game resignation. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for game resignation. ${limitDesc}`;
       case "game:offer_draw":
-        return "Rate limit exceeded for draw offers. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for draw offers. ${limitDesc}`;
       case "game:respond_draw":
-        return "Rate limit exceeded for draw responses. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for draw responses. ${limitDesc}`;
       case "game:request_rematch":
-        return "Rate limit exceeded for rematch requests. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for rematch requests. ${limitDesc}`;
       case "game:respond_rematch":
-        return "Rate limit exceeded for rematch responses. Maximum 5 requests per 10 seconds allowed.";
+        return `Rate limit exceeded for rematch responses. ${limitDesc}`;
       default:
-        return `Rate limit exceeded for ${op}. Maximum 5 requests per 10 seconds allowed.`;
+        return `Rate limit exceeded for ${op}. ${limitDesc}`;
     }
   };
 
@@ -270,6 +273,7 @@ export function registerGameSocketHandlers(
       );
 
       if (result.accept && result.nextGameState) {
+        timerRegistry.cancelAllForRoom(roomCode);
         io.to(roomCode).emit("game:rematch_started", {
           gameState: result.nextGameState,
           room: result.room,

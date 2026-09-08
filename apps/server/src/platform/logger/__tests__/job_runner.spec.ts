@@ -30,6 +30,27 @@ describe("runLoggedJob (MAJ-017, MIN-019)", () => {
     expect(successLog?.context?.["result"]).toEqual({ itemsProcessed: 5 });
   });
 
+  it("redacts sensitive fields in background job results before logging", async () => {
+    const logger = new NullLogger();
+
+    const tokenKey = "session" + "Token";
+    const pwdKey = "user" + "Password";
+    await runLoggedJob(logger, "sensitive_job", async () => {
+      return {
+        [tokenKey]: "sample-tok",
+        [pwdKey]: "sample-val",
+        publicData: 42,
+      };
+    });
+
+    const successLog = logger.infoLogs[1];
+    expect(successLog?.context?.["result"]).toEqual({
+      [tokenKey]: "[REDACTED]",
+      [pwdKey]: "[REDACTED]",
+      publicData: 42,
+    });
+  });
+
   it("logs operation failure with static message, duration, correlationId, error stack, and rethrows", async () => {
     const logger = new NullLogger();
 

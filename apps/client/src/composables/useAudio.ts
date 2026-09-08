@@ -7,6 +7,10 @@ import {
   type IAudioService,
   audioSynthesizer as defaultSynth,
 } from '../platform/audio/index.js';
+import {
+  type IHapticsService,
+  defaultHapticsService,
+} from '../platform/hardware/index.js';
 import { logger } from '../platform/telemetry/index.js';
 
 export interface GameDomainEventSource {
@@ -24,8 +28,9 @@ export type GameDomainEvent =
   | { type: 'defeat' }
   | { type: 'draw' };
 
-export function useAudio(injectedSynth?: IAudioService) {
+export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapticsService) {
   const synth: IAudioService = injectedSynth || defaultSynth;
+  const haptics: IHapticsService = injectedHaptics || defaultHapticsService;
   const isMuted = ref(synth.isMuted());
   const isSoundEnabled = ref(!synth.isMuted());
 
@@ -51,15 +56,13 @@ export function useAudio(injectedSynth?: IAudioService) {
   }
 
   function triggerHaptic(pattern: number | number[]): void {
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function') {
-      try {
-        navigator.vibrate(pattern);
-      } catch (err) {
-        logger.debug('Haptic vibration failed', {
-          operation: 'audio_trigger_haptic',
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+    try {
+      haptics.vibrate(pattern);
+    } catch (err) {
+      logger.debug('Haptic vibration failed', {
+        operation: 'audio_trigger_haptic',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -224,7 +227,16 @@ export function useAudio(injectedSynth?: IAudioService) {
     }
 
     return () => {
-      unsubs.forEach((u) => u());
+      unsubs.forEach((u) => {
+        try {
+          u();
+        } catch (err) {
+          logger.debug('Failed to unsubscribe audio listener', {
+            operation: 'audio_unsubscribe_listener',
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
     };
   }
 

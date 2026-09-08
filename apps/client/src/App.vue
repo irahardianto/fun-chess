@@ -6,10 +6,13 @@ import { AppNavbar, AppViewRouter, AppToastManager, AppModalContainer, useTheme,
 import { OfflineIndicator, usePwaInstall, useNetworkStatus } from '@/features/pwa';
 import { useProgressSync } from '@/features/portability';
 import { useSocket, useChessGame, useAudio, useConfetti } from '@/composables';
-import { apiClient } from '@/platform/api';
-import { safeLocalStorage, STORAGE_KEYS } from '@/platform/storage';
-import { logger } from '@/platform/telemetry';
+import { useInjectApiClient, useInjectStorage, useInjectLogger } from '@/platform/di';
+import { STORAGE_KEYS } from '@/platform/storage';
 import { defaultLocalStorageProgressStore } from '@/features/scenarios';
+
+const apiClient = useInjectApiClient();
+const safeLocalStorage = useInjectStorage();
+const logger = useInjectLogger();
 
 const { isDarkMode, toggleTheme, initTheme } = useTheme();
 const { notifications, notificationAnnouncement, showNotification, dismissNotification } = useNotification();
@@ -40,17 +43,28 @@ function getInitialRoomCode(): string {
     try {
       const p = new URLSearchParams(window.location.search).get('join') || new URLSearchParams(window.location.search).get('room');
       return p ? p.toUpperCase() : '';
-    } catch {
+    } catch (err) {
+      logger.debug('Failed to parse URL query params for initial room code', {
+        operation: 'app_get_initial_room_code',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return '';
     }
   }
   return '';
 }
 
-const currentAppMode = ref<AppGameMode>('lobby'), lobbyActiveMode = ref<AppGameMode>(getInitialLobbyMode());
-const soloAiConfig = ref<SoloAiLaunchConfig | null>(null), activeScenario = ref<ChessScenario | null>(null);
-const puzzleSubMode = ref<'hub' | 'themed_drills' | 'adaptive_ladder' | 'puzzle_rush' | 'streak_survivor'>('hub'), puzzleDrillTheme = ref<PuzzleTheme>('fork');
-const initialRoomCode = ref(getInitialRoomCode()), lanInfo = ref<any>(null), isActionLoading = ref(false), showQrModal = ref(false), showGameOverModal = ref(false);
+const currentAppMode = ref<AppGameMode>('lobby');
+const lobbyActiveMode = ref<AppGameMode>(getInitialLobbyMode());
+const soloAiConfig = ref<SoloAiLaunchConfig | null>(null);
+const activeScenario = ref<ChessScenario | null>(null);
+const puzzleSubMode = ref<'hub' | 'themed_drills' | 'adaptive_ladder' | 'puzzle_rush' | 'streak_survivor'>('hub');
+const puzzleDrillTheme = ref<PuzzleTheme>('fork');
+const initialRoomCode = ref(getInitialRoomCode());
+const lanInfo = ref<any>(null);
+const isActionLoading = ref(false);
+const showQrModal = ref(false);
+const showGameOverModal = ref(false);
 
 // Accessible confirmation modal state (replaces raw window.confirm per CRIT-005 & MIN-010)
 const showConfirmModal = ref(false);
@@ -102,9 +116,52 @@ const socketApi = useSocket();
 const { socketId, isConnected, currentRoom, currentPlayer, drawOfferedBy, rematchRequestedBy, lastGameOver, kingInCheck, connect, createRoom, joinRoom, makeMove, resign, offerDraw, respondDraw, requestRematch, respondRematch, leaveRoom } = socketApi;
 const chessEngine = useChessGame();
 const { fen, turn, orientation, lastMove, myColor, isMyTurn, selectedSquare, legalMoves, capturedWhite, capturedBlack, materialAdvantage, kingInCheckSquare, pendingPromotion, selectSquare, completePromotion, cancelPromotion, syncGameState, resetGame, flipBoard, setPlayerColor, moveHistory } = chessEngine;
-const isHost = computed(() => !!(currentRoom.value && currentPlayer.value && currentRoom.value.hostId === currentPlayer.value.id)), opponentPlayer = computed(() => currentRoom.value && currentPlayer.value ? (currentPlayer.value.color === 'w' ? currentRoom.value.blackPlayer : currentRoom.value.whitePlayer) : null);
-const isWinner = computed(() => !!(lastGameOver.value && myColor.value && lastGameOver.value.winner === myColor.value)), isDrawResult = computed(() => !!(lastGameOver.value && lastGameOver.value.winner === 'draw'));
-const isRematchRequestedByMe = computed(() => !!(currentRoom.value?.rematch?.status === 'pending' && currentRoom.value.rematch.requestedBy === currentPlayer.value?.id)), showIncomingRematchModal = computed(() => !!(rematchRequestedBy.value && currentPlayer.value && rematchRequestedBy.value.requestedBy !== currentPlayer.value.id));
+const isHost = computed(() => {
+  return Boolean(
+    currentRoom.value &&
+    currentPlayer.value &&
+    currentRoom.value.hostId === currentPlayer.value.id
+  );
+});
+
+const opponentPlayer = computed(() => {
+  if (!currentRoom.value || !currentPlayer.value) {
+    return null;
+  }
+  return currentPlayer.value.color === 'w'
+    ? currentRoom.value.blackPlayer
+    : currentRoom.value.whitePlayer;
+});
+
+const isWinner = computed(() => {
+  return Boolean(
+    lastGameOver.value &&
+    myColor.value &&
+    lastGameOver.value.winner === myColor.value
+  );
+});
+
+const isDrawResult = computed(() => {
+  return Boolean(
+    lastGameOver.value &&
+    lastGameOver.value.winner === 'draw'
+  );
+});
+
+const isRematchRequestedByMe = computed(() => {
+  return Boolean(
+    currentRoom.value?.rematch?.status === 'pending' &&
+    currentRoom.value.rematch.requestedBy === currentPlayer.value?.id
+  );
+});
+
+const showIncomingRematchModal = computed(() => {
+  return Boolean(
+    rematchRequestedBy.value &&
+    currentPlayer.value &&
+    rematchRequestedBy.value.requestedBy !== currentPlayer.value.id
+  );
+});
 
 let cleanupAudioListeners: (() => void) | null = null;
 
@@ -114,10 +171,15 @@ onMounted(async () => {
   cleanupAudioListeners = attachGameEventListeners(socketApi);
   if (typeof window !== 'undefined' && window.location?.search) {
     try {
-      const p = new URLSearchParams(window.location.search).get('join') || new URLSearchParams(window.location.search).get('room');
-      if (p) initialRoomCode.value = p.toUpperCase();
-    } catch {
-      // Ignore
+      const roomParam = new URLSearchParams(window.location.search).get('join') || new URLSearchParams(window.location.search).get('room');
+      if (roomParam) {
+        initialRoomCode.value = roomParam.toUpperCase();
+      }
+    } catch (err) {
+      logger.debug('Failed to parse URL search params on mount', {
+        operation: 'app_mount_room_param',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
   try {
@@ -149,38 +211,145 @@ onUnmounted(() => {
   }
 });
 
-watch(() => currentRoom.value, (r) => {
-  if (!r) { setPlayerColor(null); resetGame(); return; }
-  if (r.game) syncGameState(r.game);
-  if (currentPlayer.value) { setPlayerColor(currentPlayer.value.color); orientation.value = currentPlayer.value.color; }
-  else if (socketId.value) { const c = r.whitePlayer?.socketId === socketId.value ? 'w' : (r.blackPlayer?.socketId === socketId.value ? 'b' : null); if (c) { setPlayerColor(c); orientation.value = c; } }
-  if (r.status === 'lobby' && isHost.value) showQrModal.value = true;
-}, { deep: true });
-watch(() => currentRoom.value?.status, (s, old) => { if (s === 'playing' && old === 'lobby') { showQrModal.value = false; playStart(); } });
-watch(() => lastGameOver.value, (g) => { if (g) { showGameOverModal.value = true; if (myColor.value && g.winner === myColor.value) { playVictory(); celebrate(); } else if (g.winner === 'draw') playDraw(); } });
-watch(() => kingInCheck.value, (c) => { if (c) playCheck(); });
+watch(
+  () => currentRoom.value,
+  (room) => {
+    if (!room) {
+      setPlayerColor(null);
+      resetGame();
+      return;
+    }
+    if (room.game) {
+      syncGameState(room.game);
+    }
+    if (currentPlayer.value) {
+      setPlayerColor(currentPlayer.value.color);
+      orientation.value = currentPlayer.value.color;
+    } else if (socketId.value) {
+      const assignedColor =
+        room.whitePlayer?.socketId === socketId.value
+          ? 'w'
+          : room.blackPlayer?.socketId === socketId.value
+            ? 'b'
+            : null;
+      if (assignedColor) {
+        setPlayerColor(assignedColor);
+        orientation.value = assignedColor;
+      }
+    }
+    if (room.status === 'lobby' && isHost.value) {
+      showQrModal.value = true;
+    }
+  },
+  { deep: true }
+);
+
+watch(
+  () => currentRoom.value?.status,
+  (newStatus, oldStatus) => {
+    if (newStatus === 'playing' && oldStatus === 'lobby') {
+      showQrModal.value = false;
+      playStart();
+    }
+  }
+);
+
+watch(
+  () => lastGameOver.value,
+  (gameOver) => {
+    if (gameOver) {
+      showGameOverModal.value = true;
+      if (myColor.value && gameOver.winner === myColor.value) {
+        playVictory();
+        celebrate();
+      } else if (gameOver.winner === 'draw') {
+        playDraw();
+      }
+    }
+  }
+);
+
+watch(
+  () => kingInCheck.value,
+  (isInCheck) => {
+    if (isInCheck) {
+      playCheck();
+    }
+  }
+);
 
 function handleNavbarBrandClick() {
-  if (currentRoom.value) handleLeaveRoom();
-  else { currentAppMode.value = 'lobby'; activeScenario.value = null; puzzleSubMode.value = 'hub'; }
+  if (currentRoom.value) {
+    handleLeaveRoom();
+  } else {
+    currentAppMode.value = 'lobby';
+    activeScenario.value = null;
+    puzzleSubMode.value = 'hub';
+  }
 }
-async function handleHostGame(p: { playerName: string; avatar?: string; preferredColor: 'w' | 'b' | 'random' }) {
-  if (p.avatar) { myPlayerAvatar.value = p.avatar; safeLocalStorage.safeSetItem(STORAGE_KEYS.PLAYER_AVATAR, p.avatar); }
+
+async function handleHostGame(payload: { playerName: string; avatar?: string; preferredColor: 'w' | 'b' | 'random' }) {
+  if (payload.avatar) {
+    myPlayerAvatar.value = payload.avatar;
+    safeLocalStorage.safeSetItem(STORAGE_KEYS.PLAYER_AVATAR, payload.avatar);
+  }
   isActionLoading.value = true;
-  try { const res = await createRoom(p.playerName, p.preferredColor, p.avatar); if (res.success) showQrModal.value = true; else { playError(); showNotification(res.error?.message || 'Unable to create room. Check your connection and try again.', 'error'); } } finally { isActionLoading.value = false; }
+  try {
+    const result = await createRoom(payload.playerName, payload.preferredColor, payload.avatar);
+    if (result.success) {
+      showQrModal.value = true;
+    } else {
+      playError();
+      showNotification(
+        result.error?.message || 'Unable to create room. Check your connection and try again.',
+        'error'
+      );
+    }
+  } finally {
+    isActionLoading.value = false;
+  }
 }
-async function handleJoinGame(p: { roomCode: string; playerName: string; avatar?: string }) {
-  if (p.avatar) { myPlayerAvatar.value = p.avatar; safeLocalStorage.safeSetItem(STORAGE_KEYS.PLAYER_AVATAR, p.avatar); }
+
+async function handleJoinGame(payload: { roomCode: string; playerName: string; avatar?: string }) {
+  if (payload.avatar) {
+    myPlayerAvatar.value = payload.avatar;
+    safeLocalStorage.safeSetItem(STORAGE_KEYS.PLAYER_AVATAR, payload.avatar);
+  }
   isActionLoading.value = true;
-  try { const res = await joinRoom(p.roomCode, p.playerName, p.avatar); if (!res.success) { playError(); showNotification(res.error?.message || 'Unable to join room. Check the 4-letter room code and try again.', 'error'); } } finally { isActionLoading.value = false; }
+  try {
+    const result = await joinRoom(payload.roomCode, payload.playerName, payload.avatar);
+    if (!result.success) {
+      playError();
+      showNotification(
+        result.error?.message || 'Unable to join room. Check the 4-letter room code and try again.',
+        'error'
+      );
+    }
+  } finally {
+    isActionLoading.value = false;
+  }
 }
+
 let isSubmittingMove = false;
-async function handleExecuteMove(m: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }) {
-  if (!currentRoom.value || isSubmittingMove) return;
+async function handleExecuteMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }) {
+  if (!currentRoom.value || isSubmittingMove) {
+    return;
+  }
   isSubmittingMove = true;
   try {
-    const res = await makeMove(currentRoom.value.roomCode, m);
-    if (res.success) { if (res.moveResult.captured) playCapture(); else playMove(); } else { playError(); if (currentRoom.value.game) syncGameState(currentRoom.value.game); }
+    const result = await makeMove(currentRoom.value.roomCode, move);
+    if (result.success) {
+      if (result.moveResult.captured) {
+        playCapture();
+      } else {
+        playMove();
+      }
+    } else {
+      playError();
+      if (currentRoom.value.game) {
+        syncGameState(currentRoom.value.game);
+      }
+    }
   } finally {
     isSubmittingMove = false;
   }
@@ -289,7 +458,7 @@ defineExpose({ showNotification, dismissNotification, isDarkMode, toggleTheme, c
       @promotion-select="completePromotion($event, handleExecuteMove)" @promotion-cancel="cancelPromotion"
       @request-rematch="requestRematch(currentRoom?.roomCode || '')" @accept-rematch="respondRematch(currentRoom?.roomCode || '', true); showGameOverModal = false;"
       @decline-rematch="respondRematch(currentRoom?.roomCode || '', false)" @leave-room="handleLeaveRoom"
-      @resolve-conflict="executeMerge" @dismiss-conflict="closeConflictModal" @prompt-install="promptInstall" @snooze-prompt="snoozePrompt"
+      @resolve-conflict="executeMerge" @cancel-conflict="closeConflictModal" @dismiss-conflict="closeConflictModal" @prompt-install="promptInstall" @snooze-prompt="snoozePrompt"
       @confirm-proceed="handleConfirmProceed" @confirm-cancel="handleConfirmCancel"
     />
     <!-- Contracts: data-testid="app-notification-banner", 'Flip board' 'Offer draw' 'Hide moves' : 'View moves' -->
@@ -298,26 +467,147 @@ defineExpose({ showNotification, dismissNotification, isDarkMode, toggleTheme, c
 </template>
 
 <style scoped>
-.app-shell { min-height: 100dvh; display: flex; flex-direction: column; background-color: var(--bg-app); width: 100%; max-width: 100vw; overflow-x: hidden; scrollbar-gutter: stable; }
-.app-viewport { display: flex; flex-direction: column; justify-content: flex-start; max-width: 880px; width: 100%; margin: 0 auto; box-sizing: border-box; overflow-x: hidden; padding: var(--space-4) var(--space-4) var(--space-8); }
-.skip-link { position: absolute; top: -120px; left: 50%; inset-inline-start: 50%; transform: translateX(-50%); background-color: var(--color-primary); color: var(--text-on-primary, #ffffff); padding: 8px 16px; border-radius: var(--radius-md, 12px); z-index: 1000; font-family: var(--font-display); font-weight: var(--weight-bold, 700); font-size: var(--text-sm, 14px); text-decoration: none; box-shadow: var(--shadow-lg); transition: top var(--duration-fast, 140ms) var(--ease-spring); }
-.skip-link:focus, .skip-link:focus-visible { top: 12px; outline: 2px solid var(--text-on-primary, #ffffff); outline-offset: 2px; }
-.navbar-brand:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.app-notification-banner { position: fixed; top: 68px; left: 50%; transform: translateX(-50%); z-index: var(--z-global-notification, 100); }
-.game-arena-container { position: relative; }
-.disconnect-warning-banner { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: var(--z-overlay-alert, 30); }
-.draw-offer-banner { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: var(--z-overlay-alert, 30); }
-.nav-icon-btn { min-width: 44px; min-height: 44px; height: 44px; }
-.navbar-brand { min-height: 44px; min-width: 44px; }
-.room-code-chip { min-height: 44px; min-width: 44px; }
-.nav-install-btn { min-height: 44px; min-width: 44px; }
-.notification-dismiss-btn { min-width: 44px; min-height: 44px; }
-.room-code-chip:active { transform: scale(0.96); }
-.navbar-brand:active { transform: scale(0.96); }
-.nav-install-btn:active { transform: scale(0.96); }
-.nav-icon-btn:active { transform: scale(0.96); }
-.notification-dismiss-btn:active { transform: scale(0.96); }
-.action-btn--subdued-danger { color: var(--color-danger); }
-@media (max-width: 640px) { .app-viewport { padding: var(--space-2); } }
-@media (max-width: 380px) { .app-viewport { padding: var(--space-1); } }
+.app-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-app);
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.app-viewport {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  max-width: 880px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  padding: var(--space-4) var(--space-4) var(--space-8);
+}
+
+.skip-link {
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  background-color: var(--color-primary);
+  color: var(--text-on-primary, #ffffff);
+  padding: 8px 16px;
+  border-radius: var(--radius-md, 12px);
+  z-index: 1000;
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold, 700);
+  font-size: var(--text-sm, 14px);
+  text-decoration: none;
+  box-shadow: var(--shadow-lg);
+  transition: top var(--duration-fast, 140ms) var(--ease-spring);
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 12px;
+  outline: 2px solid var(--text-on-primary, #ffffff);
+  outline-offset: 2px;
+}
+
+.navbar-brand:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.app-notification-banner {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-global-notification, 100);
+}
+
+.game-arena-container {
+  position: relative;
+}
+
+.disconnect-warning-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-alert, 30);
+}
+
+.draw-offer-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-overlay-alert, 30);
+}
+
+.nav-icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+}
+
+.navbar-brand {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.room-code-chip {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.nav-install-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.notification-dismiss-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.room-code-chip:active {
+  transform: scale(0.96);
+}
+
+.navbar-brand:active {
+  transform: scale(0.96);
+}
+
+.nav-install-btn:active {
+  transform: scale(0.96);
+}
+
+.nav-icon-btn:active {
+  transform: scale(0.96);
+}
+
+.notification-dismiss-btn:active {
+  transform: scale(0.96);
+}
+
+.action-btn--subdued-danger {
+  color: var(--color-danger);
+}
+
+@media (max-width: 640px) {
+  .app-viewport {
+    padding: var(--space-2);
+  }
+}
+
+@media (max-width: 380px) {
+  .app-viewport {
+    padding: var(--space-1);
+  }
+}
 </style>

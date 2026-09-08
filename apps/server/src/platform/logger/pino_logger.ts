@@ -102,3 +102,6 @@ export class PinoLogger implements Logger {
     return new PinoLogger(this.logger.child(bindings));
   }
 }
+
+export const defaultLogger: Logger = new PinoLogger();
+export const logger: Logger = defaultLogger;

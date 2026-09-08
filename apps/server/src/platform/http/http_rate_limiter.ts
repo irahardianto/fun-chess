@@ -42,6 +42,10 @@ export class HttpRateLimiter {
     return this.limiter.getRemaining(clientIp, now);
   }
 
+  public getLimitDescription(): string {
+    return this.limiter.getLimitDescription();
+  }
+
   public reset(clientIp: string): void {
     this.limiter.reset(clientIp);
   }

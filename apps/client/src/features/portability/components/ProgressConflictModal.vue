@@ -12,6 +12,7 @@ const props = withDefaults(
   defineProps<{
     modelValue?: boolean;
     currentProgress?: UnifiedProgressPayload | null;
+    localProgress?: UnifiedProgressPayload | null;
     incomingProgress?: UnifiedProgressPayload | null;
     diffPreview?: ProgressDiffPreview | null;
     loading?: boolean;
@@ -19,6 +20,7 @@ const props = withDefaults(
   {
     modelValue: false,
     currentProgress: null,
+    localProgress: null,
     incomingProgress: null,
     diffPreview: null,
     loading: false,
@@ -27,6 +29,9 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean];
+  'resolve-conflict': [strategy: SyncMergeStrategy];
+  'cancel-conflict': [];
+  close: [];
   resolve: [strategy: SyncMergeStrategy];
   merge: [strategy?: SyncMergeStrategy];
   replace: [strategy?: SyncMergeStrategy];
@@ -34,15 +39,23 @@ const emit = defineEmits<{
   closed: [];
 }>();
 
+const effectiveLocalProgress = computed(() => props.currentProgress || props.localProgress);
+
 const localStars = computed(() => {
-  if (!props.currentProgress?.scenarios) return 0;
-  return Object.values(props.currentProgress.scenarios).reduce(
+  if (props.diffPreview?.academy?.localTotalStars !== undefined) {
+    return props.diffPreview.academy.localTotalStars;
+  }
+  if (!effectiveLocalProgress.value?.scenarios) return 0;
+  return Object.values(effectiveLocalProgress.value.scenarios).reduce(
     (sum, sc) => sum + (sc.starsEarned || 0),
     0
   );
 });
 
 const incomingStars = computed(() => {
+  if (props.diffPreview?.academy?.incomingTotalStars !== undefined) {
+    return props.diffPreview.academy.incomingTotalStars;
+  }
   if (!props.incomingProgress?.scenarios) return 0;
   return Object.values(props.incomingProgress.scenarios).reduce(
     (sum, sc) => sum + (sc.starsEarned || 0),
@@ -50,24 +63,86 @@ const incomingStars = computed(() => {
   );
 });
 
+const mergedStars = computed(() => {
+  if (props.diffPreview?.academy?.mergedTotalStars !== undefined) {
+    return props.diffPreview.academy.mergedTotalStars;
+  }
+  return Math.max(localStars.value, incomingStars.value);
+});
+
+const starUpgrades = computed(() => {
+  return props.diffPreview?.academy?.starUpgrades ?? [];
+});
+
 const localRating = computed(() => {
-  return props.currentProgress?.puzzles?.ratingProfile?.rating ?? 800;
+  if (props.diffPreview?.puzzles?.localRating !== undefined) {
+    return props.diffPreview.puzzles.localRating;
+  }
+  return effectiveLocalProgress.value?.puzzles?.ratingProfile?.rating ?? 800;
 });
 
 const incomingRating = computed(() => {
+  if (props.diffPreview?.puzzles?.incomingRating !== undefined) {
+    return props.diffPreview.puzzles.incomingRating;
+  }
   return props.incomingProgress?.puzzles?.ratingProfile?.rating ?? 800;
 });
 
+const mergedRating = computed(() => {
+  if (props.diffPreview?.puzzles?.mergedRating !== undefined) {
+    return props.diffPreview.puzzles.mergedRating;
+  }
+  return Math.max(localRating.value, incomingRating.value);
+});
+
+const localPeakRating = computed(() => {
+  if (props.diffPreview?.puzzles?.localPeakRating !== undefined) {
+    return props.diffPreview.puzzles.localPeakRating;
+  }
+  return effectiveLocalProgress.value?.puzzles?.ratingProfile?.peakRating ?? localRating.value;
+});
+
+const incomingPeakRating = computed(() => {
+  if (props.diffPreview?.puzzles?.incomingPeakRating !== undefined) {
+    return props.diffPreview.puzzles.incomingPeakRating;
+  }
+  return props.incomingProgress?.puzzles?.ratingProfile?.peakRating ?? incomingRating.value;
+});
+
+const mergedPeakRating = computed(() => {
+  if (props.diffPreview?.puzzles?.mergedPeakRating !== undefined) {
+    return props.diffPreview.puzzles.mergedPeakRating;
+  }
+  return Math.max(localPeakRating.value, incomingPeakRating.value);
+});
+
 const localSolved = computed(() => {
-  return Object.keys(props.currentProgress?.puzzles?.solvedPuzzles || {}).length;
+  if (props.diffPreview?.puzzles?.localSolvedCount !== undefined) {
+    return props.diffPreview.puzzles.localSolvedCount;
+  }
+  return Object.keys(effectiveLocalProgress.value?.puzzles?.solvedPuzzles || {}).length;
 });
 
 const incomingSolved = computed(() => {
+  if (props.diffPreview?.puzzles?.incomingSolvedCount !== undefined) {
+    return props.diffPreview.puzzles.incomingSolvedCount;
+  }
   return Object.keys(props.incomingProgress?.puzzles?.solvedPuzzles || {}).length;
 });
 
+const mergedSolved = computed(() => {
+  if (props.diffPreview?.puzzles?.mergedSolvedCount !== undefined) {
+    return props.diffPreview.puzzles.mergedSolvedCount;
+  }
+  return Math.max(localSolved.value, incomingSolved.value);
+});
+
+const newPuzzlesSolvedCount = computed(() => {
+  return props.diffPreview?.puzzles?.newPuzzlesSolvedCount ?? 0;
+});
+
 const localStreak = computed(() => {
-  return props.currentProgress?.puzzles?.ratingProfile?.bestStreak ?? 0;
+  return effectiveLocalProgress.value?.puzzles?.ratingProfile?.bestStreak ?? 0;
 });
 
 const incomingStreak = computed(() => {
@@ -75,12 +150,14 @@ const incomingStreak = computed(() => {
 });
 
 function handleAction(strategy: SyncMergeStrategy) {
+  emit('resolve-conflict', strategy);
   emit('resolve', strategy);
   if (strategy === 'smart_merge') {
     emit('merge', strategy);
   } else if (strategy === 'replace_local') {
     emit('replace', strategy);
   } else if (strategy === 'keep_local') {
+    emit('cancel-conflict');
     emit('cancel');
   }
   emit('update:modelValue', false);
@@ -88,6 +165,9 @@ function handleAction(strategy: SyncMergeStrategy) {
 
 function handleClose() {
   emit('update:modelValue', false);
+  emit('cancel-conflict');
+  emit('cancel');
+  emit('close');
   emit('closed');
 }
 </script>
@@ -191,6 +271,31 @@ function handleClose() {
               <span>🔥 {{ incomingStreak }} Streak</span>
               <span v-if="incomingStreak > localStreak" class="stat-winner-badge">Best</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Projected Smart Merge Outcome Preview Card (design-ux.md §6) -->
+      <div class="merge-outcome-card merge-outcome-callout" data-testid="projected-merge-outcome">
+        <div class="merge-outcome-header">
+          <span class="merge-outcome-title">Projected Smart Merge Outcome ✨</span>
+          <span class="merge-outcome-badge">Safe Union</span>
+        </div>
+        <div class="merge-outcome-stats">
+          <div class="outcome-stat-pill">
+            <span class="outcome-stat-label">Stars</span>
+            <span class="outcome-stat-val">⭐ {{ mergedStars }}</span>
+            <span v-if="starUpgrades.length > 0" class="outcome-stat-delta">+{{ starUpgrades.length }} upgraded</span>
+          </div>
+          <div class="outcome-stat-pill">
+            <span class="outcome-stat-label">Rating</span>
+            <span class="outcome-stat-val">🎯 {{ mergedRating }}</span>
+            <span v-if="mergedPeakRating > mergedRating" class="outcome-stat-sub">Peak {{ mergedPeakRating }}</span>
+          </div>
+          <div class="outcome-stat-pill">
+            <span class="outcome-stat-label">Puzzles</span>
+            <span class="outcome-stat-val">🧩 {{ mergedSolved }}</span>
+            <span v-if="newPuzzlesSolvedCount > 0" class="outcome-stat-delta">+{{ newPuzzlesSolvedCount }} new</span>
           </div>
         </div>
       </div>
@@ -344,6 +449,90 @@ function handleClose() {
   color: var(--text-on-primary, #ffffff);
   padding: 2px 6px;
   border-radius: var(--radius-pill, 9999px);
+}
+
+.merge-outcome-card,
+.merge-outcome-callout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5, 10px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--stat-better-bg, rgba(16, 185, 129, 0.12));
+  border: 1.5px solid var(--stat-better-border, #10b981);
+  border-radius: var(--radius-xl, 22px);
+}
+
+.merge-outcome-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.merge-outcome-title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm, 14px);
+  font-weight: var(--weight-bold, 700);
+  color: var(--stat-better-text, #166534);
+}
+
+.merge-outcome-badge {
+  font-family: var(--font-display);
+  font-size: var(--text-xs, 11px);
+  font-weight: var(--weight-bold, 700);
+  background-color: var(--stat-better-badge, #047857);
+  color: var(--text-on-primary, #ffffff);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill, 9999px);
+}
+
+.merge-outcome-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2, 8px);
+}
+
+@media (max-width: 480px) {
+  .merge-outcome-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.outcome-stat-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 8px;
+  background-color: var(--bg-surface, #ffffff);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.outcome-stat-label {
+  font-family: var(--font-body);
+  font-size: var(--text-xs, 11px);
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.outcome-stat-val {
+  font-family: var(--font-display);
+  font-size: var(--text-sm, 14px);
+  font-weight: var(--weight-bold, 700);
+  color: var(--text-main, #0f172a);
+}
+
+.outcome-stat-delta {
+  font-family: var(--font-body);
+  font-size: var(--text-xs, 11px);
+  font-weight: var(--weight-semibold, 600);
+  color: var(--stat-better-text, #166534);
+}
+
+.outcome-stat-sub {
+  font-family: var(--font-body);
+  font-size: var(--text-xs, 11px);
+  color: var(--text-muted, #64748b);
 }
 
 .merge-info-callout {

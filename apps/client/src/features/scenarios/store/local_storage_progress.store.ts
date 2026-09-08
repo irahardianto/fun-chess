@@ -94,7 +94,12 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
         }
       }
       return result;
-    } catch {
+    } catch (err) {
+      logger.warn('Corrupted scenario progress JSON in storage', {
+        operation: 'scenario_get_progress_map',
+        storageKey: this.storageKey,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // Fall back safely to memory cache
       const result: ScenarioProgressMap = {};
       for (const [id, rec] of this.memoryFallback.entries()) {

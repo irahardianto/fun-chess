@@ -33,6 +33,18 @@ watch(
   }
 );
 
+watch(joinNickname, () => {
+  if (nicknameError.value) {
+    nicknameError.value = '';
+  }
+});
+
+watch(roomCode, () => {
+  if (localError.value) {
+    localError.value = '';
+  }
+});
+
 function onJoinSubmit() {
   nicknameError.value = '';
   localError.value = '';
@@ -66,7 +78,7 @@ function onJoinSubmit() {
       <BaseInput
         v-model="joinNickname"
         label="Your Nickname"
-        placeholder="e.g. ShadowBishop 🐼"
+        placeholder="e.g. ShadowBishop"
         :error="nicknameError"
         clearable
         data-testid="join-nickname-input"
@@ -127,7 +139,7 @@ function onJoinSubmit() {
 .card-badge {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  color: var(--color-accent-text, #92400e);
+  color: var(--color-accent-text);
   background-color: var(--color-accent-subtle);
   padding: 2px 8px;
   border-radius: var(--radius-pill);

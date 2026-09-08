@@ -10,6 +10,9 @@ import {
   SCENARIO_STORE_KEY,
   PUZZLE_STORE_KEY,
   PROGRESS_STORAGE_KEY,
+  FILE_DOWNLOADER_KEY,
+  HAPTICS_KEY,
+  WEBRTC_DISCOVERY_KEY,
   useInjectApiClient,
   useInjectStorage,
   useInjectSessionStorage,
@@ -18,17 +21,26 @@ import {
   useInjectScenarioStore,
   useInjectPuzzleStore,
   useInjectProgressStorage,
+  useInjectFileDownloader,
+  useInjectHaptics,
+  useInjectWebRtcDiscovery,
   registerDefaultDomainStores,
 } from '../index';
 import type { IApiClient } from '../../api/api_client.interface';
 import type { KeyValueStorage } from '../../storage/key_value_storage';
 import type { IAudioService } from '../../audio/audio.interface';
 import type { ILogger } from '../../telemetry';
+import type { IFileDownloader, IHapticsService, IWebRtcDiscovery } from '../../hardware';
 import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
 import { apiClient } from '../../api';
 import { safeLocalStorage, safeSessionStorage } from '../../storage';
 import { audioSynthesizer } from '../../audio/audio_synthesizer';
 import { logger } from '../../telemetry';
+import {
+  defaultFileDownloader,
+  defaultHapticsService,
+  defaultWebRtcDiscovery,
+} from '../../hardware';
 
 describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
   describe('Injection Keys Verification', () => {
@@ -41,6 +53,9 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       { name: 'SCENARIO_STORE_KEY', key: SCENARIO_STORE_KEY, expectedDesc: 'SCENARIO_STORE' },
       { name: 'PUZZLE_STORE_KEY', key: PUZZLE_STORE_KEY, expectedDesc: 'PUZZLE_STORE' },
       { name: 'PROGRESS_STORAGE_KEY', key: PROGRESS_STORAGE_KEY, expectedDesc: 'PROGRESS_STORAGE' },
+      { name: 'FILE_DOWNLOADER_KEY', key: FILE_DOWNLOADER_KEY, expectedDesc: 'FILE_DOWNLOADER' },
+      { name: 'HAPTICS_KEY', key: HAPTICS_KEY, expectedDesc: 'HAPTICS' },
+      { name: 'WEBRTC_DISCOVERY_KEY', key: WEBRTC_DISCOVERY_KEY, expectedDesc: 'WEBRTC_DISCOVERY' },
     ];
 
     it.each(tokens)('$name is a valid Symbol with expected description "$expectedDesc"', ({ key, expectedDesc }) => {
@@ -65,6 +80,9 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       const mockScenarioStore = { getProgressMap: () => Promise.resolve({}) } as unknown as ScenarioProgressStore;
       const mockPuzzleStore = { getProgress: () => Promise.resolve({}) } as unknown as PuzzleProgressStore;
       const mockProgressStorage = { getUnifiedProgress: () => Promise.resolve({}) } as unknown as ProgressStorage;
+      const mockFileDownloader = { download: () => {} } as unknown as IFileDownloader;
+      const mockHaptics = { vibrate: () => true, isSupported: () => true } as unknown as IHapticsService;
+      const mockWebRtcDiscovery = { discoverLocalIp: () => Promise.resolve('192.168.1.100') } as unknown as IWebRtcDiscovery;
 
       const app = createApp({});
       app.provide(API_CLIENT_KEY, mockApiClient);
@@ -75,6 +93,9 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       app.provide(SCENARIO_STORE_KEY, mockScenarioStore);
       app.provide(PUZZLE_STORE_KEY, mockPuzzleStore);
       app.provide(PROGRESS_STORAGE_KEY, mockProgressStorage);
+      app.provide(FILE_DOWNLOADER_KEY, mockFileDownloader);
+      app.provide(HAPTICS_KEY, mockHaptics);
+      app.provide(WEBRTC_DISCOVERY_KEY, mockWebRtcDiscovery);
 
       app.runWithContext(() => {
         expect(useInjectApiClient()).toBe(mockApiClient);
@@ -85,6 +106,9 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectScenarioStore()).toBe(mockScenarioStore);
         expect(useInjectPuzzleStore()).toBe(mockPuzzleStore);
         expect(useInjectProgressStorage()).toBe(mockProgressStorage);
+        expect(useInjectFileDownloader()).toBe(mockFileDownloader);
+        expect(useInjectHaptics()).toBe(mockHaptics);
+        expect(useInjectWebRtcDiscovery()).toBe(mockWebRtcDiscovery);
       });
     });
 
@@ -121,6 +145,9 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectSessionStorage()).toBe(safeSessionStorage);
         expect(useInjectAudioService()).toBe(audioSynthesizer);
         expect(useInjectLogger()).toBe(logger);
+        expect(useInjectFileDownloader()).toBe(defaultFileDownloader);
+        expect(useInjectHaptics()).toBe(defaultHapticsService);
+        expect(useInjectWebRtcDiscovery()).toBe(defaultWebRtcDiscovery);
       });
     });
 
@@ -132,6 +159,9 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       const customScenarioStore = { resetAllProgress: () => Promise.resolve() } as unknown as ScenarioProgressStore;
       const customPuzzleStore = { resetAll: () => Promise.resolve() } as unknown as PuzzleProgressStore;
       const customProgressStorage = { saveUnifiedProgress: () => Promise.resolve() } as unknown as ProgressStorage;
+      const customFileDownloader = { download: () => {} } as unknown as IFileDownloader;
+      const customHaptics = { vibrate: () => false, isSupported: () => false } as unknown as IHapticsService;
+      const customWebRtcDiscovery = { discoverLocalIp: () => Promise.resolve(null) } as unknown as IWebRtcDiscovery;
 
       const app = createApp({});
 
@@ -144,6 +174,9 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectScenarioStore(customScenarioStore)).toBe(customScenarioStore);
         expect(useInjectPuzzleStore(customPuzzleStore)).toBe(customPuzzleStore);
         expect(useInjectProgressStorage(customProgressStorage)).toBe(customProgressStorage);
+        expect(useInjectFileDownloader(customFileDownloader)).toBe(customFileDownloader);
+        expect(useInjectHaptics(customHaptics)).toBe(customHaptics);
+        expect(useInjectWebRtcDiscovery(customWebRtcDiscovery)).toBe(customWebRtcDiscovery);
       });
     });
 

@@ -523,7 +523,7 @@ describe("Room Socket Handlers", () => {
       expect(rateLimitAck.error.message).toContain("Rate limit exceeded for room reconnection");
     });
 
-    it("enforces rate limit across socket disconnections keyed by client IP (SEC-HIGH-001, MAJ-001)", async () => {
+    it("keys rate limits by (ip, socket.id) so co-located sockets on same IP are isolated (MAJ-003)", async () => {
       const sharedLimiter = new SocketRateLimiter({ maxRequests: 5, windowMs: 10_000 });
       const ip = "10.200.1.42";
 
@@ -551,6 +551,18 @@ describe("Room Socket Handlers", () => {
         expect(ack.success).toBe(true);
       }
 
+      // 6th attempt on socket1 must be rate limited
+      let socket1Ack: any;
+      await socket1.trigger(
+        "room:create",
+        { playerName: "UserExceeded", preferredColor: "w" },
+        (res) => {
+          socket1Ack = res;
+        },
+      );
+      expect(socket1Ack.success).toBe(false);
+      expect(socket1Ack.error.code).toBe("ERR_RATE_LIMITED");
+
       // Socket1 disconnects
       await handleSocketDisconnect(
         io as unknown as TypedSocketServer,
@@ -561,7 +573,7 @@ describe("Room Socket Handlers", () => {
         sharedLimiter,
       );
 
-      // Socket2 connects with NEW socket ID but SAME client IP
+      // Socket2 connects with NEW socket ID but SAME client IP (e.g. co-located LAN player)
       const socket2 = new TestSocket("sock_ephemeral_2");
       socket2.handshake.address = ip;
 
@@ -573,18 +585,17 @@ describe("Room Socket Handlers", () => {
         sharedLimiter,
       );
 
-      // Attempt on socket2 must STILL be rate limited because IP is blocked
-      let rateLimitAck: any;
+      // Attempt on socket2 must SUCCEED because rate limit is keyed by (ip, socket.id) (MAJ-003)
+      let socket2Ack: any;
       await socket2.trigger(
         "room:create",
-        { playerName: "AttackerNewSocket", preferredColor: "w" },
+        { playerName: "ColocatedPlayer", preferredColor: "w" },
         (res) => {
-          rateLimitAck = res;
+          socket2Ack = res;
         },
       );
 
-      expect(rateLimitAck.success).toBe(false);
-      expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
+      expect(socket2Ack.success).toBe(true);
     });
   });
 

@@ -9,7 +9,8 @@ const LOG_LEVEL_SEVERITY: Record<LogLevel, number> = {
   none: 5,
 };
 
-const SENSITIVE_KEY_REGEX = /password|token|sessionToken|secret|authorization/i;
+export const SENSITIVE_KEY_REGEX =
+  /password|token|sessionToken|secret|key|authorization|bearer|cookie|apiKey|credential/i;
 
 /**
  * Recursively scrubs sensitive values from objects and arrays with circular reference protection.

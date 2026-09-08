@@ -5,6 +5,7 @@ import type {
   Puzzle,
   PlayerMoveAction,
   MoveValidationOutcome,
+  PuzzleStepExplanation,
 } from '@fun-chess/shared';
 import {
   generateMistakeRefutation,
@@ -13,6 +14,7 @@ import {
 } from './puzzle_analysis_engine';
 
 import { formatPlayerMoveToUci, parseUciMove } from '@fun-chess/shared';
+import { logger } from '../../../platform/telemetry/index.js';
 export { formatPlayerMoveToUci, parseUciMove };
 
 /**
@@ -25,7 +27,14 @@ export function isPawnPromotionMove(fen: string, from: Square, to: Square): bool
     if (!piece || piece.type !== 'p') return false;
     const toRank = to.charAt(1);
     return (piece.color === 'w' && toRank === '8') || (piece.color === 'b' && toRank === '1');
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to inspect pawn promotion move', {
+      operation: 'puzzle_is_pawn_promotion',
+      fen,
+      from,
+      to,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return false;
   }
 }
@@ -41,7 +50,13 @@ export function getLegalMovesForSquare(fen: string, square: Square): Square[] {
       verbose: true,
     });
     return moves.map((m) => m.to as Square);
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to get legal moves for square', {
+      operation: 'puzzle_get_legal_moves',
+      fen,
+      square,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return [];
   }
 }
@@ -54,7 +69,14 @@ export function isPieceOfColor(fen: string, square: Square, color: PieceColor): 
     const chess = new Chess(fen);
     const piece = chess.get(square as unknown as import('chess.js').Square);
     return Boolean(piece && piece.color === color);
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to inspect piece color', {
+      operation: 'puzzle_is_piece_of_color',
+      fen,
+      square,
+      color,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return false;
   }
 }
@@ -103,7 +125,12 @@ export function validatePuzzleMove(
   let chess: Chess;
   try {
     chess = new Chess(currentFen);
-  } catch {
+  } catch (err) {
+    logger.warn('Corrupted board state in validatePuzzleMove', {
+      operation: 'puzzle_validate_move_fen',
+      currentFen,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return {
       isCorrect: false,
       isPuzzleComplete: false,
@@ -120,7 +147,12 @@ export function validatePuzzleMove(
       to: playerMove.to as unknown as import('chess.js').Square,
       promotion: playerMove.promotion,
     });
-  } catch {
+  } catch (err) {
+    logger.debug('Illegal player move in validatePuzzleMove', {
+      operation: 'puzzle_validate_player_move',
+      playerMove,
+      error: err instanceof Error ? err.message : String(err),
+    });
     playerResult = null;
   }
 
@@ -128,42 +160,11 @@ export function validatePuzzleMove(
   // If the player proposes a legal move delivering immediate checkmate, accept it
   // as a valid checkmate completion even if it differs from the expected UCI line.
   if (playerResult && chess.isCheckmate() && (!matchesExpected || currentMoveIndex + 1 < puzzle.moves.length)) {
-    const finalFen = chess.fen();
-    const stepNarratives = puzzle.stepExplanations ?? generateStepBreakdowns(puzzle);
-    const stepExplanation = stepNarratives[currentMoveIndex] ?? {
-      plyIndex: currentMoveIndex,
-      moveSan: playerResult.san,
-      moveUci: playerUci,
-      actor: puzzle.playerColor,
-      explanation: `Plays ${playerResult.san} delivering checkmate! 👑`,
-    };
-    const analysis = analyzePuzzleSolution(puzzle);
-
-    return {
-      isCorrect: true,
-      isPuzzleComplete: true,
-      intermediateFen: finalFen,
-      nextFen: finalFen,
-      nextMoveIndex: puzzle.moves.length,
-      feedback: 'Brilliant! You found a checkmate! 🎉',
-      stepExplanation,
-      analysis,
-    };
+    return handleImmediateCheckmateSolution(puzzle, currentMoveIndex, playerResult, playerUci, chess);
   }
 
   if (!matchesExpected) {
-    const refutation = generateMistakeRefutation(currentFen, playerMove);
-    const feedback = refutation
-      ? `Not quite! ${refutation.kidFriendlyExplanation}`
-      : 'Not quite! Look closer for the best tactical move.';
-    return {
-      isCorrect: false,
-      isPuzzleComplete: false,
-      nextFen: currentFen,
-      nextMoveIndex: currentMoveIndex,
-      feedback,
-      refutation: refutation ?? undefined,
-    };
+    return handleUnexpectedMove(currentFen, currentMoveIndex, playerMove);
   }
 
   if (!playerResult) {
@@ -179,6 +180,11 @@ export function validatePuzzleMove(
   const intermediateFen = chess.fen();
   const nextMoveIdx = currentMoveIndex + 1;
 
+  // Case 1: Player executed the final ply of the puzzle
+  if (nextMoveIdx >= puzzle.moves.length) {
+    return handleFinalPlySolution(puzzle, currentMoveIndex, playerResult, expectedUci, intermediateFen);
+  }
+
   // Step explanation for this ply
   const stepNarratives = puzzle.stepExplanations ?? generateStepBreakdowns(puzzle);
   const stepExplanation = stepNarratives[currentMoveIndex] ?? {
@@ -189,22 +195,109 @@ export function validatePuzzleMove(
     explanation: `Plays ${playerResult.san} accurately!`,
   };
 
-  // Case 1: Player executed the final ply of the puzzle
-  if (nextMoveIdx >= puzzle.moves.length) {
-    const analysis = analyzePuzzleSolution(puzzle);
-    return {
-      isCorrect: true,
-      isPuzzleComplete: true,
-      intermediateFen,
-      nextFen: intermediateFen,
-      nextMoveIndex: nextMoveIdx,
-      feedback: 'Brilliant! You solved the puzzle! 🎉',
-      stepExplanation,
-      analysis,
-    };
-  }
-
   // Case 2: Multi-ply puzzle! Automated opponent response needed
+  return handleOpponentCounterReply(puzzle, nextMoveIdx, chess, intermediateFen, stepExplanation);
+}
+
+/**
+ * Handles sound checkmate acceptance where the player's legal move delivers immediate checkmate,
+ * completing the puzzle even if differing from the expected solution line.
+ */
+export function handleImmediateCheckmateSolution(
+  puzzle: Puzzle,
+  currentMoveIndex: number,
+  playerResult: Move,
+  playerUci: string,
+  chess: Chess
+): MoveValidationOutcome {
+  const finalFen = chess.fen();
+  const stepNarratives = puzzle.stepExplanations ?? generateStepBreakdowns(puzzle);
+  const stepExplanation = stepNarratives[currentMoveIndex] ?? {
+    plyIndex: currentMoveIndex,
+    moveSan: playerResult.san,
+    moveUci: playerUci,
+    actor: puzzle.playerColor,
+    explanation: `Plays ${playerResult.san} delivering checkmate! 👑`,
+  };
+  const analysis = analyzePuzzleSolution(puzzle);
+
+  return {
+    isCorrect: true,
+    isPuzzleComplete: true,
+    intermediateFen: finalFen,
+    nextFen: finalFen,
+    nextMoveIndex: puzzle.moves.length,
+    feedback: 'Brilliant! You found a checkmate! 🎉',
+    stepExplanation,
+    analysis,
+  };
+}
+
+/**
+ * Handles unexpected or incorrect player moves with tactical refutation feedback.
+ */
+export function handleUnexpectedMove(
+  currentFen: string,
+  currentMoveIndex: number,
+  playerMove: PlayerMoveAction
+): MoveValidationOutcome {
+  const refutation = generateMistakeRefutation(currentFen, playerMove);
+  const feedback = refutation
+    ? `Not quite! ${refutation.kidFriendlyExplanation}`
+    : 'Not quite! Look closer for the best tactical move.';
+
+  return {
+    isCorrect: false,
+    isPuzzleComplete: false,
+    nextFen: currentFen,
+    nextMoveIndex: currentMoveIndex,
+    feedback,
+    refutation: refutation ?? undefined,
+  };
+}
+
+/**
+ * Handles final ply completion when player executes the decisive move of the puzzle.
+ */
+export function handleFinalPlySolution(
+  puzzle: Puzzle,
+  currentMoveIndex: number,
+  playerResult: Move,
+  expectedUci: string,
+  intermediateFen: string
+): MoveValidationOutcome {
+  const stepNarratives = puzzle.stepExplanations ?? generateStepBreakdowns(puzzle);
+  const stepExplanation = stepNarratives[currentMoveIndex] ?? {
+    plyIndex: currentMoveIndex,
+    moveSan: playerResult.san,
+    moveUci: expectedUci,
+    actor: puzzle.playerColor,
+    explanation: `Plays ${playerResult.san} accurately!`,
+  };
+  const analysis = analyzePuzzleSolution(puzzle);
+
+  return {
+    isCorrect: true,
+    isPuzzleComplete: true,
+    intermediateFen,
+    nextFen: intermediateFen,
+    nextMoveIndex: currentMoveIndex + 1,
+    feedback: 'Brilliant! You solved the puzzle! 🎉',
+    stepExplanation,
+    analysis,
+  };
+}
+
+/**
+ * Handles multi-ply puzzle progression by executing the automated opponent counter-response.
+ */
+export function handleOpponentCounterReply(
+  puzzle: Puzzle,
+  nextMoveIdx: number,
+  chess: Chess,
+  intermediateFen: string,
+  stepExplanation: PuzzleStepExplanation
+): MoveValidationOutcome {
   const opponentUci = puzzle.moves[nextMoveIdx];
   if (!opponentUci) {
     const analysis = analyzePuzzleSolution(puzzle);
@@ -228,7 +321,12 @@ export function validatePuzzleMove(
       to: oppParsed.to as unknown as import('chess.js').Square,
       promotion: oppParsed.promotion,
     });
-  } catch {
+  } catch (err) {
+    logger.warn('Failed to execute opponent puzzle move from UCI', {
+      operation: 'puzzle_validate_opponent_move',
+      opponentUci,
+      error: err instanceof Error ? err.message : String(err),
+    });
     oppResult = null;
   }
 

@@ -1,4 +1,8 @@
-import { LanInfoResponse, HealthCheckResponse } from "@fun-chess/shared";
+import type {
+  LanInfoResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
+} from "@fun-chess/shared";
 
 export interface HttpResponse<T> {
   status: number;
@@ -20,9 +24,33 @@ export async function fetchLanInfo(
 
 export async function fetchHealth(
   baseUrl: string,
-): Promise<HttpResponse<HealthCheckResponse>> {
+): Promise<HttpResponse<LivenessHealthResponse>> {
   const res = await fetch(`${baseUrl}/api/health`);
-  const data = (await res.json()) as HealthCheckResponse;
+  const data = (await res.json()) as LivenessHealthResponse;
+  return {
+    status: res.status,
+    headers: res.headers,
+    data,
+  };
+}
+
+export async function fetchMetrics(
+  baseUrl: string,
+): Promise<HttpResponse<DetailedHealthResponse>> {
+  const res = await fetch(`${baseUrl}/metrics`);
+  const data = (await res.json()) as DetailedHealthResponse;
+  return {
+    status: res.status,
+    headers: res.headers,
+    data,
+  };
+}
+
+export async function fetchHealthDetail(
+  baseUrl: string,
+): Promise<HttpResponse<DetailedHealthResponse>> {
+  const res = await fetch(`${baseUrl}/health/detail`);
+  const data = (await res.json()) as DetailedHealthResponse;
   return {
     status: res.status,
     headers: res.headers,

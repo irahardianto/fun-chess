@@ -1,11 +1,16 @@
 import { test, expect } from '@playwright/test';
-import { HealthCheckResponseSchema, type HealthCheckResponse } from '@fun-chess/shared';
+import {
+  LivenessHealthResponseSchema,
+  DetailedHealthResponseSchema,
+  type LivenessHealthResponse,
+  type DetailedHealthResponse,
+} from '@fun-chess/shared';
 import { getApiBaseUrl, EXPECTED_SECURITY_HEADERS } from './api_test_helper.js';
 
-test.describe('Health Check API (/health, /api/health, /healthz)', () => {
+test.describe('Health Check API (/health, /api/health, /healthz, /metrics, /health/detail)', () => {
   const baseUrl = getApiBaseUrl();
 
-  test('GET /health returns 200 OK and satisfies HealthCheckResponse schema contract', async ({ request }) => {
+  test('GET /health returns 200 OK and satisfies LivenessHealthResponse schema contract (ENH-003)', async ({ request }) => {
     // Act
     const response = await request.get(`${baseUrl}/health`);
 
@@ -15,11 +20,11 @@ test.describe('Health Check API (/health, /api/health, /healthz)', () => {
 
     // Assert: Contract Schema Validation via Zod
     const body: unknown = await response.json();
-    const parseResult = HealthCheckResponseSchema.safeParse(body);
+    const parseResult = LivenessHealthResponseSchema.safeParse(body);
     expect(parseResult.success, `Schema validation failed: ${JSON.stringify(parseResult)}`).toBe(true);
 
-    // Assert: Structural invariants per .agentwork/api_contracts.md
-    const health = body as HealthCheckResponse;
+    // Assert: Structural invariants per .agentwork/api_contracts.md §5.3
+    const health = body as LivenessHealthResponse;
     expect(['ok', 'degraded']).toContain(health.status);
     expect(typeof health.uptimeSeconds).toBe('number');
     expect(health.uptimeSeconds).toBeGreaterThanOrEqual(0);
@@ -29,44 +34,14 @@ test.describe('Health Check API (/health, /api/health, /healthz)', () => {
     const parsedDate = new Date(health.timestamp);
     expect(Number.isNaN(parsedDate.getTime())).toBe(false);
 
-    // Validate active counters
-    expect(Number.isInteger(health.activeRooms)).toBe(true);
-    expect(health.activeRooms).toBeGreaterThanOrEqual(0);
-    expect(Number.isInteger(health.activeSockets)).toBe(true);
-    expect(health.activeSockets).toBeGreaterThanOrEqual(0);
-
-    // Validate memory telemetry structure
-    expect(typeof health.memoryUsageMb).toBe('object');
-    expect(health.memoryUsageMb).not.toBeNull();
-    expect(typeof health.memoryUsageMb.rss).toBe('number');
-    expect(health.memoryUsageMb.rss).toBeGreaterThanOrEqual(0);
-    expect(typeof health.memoryUsageMb.heapTotal).toBe('number');
-    expect(health.memoryUsageMb.heapTotal).toBeGreaterThanOrEqual(0);
-    expect(typeof health.memoryUsageMb.heapUsed).toBe('number');
-    expect(health.memoryUsageMb.heapUsed).toBeGreaterThanOrEqual(0);
-
-    // Enforce consistency: in production mode memory telemetry is redacted to zeros [MIN-001],
-    // while non-production telemetry reports non-zero positive numbers.
-    if (health.memoryUsageMb.rss === 0) {
-      expect(health.memoryUsageMb.heapTotal).toBe(0);
-      expect(health.memoryUsageMb.heapUsed).toBe(0);
-    } else {
-      expect(health.memoryUsageMb.heapTotal).toBeGreaterThan(0);
-      expect(health.memoryUsageMb.heapUsed).toBeGreaterThan(0);
-    }
-
-    // Validate relay mode if present
-    if (health.relay) {
-      const relay = health.relay;
-      expect(['cloud', 'lan']).toContain(relay.mode);
-      if (relay.publicUrl) {
-        const publicUrl = relay.publicUrl;
-        expect(() => new URL(publicUrl)).not.toThrow();
-      }
-    }
+    // Ensure operational metrics are NOT leaked on unauthenticated /health (ENH-003)
+    const anyBody = body as Record<string, unknown>;
+    expect(anyBody['activeRooms']).toBeUndefined();
+    expect(anyBody['activeSockets']).toBeUndefined();
+    expect(anyBody['memoryUsageMb']).toBeUndefined();
   });
 
-  test('GET /api/health alias endpoint returns 200 OK matching /health structure', async ({ request }) => {
+  test('GET /api/health alias endpoint returns 200 OK matching /health structure (ENH-003)', async ({ request }) => {
     // Act
     const response = await request.get(`${baseUrl}/api/health`);
 
@@ -75,13 +50,41 @@ test.describe('Health Check API (/health, /api/health, /healthz)', () => {
     expect(response.headers()['content-type']).toContain('application/json');
 
     const body: unknown = await response.json();
-    const parseResult = HealthCheckResponseSchema.safeParse(body);
+    const parseResult = LivenessHealthResponseSchema.safeParse(body);
     expect(parseResult.success).toBe(true);
 
-    const health = body as HealthCheckResponse;
+    const health = body as LivenessHealthResponse;
     expect(['ok', 'degraded']).toContain(health.status);
     expect(health.uptimeSeconds).toBeGreaterThanOrEqual(0);
-    expect(health.memoryUsageMb.rss).toBeGreaterThanOrEqual(0);
+  });
+
+  test('GET /metrics returns 200 OK and satisfies DetailedHealthResponse schema contract (ENH-003)', async ({ request }) => {
+    const response = await request.get(`${baseUrl}/metrics`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('application/json');
+
+    const body: unknown = await response.json();
+    const parseResult = DetailedHealthResponseSchema.safeParse(body);
+    expect(parseResult.success, `Schema validation failed: ${JSON.stringify(parseResult)}`).toBe(true);
+
+    const detailed = body as DetailedHealthResponse;
+    expect(['ok', 'degraded']).toContain(detailed.status);
+    expect(typeof detailed.uptimeSeconds).toBe('number');
+    expect(detailed.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(Number.isInteger(detailed.activeRooms)).toBe(true);
+    expect(Number.isInteger(detailed.activeSockets)).toBe(true);
+    expect(typeof detailed.memoryUsageMb).toBe('object');
+    expect(detailed.memoryUsageMb).not.toBeNull();
+  });
+
+  test('GET /health/detail returns 200 OK and satisfies DetailedHealthResponse schema contract (ENH-003)', async ({ request }) => {
+    const response = await request.get(`${baseUrl}/health/detail`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('application/json');
+
+    const body: unknown = await response.json();
+    const parseResult = DetailedHealthResponseSchema.safeParse(body);
+    expect(parseResult.success).toBe(true);
   });
 
   test('GET /healthz returns 200 OK with plain text "OK" for container orchestrator probes', async ({ request }) => {
@@ -120,8 +123,10 @@ test.describe('Health Check API (/health, /api/health, /healthz)', () => {
   });
 
   test('GET /health returns all mandatory security headers and correlation ID', async ({ request }) => {
-    // Act
-    const response = await request.get(`${baseUrl}/health`);
+    // Act: Send with x-forwarded-proto: https to verify full security headers suite including HSTS
+    const response = await request.get(`${baseUrl}/health`, {
+      headers: { 'x-forwarded-proto': 'https' },
+    });
     const headers = response.headers();
 
     // Assert: Standard security headers per .agentwork/api_contracts.md §5.1

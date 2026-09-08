@@ -34,6 +34,10 @@ export function safeParseUrl(input: string | undefined): URL | undefined {
 }
 
 export const ServerEnvSchema = BaseServerEnvSchema.extend({
+  CLIENT_DIST_PATH: z.preprocess(
+    emptyStringToUndefined,
+    z.string().optional(),
+  ),
   TRUST_PROXY: z.preprocess((val) => {
     if (typeof val === "boolean") return val;
     if (typeof val === "string") return val.toLowerCase() === "true" || val === "1";
@@ -141,11 +145,14 @@ export function resolveAllowedOrigins(env?: Partial<ServerEnv>): string[] {
  */
 export function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
   if (!origin) return true; // Same-origin or non-browser/server-to-server request
-  const normalizedOrigin = origin.trim().replace(/\/+$/, "");
+  const normalizedOrigin = origin.trim().replace(/\/+$/, "").toLowerCase();
   return (
     allowedOrigins.includes("*") ||
-    allowedOrigins.includes(origin) ||
-    allowedOrigins.includes(normalizedOrigin)
+    allowedOrigins.some((allowed) => {
+      if (allowed === "*") return true;
+      const normalizedAllowed = allowed.trim().replace(/\/+$/, "").toLowerCase();
+      return normalizedAllowed === normalizedOrigin;
+    })
   );
 }
 
@@ -163,3 +170,5 @@ export function loadServerConfig(rawEnv: Record<string, unknown> = process.env):
   }
   return result.data;
 }
+
+export const validateServerConfig = loadServerConfig;

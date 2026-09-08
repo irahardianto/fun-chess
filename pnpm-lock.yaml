@@ -132,6 +132,9 @@ importers:
       pino-pretty:
         specifier: 13.0.0
         version: 13.0.0
+      socket.io-client:
+        specifier: 4.8.1
+        version: 4.8.1
       tsx:
         specifier: 4.19.3
         version: 4.19.3

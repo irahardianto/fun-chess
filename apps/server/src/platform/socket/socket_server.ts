@@ -32,18 +32,16 @@ export function createSocketServer(
   const corsOrigin =
     allowedOrigins.includes("*")
       ? "*"
-      : allowedOrigins.length === 1
-        ? allowedOrigins[0]
-        : (
-            origin: string | undefined,
-            callback: (err: Error | null, success?: boolean) => void,
-          ) => {
-            if (isOriginAllowed(origin, allowedOrigins)) {
-              callback(null, true);
-            } else {
-              callback(new Error(`CORS origin not allowed: ${origin}`), false);
-            }
-          };
+      : (
+          origin: string | undefined,
+          callback: (err: Error | null, success?: boolean) => void,
+        ) => {
+          if (isOriginAllowed(origin, allowedOrigins)) {
+            callback(null, true);
+          } else {
+            callback(new Error(`CORS origin not allowed: ${origin}`), false);
+          }
+        };
 
   const { allowedOrigins: _omit, logger, env: _env, ...ioOptions } = customOptions || {};
 
@@ -53,6 +51,14 @@ export function createSocketServer(
       cors: {
         origin: corsOrigin,
         methods: ["GET", "POST"],
+      },
+      allowRequest: (req, callback) => {
+        const origin = req.headers.origin;
+        if (isOriginAllowed(origin, allowedOrigins)) {
+          callback(null, true);
+        } else {
+          callback(3 as unknown as string, false);
+        }
       },
       pingInterval: 25000,
       pingTimeout: 20000,

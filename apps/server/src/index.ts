@@ -3,40 +3,46 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import {
-  loadServerConfig,
+  validateServerConfig,
   resolveAllowedOrigins,
   type ServerEnv,
 } from "./platform/config/index.js";
-import { PinoLogger } from "./platform/logger/pino_logger.js";
-import { Logger } from "./platform/logger/logger.interface.js";
-import { runLoggedJob } from "./platform/logger/job_runner.js";
-import { createHttpServer } from "./platform/http/http_server.js";
+import {
+  PinoLogger,
+  type Logger,
+  runLoggedJob,
+} from "./platform/logger/index.js";
+import { createHttpServer } from "./platform/http/index.js";
 import {
   createSocketServer,
+  createSocketRateLimiter,
   type TypedSocketServer,
-} from "./platform/socket/socket_server.js";
+  type SocketRateLimiter,
+} from "./platform/socket/index.js";
 import {
   ShutdownCoordinator,
   type ShutdownCoordinatorOptions,
-} from "./platform/lifecycle/shutdown_coordinator.js";
+} from "./platform/lifecycle/index.js";
+import {
+  SystemClock,
+  UuidGenerator,
+} from "./platform/time/index.js";
+import type { IClock, IIdGenerator } from "@fun-chess/shared";
 import {
   InMemoryRoomStore,
+  type RoomStore,
   RoomService,
   clearAllDisconnectTimers,
   defaultDisconnectTimerRegistry,
   type IDisconnectTimerRegistry,
-} from "./features/rooms/index.js";
-import { GameService } from "./features/game/index.js";
-import { RelayAddressService } from "./features/lan/index.js";
-import {
   registerRoomSocketHandlers,
   handleSocketDisconnect,
-} from "./features/rooms/room.socket_handler.js";
-import { registerGameSocketHandlers } from "./features/game/game.socket_handler.js";
+} from "./features/rooms/index.js";
 import {
-  createSocketRateLimiter,
-  type SocketRateLimiter,
-} from "./platform/socket/socket_rate_limiter.js";
+  GameService,
+  registerGameSocketHandlers,
+} from "./features/game/index.js";
+import { RelayAddressService } from "./features/lan/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,7 +52,9 @@ export interface StartServerOptions {
   port?: number;
   host?: string;
   logger?: Logger;
-  roomStore?: InMemoryRoomStore;
+  roomStore?: RoomStore;
+  clock?: IClock;
+  idGenerator?: IIdGenerator;
   distPath?: string;
   autoListen?: boolean;
   timerRegistry?: IDisconnectTimerRegistry;
@@ -57,7 +65,7 @@ export interface ServerInstance {
   server: http.Server;
   io: TypedSocketServer;
   shutdownCoordinator: ShutdownCoordinator;
-  roomStore: InMemoryRoomStore;
+  roomStore: RoomStore;
   roomService: RoomService;
   gameService: GameService;
   rateLimiter: SocketRateLimiter;
@@ -73,20 +81,20 @@ export interface ServerInstance {
  * Returns running ServerInstance with lifecycle handles (MAJ-033).
  */
 export async function startServer(options: StartServerOptions = {}): Promise<ServerInstance> {
-  // 1. Centralized Fail-Fast Environment Validation (MAJ-015, MAJ-016, MAJ-004)
-  const baseConfig = loadServerConfig(process.env);
-  const env: ServerEnv = {
-    ...baseConfig,
+  // 1. Centralized Fail-Fast Environment Validation (MAJ-015, MAJ-016, MAJ-004, MAJ-001, SEC-RT-003)
+  const rawMerged: Record<string, unknown> = {
+    ...process.env,
     ...(options.config || {}),
   };
 
   if (options.port !== undefined) {
-    (env as any).PORT = options.port;
+    rawMerged.PORT = options.port;
   }
   if (options.host !== undefined) {
-    (env as any).HOST = options.host;
+    rawMerged.HOST = options.host;
   }
 
+  const env: ServerEnv = validateServerConfig(rawMerged);
   const allowedOrigins = resolveAllowedOrigins(env);
 
   const logger =
@@ -98,9 +106,13 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
   const port = options.port ?? env.PORT;
   const host = options.host ?? env.HOST;
   const isProduction = env.NODE_ENV === "production";
-  const distPath = options.distPath ?? path.resolve(__dirname, "../../client/dist");
+  const distPath =
+    options.distPath ?? env.CLIENT_DIST_PATH ?? path.resolve(__dirname, "../../client/dist");
 
+  const bootstrapCorrelationId = randomUUID();
   logger.info("Initializing Fun Chess server bootstrap...", {
+    operation: "server_bootstrap_init",
+    correlationId: bootstrapCorrelationId,
     port,
     host,
     nodeEnv: env.NODE_ENV,
@@ -111,14 +123,16 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
   // 2. Instantiate Storage Adapters & Domain Services
   const timerRegistry = options.timerRegistry ?? defaultDisconnectTimerRegistry;
   const roomStore = options.roomStore ?? new InMemoryRoomStore();
+  const clock = options.clock ?? new SystemClock();
+  const idGenerator = options.idGenerator ?? new UuidGenerator();
   const roomService = new RoomService(
     roomStore,
     undefined,
-    undefined,
-    undefined,
+    clock,
+    idGenerator,
     timerRegistry,
   );
-  const gameService = new GameService(roomStore);
+  const gameService = new GameService(roomStore, clock, idGenerator);
   const relayAddressService = new RelayAddressService({
     publicUrl: env.PUBLIC_URL,
     host: env.HOST,
@@ -195,7 +209,14 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
       rateLimiter,
       timerRegistry,
     );
-    registerGameSocketHandlers(io, socket, gameService, logger, rateLimiter);
+    registerGameSocketHandlers(
+      io,
+      socket,
+      gameService,
+      logger,
+      rateLimiter,
+      timerRegistry,
+    );
 
     // CRIT-003 & MAJ-025: Wrap async disconnect listener in try/catch with structured error log
     socket.on("disconnect", async (reason) => {
@@ -239,15 +260,22 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
       try {
         await runLoggedJob(logger, "room_cleanup", async () => {
           const count = await roomService.cleanupAbandonedRooms(10 * 60 * 1000);
-          const sessionsCleaned = await roomService.cleanupExpiredSessions();
-          return { cleanedCount: count, cleanedSessions: sessionsCleaned };
+          return { cleanedCount: count };
         });
-      } catch {
-        // Error is logged by runLoggedJob; do not trigger unhandled rejection
+      } catch (err) {
+        // Log scheduled job error explicitly (no silent catches)
+        logger.debug("Scheduled room_cleanup caught rejection", {
+          operation: "room_cleanup",
+          error:
+            err instanceof Error
+              ? { name: err.name, message: err.message }
+              : { raw: err },
+        });
       }
     },
     5 * 60 * 1000,
   );
+  cleanupInterval.unref?.();
 
   // 7. Graceful Process Termination & Crash Guards (CRIT-002, CRIT-003, ENH-008, ENH-011, MAJ-010, MIN-013)
   const onExit =
@@ -309,8 +337,8 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
       localUrl: addrInfo.localUrl,
     });
 
-    // Suppress ASCII banner in production and test
-    if (!isProduction && env.NODE_ENV !== "test") {
+    // Suppress ASCII banner in production, test, and non-interactive (non-TTY) sessions (ENH-006)
+    if (!isProduction && env.NODE_ENV !== "test" && Boolean(process.stdout.isTTY)) {
       console.log(`
 ============================================================
   ♞ FUN CHESS ${addrInfo.relayMode === "cloud" ? "CLOUD RELAY" : "LOCAL LAN"} SERVER IS RUNNING!
@@ -366,8 +394,14 @@ const isMain =
 if (isMain) {
   startServer().catch((err) => {
     const bootstrapCorrelationId = randomUUID();
+    const rawLogLevel = process.env.LOG_LEVEL;
+    const validLogLevels = ["trace", "debug", "info", "warn", "error", "fatal"];
+    const safeLogLevel =
+      typeof rawLogLevel === "string" && validLogLevels.includes(rawLogLevel.toLowerCase())
+        ? (rawLogLevel.toLowerCase() as any)
+        : "info";
     const fallbackLogger = new PinoLogger({
-      level: (process.env.LOG_LEVEL as any) ?? "info",
+      level: safeLogLevel,
     });
     fallbackLogger.fatal("Fatal bootstrap error during server startup", {
       operation: "server_bootstrap_fatal",

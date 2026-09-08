@@ -1,4 +1,8 @@
-import { HealthCheckResponse } from "@fun-chess/shared";
+import {
+  HealthCheckResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
+} from "@fun-chess/shared";
 import { IRoomCountProvider, IAddressingInfoProvider } from "../http_server.js";
 
 export interface HealthControllerOptions {
@@ -31,11 +35,15 @@ export class HealthController {
     this.startTime = options.startTime ?? Date.now();
   }
 
-  public getLiveness(): string {
-    return "OK";
+  public getLiveness(): LivenessHealthResponse {
+    return {
+      status: "ok",
+      uptimeSeconds: Math.round((Date.now() - this.startTime) / 100) / 10,
+      timestamp: new Date().toISOString(),
+    };
   }
 
-  public async getHealth(): Promise<HealthCheckResponse> {
+  public async getDetailedHealth(): Promise<DetailedHealthResponse> {
     const mem = process.memoryUsage();
     const activeRooms = await this.roomStore.count();
     const activeSockets = this.getActiveSocketCount();
@@ -44,7 +52,7 @@ export class HealthController {
       : false;
     const addrInfo = this.addressService.getAddressingInfo(this.port);
 
-    // Redact process memory internals on unauthenticated /health endpoint in production (MIN-001)
+    // Redact process memory internals on unauthenticated endpoint in production (MIN-001)
     const memoryUsageMb = this.isProduction
       ? { rss: 0, heapTotal: 0, heapUsed: 0 }
       : {
@@ -65,5 +73,9 @@ export class HealthController {
         ...(addrInfo.publicUrl ? { publicUrl: addrInfo.publicUrl } : {}),
       },
     };
+  }
+
+  public async getHealth(): Promise<DetailedHealthResponse> {
+    return this.getDetailedHealth();
   }
 }

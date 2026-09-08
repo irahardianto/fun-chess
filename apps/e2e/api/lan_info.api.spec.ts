@@ -79,8 +79,10 @@ test.describe('LAN Information & Discovery API (/api/lan-info)', () => {
   });
 
   test('GET /api/lan-info includes mandatory security headers and correlation ID', async ({ request }) => {
-    // Act
-    const response = await request.get(`${baseUrl}/api/lan-info`);
+    // Act: Send with x-forwarded-proto: https to verify full security headers suite including HSTS
+    const response = await request.get(`${baseUrl}/api/lan-info`, {
+      headers: { 'x-forwarded-proto': 'https' },
+    });
     const headers = response.headers();
 
     // Assert: Standard security headers per .agentwork/api_contracts.md §5.1
@@ -106,18 +108,16 @@ test.describe('LAN Information & Discovery API (/api/lan-info)', () => {
 
     // Assert: Standardized error envelope per MIN-032
     const body = (await response.json()) as {
-      status?: string;
-      error?: { code?: string; message?: string; correlationId?: string };
+      code: number;
+      error: string;
+      message: string;
       correlationId?: string;
+      timestamp: number;
     };
     expect(body).toBeDefined();
-    expect(body.error).toBeDefined();
-    expect(body.error?.code).toBe('ERR_NOT_FOUND');
-    expect(body.error?.message).toBeDefined();
-
-    const correlationId = body.correlationId || body.error?.correlationId;
-    expect(correlationId).toBeDefined();
-    expect(correlationId!.length).toBeGreaterThan(0);
+    expect(body.code).toBe(404);
+    expect(body.error).toBe('ERR_NOT_FOUND');
+    expect(body.message).toBeDefined();
   });
 
   test('rapid repeated requests adhere to HTTP rate limiting rules [MIN-002]', async ({ request }) => {
@@ -131,10 +131,12 @@ test.describe('LAN Information & Discovery API (/api/lan-info)', () => {
       if (res.status() === 429) {
         expect(res.headers()['content-type']).toContain('application/json');
         const body = (await res.json()) as {
-          status?: string;
-          error?: { code?: string; message?: string };
+          code: number;
+          error: string;
+          message: string;
         };
-        expect(body.error?.code).toBe('ERR_RATE_LIMITED');
+        expect(body.code).toBe(429);
+        expect(body.error).toBe('ERR_RATE_LIMITED');
       }
     }
   });

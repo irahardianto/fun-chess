@@ -21,7 +21,16 @@ export interface IApiClient {
   /** Performs GET request with timeout and error handling */
   get<T>(url: string, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
 
-  /** Performs POST request with JSON body and timeout */
+  /**
+   * Performs a POST request with an optional JSON-serializable body, timeout handling,
+   * and correlation tracking.
+   *
+   * @template T - Expected type of the parsed response payload.
+   * @param url - Target endpoint URL or path relative to baseUrl.
+   * @param body - Optional JSON-serializable request payload sent in the HTTP request body.
+   * @param options - Request options including timeoutMs, signal, headers, and correlationId.
+   * @returns Promise resolving to an ApiResponse containing parsed data, HTTP status code, and ok flag.
+   */
   post<T>(url: string, body?: unknown, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
 
   /** Discovers LAN networking information from server */

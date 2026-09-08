@@ -2,6 +2,48 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { Logger } from "./logger.interface.js";
 
+const SENSITIVE_KEYS = new Set([
+  "sessiontoken",
+  "session_token",
+  "password",
+  "token",
+  "secret",
+  "authorization",
+  "cookie",
+  "key",
+  "apikey",
+  "api_key",
+]);
+
+function sanitizeJobResult(data: unknown, seen = new WeakSet<object>()): unknown {
+  if (data === null || data === undefined) return data;
+  if (typeof data !== "object") return data;
+  if (seen.has(data as object)) return "[CIRCULAR]";
+  seen.add(data as object);
+
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeJobResult(item, seen));
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    const lower = key.toLowerCase().replace(/[-_]/g, "");
+    if (
+      SENSITIVE_KEYS.has(key.toLowerCase()) ||
+      lower.includes("secret") ||
+      lower.includes("token") ||
+      lower.includes("password")
+    ) {
+      result[key] = "[REDACTED]";
+    } else if (typeof value === "object" && value !== null) {
+      result[key] = sanitizeJobResult(value, seen);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 /**
  * Runs a background operation with standardized 3-point structured logging:
  * 1. Start: operation name, correlationId, start timestamp
@@ -28,6 +70,7 @@ export async function runLoggedJob<T>(
   try {
     const result = await jobFn(correlationId);
     const duration = Math.round(performance.now() - startTime);
+    const sanitizedResult = sanitizeJobResult(result);
 
     logger.info("Background job succeeded", {
       operation,
@@ -35,7 +78,10 @@ export async function runLoggedJob<T>(
       duration,
       durationMs: duration,
       status: "success",
-      result: typeof result === "object" && result !== null ? result : { count: result },
+      result:
+        typeof sanitizedResult === "object" && sanitizedResult !== null
+          ? sanitizedResult
+          : { count: sanitizedResult },
     });
 
     return result;

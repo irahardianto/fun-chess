@@ -1,4 +1,4 @@
-import { AppError, type ErrorCode } from "@fun-chess/shared";
+import { AppError } from "@fun-chess/shared";
 
 export {
   AppError,
@@ -20,7 +20,7 @@ export {
 export class OptimisticLockConflictError extends AppError {
   constructor(roomCode: string, expectedVersion: number, actualVersion: number) {
     super(
-      "ERR_CONFLICT" as ErrorCode,
+      "ERR_CONFLICT",
       `State conflict for room '${roomCode}': expected version ${expectedVersion}, found ${actualVersion}. The room was updated concurrently.`,
       409,
       { roomCode, expectedVersion, actualVersion },
@@ -39,5 +39,21 @@ export class LockTimeoutError extends AppError {
       408,
       { roomCode, timeoutMs },
     );
+  }
+}
+
+/**
+ * Thrown when an operation times out while actively executing inside a room's exclusive lock.
+ * Addresses MAJ-005: Prevents hung actions from blocking room operations indefinitely.
+ */
+export class LockExecutionTimeoutError extends AppError {
+  constructor(roomCode: string, timeoutMs: number) {
+    super(
+      "ERR_SOCKET_TIMEOUT",
+      `Execution timed out while holding lock on room '${roomCode}' after ${timeoutMs}ms`,
+      408,
+      { roomCode, timeoutMs, phase: "execution" },
+    );
+    this.name = "LockExecutionTimeoutError";
   }
 }
