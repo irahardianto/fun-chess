@@ -71,6 +71,8 @@ export type PublicPlayer = Player;
 /**
  * Private authentication credential stored server-side and client-side (sessionStorage).
  * Exchanged ONLY over initial private room establishment and reconnection handshakes.
+ *
+ * @deprecated Use SavedSession for client-persisted session data or server session records (ENH-012).
  */
 export interface SessionInfo {
   /** Cryptographic secret UUID token used to authenticate reconnection */
@@ -83,6 +85,16 @@ export interface SessionInfo {
   createdAt: number;
   /** Epoch timestamp (milliseconds) of last observed activity */
   lastSeenAt: number;
+}
+
+/**
+ * State of a draw offer proposal.
+ */
+export interface DrawOffer {
+  /** Player ID who offered the draw */
+  offeredBy: string;
+  /** Epoch timestamp ms of offer */
+  offeredAt: number;
 }
 
 /**
@@ -203,7 +215,7 @@ export interface RoomState {
   /** Active rematch proposal state */
   rematch: RematchState | null;
   /** Active draw offer state */
-  drawOffer?: { offeredBy: string; offeredAt: number } | null;
+  drawOffer?: DrawOffer | null;
   /** Epoch timestamp of room creation */
   createdAt: number;
   /** Epoch timestamp of last mutation */

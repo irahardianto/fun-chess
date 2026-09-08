@@ -209,7 +209,7 @@ export function getScenarioById(id: string): ChessScenario | undefined {
 export function getNextScenario(currentId: string): ChessScenario | null {
   const index = ALL_SCENARIOS.findIndex((s) => s.id === currentId);
   if (index >= 0 && index + 1 < ALL_SCENARIOS.length) {
-    return ALL_SCENARIOS[index + 1];
+    return ALL_SCENARIOS[index + 1] ?? null;
   }
   return null;
 }

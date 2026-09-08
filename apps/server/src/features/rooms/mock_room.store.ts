@@ -1,9 +1,21 @@
-import { RoomState } from "@fun-chess/shared";
+import {
+  GameState,
+  GameOverPayload,
+  Player,
+  RoomState,
+} from "@fun-chess/shared";
 import { RoomStore, RoomMutator } from "./room.store.js";
 import {
   RoomNotFoundError,
   OptimisticLockConflictError,
+  RoomAlreadyExistsError,
 } from "./room.errors.js";
+import {
+  applyGameMoveTransition,
+  finalizeGameTransition,
+  updateDrawOfferTransition,
+  updateRematchTransition,
+} from "./room.logic.js";
 
 /**
  * Unit test double for RoomStore.
@@ -38,6 +50,22 @@ export class MockRoomStore implements RoomStore {
 
     this.saveCalls.push(structuredClone(roomToSave));
     this.rooms.set(code, roomToSave);
+  }
+
+  public async createIfAbsent(room: RoomState): Promise<void> {
+    const code = room.roomCode.toUpperCase();
+    await this.withLock(code, async () => {
+      if (this.rooms.has(code)) {
+        throw new RoomAlreadyExistsError(code);
+      }
+      const roomToSave: RoomState = {
+        ...structuredClone(room),
+        version: room.version || 1,
+        lastActivityAt: room.lastActivityAt ?? Date.now(),
+      };
+      this.saveCalls.push(structuredClone(roomToSave));
+      this.rooms.set(code, roomToSave);
+    });
   }
 
   public async mutate<T>(
@@ -124,5 +152,69 @@ export class MockRoomStore implements RoomStore {
     this.rooms.clear();
     this.saveCalls = [];
     this.deleteCalls = [];
+  }
+
+  // --- IRoomGameAdapter Implementation ---
+
+  public async getRoom(roomCode: string): Promise<RoomState | null> {
+    return this.findByCode(roomCode);
+  }
+
+  public async applyGameMove(
+    roomCode: string,
+    nextGameState: GameState,
+    gameOverPayload?: GameOverPayload,
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      const now = Date.now();
+      const updated = applyGameMoveTransition(
+        room,
+        nextGameState,
+        gameOverPayload,
+        now,
+      );
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  public async finalizeGame(
+    roomCode: string,
+    gameOverPayload: GameOverPayload,
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      const now = Date.now();
+      const updated = finalizeGameTransition(room, gameOverPayload, now);
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  public async updateDrawOffer(
+    roomCode: string,
+    drawOffer: RoomState["drawOffer"],
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      const now = Date.now();
+      const updated = updateDrawOfferTransition(room, drawOffer, now);
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  public async updateRematch(
+    roomCode: string,
+    rematch: RoomState["rematch"],
+    newGameState?: GameState,
+    players?: { whitePlayer: Player | null; blackPlayer: Player | null },
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      const now = Date.now();
+      const updated = updateRematchTransition(
+        room,
+        rematch,
+        newGameState,
+        now,
+        players,
+      );
+      return { updatedRoom: updated, result: updated };
+    });
   }
 }

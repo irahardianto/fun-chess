@@ -1,10 +1,22 @@
-import { RoomState } from "@fun-chess/shared";
+import { AsyncLocalStorage } from "node:async_hooks";
+import {
+  AppError,
+  GameState,
+  GameOverPayload,
+  Player,
+  RoomState,
+} from "@fun-chess/shared";
 import { RoomStore, RoomMutator } from "./room.store.js";
+import { IRoomGameAdapter } from "./room.interface.js";
 import {
   RoomNotFoundError,
   OptimisticLockConflictError,
   LockTimeoutError,
   LockExecutionTimeoutError,
+  RoomAlreadyExistsError,
+  StaleLockExecutionError,
+  GameNotActiveError,
+  RoomCapacityExceededError,
 } from "./room.errors.js";
 import {
   IClock,
@@ -12,6 +24,21 @@ import {
   IIdGenerator,
   UuidGenerator,
 } from "./clock.js";
+import {
+  applyGameMoveTransition,
+  finalizeGameTransition,
+  updateDrawOfferTransition,
+  updateRematchTransition,
+} from "./room.logic.js";
+import type { Logger } from "../../platform/logger/index.js";
+
+export const MAX_ROOMS = 10_000;
+
+export interface LockContext {
+  roomCode: string;
+  ticket: number;
+  isCancelled: () => boolean;
+}
 
 interface LockEntry {
   tail: Promise<unknown>;
@@ -20,22 +47,86 @@ interface LockEntry {
 
 /**
  * Production in-memory adapter for ephemeral RoomStore storage.
- * Enforces linearizable per-room mutations via FIFO lock queues and monotonic CAS versioning (CRIT-006).
+ * Enforces linearizable per-room mutations via FIFO lock queues, monotonic CAS versioning,
+ * and a monotonic ticket sequence model with stale execution rejection (CRIT-002, CRIT-003, CRIT-006).
  */
-export class InMemoryRoomStore implements RoomStore {
+export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
   private readonly rooms = new Map<string, RoomState>();
   private readonly lockQueues = new Map<string, LockEntry>();
   // PERF: Reverse index from socketId -> { roomCode, playerId } for O(1) disconnect lookups (HIGH-006)
   private readonly socketIndex = new Map<string, { roomCode: string; playerId: string }>();
   // PERF: Reverse index from roomCode -> Set<socketId> for O(k) cleanup instead of O(N) scan
   private readonly roomSockets = new Map<string, Set<string>>();
-  public readonly LOCK_TIMEOUT_MS = 5000;
-  public readonly EXECUTION_TIMEOUT_MS = 5000;
+
+  // Monotonic ticket model for lock acquisitions (CRIT-002)
+  private ticketSequence = 0;
+  private readonly activeTickets = new Map<string, number>();
+  private readonly cancelledTickets = new Set<number>();
+  private readonly lockContextStorage = new AsyncLocalStorage<LockContext>();
+
+  public readonly MAX_CANCELLED_TICKETS = 5_000;
+
+  private trackCancelledTicket(ticket: number): void {
+    this.cancelledTickets.add(ticket);
+    if (this.cancelledTickets.size > this.MAX_CANCELLED_TICKETS) {
+      const oldest = this.cancelledTickets.values().next().value;
+      if (oldest !== undefined) {
+        this.cancelledTickets.delete(oldest);
+      }
+    }
+  }
+
+  public LOCK_TIMEOUT_MS = 5000;
+  public EXECUTION_TIMEOUT_MS = 5000;
+  public maxRooms: number = MAX_ROOMS;
+  private readonly logger?: Logger;
 
   constructor(
     private readonly clock: IClock = new SystemClock(),
     private readonly idGenerator: IIdGenerator = new UuidGenerator(),
-  ) {}
+    optionsOrLogger?:
+      | Logger
+      | {
+          lockTimeoutMs?: number;
+          executionTimeoutMs?: number;
+          maxRooms?: number;
+          logger?: Logger;
+        },
+    options?: {
+      lockTimeoutMs?: number;
+      executionTimeoutMs?: number;
+      maxRooms?: number;
+    },
+  ) {
+    if (optionsOrLogger) {
+      if (
+        "debug" in optionsOrLogger &&
+        typeof (optionsOrLogger as Logger).debug === "function"
+      ) {
+        this.logger = optionsOrLogger as Logger;
+      } else {
+        const opts = optionsOrLogger as {
+          lockTimeoutMs?: number;
+          executionTimeoutMs?: number;
+          maxRooms?: number;
+          logger?: Logger;
+        };
+        if (opts.lockTimeoutMs !== undefined)
+          this.LOCK_TIMEOUT_MS = opts.lockTimeoutMs;
+        if (opts.executionTimeoutMs !== undefined)
+          this.EXECUTION_TIMEOUT_MS = opts.executionTimeoutMs;
+        if (opts.maxRooms !== undefined) this.maxRooms = opts.maxRooms;
+        if (opts.logger) this.logger = opts.logger;
+      }
+    }
+    if (options) {
+      if (options.lockTimeoutMs !== undefined)
+        this.LOCK_TIMEOUT_MS = options.lockTimeoutMs;
+      if (options.executionTimeoutMs !== undefined)
+        this.EXECUTION_TIMEOUT_MS = options.executionTimeoutMs;
+      if (options.maxRooms !== undefined) this.maxRooms = options.maxRooms;
+    }
+  }
 
   private indexSockets(room: RoomState): void {
     const code = room.roomCode.toUpperCase();
@@ -71,6 +162,16 @@ export class InMemoryRoomStore implements RoomStore {
         this.socketIndex.delete(socketId);
       }
       this.roomSockets.delete(code);
+    }
+  }
+
+  private assertTicketValid(code: string, explicitContext?: LockContext): void {
+    const ctx = explicitContext ?? this.lockContextStorage.getStore();
+    if (!ctx) return;
+    if (ctx.roomCode !== code) return;
+
+    if (this.cancelledTickets.has(ctx.ticket) || this.activeTickets.get(code) !== ctx.ticket) {
+      throw new StaleLockExecutionError(code, ctx.ticket);
     }
   }
 
@@ -124,9 +225,32 @@ export class InMemoryRoomStore implements RoomStore {
 
   public async withLock<T>(
     roomCode: string,
-    action: () => Promise<T>,
+    action: (context?: LockContext) => Promise<T>,
   ): Promise<T> {
     const code = roomCode.toUpperCase();
+    const currentContext = this.lockContextStorage.getStore();
+    if (
+      currentContext &&
+      currentContext.roomCode === code &&
+      !currentContext.isCancelled() &&
+      this.activeTickets.get(code) === currentContext.ticket
+    ) {
+      return await action(currentContext);
+    }
+
+    const ticket = ++this.ticketSequence;
+    const context: LockContext = {
+      roomCode: code,
+      ticket,
+      isCancelled: () => this.cancelledTickets.has(ticket),
+    };
+
+    this.logger?.debug("Lock acquisition requested", {
+      operation: "room_lock_acquire_requested",
+      roomCode: code,
+      ticket,
+    });
+
     let entry = this.lockQueues.get(code);
 
     if (!entry) {
@@ -155,29 +279,58 @@ export class InMemoryRoomStore implements RoomStore {
       await Promise.race([
         prevTail,
         new Promise((_, reject) => {
-          acquireTimer = setTimeout(
-            () => reject(new LockTimeoutError(code, this.LOCK_TIMEOUT_MS)),
-            this.LOCK_TIMEOUT_MS,
-          );
+          acquireTimer = setTimeout(() => {
+            this.trackCancelledTicket(ticket);
+            this.logger?.debug("Lock acquisition timed out", {
+              operation: "room_lock_acquire_timeout",
+              roomCode: code,
+              ticket,
+            });
+            reject(new LockTimeoutError(code, this.LOCK_TIMEOUT_MS));
+          }, this.LOCK_TIMEOUT_MS);
         }),
       ]);
       acquired = true;
       if (acquireTimer) clearTimeout(acquireTimer);
 
-      // 2. Lock Execution Race (5000ms execution timeout) — MAJ-005
-      const actionPromise = action();
-      const executionTimeoutPromise = new Promise<never>((_, reject) => {
-        executionTimer = setTimeout(
-          () => reject(new LockExecutionTimeoutError(code, this.EXECUTION_TIMEOUT_MS)),
-          this.EXECUTION_TIMEOUT_MS,
-        );
+      this.activeTickets.set(code, ticket);
+      this.logger?.debug("Lock acquired", {
+        operation: "room_lock_acquired",
+        roomCode: code,
+        ticket,
       });
+
+      // 2. Lock Execution Race (5000ms execution timeout) — MAJ-005, CRIT-002
+      const executionTimeoutPromise = new Promise<never>((_, reject) => {
+        executionTimer = setTimeout(() => {
+          this.trackCancelledTicket(ticket);
+          if (this.activeTickets.get(code) === ticket) {
+            this.activeTickets.delete(code);
+          }
+          this.logger?.debug("Lock execution timed out", {
+            operation: "room_lock_execution_timeout",
+            roomCode: code,
+            ticket,
+          });
+          reject(new LockExecutionTimeoutError(code, this.EXECUTION_TIMEOUT_MS));
+        }, this.EXECUTION_TIMEOUT_MS);
+      });
+
+      const actionPromise = this.lockContextStorage.run(context, () => action(context));
 
       return await Promise.race([actionPromise, executionTimeoutPromise]);
     } finally {
       if (acquireTimer) clearTimeout(acquireTimer);
       if (executionTimer) clearTimeout(executionTimer);
       if (acquired) {
+        if (this.activeTickets.get(code) === ticket) {
+          this.activeTickets.delete(code);
+        }
+        this.logger?.debug("Lock released", {
+          operation: "room_lock_released",
+          roomCode: code,
+          ticket,
+        });
         releaseLock();
         const currentEntry = this.lockQueues.get(code);
         if (currentEntry) {
@@ -188,9 +341,8 @@ export class InMemoryRoomStore implements RoomStore {
           }
         }
       } else {
-        // CRIT-002: On timeout before acquisition, do NOT prematurely release the lock
-        // or delete the queue from lockQueues.
-        // Forward resolution once prevTail settles so queued waiters remain blocked until the slow holder completes.
+        // CRIT-002: Invalidate ticket on timeout before acquisition
+        this.trackCancelledTicket(ticket);
         prevTail.finally(() => {
           releaseLock();
           const currentEntry = this.lockQueues.get(code);
@@ -209,8 +361,10 @@ export class InMemoryRoomStore implements RoomStore {
     roomCode: string,
     mutator: RoomMutator<T>,
   ): Promise<T> {
-    return this.withLock(roomCode, async () => {
+    return this.withLock(roomCode, async (context) => {
       const code = roomCode.toUpperCase();
+      this.assertTicketValid(code, context);
+
       const existing = this.rooms.get(code);
       if (!existing) {
         throw new RoomNotFoundError(code);
@@ -219,7 +373,17 @@ export class InMemoryRoomStore implements RoomStore {
       const clone = structuredClone(existing);
       const expectedVersion = clone.version || 1;
 
+      this.logger?.debug("Room mutation started", {
+        operation: "room_mutate_started",
+        roomCode: code,
+        expectedVersion,
+        ticket: context?.ticket,
+      });
+
       const { updatedRoom, result } = await mutator(clone);
+
+      // Re-assert ticket is still valid after mutator resolves (CRIT-002)
+      this.assertTicketValid(code, context);
 
       if (updatedRoom.roomCode.toUpperCase() !== code) {
         throw new Error(
@@ -240,12 +404,26 @@ export class InMemoryRoomStore implements RoomStore {
 
       this.rooms.set(code, roomToSave);
       this.indexSockets(roomToSave);
+
+      this.logger?.debug("Room mutation completed", {
+        operation: "room_mutate_completed",
+        roomCode: code,
+        nextVersion,
+        ticket: context?.ticket,
+      });
+
       return result;
     });
   }
 
   public async save(room: RoomState, expectedVersion?: number): Promise<void> {
     const code = room.roomCode.toUpperCase();
+    this.assertTicketValid(code);
+
+    if (!this.rooms.has(code) && this.rooms.size >= this.maxRooms) {
+      throw new RoomCapacityExceededError(this.maxRooms);
+    }
+
     const existing = this.rooms.get(code);
 
     if (existing && expectedVersion !== undefined) {
@@ -270,22 +448,31 @@ export class InMemoryRoomStore implements RoomStore {
     this.indexSockets(roomToSave);
   }
 
+  public async createIfAbsent(room: RoomState): Promise<void> {
+    const code = room.roomCode.toUpperCase();
+    await this.withLock(code, async () => {
+      if (this.rooms.size >= this.maxRooms) {
+        throw new RoomCapacityExceededError(this.maxRooms);
+      }
+      if (this.rooms.has(code)) {
+        throw new RoomAlreadyExistsError(code);
+      }
+      const roomToSave: RoomState = {
+        ...structuredClone(room),
+        version: room.version || 1,
+        lastActivityAt: room.lastActivityAt ?? this.clock.now(),
+      };
+      this.rooms.set(code, roomToSave);
+      this.indexSockets(roomToSave);
+    });
+  }
+
   public async delete(roomCode: string): Promise<boolean> {
     const code = roomCode.toUpperCase();
-    const entry = this.lockQueues.get(code);
-    if (entry && entry.waitersCount > 0) {
-      // Retain queue until all queued operations settle to preserve linearizability (MAJ-024)
-      entry.tail.finally(() => {
-        const current = this.lockQueues.get(code);
-        if (current && current.waitersCount <= 0) {
-          this.lockQueues.delete(code);
-        }
-      });
-    } else {
-      this.lockQueues.delete(code);
-    }
-    this.unindexSockets(code);
-    return this.rooms.delete(code);
+    return this.withLock(code, async () => {
+      this.unindexSockets(code);
+      return this.rooms.delete(code);
+    });
   }
 
   public async listActiveRooms(): Promise<RoomState[]> {
@@ -297,12 +484,94 @@ export class InMemoryRoomStore implements RoomStore {
   }
 
   /**
-   * Helper to clear store and active queues in tests or maintenance.
+   * Helper to clear store, active tickets, and queues in tests or maintenance.
    */
   public async clear(): Promise<void> {
     this.lockQueues.clear();
     this.socketIndex.clear();
     this.roomSockets.clear();
     this.rooms.clear();
+    this.activeTickets.clear();
+    this.cancelledTickets.clear();
+  }
+
+  // --- IRoomGameAdapter Implementation (Fallback Adapter) ---
+
+  public async getRoom(roomCode: string): Promise<RoomState | null> {
+    return this.findByCode(roomCode);
+  }
+
+  public async applyGameMove(
+    roomCode: string,
+    nextGameState: GameState,
+    gameOverPayload?: GameOverPayload,
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      if (room.status !== "playing") {
+        throw new GameNotActiveError(room.status);
+      }
+      if (nextGameState.moveCount <= room.game.moveCount) {
+        throw new OptimisticLockConflictError(
+          room.roomCode,
+          nextGameState.moveCount - 1,
+          room.game.moveCount,
+        );
+      }
+      const now = this.clock.now();
+      const updated = applyGameMoveTransition(
+        room,
+        nextGameState,
+        gameOverPayload,
+        now,
+      );
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  public async finalizeGame(
+    roomCode: string,
+    gameOverPayload: GameOverPayload,
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      if (room.status !== "playing") {
+        throw new GameNotActiveError(room.status);
+      }
+      if (gameOverPayload.reason === "draw_agreement" && !room.drawOffer) {
+        throw new GameNotActiveError("No draw offer is currently pending");
+      }
+      const now = this.clock.now();
+      const updated = finalizeGameTransition(room, gameOverPayload, now);
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  public async updateDrawOffer(
+    roomCode: string,
+    drawOffer: RoomState["drawOffer"],
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      const now = this.clock.now();
+      const updated = updateDrawOfferTransition(room, drawOffer, now);
+      return { updatedRoom: updated, result: updated };
+    });
+  }
+
+  public async updateRematch(
+    roomCode: string,
+    rematch: RoomState["rematch"],
+    newGameState?: GameState,
+    players?: { whitePlayer: Player | null; blackPlayer: Player | null },
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      const now = this.clock.now();
+      const updated = updateRematchTransition(
+        room,
+        rematch,
+        newGameState,
+        now,
+        players,
+      );
+      return { updatedRoom: updated, result: updated };
+    });
   }
 }

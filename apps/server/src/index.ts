@@ -110,8 +110,9 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     options.distPath ?? env.CLIENT_DIST_PATH ?? path.resolve(__dirname, "../../client/dist");
 
   const bootstrapCorrelationId = randomUUID();
+  const startTime = performance.now();
   logger.info("Initializing Fun Chess server bootstrap...", {
-    operation: "server_bootstrap_init",
+    operation: "server_bootstrap",
     correlationId: bootstrapCorrelationId,
     port,
     host,
@@ -156,6 +157,11 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
   });
 
   const server = http.createServer(httpHandler);
+
+  // Configure connection timeouts (MIN-007)
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 31_000;
+  server.keepAliveTimeout = 5_000;
 
   // 4. Setup Typed Socket.io Server with Strict CORS (MAJ-003, CRIT-006, MAJ-022)
   const io = createSocketServer(server, {
@@ -327,7 +333,13 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
 
     const addrInfo = relayAddressService.getAddressingInfo(boundPort);
 
+    const duration = Math.round(performance.now() - startTime);
     logger.info("Fun Chess server started successfully", {
+      operation: "server_bootstrap",
+      correlationId: bootstrapCorrelationId,
+      status: "success",
+      duration,
+      durationMs: duration,
       port: boundPort,
       relayMode: addrInfo.relayMode,
       isCloudRelay: addrInfo.isCloudRelay,
@@ -337,37 +349,68 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
       localUrl: addrInfo.localUrl,
     });
 
-    // Suppress ASCII banner in production, test, and non-interactive (non-TTY) sessions (ENH-006)
+    // Structured logger for banner (ENH-004)
     if (!isProduction && env.NODE_ENV !== "test" && Boolean(process.stdout.isTTY)) {
-      console.log(`
-============================================================
-  ♞ FUN CHESS ${addrInfo.relayMode === "cloud" ? "CLOUD RELAY" : "LOCAL LAN"} SERVER IS RUNNING!
-  
-  Mode:       ${addrInfo.relayMode === "cloud" ? "Cloud Relay" : "Local LAN"}
-  Localhost:  ${addrInfo.localUrl}
-  Join URL:   ${addrInfo.joinUrl}
-  ${addrInfo.publicUrl ? `Public URL: ${addrInfo.publicUrl}` : `LAN Host:   http://${addrInfo.lanIp}:${boundPort}`}
-  
-  Share this URL or scan QR code on any device!
-============================================================
-      `);
+      logger.info("Fun Chess server ready", {
+        operation: "server_banner",
+        correlationId: bootstrapCorrelationId,
+        relayMode: addrInfo.relayMode,
+        localUrl: addrInfo.localUrl,
+        joinUrl: addrInfo.joinUrl,
+        publicUrl: addrInfo.publicUrl,
+      });
     }
   }
 
   const close = async (): Promise<void> => {
-    clearInterval(cleanupInterval);
-    timerRegistry.clear();
-    clearAllDisconnectTimers();
-    rateLimiter.destroy();
-    if (typeof io.disconnectSockets === "function") {
-      io.disconnectSockets(true);
-    }
-    await new Promise<void>((resolve) => io.close(() => resolve()));
-    if (server.listening) {
-      if (typeof (server as any).closeIdleConnections === "function") {
-        (server as any).closeIdleConnections();
+    const closeCorrelationId = randomUUID();
+    const closeStartTime = performance.now();
+    logger.info("Fun Chess server closing...", {
+      operation: "server_close",
+      correlationId: closeCorrelationId,
+    });
+
+    try {
+      clearInterval(cleanupInterval);
+      timerRegistry.clear();
+      clearAllDisconnectTimers();
+      rateLimiter.destroy();
+      if (typeof io.disconnectSockets === "function") {
+        io.disconnectSockets(true);
       }
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => io.close(() => resolve()));
+      if (server.listening) {
+        const sWithConn = server as http.Server & {
+          closeIdleConnections?: () => void;
+          closeAllConnections?: () => void;
+        };
+        if (typeof sWithConn.closeIdleConnections === "function") {
+          sWithConn.closeIdleConnections();
+        }
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+      const closeDuration = Math.round(performance.now() - closeStartTime);
+      logger.info("Fun Chess server closed successfully", {
+        operation: "server_close",
+        correlationId: closeCorrelationId,
+        status: "success",
+        duration: closeDuration,
+        durationMs: closeDuration,
+      });
+    } catch (err) {
+      const closeDuration = Math.round(performance.now() - closeStartTime);
+      logger.error("Fun Chess server close error", {
+        operation: "server_close",
+        correlationId: closeCorrelationId,
+        status: "failed",
+        duration: closeDuration,
+        durationMs: closeDuration,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message, stack: err.stack }
+            : { raw: err },
+      });
+      throw err;
     }
   };
 

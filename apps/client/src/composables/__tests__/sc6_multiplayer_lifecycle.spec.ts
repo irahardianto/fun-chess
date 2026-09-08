@@ -5,7 +5,7 @@ import type { MoveResult, Player, RoomState, GameOverPayload, PieceColor } from 
 
 describe('Scope Card SC-6: Client Multiplayer Connection, Lifecycle & Contract Verification', () => {
   let mockSocket: any;
-  let eventHandlers: Record<string, Function>;
+  let eventHandlers: Record<string, any>;
 
   function createTestPlayer(overrides: Partial<Player> = {}): Player {
     return {

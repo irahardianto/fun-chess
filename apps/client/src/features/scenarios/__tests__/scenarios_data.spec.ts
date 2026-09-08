@@ -100,7 +100,7 @@ describe('Chess Academy Scenario Data Integrity (scenarios_data.spec.ts)', () =>
 
               // Test applying player move then opponent response
               const flowChess = new Chess(step.setupFen);
-              const firstAllowed = step.allowedMoves![0];
+              const firstAllowed = step.allowedMoves![0]!;
               flowChess.move({
                 from: firstAllowed.from as Square,
                 to: firstAllowed.to as Square,
@@ -122,7 +122,7 @@ describe('Chess Academy Scenario Data Integrity (scenarios_data.spec.ts)', () =>
 
   describe('Scenario Lookup & Navigation Utilities', () => {
     it('retrieves scenario by id using getScenarioById', () => {
-      const first = ALL_SCENARIOS[0];
+      const first = ALL_SCENARIOS[0]!;
       const retrieved = getScenarioById(first.id);
       expect(retrieved).toBeDefined();
       expect(retrieved?.id).toBe(first.id);
@@ -132,13 +132,13 @@ describe('Chess Academy Scenario Data Integrity (scenarios_data.spec.ts)', () =>
     });
 
     it('returns the next scenario correctly using getNextScenario', () => {
-      const first = ALL_SCENARIOS[0];
-      const second = ALL_SCENARIOS[1];
+      const first = ALL_SCENARIOS[0]!;
+      const second = ALL_SCENARIOS[1]!;
       const next = getNextScenario(first.id);
       expect(next).toBeDefined();
       expect(next?.id).toBe(second.id);
 
-      const last = ALL_SCENARIOS[ALL_SCENARIOS.length - 1];
+      const last = ALL_SCENARIOS[ALL_SCENARIOS.length - 1]!;
       const nextAfterLast = getNextScenario(last.id);
       expect(nextAfterLast).toBeNull();
 

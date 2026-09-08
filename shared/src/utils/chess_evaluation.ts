@@ -21,16 +21,23 @@ const STARTING_PIECES: Record<PieceType, number> = {
 };
 
 /**
- * Calculates captured pieces and net material advantages for both players.
+ * Summary of board piece counts and total material values for both players.
+ */
+export interface BoardMaterialSummary {
+  readonly whiteCounts: Record<PieceType, number>;
+  readonly blackCounts: Record<PieceType, number>;
+  readonly whiteMaterial: number;
+  readonly blackMaterial: number;
+}
+
+/**
+ * Iterates across the board once to count pieces and calculate material values (MIN-018).
+ * Centralized logic shared across material difference and capture calculations.
  *
  * @param chess - Active Chess instance
- * @returns Captured piece arrays and calculated material advantage
+ * @returns BoardMaterialSummary containing piece counts and total material for white and black
  */
-export function calculateMaterialAndCaptures(chess: Chess): {
-  capturedWhite: PieceType[];
-  capturedBlack: PieceType[];
-  materialAdvantage: { white: number; black: number };
-} {
+export function calculateBoardMaterial(chess: Chess): BoardMaterialSummary {
   const board = chess.board();
 
   const whiteCounts: Record<PieceType, number> = {
@@ -61,15 +68,74 @@ export function calculateMaterialAndCaptures(chess: Chess): {
       if (!piece) continue;
 
       const pType = piece.type as PieceType;
+      const points = STANDARD_PIECE_POINTS[pType] ?? 0;
       if (piece.color === "w") {
         whiteCounts[pType]++;
-        whiteMaterial += STANDARD_PIECE_POINTS[pType];
+        whiteMaterial += points;
       } else {
         blackCounts[pType]++;
-        blackMaterial += STANDARD_PIECE_POINTS[pType];
+        blackMaterial += points;
       }
     }
   }
+
+  return {
+    whiteCounts,
+    blackCounts,
+    whiteMaterial,
+    blackMaterial,
+  };
+}
+
+/**
+ * Net material advantage for both white and black.
+ */
+export interface MaterialDifference {
+  white: number;
+  black: number;
+}
+
+/**
+ * Calculates net material advantage for both players (MIN-016).
+ *
+ * @param chessOrSummary - Active Chess instance or precomputed BoardMaterialSummary
+ * @returns Non-negative material advantage for white and black
+ */
+export function calculateMaterialDifference(
+  chessOrSummary: Chess | BoardMaterialSummary,
+): MaterialDifference {
+  const summary =
+    "whiteMaterial" in chessOrSummary
+      ? chessOrSummary
+      : calculateBoardMaterial(chessOrSummary);
+
+  return {
+    white: Math.max(0, summary.whiteMaterial - summary.blackMaterial),
+    black: Math.max(0, summary.blackMaterial - summary.whiteMaterial),
+  };
+}
+
+/**
+ * Captured pieces lists for white and black.
+ */
+export interface CapturedPieces {
+  capturedWhite: PieceType[];
+  capturedBlack: PieceType[];
+}
+
+/**
+ * Calculates captured piece lists for both sides based on missing starting pieces (MIN-016).
+ *
+ * @param chessOrSummary - Active Chess instance or precomputed BoardMaterialSummary
+ * @returns Ordered lists of captured pieces (q, r, b, n, p)
+ */
+export function calculateCaptures(
+  chessOrSummary: Chess | BoardMaterialSummary,
+): CapturedPieces {
+  const summary =
+    "whiteCounts" in chessOrSummary
+      ? chessOrSummary
+      : calculateBoardMaterial(chessOrSummary);
 
   const capturedWhite: PieceType[] = [];
   const capturedBlack: PieceType[] = [];
@@ -77,27 +143,73 @@ export function calculateMaterialAndCaptures(chess: Chess): {
   const pieceOrder: PieceType[] = ["q", "r", "b", "n", "p"];
 
   for (const type of pieceOrder) {
-    const whiteMissing = Math.max(0, STARTING_PIECES[type] - whiteCounts[type]);
+    const whiteMissing = Math.max(0, STARTING_PIECES[type] - summary.whiteCounts[type]);
     for (let i = 0; i < whiteMissing; i++) {
       capturedWhite.push(type);
     }
 
-    const blackMissing = Math.max(0, STARTING_PIECES[type] - blackCounts[type]);
+    const blackMissing = Math.max(0, STARTING_PIECES[type] - summary.blackCounts[type]);
     for (let i = 0; i < blackMissing; i++) {
       capturedBlack.push(type);
     }
   }
 
-  const materialAdvantage = {
-    white: Math.max(0, whiteMaterial - blackMaterial),
-    black: Math.max(0, blackMaterial - whiteMaterial),
+  return {
+    capturedWhite,
+    capturedBlack,
   };
+}
+
+/**
+ * Calculates captured pieces and net material advantages for both players.
+ * Composes calculateBoardMaterial, calculateMaterialDifference, and calculateCaptures (MIN-016, MIN-018).
+ *
+ * @param chess - Active Chess instance
+ * @returns Captured piece arrays and calculated material advantage
+ */
+export function calculateMaterialAndCaptures(chess: Chess): {
+  capturedWhite: PieceType[];
+  capturedBlack: PieceType[];
+  materialAdvantage: { white: number; black: number };
+} {
+  const summary = calculateBoardMaterial(chess);
+  const { capturedWhite, capturedBlack } = calculateCaptures(summary);
+  const materialAdvantage = calculateMaterialDifference(summary);
 
   return {
     capturedWhite,
     capturedBlack,
     materialAdvantage,
   };
+}
+
+const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
+const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
+
+/**
+ * Locates the board coordinate square of the king for a given color (MIN-019).
+ *
+ * @param chess - Active Chess instance
+ * @param color - Color of the king to find ('w' or 'b')
+ * @returns The board square coordinate (e.g. "e1", "e8") or null if not found
+ */
+export function getKingSquare(chess: Chess, color: PieceColor): Square | null {
+  const board = chess.board();
+  for (let r = 0; r < 8; r++) {
+    const row = board[r];
+    if (!row) continue;
+    for (let c = 0; c < 8; c++) {
+      const piece = row[c];
+      if (piece && piece.type === "k" && piece.color === color) {
+        const file = FILES[c];
+        const rank = RANKS[r];
+        if (file && rank) {
+          return `${file}${rank}` as Square;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /**

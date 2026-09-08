@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { getComboMultiplier, getFlameStage, getFlameLabel } from '../engine/rush_engine';
 
 interface Props {
-  streak: number;
+  streak?: number;
   multiplier?: number;
   label?: string;
   showCombo?: boolean;

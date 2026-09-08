@@ -46,6 +46,7 @@ describe('AudioSynthesizer', () => {
       synth.playMove();
       synth.playCapture();
       synth.playCheck();
+      synth.playCheckmate();
       synth.playVictory();
       synth.playDefeat();
       synth.playDraw();
@@ -139,6 +140,65 @@ describe('AudioSynthesizer', () => {
     audioSynth.setMuted(true);
     audioSynth.playMove();
     expect(mockAudioContext.createOscillator.mock.calls.length).toBe(callCountBeforeMute);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('schedules Web Audio oscillators and gains for checkmate fanfare [MIN-030]', () => {
+    const mockOscillator = {
+      type: 'sine',
+      frequency: {
+        setValueAtTime: vi.fn(),
+        exponentialRampToValueAtTime: vi.fn(),
+        linearRampToValueAtTime: vi.fn(),
+      },
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+    };
+
+    const mockGain = {
+      gain: {
+        setValueAtTime: vi.fn(),
+        exponentialRampToValueAtTime: vi.fn(),
+        linearRampToValueAtTime: vi.fn(),
+      },
+      connect: vi.fn(),
+    };
+
+    const mockAudioContext = {
+      currentTime: 10,
+      state: 'running',
+      destination: {},
+      createOscillator: vi.fn(() => ({
+        ...mockOscillator,
+        frequency: { setValueAtTime: vi.fn() },
+      })),
+      createGain: vi.fn(() => ({
+        ...mockGain,
+        gain: {
+          setValueAtTime: vi.fn(),
+          linearRampToValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+        },
+      })),
+      resume: vi.fn().mockResolvedValue(undefined),
+    };
+
+    vi.stubGlobal('AudioContext', vi.fn(() => mockAudioContext));
+
+    const audioSynth = new AudioSynthesizer({ muted: false });
+    audioSynth.initContext();
+    mockAudioContext.createOscillator.mockClear();
+    mockAudioContext.createGain.mockClear();
+
+    audioSynth.playCheckmate();
+
+    // 4 notes in checkmate fanfare: A4 (440), C#5 (554.37), E5 (659.25), A5 (880)
+    expect(mockAudioContext.createOscillator).toHaveBeenCalledTimes(4);
+    expect(mockAudioContext.createGain).toHaveBeenCalledTimes(4);
+    expect(mockOscillator.start).toHaveBeenCalledTimes(4);
+    expect(mockOscillator.stop).toHaveBeenCalledTimes(4);
 
     vi.unstubAllGlobals();
   });

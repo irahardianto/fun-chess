@@ -266,4 +266,68 @@ describe('useAiWorker composable', () => {
     const elapsed = performance.now() - start;
     expect(elapsed).toBeGreaterThanOrEqual(100);
   });
+
+  it('settles hanging delay Promise immediately when cancelCalculation() is invoked during delay (MAJ-004)', async () => {
+    const { requestAiMove, cancelCalculation, isAiThinking } = useAiWorker({ simulateThinkDelay: true });
+
+    const mockMove = { from: 'e7', to: 'e5', color: 'b' } as Move;
+    vi.spyOn(minimaxEngine, 'findBestMove').mockResolvedValue({
+      move: { from: 'e7', to: 'e5' },
+      score: 10,
+      depth: 1,
+      nodesEvaluated: 5,
+      isBlunder: false,
+      searchDurationMs: 2,
+    });
+
+    const promise = requestAiMove(
+      'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1',
+      'sparky', // simulatedThinkTimeMs: [150, 350]
+      () => [mockMove],
+      () => mockMove
+    );
+
+    // AI is thinking and waiting on think delay Promise
+    expect(isAiThinking.value).toBe(true);
+
+    // Cancel calculation while in delay
+    cancelCalculation();
+    expect(isAiThinking.value).toBe(false);
+
+    // The promise must resolve promptly to null rather than hanging indefinitely
+    const result = await promise;
+    expect(result).toBeNull();
+  });
+
+  it('uses injected custom aiEngine instead of minimaxEngine (ENH-011)', async () => {
+    const mockCustomEngine = {
+      findBestMove: vi.fn().mockResolvedValue({
+        move: { from: 'd7', to: 'd5' },
+        score: 25,
+        depth: 3,
+        nodesEvaluated: 100,
+        isBlunder: false,
+        searchDurationMs: 15,
+      }),
+      evaluatePosition: vi.fn().mockReturnValue(0),
+    };
+
+    const mockMove = { from: 'd7', to: 'd5', color: 'b' } as Move;
+    const applyMoveFn = vi.fn().mockReturnValue(mockMove);
+
+    const { requestAiMove } = useAiWorker({
+      aiEngine: mockCustomEngine,
+      simulateThinkDelay: false,
+    });
+
+    const result = await requestAiMove(
+      'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1',
+      'peanut',
+      () => [mockMove],
+      applyMoveFn
+    );
+
+    expect(mockCustomEngine.findBestMove).toHaveBeenCalledTimes(1);
+    expect(result?.move).toBe(mockMove);
+  });
 });

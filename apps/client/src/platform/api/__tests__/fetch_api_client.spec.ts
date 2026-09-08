@@ -79,20 +79,17 @@ describe('FetchApiClient', () => {
     expect(result.port).toBe(3000);
   });
 
-  it('queries health telemetry and parses response with Zod schema', async () => {
-    const mockHealth = {
+  it('queries health liveness telemetry and parses response with Zod schema [CRIT-001]', async () => {
+    const mockLiveness = {
       status: 'ok' as const,
       uptimeSeconds: 3600,
       timestamp: new Date().toISOString(),
-      activeRooms: 2,
-      activeSockets: 4,
-      memoryUsageMb: { rss: 50, heapTotal: 40, heapUsed: 30 },
     };
 
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => mockHealth,
+      json: async () => mockLiveness,
     });
 
     const client = new FetchApiClient('http://localhost:3000');
@@ -100,6 +97,42 @@ describe('FetchApiClient', () => {
 
     expect(result.status).toBe('ok');
     expect(result.uptimeSeconds).toBe(3600);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/health',
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('queries detailed health telemetry from /health/detail and parses response with Zod schema [CRIT-001]', async () => {
+    const mockDetailedHealth = {
+      status: 'ok' as const,
+      uptimeSeconds: 3600,
+      timestamp: new Date().toISOString(),
+      activeRooms: 2,
+      activeSockets: 4,
+      memoryUsageMb: { rss: 50, heapTotal: 40, heapUsed: 30 },
+      relay: {
+        mode: 'lan' as const,
+        publicUrl: 'http://localhost:3000',
+      },
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockDetailedHealth,
+    });
+
+    const client = new FetchApiClient('http://localhost:3000');
+    const result = await client.getDetailedHealth();
+
+    expect(result.status).toBe('ok');
+    expect(result.activeRooms).toBe(2);
+    expect(result.memoryUsageMb.rss).toBe(50);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/health/detail',
+      expect.objectContaining({ method: 'GET' })
+    );
   });
 
   it('verifies connectivity with checkConnectivity HEAD probe', async () => {
@@ -229,6 +262,38 @@ describe('FetchApiClient', () => {
     expect(result.ok).toBe(false);
     expect(result.status).toBe(500);
     expect(result.data).toBe(malformedBody);
+  });
+
+  it('logs warning when JSON parsing fails on response body [MIN-005]', async () => {
+    const malformedBody = '{ broken json ';
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    const mockResponse = new Response(malformedBody, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as any);
+    const result = await client.get<string>('/api/bad-json');
+
+    expect(result.data).toBe(malformedBody);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Failed to parse JSON response body',
+      expect.objectContaining({
+        operation: 'http_parse_body',
+        error: expect.any(String),
+      })
+    );
   });
 
   it('strips query strings from URLs in telemetry logging for GET requests [MAJ-021]', async () => {

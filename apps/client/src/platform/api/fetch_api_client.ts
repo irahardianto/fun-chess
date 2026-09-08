@@ -1,9 +1,11 @@
 import type { IApiClient, ApiRequestOptions, ApiResponse } from './api_client.interface';
 import {
   LanInfoResponseSchema,
-  HealthCheckResponseSchema,
+  LivenessHealthResponseSchema,
+  DetailedHealthResponseSchema,
   type LanInfoResponse,
-  type HealthCheckResponse,
+  type LivenessHealthResponse,
+  type DetailedHealthResponse,
 } from '@fun-chess/shared';
 import { generateCorrelationId, logger as defaultLogger, type ILogger } from '../telemetry';
 
@@ -56,7 +58,11 @@ export class FetchApiClient implements IApiClient {
     try {
       new Request('http://localhost', { signal });
       return signal;
-    } catch {
+    } catch (error) {
+      this.logger.debug('AbortSignal unsupported by Request', {
+        operation: 'get_safe_signal',
+        error: error instanceof Error ? error.message : String(error),
+      });
       return undefined;
     }
   }
@@ -92,7 +98,11 @@ export class FetchApiClient implements IApiClient {
       if (isJson) {
         try {
           return JSON.parse(text) as T;
-        } catch {
+        } catch (err) {
+          this.logger.warn('Failed to parse JSON response body', {
+            operation: 'http_parse_body',
+            error: err instanceof Error ? err.message : String(err),
+          });
           return text as unknown as T;
         }
       }
@@ -102,7 +112,11 @@ export class FetchApiClient implements IApiClient {
     if (typeof response.json === 'function') {
       try {
         return await response.json();
-      } catch {
+      } catch (err) {
+        this.logger.warn('Failed to parse JSON response body', {
+          operation: 'http_parse_body',
+          error: err instanceof Error ? err.message : String(err),
+        });
         return null as T;
       }
     }
@@ -220,10 +234,16 @@ export class FetchApiClient implements IApiClient {
     return LanInfoResponseSchema.parse(res.data);
   }
 
-  async checkHealth(options?: ApiRequestOptions): Promise<HealthCheckResponse> {
+  async checkHealth(options?: ApiRequestOptions): Promise<LivenessHealthResponse> {
     const res = await this.get<unknown>('/health', options);
     if (!res.ok) throw new Error(`Health check failed: HTTP ${res.status}`);
-    return HealthCheckResponseSchema.parse(res.data);
+    return LivenessHealthResponseSchema.parse(res.data);
+  }
+
+  async getDetailedHealth(options?: ApiRequestOptions): Promise<DetailedHealthResponse> {
+    const res = await this.get<unknown>('/health/detail', options);
+    if (!res.ok) throw new Error(`Detailed health check failed: HTTP ${res.status}`);
+    return DetailedHealthResponseSchema.parse(res.data);
   }
 
   async checkConnectivity(

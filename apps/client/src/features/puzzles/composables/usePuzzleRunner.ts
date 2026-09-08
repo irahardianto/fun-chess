@@ -1,5 +1,5 @@
 import { ref, computed, readonly, onUnmounted, getCurrentInstance } from 'vue';
-import { Chess, type Square as ChessSquare } from 'chess.js';
+import type { Square as ChessSquare } from 'chess.js';
 import type {
   Puzzle,
   Square,
@@ -11,6 +11,7 @@ import type {
   PuzzleAttemptResult,
   PuzzleAnalysisResult,
 } from '@fun-chess/shared';
+import { createSafeChess } from '@fun-chess/shared';
 import { validatePuzzleMove } from '../engine/puzzle_validator';
 import { calculatePuzzleStars } from '../engine/star_calculator';
 import { analyzePuzzleSolution } from '../engine/puzzle_analysis_engine';
@@ -124,7 +125,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
   function recalculateLegalMoves(fenStr: string, sq: Square | null): Square[] {
     if (!sq) return [];
     try {
-      const chess = new Chess(fenStr);
+      const chess = createSafeChess(fenStr);
       const moves = chess.moves({ square: sq as ChessSquare, verbose: true });
       return moves.map((m) => m.to as Square);
     } catch (err) {
@@ -174,7 +175,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
 
     // Check if clicked square has player's piece
     try {
-      const chess = new Chess(currentFen.value);
+      const chess = createSafeChess(currentFen.value);
       const piece = chess.get(sq as ChessSquare);
       if (piece && piece.color === playerColor.value) {
         selectedSquare.value = sq;

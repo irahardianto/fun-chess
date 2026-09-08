@@ -8,6 +8,8 @@ import type {
   GameState,
 } from "@fun-chess/shared";
 
+import type { IDisconnectTimerRegistry } from "./disconnect_timer_registry.js";
+
 /**
  * Public service contract for room lifecycle management.
  */
@@ -37,7 +39,12 @@ export interface IRoomService {
     gameOverPayload?: GameOverPayload;
   }>;
 
-  handleDisconnect(socketId: string): Promise<{
+  handleDisconnect(
+    socketId: string,
+    onForfeit?: (room: RoomState, gameOverPayload: GameOverPayload) => void | Promise<void>,
+    gracePeriodMs?: number,
+    timerRegistry?: IDisconnectTimerRegistry,
+  ): Promise<{
     room: RoomState;
     player: Player;
     wasActiveGame: boolean;

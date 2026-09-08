@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useLanDiscovery, isValidIPv4, detectWebRtcLanIp } from '../useLanDiscovery';
+import { safeLocalStorage } from '../../platform/storage';
 
 describe('useLanDiscovery composable', () => {
   let mockStorage: Record<string, string> = {};
 
   beforeEach(() => {
+    safeLocalStorage.clear();
     mockStorage = {};
     const storageMock = {
       getItem: vi.fn((key: string) => mockStorage[key] ?? null),
@@ -28,6 +30,7 @@ describe('useLanDiscovery composable', () => {
   });
 
   afterEach(() => {
+    safeLocalStorage.clear();
     vi.restoreAllMocks();
   });
 

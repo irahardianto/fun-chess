@@ -1,5 +1,5 @@
 /**
- * Reactive sound hook with state and triggers.
+ * Reactive sound hook with state, triggers, and decoupled device haptics (MIN-017).
  */
 import { ref } from 'vue';
 import type { MoveResult, GameState } from '@fun-chess/shared';
@@ -28,9 +28,85 @@ export type GameDomainEvent =
   | { type: 'defeat' }
   | { type: 'draw' };
 
+/**
+ * Dedicated haptics composable abstracting device vibration patterns (MIN-017).
+ */
+export function useHaptics(injectedHaptics?: IHapticsService) {
+  const haptics: IHapticsService = injectedHaptics || defaultHapticsService;
+
+  function triggerHaptic(pattern: number | number[]): boolean {
+    try {
+      return haptics.vibrate(pattern);
+    } catch (err) {
+      logger.debug('Haptic vibration failed', {
+        operation: 'haptics_trigger',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  function triggerMove(): boolean {
+    return triggerHaptic(12);
+  }
+
+  function triggerCapture(): boolean {
+    return triggerHaptic([20, 30, 20]);
+  }
+
+  function triggerCheck(): boolean {
+    return triggerHaptic([40, 40, 40]);
+  }
+
+  function triggerCheckmate(): boolean {
+    return triggerHaptic([60, 60, 120]);
+  }
+
+  function triggerVictory(): boolean {
+    return triggerHaptic([50, 50, 100, 50, 150]);
+  }
+
+  function triggerError(): boolean {
+    return triggerHaptic(50);
+  }
+
+  function triggerTurnNotification(): boolean {
+    return triggerHaptic([30, 50, 30]);
+  }
+
+  function triggerStarEarned(): boolean {
+    return triggerHaptic([30, 40, 60]);
+  }
+
+  function triggerStepComplete(): boolean {
+    return triggerHaptic([25, 35, 50]);
+  }
+
+  function isSupported(): boolean {
+    return haptics.isSupported();
+  }
+
+  return {
+    isSupported,
+    triggerHaptic,
+    triggerMove,
+    triggerCapture,
+    triggerCheck,
+    triggerCheckmate,
+    triggerVictory,
+    triggerError,
+    triggerTurnNotification,
+    triggerStarEarned,
+    triggerStepComplete,
+  };
+}
+
+/**
+ * Reactive audio composable with state, sound effects, and decoupled haptic triggers.
+ */
 export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapticsService) {
   const synth: IAudioService = injectedSynth || defaultSynth;
-  const haptics: IHapticsService = injectedHaptics || defaultHapticsService;
+  const hapticController = useHaptics(injectedHaptics);
   const isMuted = ref(synth.isMuted());
   const isSoundEnabled = ref(!synth.isMuted());
 
@@ -55,40 +131,29 @@ export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapti
     setMuted(!enabled);
   }
 
-  function triggerHaptic(pattern: number | number[]): void {
-    try {
-      haptics.vibrate(pattern);
-    } catch (err) {
-      logger.debug('Haptic vibration failed', {
-        operation: 'audio_trigger_haptic',
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
   function playMove(): void {
     synth.playMove();
-    triggerHaptic(12);
+    hapticController.triggerMove();
   }
 
   function playCapture(): void {
     synth.playCapture();
-    triggerHaptic([20, 30, 20]);
+    hapticController.triggerCapture();
   }
 
   function playCheck(): void {
     synth.playCheck();
-    triggerHaptic([40, 40, 40]);
+    hapticController.triggerCheck();
   }
 
   function playCheckmate(): void {
     synth.playCheckmate();
-    triggerHaptic([60, 60, 120]);
+    hapticController.triggerCheckmate();
   }
 
   function playVictory(): void {
     synth.playVictory();
-    triggerHaptic([50, 50, 100, 50, 150]);
+    hapticController.triggerVictory();
   }
 
   function playDefeat(): void {
@@ -101,7 +166,7 @@ export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapti
 
   function playError(): void {
     synth.playError();
-    triggerHaptic(50);
+    hapticController.triggerError();
   }
 
   function playClick(): void {
@@ -114,7 +179,7 @@ export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapti
 
   function playTurnNotification(): void {
     synth.playTurnNotification();
-    triggerHaptic([30, 50, 30]);
+    hapticController.triggerTurnNotification();
   }
 
   function playStart(): void {
@@ -127,7 +192,7 @@ export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapti
 
   function playStarEarned(): void {
     synth.playStarEarned();
-    triggerHaptic([30, 40, 60]);
+    hapticController.triggerStarEarned();
   }
 
   function playMascotHappy(): void {
@@ -140,7 +205,7 @@ export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapti
 
   function playStepComplete(): void {
     synth.playStepComplete();
-    triggerHaptic([25, 35, 50]);
+    hapticController.triggerStepComplete();
   }
 
   function resumeAudio(): void {
@@ -268,5 +333,6 @@ export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapti
     initAudio,
     handleGameEvent,
     attachGameEventListeners,
+    triggerHaptic: hapticController.triggerHaptic,
   };
 }

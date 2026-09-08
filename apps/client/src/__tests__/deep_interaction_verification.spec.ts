@@ -32,7 +32,7 @@ describe('Deep Interaction & State Machine Verification', () => {
 
       for (const scenario of ALL_SCENARIOS) {
         for (let i = 0; i < scenario.steps.length; i++) {
-          const step = scenario.steps[i];
+          const step = scenario.steps[i]!;
           totalStepsVerified++;
 
           // 1. FEN validity
@@ -78,7 +78,7 @@ describe('Deep Interaction & State Machine Verification', () => {
             if (step.opponentResponse) {
               stepsWithOpponentResponse++;
               const testChess = new Chess(step.setupFen);
-              const firstMove = step.allowedMoves[0];
+              const firstMove = step.allowedMoves[0]!;
               testChess.move({
                 from: firstMove.from as Square,
                 to: firstMove.to as Square,
@@ -120,7 +120,7 @@ describe('Deep Interaction & State Machine Verification', () => {
       // Verify each scenario properly sets runner.playerColor
       for (const sc of blackScenarios) {
         const runner = useScenarioRunner({ scenario: sc });
-        const step0 = sc.steps[0];
+        const step0 = sc.steps[0]!;
         expect(runner.playerColor.value).toBe(step0.playerColor);
       }
     });
@@ -162,14 +162,14 @@ describe('Deep Interaction & State Machine Verification', () => {
       expect(runner.isShaking.value).toBe(false);
 
       // 4. Valid move execution
-      const step0Move = scenario!.steps[0].allowedMoves![0];
+      const step0Move = scenario!.steps[0]!.allowedMoves![0]!;
       const validMoveSuccess = runner.applyPlayerMove({
         from: step0Move.from,
         to: step0Move.to,
       });
       expect(validMoveSuccess).toBe(true);
       expect(runner.isStepSuccess.value).toBe(true);
-      expect(runner.feedbackMessage.value).toBe(scenario!.steps[0].explanationOnSuccess);
+      expect(runner.feedbackMessage.value).toBe(scenario!.steps[0]!.explanationOnSuccess);
     });
 
     it('verifies ScenarioProgressStore persistence, sanitization, and fallback', async () => {
@@ -239,7 +239,7 @@ describe('Deep Interaction & State Machine Verification', () => {
         const chess = new Chess(puzzle.fen);
         for (let ply = 0; ply < puzzle.moves.length; ply++) {
           totalPliesTested++;
-          const uci = puzzle.moves[ply];
+          const uci = puzzle.moves[ply]!;
           const parsed = parseUciMove(uci);
 
           const moveRes = chess.move({
@@ -303,7 +303,7 @@ describe('Deep Interaction & State Machine Verification', () => {
       for (const puzzle of ALL_PUZZLES) {
         const chess = new Chess(puzzle.fen);
         const legalMoves = chess.moves({ verbose: true });
-        const expectedUci = puzzle.moves[0];
+        const expectedUci = puzzle.moves[0] ?? '';
 
         const matingMoves: string[] = [];
         for (const m of legalMoves) {
@@ -346,7 +346,7 @@ describe('Deep Interaction & State Machine Verification', () => {
       for (const puzzle of ALL_PUZZLES) {
         const chess = new Chess(puzzle.fen);
         for (let ply = 0; ply < puzzle.moves.length; ply++) {
-          const uci = puzzle.moves[ply];
+          const uci = puzzle.moves[ply]!;
           const parsed = parseUciMove(uci);
           const actor = chess.turn();
 
@@ -377,7 +377,7 @@ describe('Deep Interaction & State Machine Verification', () => {
 
       // Verify that validatePuzzleMove correctly matches or rejects promotion piece
       if (promotionPuzzles.length > 0) {
-        const sample = promotionPuzzles[0];
+        const sample = promotionPuzzles[0]!;
         const parsed = parseUciMove(sample.uci);
 
         expect(formatPlayerMoveToUci({
@@ -390,11 +390,11 @@ describe('Deep Interaction & State Machine Verification', () => {
 
     it('verifies Alternative Solution & Mistake Refutation handling in puzzle_validator', () => {
       // Pick a sample puzzle
-      const puzzle = ALL_PUZZLES[0];
+      const puzzle = ALL_PUZZLES[0]!;
       const chess = new Chess(puzzle.fen);
       const legalMoves = chess.moves({ verbose: true });
 
-      const solutionUci = puzzle.moves[0];
+      const solutionUci = puzzle.moves[0]!;
       const parsedSol = parseUciMove(solutionUci);
 
       // Find an alternative legal move
@@ -464,7 +464,7 @@ describe('Deep Interaction & State Machine Verification', () => {
       expect(runner.isPlayerTurn.value).toBe(true);
 
       // Play ply 0
-      const ply0 = parseUciMove(multiPlyPuzzle!.moves[0]);
+      const ply0 = parseUciMove(multiPlyPuzzle!.moves[0]!);
       runner.applyPlayerMove({
         from: ply0.from,
         to: ply0.to,
@@ -534,9 +534,9 @@ describe('Deep Interaction & State Machine Verification', () => {
 
       // Record a solve
       const updated = await store.recordPuzzleAttempt('fork-001', 'fork', 'solved_first_try', 3);
-      expect(updated.solvedPuzzles['fork-001'].stars).toBe(3);
-      expect(updated.themeMastery['fork'].solved).toBe(1);
-      expect(updated.themeMastery['fork'].starsEarned).toBe(3);
+      expect(updated.solvedPuzzles['fork-001']?.stars).toBe(3);
+      expect(updated.themeMastery['fork']?.solved).toBe(1);
+      expect(updated.themeMastery['fork']?.starsEarned).toBe(3);
 
       await store.resetAll();
     });

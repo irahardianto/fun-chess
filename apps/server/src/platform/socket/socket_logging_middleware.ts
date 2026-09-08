@@ -40,6 +40,9 @@ const SENSITIVE_EXACT_KEYS = new Set([
   "key",
   "apikey",
   "api_key",
+  "bearer",
+  "credential",
+  "credentials",
 ]);
 
 function isSensitiveKey(key: string): boolean {
@@ -54,6 +57,8 @@ function isSensitiveKey(key: string): boolean {
     clean.includes("secret") ||
     clean.includes("authorization") ||
     clean.includes("cookie") ||
+    clean.includes("credential") ||
+    clean.includes("bearer") ||
     clean === "token" ||
     clean.endsWith("token") ||
     clean === "key" ||
@@ -282,8 +287,8 @@ export function wrapSocketHandler<TReq, TRes>(
       payload: sanitizePayload(rawReq),
     });
 
-    // 1. Rate Limiting Pre-check (CRIT-001, MAJ-003)
-    const rateLimitKey = `${clientIp || "127.0.0.1"}:${socketId}`;
+    // 1. Rate Limiting Pre-check (CRIT-001, MAJ-001, MAJ-003)
+    const rateLimitKey = clientIp || "127.0.0.1";
     if (effectiveRateLimiter && !effectiveRateLimiter.consume(rateLimitKey)) {
       const duration = Math.round(performance.now() - startTime);
       const limitDesc =

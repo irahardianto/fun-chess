@@ -304,6 +304,100 @@ describe('Puzzle Validator Engine', () => {
       expect(outcome.isPuzzleComplete).toBe(false);
       expect(outcome.feedback).toBe('Corrupted board state.');
     });
+
+    describe('Defensive bounds and error handling (MIN-029)', () => {
+      it('handles negative move index (-1)', () => {
+        const outcome = validatePuzzleMove(
+          singlePlyPuzzle,
+          -1,
+          singlePlyPuzzle.fen,
+          { from: 'a1', to: 'a8' }
+        );
+        expect(outcome.isCorrect).toBe(false);
+        expect(outcome.isPuzzleComplete).toBe(false);
+        expect(outcome.feedback).toBe('Puzzle session is invalid or already finished.');
+      });
+
+      it('handles out-of-bounds high move index (99)', () => {
+        const outcome = validatePuzzleMove(
+          singlePlyPuzzle,
+          99,
+          singlePlyPuzzle.fen,
+          { from: 'a1', to: 'a8' }
+        );
+        expect(outcome.isCorrect).toBe(false);
+        expect(outcome.isPuzzleComplete).toBe(false);
+        expect(outcome.feedback).toBe('Puzzle session is invalid or already finished.');
+      });
+
+      it('handles empty moves array in puzzle', () => {
+        const emptyMovesPuzzle = { ...singlePlyPuzzle, moves: [] };
+        const outcome = validatePuzzleMove(
+          emptyMovesPuzzle,
+          0,
+          singlePlyPuzzle.fen,
+          { from: 'a1', to: 'a8' }
+        );
+        expect(outcome.isCorrect).toBe(false);
+        expect(outcome.isPuzzleComplete).toBe(false);
+        expect(outcome.feedback).toBe('Puzzle session is invalid or already finished.');
+      });
+
+      it('handles null/undefined puzzle object', () => {
+        const outcome = validatePuzzleMove(
+          null as unknown as Puzzle,
+          0,
+          singlePlyPuzzle.fen,
+          { from: 'a1', to: 'a8' }
+        );
+        expect(outcome.isCorrect).toBe(false);
+        expect(outcome.feedback).toBe('Puzzle session is invalid or already finished.');
+      });
+
+      it('handles empty expected move string', () => {
+        const badMovesPuzzle = { ...singlePlyPuzzle, moves: [''] };
+        const outcome = validatePuzzleMove(
+          badMovesPuzzle,
+          0,
+          singlePlyPuzzle.fen,
+          { from: 'a1', to: 'a8' }
+        );
+        expect(outcome.isCorrect).toBe(false);
+        expect(outcome.feedback).toBe('Expected move could not be found.');
+      });
+
+      it('handles player move matching expected UCI but illegal in board state', () => {
+        // Expected UCI is e1e8, but e1e8 is illegal for King in starting board position
+        const illegalPuzzle = {
+          ...singlePlyPuzzle,
+          moves: ['e1e8'],
+        };
+        const outcome = validatePuzzleMove(
+          illegalPuzzle,
+          0,
+          singlePlyPuzzle.fen,
+          { from: 'e1', to: 'e8' }
+        );
+        expect(outcome.isCorrect).toBe(false);
+        expect(outcome.feedback).toBe('Illegal move in current position.');
+      });
+
+      it('handles illegal opponent move in multi-ply puzzle without throwing', () => {
+        // In this multi-ply puzzle, player plays valid move c3b5, but opponent move is illegal 'e8a1'
+        const badOpponentPuzzle: Puzzle = {
+          ...multiPlyPuzzle,
+          moves: ['c3b5', 'e8a1', 'b5c7'],
+        };
+        const outcome = validatePuzzleMove(
+          badOpponentPuzzle,
+          0,
+          badOpponentPuzzle.fen,
+          { from: 'c3', to: 'b5' }
+        );
+        expect(outcome.isCorrect).toBe(true);
+        expect(outcome.botReplyMove).toBeUndefined();
+      });
+    });
   });
 });
 

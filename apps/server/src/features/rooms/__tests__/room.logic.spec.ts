@@ -325,6 +325,8 @@ describe("room.logic pure functions", () => {
 
       expect(shouldDelete).toBe(false);
       expect(nextRoom.status).toBe("game_over");
+      expect(nextRoom.blackPlayer).toBeNull();
+      expect(nextRoom.whitePlayer).toEqual(basePlayer);
       expect(gameOverPayload).toBeDefined();
       expect(gameOverPayload?.winner).toBe("w");
       expect(gameOverPayload?.winnerName).toBe("Host Player");
@@ -341,6 +343,8 @@ describe("room.logic pure functions", () => {
 
       expect(shouldDelete).toBe(false);
       expect(nextRoom.status).toBe("game_over");
+      expect(nextRoom.whitePlayer).toBeNull();
+      expect(nextRoom.blackPlayer).toEqual(playingRoom.blackPlayer);
       expect(gameOverPayload?.winner).toBe("b");
       expect(gameOverPayload?.winnerName).toBe("Guest Player");
     });

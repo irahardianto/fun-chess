@@ -522,9 +522,9 @@ describe('SC-4 Integration & Core Services Test Suite', () => {
       expect(restored.ratingProfile.bestStreak).toBe(16);
 
       expect(restored.themeMastery['fork']).toBeDefined();
-      expect(restored.themeMastery['fork'].masteryLevel).toBe('master');
-      expect(restored.themeMastery['fork'].starsEarned).toBe(60);
-      expect(restored.themeMastery['pin'].masteryLevel).toBe('apprentice');
+      expect(restored.themeMastery['fork']?.masteryLevel).toBe('master');
+      expect(restored.themeMastery['fork']?.starsEarned).toBe(60);
+      expect(restored.themeMastery['pin']?.masteryLevel).toBe('apprentice');
 
       expect(restored.arcadeStats.puzzleRushHighScore).toBe(32);
       expect(restored.arcadeStats.puzzleRushBestStreak).toBe(21);

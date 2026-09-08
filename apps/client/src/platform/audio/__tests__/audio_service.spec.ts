@@ -299,6 +299,29 @@ describe('useAudio Composable with AudioService and Synthesizer', () => {
     expect(() => unsubscribe()).not.toThrow();
   });
 
+  it('executes all unsubscribe callbacks even if one throws an error [MIN-007]', () => {
+    const audio = useAudio(mockSynth);
+
+    const faultyUnsub = vi.fn(() => {
+      throw new Error('Listener cleanup exploded');
+    });
+    const healthyUnsub1 = vi.fn();
+    const healthyUnsub2 = vi.fn();
+
+    const mockSource: GameDomainEventSource = {
+      onOpponentMove: vi.fn(() => faultyUnsub),
+      onGameCheck: vi.fn(() => healthyUnsub1),
+      onGameOver: vi.fn(() => healthyUnsub2),
+    };
+
+    const cleanup = audio.attachGameEventListeners(mockSource);
+
+    expect(() => cleanup()).not.toThrow();
+    expect(faultyUnsub).toHaveBeenCalledTimes(1);
+    expect(healthyUnsub1).toHaveBeenCalledTimes(1);
+    expect(healthyUnsub2).toHaveBeenCalledTimes(1);
+  });
+
   it('works with real AudioSynthesizer instance in unmuted and muted modes', () => {
     const realSynth = new AudioSynthesizer({ muted: false });
     const audio = useAudio(realSynth);

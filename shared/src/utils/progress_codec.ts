@@ -1,4 +1,4 @@
-import { deflate, inflate, type DeflateOptions } from "pako";
+import { deflate, Inflate, type DeflateOptions } from "pako";
 import type {
   ProgressCodec,
   CodecEncodeOptions,
@@ -10,6 +10,11 @@ import {
   FUN_CHESS_PAYLOAD_MAGIC_PREFIX,
   UNIFIED_PROGRESS_SCHEMA_VERSION,
 } from "../types/progress_sync.js";
+
+/**
+ * Maximum permitted decompressed size (5MB) to guard against decompression bombs (MIN-002).
+ */
+export const MAX_DECOMPRESSED_SIZE_BYTES = 5 * 1024 * 1024;
 import { crc32Checksum } from "./checksum_crc32.js";
 import { canonicalJsonStringify } from "./canonical_json.js";
 import { defaultDictionaryMapper } from "./dictionary_mapper.js";
@@ -221,10 +226,37 @@ export class DefaultProgressCodec implements ProgressCodec {
       );
     }
 
-    // Inflate deflated bytes
+    // Inflate deflated bytes with maximum decompressed size limit guard (MIN-002)
     let jsonString: string;
     try {
-      const inflatedBytes = inflate(deflatedBytes);
+      const inflator = new Inflate();
+      const chunks: Uint8Array[] = [];
+      let totalBytes = 0;
+
+      inflator.onData = (chunk: Uint8Array) => {
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_DECOMPRESSED_SIZE_BYTES) {
+          throw new Error(
+            `Decompressed payload exceeds maximum size limit of ${MAX_DECOMPRESSED_SIZE_BYTES} bytes (5MB)`,
+          );
+        }
+        chunks.push(chunk);
+      };
+
+      inflator.push(deflatedBytes, true);
+
+      if (inflator.err) {
+        throw new Error(
+          inflator.msg || `Decompression failed with error code ${inflator.err}`,
+        );
+      }
+
+      const inflatedBytes = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        inflatedBytes.set(chunk, offset);
+        offset += chunk.length;
+      }
       jsonString = textDecoder.decode(inflatedBytes);
     } catch (inflateErr) {
       throw new Error(

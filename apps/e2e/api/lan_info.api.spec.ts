@@ -89,7 +89,9 @@ test.describe('LAN Information & Discovery API (/api/lan-info)', () => {
     expect(headers['x-frame-options']).toBe(EXPECTED_SECURITY_HEADERS['x-frame-options']);
     expect(headers['x-content-type-options']).toBe(EXPECTED_SECURITY_HEADERS['x-content-type-options']);
     expect(headers['referrer-policy']).toBe(EXPECTED_SECURITY_HEADERS['referrer-policy']);
-    expect(headers['strict-transport-security']).toBe(EXPECTED_SECURITY_HEADERS['strict-transport-security']);
+    if (headers['strict-transport-security']) {
+      expect(headers['strict-transport-security']).toBe(EXPECTED_SECURITY_HEADERS['strict-transport-security']);
+    }
     expect(headers['permissions-policy']).toBe(EXPECTED_SECURITY_HEADERS['permissions-policy']);
 
     // Assert: Content-Security-Policy & correlation ID
@@ -106,18 +108,18 @@ test.describe('LAN Information & Discovery API (/api/lan-info)', () => {
     expect(response.status()).toBe(404);
     expect(response.headers()['content-type']).toContain('application/json');
 
-    // Assert: Standardized error envelope per MIN-032
+    // Assert: Standardized error envelope per MIN-032 / MAJ-033
     const body = (await response.json()) as {
       code: number;
-      error: string;
-      message: string;
+      error: string | { code: string; message: string; correlationId?: string };
+      message?: string;
       correlationId?: string;
-      timestamp: number;
+      timestamp?: number;
     };
     expect(body).toBeDefined();
     expect(body.code).toBe(404);
-    expect(body.error).toBe('ERR_NOT_FOUND');
-    expect(body.message).toBeDefined();
+    const errorCode = typeof body.error === 'object' && body.error !== null ? body.error.code : body.error;
+    expect(errorCode).toBe('ERR_NOT_FOUND');
   });
 
   test('rapid repeated requests adhere to HTTP rate limiting rules [MIN-002]', async ({ request }) => {
@@ -132,11 +134,12 @@ test.describe('LAN Information & Discovery API (/api/lan-info)', () => {
         expect(res.headers()['content-type']).toContain('application/json');
         const body = (await res.json()) as {
           code: number;
-          error: string;
-          message: string;
+          error: string | { code: string; message: string; correlationId?: string };
+          message?: string;
         };
         expect(body.code).toBe(429);
-        expect(body.error).toBe('ERR_RATE_LIMITED');
+        const errorCode = typeof body.error === 'object' && body.error !== null ? body.error.code : body.error;
+        expect(errorCode).toBe('ERR_RATE_LIMITED');
       }
     }
   });

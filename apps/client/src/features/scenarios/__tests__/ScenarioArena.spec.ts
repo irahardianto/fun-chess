@@ -12,7 +12,7 @@ vi.mock('@/composables/useConfetti', () => ({
 }));
 
 describe('ScenarioArena.vue', () => {
-  const mockScenario = ALL_SCENARIOS[0];
+  const mockScenario = ALL_SCENARIOS[0]!;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -175,7 +175,7 @@ describe('ScenarioArena.vue', () => {
         },
       });
 
-      const newScenario = ALL_SCENARIOS[1];
+      const newScenario = ALL_SCENARIOS[1]!;
       await wrapper.setProps({ scenario: newScenario });
 
       expect(wrapper.find('.scenario-header-title').text()).toBe(newScenario.title);

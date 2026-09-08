@@ -11,12 +11,20 @@ import {
   FILE_DOWNLOADER_KEY,
   HAPTICS_KEY,
   WEBRTC_DISCOVERY_KEY,
+  CLIPBOARD_SERVICE_KEY,
+  CAMERA_SERVICE_KEY,
 } from './tokens';
 import type { IApiClient } from '../api/api_client.interface';
 import type { KeyValueStorage } from '../storage/key_value_storage';
 import type { IAudioService } from '../audio/audio.interface';
 import type { ILogger } from '../telemetry';
-import type { IFileDownloader, IHapticsService, IWebRtcDiscovery } from '../hardware';
+import type {
+  IFileDownloader,
+  IHapticsService,
+  IWebRtcDiscovery,
+  IClipboardService,
+  ICameraService,
+} from '../hardware';
 import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
 import { apiClient as defaultApiClient } from '../api';
 import { safeLocalStorage, safeSessionStorage } from '../storage';
@@ -26,9 +34,12 @@ import {
   defaultFileDownloader,
   defaultHapticsService,
   defaultWebRtcDiscovery,
+  defaultClipboardService,
+  defaultCameraService,
 } from '../hardware';
 
 export * from './tokens';
+export * from './helpers';
 
 let defaultScenarioStore: ScenarioProgressStore | null = null;
 let defaultPuzzleStore: PuzzleProgressStore | null = null;
@@ -98,5 +109,13 @@ export function useInjectHaptics(fallback?: IHapticsService): IHapticsService {
 
 export function useInjectWebRtcDiscovery(fallback?: IWebRtcDiscovery): IWebRtcDiscovery {
   return inject(WEBRTC_DISCOVERY_KEY, fallback ?? defaultWebRtcDiscovery);
+}
+
+export function useInjectClipboardService(fallback?: IClipboardService): IClipboardService {
+  return inject(CLIPBOARD_SERVICE_KEY, fallback ?? defaultClipboardService);
+}
+
+export function useInjectCameraService(fallback?: ICameraService): ICameraService {
+  return inject(CAMERA_SERVICE_KEY, fallback ?? defaultCameraService);
 }
 

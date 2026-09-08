@@ -13,7 +13,7 @@ vi.mock('../../../composables/useConfetti', () => ({
 
 describe('ScenarioCompletionModal.vue', () => {
   let wrapper: VueWrapper;
-  const mockScenario = ALL_SCENARIOS[0];
+  const mockScenario = ALL_SCENARIOS[0]!;
 
   beforeEach(() => {
     vi.clearAllMocks();

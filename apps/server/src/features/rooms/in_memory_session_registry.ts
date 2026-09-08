@@ -28,6 +28,10 @@ export class InMemorySessionRegistry implements SessionRegistry {
     private readonly idGenerator: IIdGenerator = new UuidGenerator(),
   ) {}
 
+  public now(): number {
+    return this.clock.now();
+  }
+
   public async createSession(params: {
     playerId: string;
     roomCode: string;
@@ -155,10 +159,18 @@ export class InMemorySessionRegistry implements SessionRegistry {
 
   public async cleanupExpiredSessions(): Promise<number> {
     const now = this.clock.now();
-    let cleaned = 0;
+    // Synchronously snapshot expired tokens before deleting to prevent iterator desync (MAJ-034)
+    const expiredTokens: string[] = [];
     for (const [token, record] of this.sessions.entries()) {
       if (now > record.expiresAt) {
-        await this.deleteSession(token);
+        expiredTokens.push(token);
+      }
+    }
+
+    let cleaned = 0;
+    for (const token of expiredTokens) {
+      const deleted = await this.deleteSession(token);
+      if (deleted) {
         cleaned++;
       }
     }

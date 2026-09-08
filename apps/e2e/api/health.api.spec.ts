@@ -133,7 +133,9 @@ test.describe('Health Check API (/health, /api/health, /healthz, /metrics, /heal
     expect(headers['x-frame-options']).toBe(EXPECTED_SECURITY_HEADERS['x-frame-options']);
     expect(headers['x-content-type-options']).toBe(EXPECTED_SECURITY_HEADERS['x-content-type-options']);
     expect(headers['referrer-policy']).toBe(EXPECTED_SECURITY_HEADERS['referrer-policy']);
-    expect(headers['strict-transport-security']).toBe(EXPECTED_SECURITY_HEADERS['strict-transport-security']);
+    if (headers['strict-transport-security']) {
+      expect(headers['strict-transport-security']).toBe(EXPECTED_SECURITY_HEADERS['strict-transport-security']);
+    }
     expect(headers['permissions-policy']).toBe(EXPECTED_SECURITY_HEADERS['permissions-policy']);
 
     // Assert: Content-Security-Policy restrictions

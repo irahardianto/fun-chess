@@ -1,21 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GameService } from "../game.service.js";
-import { MockRoomStore } from "../../rooms/mock_room.store.js";
-import { RoomState } from "@fun-chess/shared";
+import { MockRoomGameAdapter } from "./mock_room_adapter.js";
 import {
+  RoomState,
   RoomNotFoundError,
   GameNotActiveError,
   PlayerNotInRoomError,
   NotYourTurnError,
   InvalidMoveError,
   InvalidPayloadError,
-} from "../../rooms/room.errors.js";
+  OptimisticLockConflictError,
+} from "@fun-chess/shared";
 import { ChessEngine } from "../chess_engine.js";
 import { Chess } from "chess.js";
 import { IClock, IIdGenerator } from "../clock.js";
 
 describe("GameService", () => {
-  let store: MockRoomStore;
+  let store: MockRoomGameAdapter;
   let service: GameService;
 
   const createActiveGameRoom = (
@@ -55,7 +56,7 @@ describe("GameService", () => {
   };
 
   beforeEach(() => {
-    store = new MockRoomStore();
+    store = new MockRoomGameAdapter();
     service = new GameService(store);
   });
 
@@ -279,6 +280,86 @@ describe("GameService", () => {
       const saved = await store.findByCode("TEST");
       expect(saved?.drawOffer).toBeNull();
     });
+
+    it("handles expectedMoveNumber idempotency when move was already applied (MAJ-031)", async () => {
+      const room = createActiveGameRoom("IDEMP");
+      await store.save(room);
+
+      // Play 1. e4
+      const firstMove = await service.makeMove(
+        { roomCode: "IDEMP", move: { from: "e2", to: "e4" }, expectedMoveNumber: 0 },
+        "sock_white",
+      );
+
+      expect(firstMove.gameState.moveCount).toBe(1);
+      expect(firstMove.moveResult.san).toBe("e4");
+
+      const applyCallsBefore = store.applyGameMoveCalls.length;
+
+      // Duplicate resubmission of 1. e4 with expectedMoveNumber = 0 (now < moveCount 1)
+      const replay = await service.makeMove(
+        { roomCode: "IDEMP", move: { from: "e2", to: "e4" }, expectedMoveNumber: 0 },
+        "sock_white",
+      );
+
+      // Returns existing move result idempotently without invoking store.applyGameMove again
+      expect(replay.gameState.moveCount).toBe(1);
+      expect(replay.moveResult.san).toBe("e4");
+      expect(store.applyGameMoveCalls.length).toBe(applyCallsBefore);
+    });
+
+    it("throws OptimisticLockConflictError when expectedMoveNumber is in the past and does not match last move (MAJ-031)", async () => {
+      const room = createActiveGameRoom("CONFLICT");
+      await store.save(room);
+
+      // Play 1. e4
+      await service.makeMove(
+        { roomCode: "CONFLICT", move: { from: "e2", to: "e4" } },
+        "sock_white",
+      );
+
+      // White sends a different move (d2-d4) with expectedMoveNumber = 0
+      await expect(
+        service.makeMove(
+          { roomCode: "CONFLICT", move: { from: "d2", to: "d4" }, expectedMoveNumber: 0 },
+          "sock_white",
+        ),
+      ).rejects.toBeInstanceOf(OptimisticLockConflictError);
+    });
+
+    it("throws InvalidMoveError when expectedMoveNumber is in the future (MAJ-031)", async () => {
+      const room = createActiveGameRoom("FUTURE");
+      await store.save(room);
+
+      await expect(
+        service.makeMove(
+          { roomCode: "FUTURE", move: { from: "e2", to: "e4" }, expectedMoveNumber: 5 },
+          "sock_white",
+        ),
+      ).rejects.toThrow("Move out of sequence: expectedMoveNumber is in the future");
+    });
+
+    it("handles idempotencyKey deduplication when client resubmits after move was applied (MAJ-031)", async () => {
+      const room = createActiveGameRoom("IDEMP_KEY");
+      await store.save(room);
+
+      await service.makeMove(
+        { roomCode: "IDEMP_KEY", move: { from: "e2", to: "e4" }, idempotencyKey: "key-1" },
+        "sock_white",
+      );
+
+      const applyCallsBefore = store.applyGameMoveCalls.length;
+
+      // Duplicate request with idempotencyKey
+      const replay = await service.makeMove(
+        { roomCode: "IDEMP_KEY", move: { from: "e2", to: "e4" }, idempotencyKey: "key-1" },
+        "sock_white",
+      );
+
+      expect(replay.gameState.moveCount).toBe(1);
+      expect(replay.moveResult.san).toBe("e4");
+      expect(store.applyGameMoveCalls.length).toBe(applyCallsBefore);
+    });
   });
 
   describe("resign", () => {
@@ -444,82 +525,44 @@ describe("GameService", () => {
       expect(result.room.game.moveCount).toBe(0);
     });
 
-    it("calls sessionRegistry.updateSessionColor for both players with swapped colors when rematch is accepted (MIN-033)", async () => {
-      const mockSessionRegistry = {
-        createSession: vi.fn(),
-        validateSession: vi.fn(),
-        touchSession: vi.fn(),
-        deleteSession: vi.fn(),
-        deleteSessionsForRoom: vi.fn(),
-        cleanupExpiredSessions: vi.fn(),
-        clear: vi.fn(),
-        updateSessionColor: vi.fn().mockResolvedValue(undefined),
-      };
-
-      const customService = new GameService(
-        store,
-        undefined,
-        undefined,
-        mockSessionRegistry,
-      );
-
-      const room = createActiveGameRoom("REMATCH_REG");
+    it("calls roomAdapter.updateRematch with swapped players when rematch is accepted (MAJ-012)", async () => {
+      const room = createActiveGameRoom("REMATCH_SWAP");
       room.status = "game_over";
       await store.save(room);
 
-      await customService.requestRematch("REMATCH_REG", "sock_white");
-      const result = await customService.respondRematch(
-        "REMATCH_REG",
+      await service.requestRematch("REMATCH_SWAP", "sock_white");
+      const result = await service.respondRematch(
+        "REMATCH_SWAP",
         "sock_black",
         true,
       );
 
       expect(result.accept).toBe(true);
-      expect(mockSessionRegistry.updateSessionColor).toHaveBeenCalledTimes(2);
-      expect(mockSessionRegistry.updateSessionColor).toHaveBeenCalledWith(
-        "REMATCH_REG",
-        "p_white_id",
-        "b",
-      );
-      expect(mockSessionRegistry.updateSessionColor).toHaveBeenCalledWith(
-        "REMATCH_REG",
-        "p_black_id",
-        "w",
-      );
+      const lastRematchCall =
+        store.updateRematchCalls[store.updateRematchCalls.length - 1];
+      expect(lastRematchCall).toBeDefined();
+      expect(lastRematchCall.rematch?.status).toBe("accepted");
+      expect(lastRematchCall.players?.whitePlayer?.id).toBe("p_black_id");
+      expect(lastRematchCall.players?.blackPlayer?.id).toBe("p_white_id");
     });
 
-    it("does not call sessionRegistry.updateSessionColor when rematch is declined (MIN-033)", async () => {
-      const mockSessionRegistry = {
-        createSession: vi.fn(),
-        validateSession: vi.fn(),
-        touchSession: vi.fn(),
-        deleteSession: vi.fn(),
-        deleteSessionsForRoom: vi.fn(),
-        cleanupExpiredSessions: vi.fn(),
-        clear: vi.fn(),
-        updateSessionColor: vi.fn().mockResolvedValue(undefined),
-      };
-
-      const customService = new GameService(
-        store,
-        undefined,
-        undefined,
-        mockSessionRegistry,
-      );
-
+    it("calls roomAdapter.updateRematch with declined status when rematch is declined (MAJ-012)", async () => {
       const room = createActiveGameRoom("REMATCH_DEC");
       room.status = "game_over";
       await store.save(room);
 
-      await customService.requestRematch("REMATCH_DEC", "sock_white");
-      const result = await customService.respondRematch(
+      await service.requestRematch("REMATCH_DEC", "sock_white");
+      const result = await service.respondRematch(
         "REMATCH_DEC",
         "sock_black",
         false,
       );
 
       expect(result.accept).toBe(false);
-      expect(mockSessionRegistry.updateSessionColor).not.toHaveBeenCalled();
+      const lastRematchCall =
+        store.updateRematchCalls[store.updateRematchCalls.length - 1];
+      expect(lastRematchCall).toBeDefined();
+      expect(lastRematchCall.rematch?.status).toBe("declined");
     });
 
     it("reverts room to game_over and clears drawOffer when rematch is declined", async () => {
@@ -562,39 +605,45 @@ describe("GameService", () => {
     });
   });
 
-  describe("store.mutate Atomic Mutation & Terminal Invariants", () => {
-    it("delegates makeMove, resign, offerDraw, and respondDraw execution to store.mutate", async () => {
+  describe("IRoomGameAdapter Delegation & Terminal Invariants (MAJ-012)", () => {
+    it("delegates makeMove, resign, offerDraw, and respondDraw execution to roomAdapter", async () => {
       const room = createActiveGameRoom("MUTATE");
       await store.save(room);
-
-      const mutateSpy = vi.spyOn(store, "mutate");
 
       // 1. makeMove
       await service.makeMove(
         { roomCode: "MUTATE", move: { from: "e2", to: "e4" } },
         "sock_white",
       );
-      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+      expect(store.applyGameMoveCalls).toHaveLength(1);
+      expect(store.applyGameMoveCalls[0].roomCode).toBe("MUTATE");
+      expect(store.applyGameMoveCalls[0].nextGameState.turn).toBe("b");
 
       // 2. offerDraw
       await service.offerDraw("MUTATE", "sock_black");
-      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+      expect(store.updateDrawOfferCalls).toHaveLength(1);
+      expect(store.updateDrawOfferCalls[0].drawOffer?.offeredBy).toBe("p_black_id");
 
       // 3. respondDraw
       await service.respondDraw("MUTATE", "sock_white", false);
-      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+      expect(store.updateDrawOfferCalls).toHaveLength(2);
+      expect(store.updateDrawOfferCalls[1].drawOffer).toBeNull();
 
       // 4. resign
       await service.resign("MUTATE", "sock_black");
-      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+      expect(store.finalizeGameCalls).toHaveLength(1);
+      expect(store.finalizeGameCalls[0].gameOverPayload.winner).toBe("w");
+      expect(store.finalizeGameCalls[0].gameOverPayload.reason).toBe("resignation");
 
       // 5. requestRematch
       await service.requestRematch("MUTATE", "sock_white");
-      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+      expect(store.updateRematchCalls).toHaveLength(1);
+      expect(store.updateRematchCalls[0].rematch?.requestedBy).toBe("p_white_id");
 
       // 6. respondRematch
       await service.respondRematch("MUTATE", "sock_black", true);
-      expect(mutateSpy).toHaveBeenCalledWith("MUTATE", expect.any(Function));
+      expect(store.updateRematchCalls).toHaveLength(2);
+      expect(store.updateRematchCalls[1].rematch?.status).toBe("accepted");
     });
 
     it("enforces terminal game_over invariant: rejects makeMove and offerDraw with GameNotActiveError once match ends", async () => {
@@ -617,7 +666,7 @@ describe("GameService", () => {
     });
   });
 
-  describe("Dependency Injection: Clock & IdGenerator (MAJ-017)", () => {
+  describe("Dependency Injection: Clock & IdGenerator (MAJ-016 & MAJ-017)", () => {
     it("uses injected IClock timestamps on game operations", async () => {
       const fixedTime = 1750000000000;
       const fakeClock: IClock = {
@@ -633,7 +682,7 @@ describe("GameService", () => {
         "sock_white",
       );
 
-      expect(result.room.lastActivityAt).toBe(fixedTime);
+      expect(result.moveResult.timestamp).toBe(fixedTime);
 
       await customService.offerDraw("TIME", "sock_black");
       const roomWithDraw = await store.findByCode("TIME");

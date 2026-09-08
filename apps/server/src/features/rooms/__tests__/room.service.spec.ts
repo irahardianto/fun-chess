@@ -12,6 +12,10 @@ import {
 } from "../room.errors.js";
 import { DisconnectTimerRegistry } from "../disconnect_timer_registry.js";
 import { IClock, IIdGenerator } from "../clock.js";
+import {
+  createInitialGameState,
+  createGameOverPayload,
+} from "@fun-chess/shared";
 
 describe("RoomService", () => {
   let store: MockRoomStore;
@@ -272,6 +276,73 @@ describe("RoomService", () => {
           "sock_new",
         ),
       ).rejects.toThrow(UnauthorizedError);
+    });
+
+    it("rejects reconnect with missing roomCode, playerId, or sessionToken", async () => {
+      await expect(
+        service.reconnect(
+          { roomCode: "", playerId: "p1", sessionToken: "token" } as any,
+          "sock_new",
+        ),
+      ).rejects.toThrow(InvalidPayloadError);
+
+      await expect(
+        service.reconnect(
+          { roomCode: "ABCD", playerId: "", sessionToken: "token" } as any,
+          "sock_new",
+        ),
+      ).rejects.toThrow(InvalidPayloadError);
+
+      await expect(
+        service.reconnect(
+          { roomCode: "ABCD", playerId: "p1", sessionToken: "" } as any,
+          "sock_new",
+        ),
+      ).rejects.toThrow(InvalidPayloadError);
+    });
+
+    it("rejects reconnect with invalid room code format", async () => {
+      await expect(
+        service.reconnect(
+          { roomCode: "invalid!", playerId: "p1", sessionToken: "token" },
+          "sock_new",
+        ),
+      ).rejects.toThrow(InvalidRoomCodeError);
+    });
+
+    it("rejects reconnect to non-existent room", async () => {
+      await expect(
+        service.reconnect(
+          { roomCode: "ZZZZ", playerId: "p1", sessionToken: "token" },
+          "sock_new",
+        ),
+      ).rejects.toThrow(RoomNotFoundError);
+    });
+
+    it("rejects reconnect when player is not in the room", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "P1", preferredColor: "w" },
+        "sock_1",
+      );
+
+      const outsiderSession = await sessionRegistry.createSession({
+        playerId: "outsider_p",
+        roomCode: created.roomCode,
+        color: "w",
+        isHost: false,
+        socketId: "sock_out",
+      });
+
+      await expect(
+        service.reconnect(
+          {
+            roomCode: created.roomCode,
+            playerId: "outsider_p",
+            sessionToken: outsiderSession.sessionToken,
+          },
+          "sock_new",
+        ),
+      ).rejects.toThrow(PlayerNotInRoomError);
     });
   });
 
@@ -883,6 +954,147 @@ describe("RoomService", () => {
       expect(remainingRoom).not.toBeNull();
       expect(remainingRoom?.whitePlayer?.id).toBe(created.hostId);
       expect(remainingRoom?.blackPlayer).toBeNull();
+    });
+  });
+
+  describe("IRoomGameAdapter implementation", () => {
+    it("applyGameMove updates room game state and clears draw offers", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      // Offer draw
+      await service.updateDrawOffer(created.roomCode, {
+        offeredBy: created.hostId,
+        offeredAt: 1200,
+      });
+
+      const nextGame = { ...createInitialGameState(), turn: "b" as const, moveCount: 1 };
+      const updated = await service.applyGameMove(created.roomCode, nextGame);
+
+      expect(updated.game.turn).toBe("b");
+      expect(updated.game.moveCount).toBe(1);
+      expect(updated.drawOffer).toBeNull();
+    });
+
+    it("applyGameMove with gameOverPayload transitions room status to game_over", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      const nextGame = {
+        ...createInitialGameState(),
+        isCheckmate: true,
+        moveCount: 1,
+      };
+      const gameOver = createGameOverPayload({
+        winner: "w",
+        winnerName: "White",
+        reason: "checkmate",
+        finalFen: nextGame.fen,
+        totalMoves: 1,
+        startTimeMs: 1000,
+      });
+
+      const updated = await service.applyGameMove(
+        created.roomCode,
+        nextGame,
+        gameOver,
+      );
+
+      expect(updated.status).toBe("game_over");
+    });
+
+    it("finalizeGame sets game_over status and clears draw offers", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+      await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      await service.updateDrawOffer(created.roomCode, {
+        offeredBy: created.hostId,
+        offeredAt: 1500,
+      });
+
+      const gameOver = createGameOverPayload({
+        winner: "draw",
+        reason: "draw_agreement",
+        finalFen: created.game.fen,
+        totalMoves: 10,
+        startTimeMs: 1000,
+      });
+
+      const updated = await service.finalizeGame(created.roomCode, gameOver);
+
+      expect(updated.status).toBe("game_over");
+      expect(updated.drawOffer).toBeNull();
+    });
+
+    it("updateDrawOffer updates drawOffer state", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+
+      const offer = { offeredBy: created.hostId, offeredAt: 2000 };
+      const updated = await service.updateDrawOffer(created.roomCode, offer);
+      expect(updated.drawOffer).toEqual(offer);
+
+      const cleared = await service.updateDrawOffer(created.roomCode, null);
+      expect(cleared.drawOffer).toBeNull();
+    });
+
+    it("updateRematch updates rematch state and resets game on accepted", async () => {
+      const { room: created } = await service.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+      const { player: blackPlayer } = await service.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      const gameOver = createGameOverPayload({
+        winner: "w",
+        winnerName: "White",
+        reason: "resignation",
+        finalFen: created.game.fen,
+        totalMoves: 5,
+        startTimeMs: 1000,
+      });
+      await service.finalizeGame(created.roomCode, gameOver);
+
+      // Request rematch
+      const proposed = await service.updateRematch(created.roomCode, {
+        requestedBy: blackPlayer.id,
+        requestedAt: 3000,
+        status: "pending",
+      });
+      expect(proposed.rematch?.status).toBe("pending");
+
+      // Accept rematch
+      const accepted = await service.updateRematch(created.roomCode, {
+        requestedBy: blackPlayer.id,
+        requestedAt: 3000,
+        status: "accepted",
+      });
+      expect(accepted.status).toBe("playing");
+      expect(accepted.whitePlayer?.id).toBe(blackPlayer.id);
+      expect(accepted.blackPlayer?.id).toBe(created.hostId);
     });
   });
 });

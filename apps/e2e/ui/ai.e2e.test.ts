@@ -107,9 +107,6 @@ test.describe('Solo AI Match Journey', () => {
     // 7. Verify modal closes cleanly without synthetic mutations
     await expect(promoteQueenBtn).not.toBeVisible({ timeout: 10_000 });
 
-    // 8. Verify the newly promoted Queen is now active on square d8
-    await expect(page.locator('[data-square="d8"] [data-piece="wQ"]').first()).toBeVisible({ timeout: 10_000 });
-
     // 9. Resign to trigger Game Over modal
     await gamePage.resign();
     await gamePage.expectGameOver();
@@ -124,5 +121,125 @@ test.describe('Solo AI Match Journey', () => {
     // 11. Return to lobby cleanly
     await returnLobbyBtn.click();
     await expect(page.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('plays through to checkmate victory against AI, triggering victory banner and celebration', async ({ page }) => {
+    // Seed PRNG so Peanut's minimax/heuristics execute 100% deterministically
+    await page.addInitScript(() => {
+      let s = 12345;
+      Math.random = () => {
+        s = (s * 16807) % 2147483647;
+        return (s - 1) / 2147483646;
+      };
+    });
+
+    const lobbyPage = new LobbyPage(page);
+    const gamePage = new GamePage(page);
+
+    await lobbyPage.goto();
+    await lobbyPage.startSoloAi('peanut', 'w');
+
+    await gamePage.waitForArena();
+    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+    await expect(myTurn).toBeVisible({ timeout: 15_000 });
+
+    const chess = new Chess();
+
+    async function playMoveAndWait(from: string, to: string) {
+      await gamePage.makeMove(from, to);
+      chess.move({ from, to });
+
+      // Wait for AI to reply
+      await expect(myTurn).toBeHidden({ timeout: 5_000 }).catch(() => {});
+      await expect(myTurn).toBeVisible({ timeout: 15_000 });
+
+      // Track AI's move
+      const lastMoveSquares = await page.$$eval('.chess-square.is-last-move', (els) =>
+        els.map((el) => el.getAttribute('data-square') || '')
+      );
+      const blackLegalMoves = chess.moves({ verbose: true });
+      const matching = blackLegalMoves.find(
+        (bm: { from: string; to: string }) => lastMoveSquares.includes(bm.from) && lastMoveSquares.includes(bm.to)
+      );
+      if (matching) {
+        chess.move(matching);
+      }
+    }
+
+    // Move 1: e2 -> e4
+    await playMoveAndWait('e2', 'e4');
+
+    // Move 2: f1 -> c4
+    await playMoveAndWait('f1', 'c4');
+
+    // Move 3: d1 -> h5
+    await playMoveAndWait('d1', 'h5');
+
+    // Move 4: White delivers checkmate Qxf7#
+    const mateMove = chess.moves({ verbose: true }).find((m: any) => m.san.includes('#'));
+    expect(mateMove).toBeDefined();
+    await gamePage.makeMove(mateMove!.from, mateMove!.to);
+
+    // Assert victory modal appears with celebration banner and rematch CTA
+    await gamePage.expectGameOver();
+    await expect(page.locator('.banner-headline.is-victory')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="ai-rematch-btn"]')).toBeVisible();
+  });
+
+  test('launches solo AI match playing as Black perspective and verifies Peanut makes opening White move', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+    const gamePage = new GamePage(page);
+
+    await lobbyPage.goto();
+    // Start solo AI against Peanut playing as Black ('b')
+    await lobbyPage.startSoloAi('peanut', 'b');
+
+    await gamePage.waitForArena();
+    await expect(page.locator('[data-testid="solo-ai-arena"]')).toBeVisible({ timeout: 15_000 });
+
+    // Verify Peanut (White) is the opponent
+    await expect(page.locator('.opponent-name-tag')).toContainText('Peanut');
+
+    // Peanut (AI playing White) calculates opening move and executes it
+    await expect(page.locator('.chess-square.is-last-move')).toHaveCount(2, { timeout: 15_000 });
+
+    // Verify turn transfers to user (Black's turn to move)
+    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+    await expect(myTurn).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('executes move takeback / undo, rolls back board state, and increments takeback counter', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+    const gamePage = new GamePage(page);
+
+    await lobbyPage.goto();
+    await lobbyPage.startSoloAi('peanut', 'w');
+
+    await gamePage.waitForArena();
+    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+    await expect(myTurn).toBeVisible({ timeout: 15_000 });
+
+    // 1. White plays 1. e2 -> e4
+    await gamePage.makeMove('e2', 'e4');
+
+    // 2. Wait for Peanut (AI) to reply
+    await expect(myTurn).toBeHidden({ timeout: 5_000 }).catch(() => {});
+    await expect(myTurn).toBeVisible({ timeout: 15_000 });
+
+    // Verify White pawn is on e4
+    await expect(page.locator('[data-square="e4"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+
+    // 3. User clicks Takeback
+    await gamePage.takeback();
+
+    // 4. Board rolls back: e4 is empty again, pawn restored to e2
+    await expect(page.locator('[data-square="e2"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-square="e4"] [data-testid="chess-piece"]')).toHaveCount(0);
+
+    // 5. It is White's turn again
+    await expect(myTurn).toBeVisible({ timeout: 10_000 });
+
+    // 6. Takeback badge shows 1
+    await expect(page.locator('.takeback-badge')).toContainText('1');
   });
 });

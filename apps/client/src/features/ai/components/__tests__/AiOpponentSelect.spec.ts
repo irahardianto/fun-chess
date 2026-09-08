@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import AiOpponentSelect from '../AiOpponentSelect.vue';
 import { ALL_MASCOTS } from '../../data/index';
+import { safeLocalStorage } from '@/platform/storage';
 
 describe('AiOpponentSelect.vue', () => {
   let mockStorage: Record<string, string> = {};
 
   beforeEach(() => {
     mockStorage = {};
+    safeLocalStorage.clear();
     vi.stubGlobal('localStorage', {
       getItem: vi.fn((key: string) => mockStorage[key] ?? null),
       setItem: vi.fn((key: string, value: string) => {

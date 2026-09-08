@@ -1,4 +1,8 @@
-import type { LanInfoResponse, HealthCheckResponse } from '@fun-chess/shared';
+import type {
+  LanInfoResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
+} from '@fun-chess/shared';
 
 export interface ApiRequestOptions {
   /** Request timeout in milliseconds. Defaults to 3000ms. */
@@ -36,8 +40,11 @@ export interface IApiClient {
   /** Discovers LAN networking information from server */
   getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse>;
 
-  /** Queries operational health telemetry */
-  checkHealth(options?: ApiRequestOptions): Promise<HealthCheckResponse>;
+  /** Lightweight health probe targeting /health (CRIT-001) */
+  checkHealth(options?: ApiRequestOptions): Promise<LivenessHealthResponse>;
+
+  /** Deep telemetry probe targeting /health/detail (CRIT-001) */
+  getDetailedHealth(options?: ApiRequestOptions): Promise<DetailedHealthResponse>;
 
   /** Verifies network connectivity via light probe HEAD request */
   checkConnectivity(probeUrl?: string, options?: ApiRequestOptions): Promise<boolean>;

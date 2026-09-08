@@ -205,10 +205,10 @@ describe('usePuzzleRunner Composable', () => {
       expect(runner.replaySteps.value.length).toBe(4); // Start + 3 plies
       expect(runner.replayTotalSteps.value).toBe(3);
 
-      expect(runner.replaySteps.value[0].san).toBe('Start');
-      expect(runner.replaySteps.value[1].san).toBe('Nxc7+');
-      expect(runner.replaySteps.value[2].san).toBe('Kd8');
-      expect(runner.replaySteps.value[3].san).toBe('Nxa8');
+      expect(runner.replaySteps.value[0]!.san).toBe('Start');
+      expect(runner.replaySteps.value[1]!.san).toBe('Nxc7+');
+      expect(runner.replaySteps.value[2]!.san).toBe('Kd8');
+      expect(runner.replaySteps.value[3]!.san).toBe('Nxa8');
     });
 
     it('steps forward, backward, to start, and to end with updated displayedFen', () => {

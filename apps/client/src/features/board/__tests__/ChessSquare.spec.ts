@@ -157,6 +157,6 @@ describe('ChessSquare.vue', () => {
 
     await wrapper.trigger('keydown', { key: 'ArrowUp' });
     expect(wrapper.emitted('keydown')).toBeDefined();
-    expect(wrapper.emitted('keydown')?.[0][1]).toBe('e4');
+    expect(wrapper.emitted('keydown')?.[0]?.[1]).toBe('e4');
   });
 });

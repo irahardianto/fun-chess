@@ -4,6 +4,11 @@ import { performance } from "node:perf_hooks";
 import { TypedSocketServer } from "../socket/socket_server.js";
 import { Logger } from "../logger/logger.interface.js";
 
+export interface HttpServerWithConnectionControl {
+  closeIdleConnections?: () => void;
+  closeAllConnections?: () => void;
+}
+
 export interface ShutdownCoordinatorOptions {
   server: HttpServer;
   io: TypedSocketServer;
@@ -42,8 +47,8 @@ export class ShutdownCoordinator {
   }
 
   private logFatal(message: string, context?: Record<string, unknown>): void {
-    if (typeof (this.logger as any).fatal === "function") {
-      (this.logger as any).fatal(message, context);
+    if (typeof this.logger.fatal === "function") {
+      this.logger.fatal(message, context);
     } else {
       this.logger.error(message, context);
     }
@@ -118,11 +123,12 @@ export class ShutdownCoordinator {
     if (typeof this.io.disconnectSockets === "function") {
       this.io.disconnectSockets(true);
     }
-    if (typeof (this.server as any).closeIdleConnections === "function") {
-      (this.server as any).closeIdleConnections();
+    const serverWithControl = this.server as unknown as HttpServerWithConnectionControl;
+    if (typeof serverWithControl.closeIdleConnections === "function") {
+      serverWithControl.closeIdleConnections();
     }
-    if (typeof (this.server as any).closeAllConnections === "function") {
-      (this.server as any).closeAllConnections();
+    if (typeof serverWithControl.closeAllConnections === "function") {
+      serverWithControl.closeAllConnections();
     }
 
     // 5. Close Socket.io server and HTTP server concurrently

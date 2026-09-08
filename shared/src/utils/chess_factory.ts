@@ -27,14 +27,43 @@ export interface ChessLogger {
     meta?: ChessLoggerMetadata,
     ...args: unknown[]
   ): void;
+  error?(
+    message: string,
+    meta?: ChessLoggerMetadata,
+    ...args: unknown[]
+  ): void;
 }
 
 /**
- * Silent no-op logger for Chess factory operations (MIN-014).
+ * Default logger for Chess factory operations (MIN-004).
+ * Emits structured warnings to console.warn when warnings occur.
  */
-export const SILENT_CHESS_LOGGER: ChessLogger = {
-  warn: () => {},
+export const DEFAULT_CHESS_LOGGER: ChessLogger = {
+  warn: (message: string, meta?: ChessLoggerMetadata, ...args: unknown[]) => {
+    if (typeof console !== "undefined" && typeof console.warn === "function") {
+      if (meta) {
+        console.warn(message, meta, ...args);
+      } else {
+        console.warn(message, ...args);
+      }
+    }
+  },
+  error: (message: string, meta?: ChessLoggerMetadata, ...args: unknown[]) => {
+    if (typeof console !== "undefined" && typeof console.error === "function") {
+      if (meta) {
+        console.error(message, meta, ...args);
+      } else {
+        console.error(message, ...args);
+      }
+    }
+  },
 };
+
+/**
+ * Backwards-compatible alias for default chess logger.
+ * Note: No longer silently suppresses warnings per MIN-004.
+ */
+export const SILENT_CHESS_LOGGER: ChessLogger = DEFAULT_CHESS_LOGGER;
 
 /**
  * Validates whether a given value is a syntactically and structurally valid chess FEN.
@@ -65,12 +94,12 @@ export function isValidFen(fen: unknown): fen is string {
  * - If fen is invalid or causes an error, falls back safely to standard starting position and logs a warning.
  *
  * @param fen - Optional FEN string to initialize
- * @param logger - Optional injectable logger (defaults to silent no-op object; safe no-op if null/empty)
+ * @param logger - Optional injectable logger (defaults to DEFAULT_CHESS_LOGGER)
  * @returns A fully valid, initialized Chess instance
  */
 export function createSafeChess(
   fen?: string,
-  logger: ChessLogger = SILENT_CHESS_LOGGER,
+  logger: ChessLogger = DEFAULT_CHESS_LOGGER,
 ): Chess {
   if (!fen || typeof fen !== "string") {
     return new Chess();
@@ -117,13 +146,13 @@ export function createSafeChess(
  *
  * @param chess - The Chess instance to update
  * @param fen - The FEN string to load
- * @param logger - Optional injectable logger (defaults to silent no-op object; safe no-op if null/empty)
+ * @param logger - Optional injectable logger (defaults to DEFAULT_CHESS_LOGGER)
  * @returns true if the FEN was successfully loaded, false otherwise
  */
 export function safeLoadFen(
   chess: Chess,
   fen: string,
-  logger: ChessLogger = SILENT_CHESS_LOGGER,
+  logger: ChessLogger = DEFAULT_CHESS_LOGGER,
 ): boolean {
   if (!chess) {
     return false;
@@ -154,8 +183,26 @@ export function safeLoadFen(
     // Restore previous state if possible
     try {
       chess.load(previousFen);
-    } catch {
-      chess.reset();
+    } catch (restoreErr) {
+      logger?.warn(
+        `[safeLoadFen] Failed to restore previous FEN "${previousFen}": ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
+        {
+          operation: "safe_load_fen_restore_previous",
+          previousFen,
+          error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
+        },
+      );
+      try {
+        chess.reset();
+      } catch (resetErr) {
+        logger?.error?.(
+          `[safeLoadFen] Failed to reset chess instance after load failure: ${resetErr instanceof Error ? resetErr.message : String(resetErr)}`,
+          {
+            operation: "safe_load_fen_reset_fallback",
+            error: resetErr instanceof Error ? resetErr.message : String(resetErr),
+          },
+        );
+      }
     }
     return false;
   }

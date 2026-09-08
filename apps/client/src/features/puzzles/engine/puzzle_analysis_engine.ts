@@ -15,8 +15,9 @@ import type {
 import {
   parseUciMove,
   formatPlayerMoveToUci,
+  createSafeChess,
+  isValidFen,
 } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry/index.js';
 
 /**
  * Centipawn values for chess pieces.
@@ -85,8 +86,9 @@ export const THEME_RULES_OF_THUMB: Record<string, string> = {
  * Counts total centipawn material on board for a specific color (excluding king).
  */
 export function calculateColorMaterial(fen: string, color: PieceColor): number {
+  if (!isValidFen(fen)) return 0;
   try {
-    const chess = new Chess(fen);
+    const chess = createSafeChess(fen);
     const board = chess.board();
     let total = 0;
     for (let r = 0; r < 8; r++) {
@@ -110,8 +112,9 @@ export function calculateColorMaterial(fen: string, color: PieceColor): number {
  */
 export function getPieceCounts(fen: string, color: PieceColor): Record<PieceType, number> {
   const counts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
+  if (!isValidFen(fen)) return counts;
   try {
-    const chess = new Chess(fen);
+    const chess = createSafeChess(fen);
     for (const row of chess.board()) {
       for (const p of row) {
         if (p && p.color === color) {
@@ -176,11 +179,20 @@ export function calculateMaterialDelta(
     };
   }
 
+  if (!isValidFen(initialFen) || !isValidFen(finalFen)) {
+    return {
+      netCentipawns: 0,
+      netPoints: 0,
+      formattedAdvantage: 'Positional Advantage ⚡',
+      isDecisive: false,
+    };
+  }
+
   let chessInit: Chess;
   let chessFinal: Chess;
   try {
-    chessInit = new Chess(initialFen);
-    chessFinal = new Chess(finalFen);
+    chessInit = createSafeChess(initialFen);
+    chessFinal = createSafeChess(finalFen);
   } catch {
     return {
       netCentipawns: 0,
@@ -327,7 +339,7 @@ export function getSquaresAttackedByPiece(
     const knightHops = [
       [-2, -1], [-2, 1], [-1, -2], [-1, 2],
       [1, -2], [1, 2], [2, -1], [2, 1],
-    ];
+    ] as const;
     for (const [dr, dc] of knightHops) {
       const nr = rIdx + dr;
       const nc = cIdx + dc;
@@ -546,11 +558,19 @@ export function classifyTacticalMotif(
   readonly confidence: number;
   readonly explanation: string;
 } {
+  if (!isValidFen(fenBefore) || !isValidFen(fenAfter)) {
+    return {
+      theme: 'fork',
+      confidence: 0.5,
+      explanation: 'Tactical move executed.',
+    };
+  }
+
   let chessBefore: Chess;
   let chessAfter: Chess;
   try {
-    chessBefore = new Chess(fenBefore);
-    chessAfter = new Chess(fenAfter);
+    chessBefore = createSafeChess(fenBefore);
+    chessAfter = createSafeChess(fenAfter);
   } catch {
     return {
       theme: 'fork',
@@ -660,17 +680,17 @@ function detectPinOrSkewer(
       const val1 = PIECE_CENTIPAWN_VALUES[firstPiece.type];
       const val2 = PIECE_CENTIPAWN_VALUES[secondPiece.type];
 
-      if (secondPiece.type === 'k' || val2 > val1) {
-        return {
-          theme: 'pin',
-          confidence: 0.88,
-          explanation: `Pin! The ${PIECE_DISPLAY_NAMES[firstPiece.type]} is pinned against a higher-value target.`,
-        };
-      } else if (firstPiece.type === 'k' || val1 > val2) {
+      if (firstPiece.type === 'k' || (secondPiece.type !== 'k' && val1 > val2)) {
         return {
           theme: 'skewer',
           confidence: 0.88,
           explanation: `Skewer! The ${PIECE_DISPLAY_NAMES[firstPiece.type]} is forced to move, exposing the piece behind it.`,
+        };
+      } else if (secondPiece.type === 'k' || val2 > val1) {
+        return {
+          theme: 'pin',
+          confidence: 0.88,
+          explanation: `Pin! The ${PIECE_DISPLAY_NAMES[firstPiece.type]} is pinned against a higher-value target.`,
         };
       }
     }
@@ -688,9 +708,11 @@ export function generateMistakeRefutation(
   playerMove: PlayerMoveAction,
   _depth = 1,
 ): PlayerMistakeRefutation | null {
+  if (!isValidFen(fen)) return null;
+
   let chess: Chess;
   try {
-    chess = new Chess(fen);
+    chess = createSafeChess(fen);
   } catch {
     return null;
   }
@@ -719,7 +741,7 @@ export function generateMistakeRefutation(
 
   // Priority 1: Checkmate
   for (const m of oppMoves) {
-    const copy = new Chess(chess.fen());
+    const copy = createSafeChess(chess.fen());
     copy.move(m);
     if (copy.isCheckmate()) {
       const refUci = `${m.from}${m.to}${m.promotion ?? ''}`;
@@ -800,12 +822,12 @@ export function generateMistakeRefutation(
  * Generates turn-by-turn explanations for every ply in the solution.
  */
 export function generateStepBreakdowns(puzzle: Puzzle): readonly PuzzleStepExplanation[] {
-  if (!puzzle || !puzzle.moves || puzzle.moves.length === 0) return [];
+  if (!puzzle || !puzzle.moves || puzzle.moves.length === 0 || !isValidFen(puzzle.fen)) return [];
 
   const breakdowns: PuzzleStepExplanation[] = [];
   let chess: Chess;
   try {
-    chess = new Chess(puzzle.fen);
+    chess = createSafeChess(puzzle.fen);
   } catch {
     return [];
   }
@@ -915,18 +937,35 @@ export function generateKidExplanation(puzzle: Puzzle, analysis: PuzzleAnalysisR
  * Generates a complete pedagogical analysis of a puzzle from initial FEN to final solution ply.
  */
 export function analyzePuzzleSolution(puzzle: Puzzle): PuzzleAnalysisResult {
+  if (!puzzle || !puzzle.fen || !isValidFen(puzzle.fen)) {
+    const fallbackMat = { white: 0, black: 0, net: 0 };
+    return {
+      initialMaterial: fallbackMat,
+      finalMaterial: fallbackMat,
+      materialDeltaCentipawns: 0,
+      netPointsDelta: 0,
+      advantageSummary: {
+        netCentipawns: 0,
+        netPoints: 0,
+        formattedAdvantage: 'Positional Advantage ⚡',
+        isDecisive: false,
+      },
+      detectedTheme: puzzle?.primaryTheme || 'fork',
+      isCheckmate: false,
+      isPawnPromotion: false,
+      tacticalHeadline: puzzle?.title || 'Tactical Solution',
+      kidFriendlyExplanation: puzzle?.learningSummary || 'Great tactical vision!',
+      ruleOfThumb: puzzle?.keyTakeaway || (puzzle?.primaryTheme ? THEME_RULES_OF_THUMB[puzzle.primaryTheme] : undefined) || 'Always look for forcing moves!',
+      stepNarratives: [],
+    };
+  }
+
   let chessInit: Chess;
   let chessSim: Chess;
   try {
-    chessInit = new Chess(puzzle.fen);
-    chessSim = new Chess(puzzle.fen);
-  } catch (err) {
-    logger.warn('Corrupted or invalid puzzle FEN string during analysis', {
-      operation: 'puzzle_analyze_solution',
-      puzzleId: puzzle.id,
-      fen: puzzle.fen,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    chessInit = createSafeChess(puzzle.fen);
+    chessSim = createSafeChess(puzzle.fen);
+  } catch {
     const fallbackMat = { white: 0, black: 0, net: 0 };
     return {
       initialMaterial: fallbackMat,
@@ -962,13 +1001,7 @@ export function analyzePuzzleSolution(puzzle: Puzzle): PuzzleAnalysisResult {
         to: to as unknown as import('chess.js').Square,
         promotion,
       });
-    } catch (err) {
-      logger.error('Invalid move in puzzle simulation', {
-        operation: 'puzzle_analysis_sim_move',
-        puzzleId: puzzle.id,
-        moveUci,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
       break;
     }
   }

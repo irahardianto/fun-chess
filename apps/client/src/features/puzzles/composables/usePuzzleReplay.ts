@@ -6,7 +6,9 @@ import type {
   PieceColor,
   PuzzleAnalysisResult,
 } from '@fun-chess/shared';
+import { createSafeChess } from '@fun-chess/shared';
 import { parseUciMove } from '../engine/puzzle_validator';
+import { logger } from '@/platform/telemetry';
 
 export interface ReplayStep {
   readonly stepIndex: number;
@@ -67,8 +69,13 @@ export function usePuzzleReplay(options: UsePuzzleReplayOptions = {}) {
 
     let sim: Chess;
     try {
-      sim = new Chess(p.fen);
-    } catch {
+      sim = createSafeChess(p.fen);
+    } catch (err) {
+      logger.warn('Failed to parse puzzle replay FEN', {
+        operation: 'puzzle_replay_sim_fen',
+        fen: p.fen,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return steps;
     }
 
@@ -85,7 +92,12 @@ export function usePuzzleReplay(options: UsePuzzleReplayOptions = {}) {
           to: to as unknown as import('chess.js').Square,
           promotion,
         });
-      } catch {
+      } catch (err) {
+        logger.debug('Failed to execute puzzle replay move', {
+          operation: 'puzzle_replay_move',
+          uci,
+          error: err instanceof Error ? err.message : String(err),
+        });
         moveRes = null;
       }
 

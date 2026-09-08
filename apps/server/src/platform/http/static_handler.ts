@@ -2,6 +2,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
 import { IFileStorage, NodeFileStorage } from "./file_storage.js";
+import { extractClientIp } from "./ip_utils.js";
 
 export const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -35,29 +36,7 @@ export interface StaticFileHandlerOptions {
 
 // --- Decomposed Helper Functions (MIN-022) ---
 
-/**
- * Extracts client IP from incoming HTTP request.
- * Takes the RIGHTMOST IP before proxy when trustProxy is enabled (CRIT-006).
- */
-export function extractClientIp(
-  req: IncomingMessage,
-  trustProxy?: boolean,
-): string {
-  if (trustProxy === true) {
-    const rawForwarded = req.headers?.["x-forwarded-for"];
-    const forwarded = Array.isArray(rawForwarded)
-      ? rawForwarded.join(",")
-      : rawForwarded;
-
-    if (typeof forwarded === "string" && forwarded.trim()) {
-      const parts = forwarded.split(",");
-      const rightmost = parts[parts.length - 1]?.trim();
-      if (rightmost) return rightmost;
-    }
-  }
-
-  return req.socket?.remoteAddress || "127.0.0.1";
-}
+export { extractClientIp };
 
 /**
  * Checks for path traversal sequences, URL encoding bypasses (%2e%2e),
@@ -259,8 +238,25 @@ export async function serveStaticFile(
     const contentType = MIME_TYPES[resolvedExt] || "application/octet-stream";
     const isIndex = targetFilePath.endsWith("index.html");
 
-    sendAssetResponse(res, content, contentType, isIndex, isHead);
-    return true;
+    try {
+      sendAssetResponse(res, content, contentType, isIndex, isHead);
+      return true;
+    } catch (sendErr: unknown) {
+      logger?.error("Failed to send static asset response", {
+        operation: "http_static",
+        correlationId,
+        path: urlPath,
+        error:
+          sendErr instanceof Error
+            ? { name: sendErr.name, message: sendErr.message, stack: sendErr.stack }
+            : { raw: sendErr },
+      });
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Internal Server Error");
+      }
+      return true;
+    }
   } catch (err: unknown) {
     const errCode = (err as { code?: string })?.code;
     if (errCode && errCode !== "ENOENT") {
@@ -274,11 +270,13 @@ export async function serveStaticFile(
             ? { name: err.name, message: err.message, stack: err.stack }
             : { raw: err },
       });
-      res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-      if (isHead) {
-        res.end();
-      } else {
-        res.end("Internal Server Error");
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        if (isHead) {
+          res.end();
+        } else {
+          res.end("Internal Server Error");
+        }
       }
       return true;
     }
@@ -289,11 +287,29 @@ export async function serveStaticFile(
       !ext &&
       (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader)
     ) {
-      sendAssetResponse(res, options.fallbackHtml, "text/html; charset=utf-8", true, isHead);
-      return true;
+      try {
+        sendAssetResponse(res, options.fallbackHtml, "text/html; charset=utf-8", true, isHead);
+        return true;
+      } catch (fallbackErr: unknown) {
+        logger?.error("Failed to send fallback HTML response", {
+          operation: "http_static",
+          correlationId,
+          path: urlPath,
+          error:
+            fallbackErr instanceof Error
+              ? { name: fallbackErr.name, message: fallbackErr.message }
+              : { raw: fallbackErr },
+        });
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Internal Server Error");
+        }
+        return true;
+      }
     }
 
     logger?.debug("Static file not found and no fallback provided", {
+      operation: "http_static",
       targetFilePath,
       correlationId,
       error: err instanceof Error ? err.message : String(err),

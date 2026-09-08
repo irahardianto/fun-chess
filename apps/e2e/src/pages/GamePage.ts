@@ -12,6 +12,8 @@ export class GamePage {
   readonly offerDrawAction: Locator;
   readonly flipBoardAction: Locator;
   readonly turnIndicator: Locator;
+  readonly takebackAction: Locator;
+  readonly disconnectWarningBanner: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -21,6 +23,8 @@ export class GamePage {
     this.offerDrawAction = page.locator('[data-testid="offer-draw-action"], [data-testid="offer-draw-btn"]');
     this.flipBoardAction = page.locator('[data-testid="flip-board-action"], [data-testid="flip-btn"]');
     this.turnIndicator = page.locator('.arena-turn-indicator, .ai-turn-indicator, [role="status"]');
+    this.takebackAction = page.locator('[data-testid="takeback-btn"]');
+    this.disconnectWarningBanner = page.locator('.disconnect-warning-banner');
   }
 
   /**
@@ -102,13 +106,22 @@ export class GamePage {
   }
 
   /**
+   * Executes a move takeback / undo in Solo AI mode.
+   */
+  async takeback(): Promise<void> {
+    await expect(this.takebackAction).toBeVisible({ timeout: 10_000 });
+    await expect(this.takebackAction).toBeEnabled({ timeout: 10_000 });
+    await this.takebackAction.click();
+  }
+
+  /**
    * Waits for the game over modal / rematch dialog to appear on screen.
    */
-  async expectGameOver(): Promise<void> {
+  async expectGameOver(timeout = 15_000): Promise<void> {
     const gameOverLocator = this.page.locator(
       '[data-testid="ai-rematch-btn"], [data-testid="request-rematch-btn"], [data-testid="game-over-message"], .ai-game-over-content, .game-over-content'
     ).first();
 
-    await expect(gameOverLocator).toBeVisible({ timeout: 15_000 });
+    await expect(gameOverLocator).toBeVisible({ timeout });
   }
 }

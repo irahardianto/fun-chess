@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { registerGameSocketHandlers } from "../game.socket_handler.js";
 import { GameService } from "../game.service.js";
-import { MockRoomStore } from "../../rooms/mock_room.store.js";
+import { MockRoomGameAdapter } from "./mock_room_adapter.js";
 import { NullLogger } from "../../../platform/logger/null_logger.js";
 import { TypedSocketServer } from "../../../platform/socket/socket_server.js";
 import { Socket } from "socket.io";
@@ -70,7 +70,7 @@ class TestIo {
 }
 
 describe("Game Socket Handlers", () => {
-  let store: MockRoomStore;
+  let store: MockRoomGameAdapter;
   let service: GameService;
   let logger: NullLogger;
   let io: TestIo;
@@ -116,7 +116,7 @@ describe("Game Socket Handlers", () => {
   };
 
   beforeEach(() => {
-    store = new MockRoomStore();
+    store = new MockRoomGameAdapter();
     service = new GameService(store);
     logger = new NullLogger();
     io = new TestIo();
@@ -263,7 +263,7 @@ describe("Game Socket Handlers", () => {
 
       expect(rateLimitAck.success).toBe(false);
       expect(rateLimitAck.error.code).toBe("ERR_RATE_LIMITED");
-      expect(rateLimitAck.error.message).toContain("Rate limit exceeded for game moves");
+      expect(rateLimitAck.error.message).toContain("Maximum 5 requests per 10 seconds allowed.");
     });
   });
 

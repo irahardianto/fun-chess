@@ -62,7 +62,7 @@ export class BrowserStorageAdapter implements KeyValueStorage {
       return this.fallback.get(key) ?? null;
     }
     try {
-      return storage.getItem(key);
+      return storage.getItem(key) ?? this.fallback.get(key) ?? null;
     } catch {
       return this.fallback.get(key) ?? null;
     }

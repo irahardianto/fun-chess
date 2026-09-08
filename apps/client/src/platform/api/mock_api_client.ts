@@ -1,5 +1,9 @@
 import type { IApiClient, ApiRequestOptions, ApiResponse } from './api_client.interface';
-import type { LanInfoResponse, HealthCheckResponse } from '@fun-chess/shared';
+import type {
+  LanInfoResponse,
+  LivenessHealthResponse,
+  DetailedHealthResponse,
+} from '@fun-chess/shared';
 
 export class MockApiClient implements IApiClient {
   public lanInfoResult: LanInfoResponse = {
@@ -26,7 +30,15 @@ export class MockApiClient implements IApiClient {
     return this.lanInfoResult;
   }
 
-  async checkHealth(_options?: ApiRequestOptions): Promise<HealthCheckResponse> {
+  async checkHealth(_options?: ApiRequestOptions): Promise<LivenessHealthResponse> {
+    return {
+      status: this.isHealthy ? 'ok' : 'degraded',
+      uptimeSeconds: 120,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  async getDetailedHealth(_options?: ApiRequestOptions): Promise<DetailedHealthResponse> {
     return {
       status: this.isHealthy ? 'ok' : 'degraded',
       uptimeSeconds: 120,

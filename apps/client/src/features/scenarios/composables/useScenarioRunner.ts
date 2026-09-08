@@ -1,4 +1,4 @@
-import { ref, computed, readonly, onUnmounted, getCurrentInstance } from 'vue';
+import { ref, computed, readonly, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope } from 'vue';
 import type { Move } from 'chess.js';
 import type {
   Square,
@@ -15,6 +15,7 @@ import {
 } from '../engine/scenario_validator';
 import { calculateStars, calculateAccuracy } from '../engine/star_calculator';
 import { useBoardSelection } from '../../board/index';
+import { logger } from '@/platform/telemetry';
 
 export interface ScenarioStepOutcomeEvent {
   type: 'scenario_step_completed';
@@ -110,7 +111,11 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       safeLoadFen(chess, fenStr);
       currentFen.value = chess.fen();
     } catch (err) {
-      console.warn('[useScenarioRunner] safeLoadFen failed, using fallback string:', err);
+      logger.warn('Failed to load FEN into engine, using fallback string', {
+        operation: 'scenario_sync_fen',
+        fen: fenStr,
+        error: err instanceof Error ? err.message : String(err),
+      });
       currentFen.value = fenStr;
     }
   }
@@ -123,7 +128,11 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       });
       return moves.map((m) => m.to as Square);
     } catch (err) {
-      console.warn('[useScenarioRunner] chess.moves failed:', err);
+      logger.warn('Failed to compute legal moves for square', {
+        operation: 'scenario_legal_moves',
+        square: sq,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return [];
     }
   }
@@ -140,6 +149,7 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
 
     currentStepIndex.value = stepIdx;
     const step = scenario.value.steps[stepIdx];
+    if (!step) return;
     syncEngineFen(step.setupFen);
 
     activeHint.value = null;
@@ -195,7 +205,12 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
         promotion: isPromo ? promoChar : undefined,
       });
     } catch (err) {
-      console.warn('[useScenarioRunner] chess.move error, using fallback board mutation:', err);
+      logger.warn('Failed to apply move via chess engine, using fallback board mutation', {
+        operation: 'scenario_player_move_engine',
+        from: move.from,
+        to: move.to,
+        error: err instanceof Error ? err.message : String(err),
+      });
       res = null;
     }
 
@@ -241,7 +256,12 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
             promotion: oppPromo,
           });
         } catch (err) {
-          console.warn('[useScenarioRunner] Bot response chess.move error, using fallback mutation:', err);
+          logger.warn('Failed to apply bot response via chess engine, using fallback mutation', {
+            operation: 'scenario_bot_response_engine',
+            from: opp.from,
+            to: opp.to,
+            error: err instanceof Error ? err.message : String(err),
+          });
           oppRes = null;
         }
 
@@ -255,7 +275,10 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
             );
             oppMoveSuccess = true;
           } else {
-            console.warn('[useScenarioRunner] Opponent move failed: piece not found at', opp.from);
+            logger.warn('Opponent move failed: piece not found at source square', {
+              operation: 'scenario_bot_response_piece_missing',
+              from: opp.from,
+            });
             oppMoveSuccess = false;
           }
         } else {
@@ -267,7 +290,10 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
           lastMove.value = { from: opp.from, to: opp.to };
         }
       } catch (err) {
-        console.warn('[useScenarioRunner] Bot response execution failed:', err);
+        logger.warn('Bot response execution failed', {
+          operation: 'scenario_bot_response_execution',
+          error: err instanceof Error ? err.message : String(err),
+        });
         oppMoveSuccess = false;
       } finally {
         isWaitingForBotResponse.value = false;
@@ -311,7 +337,10 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
 
       return true;
     } catch (err) {
-      console.warn('[useScenarioRunner] applyPlayerMove error:', err);
+      logger.warn('Failed to apply player move', {
+        operation: 'scenario_apply_player_move',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return false;
     }
   }
@@ -324,7 +353,11 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
         if (!piece) return null;
         return { type: piece.type, color: piece.color as 'w' | 'b' };
       } catch (err) {
-        console.warn('[useScenarioRunner] getPiece error:', err);
+        logger.warn('Failed to inspect piece at square', {
+          operation: 'scenario_get_piece',
+          square: sq,
+          error: err instanceof Error ? err.message : String(err),
+        });
         return null;
       }
     },
@@ -356,7 +389,11 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
         return;
       }
     } catch (err) {
-      console.warn('[useScenarioRunner] selectSquare piece check error:', err);
+      logger.warn('Failed to check piece on square selection', {
+        operation: 'scenario_select_square_check',
+        square: sq,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // Deselect if empty or invalid
@@ -404,10 +441,11 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
 
     // Determine highlight glow squares
     if (currentStep.value.allowedMoves && currentStep.value.allowedMoves.length > 0) {
-      hintGlowSquare.value = currentStep.value.allowedMoves[0].from;
-      hintTargetSquare.value = currentStep.value.allowedMoves[0].to;
+      const firstMove = currentStep.value.allowedMoves[0];
+      hintGlowSquare.value = firstMove?.from ?? null;
+      hintTargetSquare.value = firstMove?.to ?? null;
     } else if (currentStep.value.highlightSquares && currentStep.value.highlightSquares.length > 0) {
-      hintGlowSquare.value = currentStep.value.highlightSquares[0];
+      hintGlowSquare.value = currentStep.value.highlightSquares[0] ?? null;
       hintTargetSquare.value = currentStep.value.highlightSquares[1] ?? null;
     }
   }
@@ -424,7 +462,11 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     }
   }
 
-  if (getCurrentInstance()) {
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      clearTimers();
+    });
+  } else if (getCurrentInstance()) {
     onUnmounted(() => {
       clearTimers();
     });

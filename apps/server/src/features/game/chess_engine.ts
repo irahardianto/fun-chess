@@ -7,11 +7,8 @@ import {
   PieceType,
   Square,
   calculateMaterialAndCaptures,
+  getKingSquare,
 } from "@fun-chess/shared";
-import { logger } from "../../platform/logger/index.js";
-
-const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
-const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 
 export interface ValidationSuccess {
   success: true;
@@ -56,12 +53,7 @@ export class ChessEngine {
     let chess: Chess;
     try {
       chess = new Chess(currentFen);
-    } catch (err: unknown) {
-      logger.warn("Invalid board FEN string in chess engine move validation", {
-        operation: "chess_engine_validate_move_fen",
-        currentFen,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
       return { success: false, error: "Invalid board FEN string" };
     }
 
@@ -138,13 +130,14 @@ export class ChessEngine {
   /**
    * Validates and applies a move to the current FEN board state.
    * Delegates to pure validateMove and applyMove methods to preserve backwards compatibility.
+   * Requires explicit timestamp (MAJ-016).
    */
   public static validateAndApplyMove(
     currentFen: string,
     move: MovePayload,
     expectedTurn: PieceColor,
-    currentHistory: MoveResult[] = [],
-    timestamp: number = Date.now(),
+    currentHistory: MoveResult[],
+    timestamp: number,
   ): MoveValidationOutcome {
     const validation = this.validateMove(currentFen, move, expectedTurn);
     if (!validation.success) {
@@ -296,24 +289,10 @@ export class ChessEngine {
 
   /**
    * Locates the square of the king for a given color.
+   * Delegates to shared getKingSquare (MIN-019).
    */
   public static getKingSquare(chess: Chess, color: PieceColor): Square | null {
-    const board = chess.board();
-    for (let r = 0; r < 8; r++) {
-      const row = board[r];
-      if (!row) continue;
-      for (let c = 0; c < 8; c++) {
-        const piece = row[c];
-        if (piece && piece.type === "k" && piece.color === color) {
-          const file = FILES[c];
-          const rank = RANKS[r];
-          if (file && rank) {
-            return `${file}${rank}` as Square;
-          }
-        }
-      }
-    }
-    return null;
+    return getKingSquare(chess, color);
   }
 
   /**

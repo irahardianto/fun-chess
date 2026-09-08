@@ -103,7 +103,7 @@ describe("createSocketServer (MAJ-002, MAJ-017)", () => {
           LOG_LEVEL: "info",
         },
       }),
-    ).toThrowError(/FATAL: CORS_ORIGIN or PUBLIC_URL must be configured in production mode/);
+    ).toThrowError(/FATAL: CORS_ORIGIN, PUBLIC_URL, or CLIENT_URL must be configured in production mode/);
   });
 
   it("registers engine connection_error listener and strips query string from URL (MAJ-017, MAJ-022)", () => {

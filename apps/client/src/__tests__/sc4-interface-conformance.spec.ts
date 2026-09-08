@@ -104,7 +104,7 @@ describe('SC-4 Interface Specifications & UI/UX Conformance Suite', () => {
   describe('3. Actionable Error Messages', () => {
     it('useProgressSync provides actionable error strings for storage and export failures', () => {
       expect(useProgressSyncSrc).toContain("syncError.value = 'Unable to load progress. Refresh the page to try again.';");
-      expect(useProgressSyncSrc).toContain("syncError.value = err?.message || 'Unable to export backup file. Check storage permissions and try again.';");
+      expect(useProgressSyncSrc).toContain("syncError.value = (err instanceof Error ? err.message : null) || 'Unable to export backup file. Check storage permissions and try again.';");
     });
 
     it('App.vue uses actionable error notifications for room failures', () => {

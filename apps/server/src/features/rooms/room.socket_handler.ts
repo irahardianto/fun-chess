@@ -10,17 +10,21 @@ import {
   ReconnectRequestSchema,
   RoomState,
   Player,
+  GameOverPayload,
 } from "@fun-chess/shared";
-import { Logger } from "../../platform/logger/logger.interface.js";
-import { wrapSocketHandler } from "../../platform/socket/socket_logging_middleware.js";
+import { type Logger, runLoggedJob } from "../../platform/logger/index.js";
 import {
-  SocketRateLimiter,
+  type SocketRateLimiter,
   createSocketRateLimiter,
-} from "../../platform/socket/socket_rate_limiter.js";
+  type TypedSocketServer,
+  type SocketOperationContext,
+} from "../../platform/socket/index.js";
+import {
+  createFeatureSocketHandler,
+  type FeatureSocketHandlerOptions,
+} from "../common/socket_handler.utils.js";
 import { RoomService } from "./room.service.js";
 import type { IRoomService } from "./room.interface.js";
-import { TypedSocketServer } from "../../platform/socket/socket_server.js";
-import { runLoggedJob } from "../../platform/logger/job_runner.js";
 import {
   type IDisconnectTimerRegistry,
   DisconnectTimerRegistry,
@@ -48,70 +52,34 @@ function createRoomHandler<TReq, TRes>(
   logger: Logger,
   operationName: string,
   socket: Socket,
-  options: { schema: any; rateLimiter: SocketRateLimiter },
-  handler: (req: TReq, context: any) => Promise<TRes>,
+  options: FeatureSocketHandlerOptions<TReq>,
+  handler: (req: TReq, context: SocketOperationContext) => Promise<TRes>,
 ) {
-  const rateLimitLogger: Logger = new Proxy(logger, {
-    get(target, prop, receiver) {
-      if (prop === "warn") {
-        return (msg: string, meta?: Record<string, unknown>) => {
-          target.warn(msg, meta);
-          if (msg === "Operation rate limit exceeded" && meta?.operation) {
-            target.warn(`Rate limit exceeded for ${meta.operation}`, meta);
-          }
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-
-  const getMessage = (op: string) => {
-    const limitDesc =
-      (options.rateLimiter as any)?.getLimitDescription?.() ||
-      "Maximum 60 requests per 10 seconds allowed.";
-    switch (op) {
-      case "room:create":
-        return `Rate limit exceeded for room creation. ${limitDesc}`;
-      case "room:join":
-        return `Rate limit exceeded for room joining. ${limitDesc}`;
-      case "room:reconnect":
-        return `Rate limit exceeded for room reconnection. ${limitDesc}`;
-      case "room:leave":
-        return `Rate limit exceeded for room leave. ${limitDesc}`;
-      default:
-        return `Rate limit exceeded for ${op}. ${limitDesc}`;
-    }
-  };
-
-  const proxiedSocket = new Proxy(socket, {
-    get(target, prop, receiver) {
-      if (prop === "emit") {
-        return (event: string, ...args: any[]) => {
-          if (event === "error" && args[0]?.code === "ERR_RATE_LIMITED") {
-            args[0].message = getMessage(operationName);
-          }
-          return (target as any).emit(event, ...args);
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-
-  const wrapped = wrapSocketHandler<TReq, TRes>(
-    rateLimitLogger,
+  const inner = createFeatureSocketHandler<TReq, TRes>(
+    logger,
     operationName,
-    proxiedSocket,
+    socket,
     options,
     handler,
   );
-
-  return (rawReq: unknown, callback?: (res: any) => void) => {
-    return wrapped(
+  return async (rawReq: unknown, callback?: (res: unknown) => void): Promise<void> => {
+    return inner(
       rawReq,
       callback
         ? (res: any) => {
             if (res?.error?.code === "ERR_RATE_LIMITED") {
-              res.error.message = getMessage(operationName);
+              const limitDesc = options.rateLimiter.getLimitDescription();
+              const opDesc =
+                operationName === "room:create"
+                  ? "room creation"
+                  : operationName === "room:join"
+                    ? "room joining"
+                    : operationName === "room:reconnect"
+                      ? "room reconnection"
+                      : operationName === "room:leave"
+                        ? "room leave"
+                        : operationName;
+              res.error.message = `Rate limit exceeded for ${opDesc}. ${limitDesc}`;
             }
             callback(res);
           }
@@ -211,9 +179,9 @@ export function registerRoomSocketHandlers(
         playerId: result.player.id,
         playerName: result.player.name,
         roomStatus: result.room.status,
-      } as any);
+      });
 
-      socket.emit("room:reconnected" as any, {
+      socket.emit("room:reconnected", {
         room: result.room,
         player: result.player,
         roomStatus: result.room.status,
@@ -231,7 +199,10 @@ export function registerRoomSocketHandlers(
   socket.on("room:reconnect", handleReconnect);
 
   // 4. room:leave
-  const handleLeave = createRoomHandler<LeaveRoomRequest, { success: true }>(
+  const handleLeave = createRoomHandler<
+    LeaveRoomRequest,
+    { success: true }
+  >(
     logger,
     "room:leave",
     socket,
@@ -266,7 +237,7 @@ export function registerRoomSocketHandlers(
 
 /**
  * Handles socket disconnection event across rooms.
- * Starts a 60-second grace timer if the player was in an active game.
+ * Starts a grace timer under the room lock if the player was in an active game.
  * Uses standardized 3-point logged job for disconnect abandonment (MAJ-023).
  */
 export async function handleSocketDisconnect(
@@ -279,11 +250,41 @@ export async function handleSocketDisconnect(
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
   correlationId?: string,
 ): Promise<void> {
-  const result = await roomService.handleDisconnect(socketId);
+  const onForfeit = async (room: RoomState, gameOverPayload: GameOverPayload) => {
+    try {
+      await runLoggedJob(
+        logger,
+        "disconnect_grace_period_abandonment",
+        async (jobCorrelationId) => {
+          logger.info("Game forfeited by abandonment", {
+            operation: "game_abandoned",
+            correlationId: jobCorrelationId,
+            roomCode: room.roomCode,
+            playerId: gameOverPayload.winner,
+            winner: gameOverPayload.winner,
+          });
+          io.to(room.roomCode).emit("game:over", gameOverPayload);
+          return {
+            roomCode: room.roomCode,
+            forfeited: true,
+          };
+        },
+      );
+    } catch {
+      // Handled by runLoggedJob
+    }
+  };
+
+  const result = await roomService.handleDisconnect(
+    socketId,
+    onForfeit,
+    gracePeriodMs,
+    timerRegistry,
+  );
   if (!result) return;
 
   const { room, player, wasActiveGame } = result;
-  logger.info(`Player disconnected from room ${room.roomCode}`, {
+  logger.info("Player disconnected from room", {
     operation: "player_disconnected",
     ...(correlationId ? { correlationId } : {}),
     roomCode: room.roomCode,
@@ -296,49 +297,5 @@ export async function handleSocketDisconnect(
     playerId: player.id,
     gracePeriodMs,
     roomStatus: room.status,
-  } as any);
-
-  if (wasActiveGame) {
-    // Clear any previous timer for this player/room
-    timerRegistry.cancel(room.roomCode, player.id);
-
-    const timer = setTimeout(async () => {
-      timerRegistry.cancel(room.roomCode, player.id);
-      try {
-        await runLoggedJob(
-          logger,
-          "disconnect_grace_period_abandonment",
-          async (correlationId) => {
-            const forfeitResult = await roomService.handleAbandonmentForfeit(
-              room.roomCode,
-              player.id,
-            );
-            if (forfeitResult) {
-              logger.info(
-                `Game forfeited by abandonment in room ${room.roomCode}`,
-                {
-                  operation: "game_abandoned",
-                  correlationId,
-                  roomCode: room.roomCode,
-                  playerId: player.id,
-                  winner: forfeitResult.gameOverPayload.winner,
-                },
-              );
-              io.to(room.roomCode).emit("game:over", forfeitResult.gameOverPayload);
-            }
-            return {
-              roomCode: room.roomCode,
-              playerId: player.id,
-              forfeited: !!forfeitResult,
-            };
-          },
-        );
-      } catch {
-        // runLoggedJob logs error on failure; caught here to prevent unhandled rejection in setTimeout
-      }
-    }, gracePeriodMs);
-
-    timer.unref?.();
-    timerRegistry.set(room.roomCode, player.id, timer);
-  }
+  });
 }

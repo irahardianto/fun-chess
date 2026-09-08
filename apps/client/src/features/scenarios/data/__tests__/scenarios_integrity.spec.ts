@@ -28,7 +28,7 @@ describe('Scenarios Data Integrity & Chess Rules Validation', () => {
     const greek = SCENARIOS_MAP.get('greek-gift-sacrifice');
     expect(cct).toBeDefined();
     expect(greek).toBeDefined();
-    expect(cct!.steps[0].setupFen).not.toBe(greek!.steps[0].setupFen);
+    expect(cct!.steps[0]!.setupFen).not.toBe(greek!.steps[0]!.setupFen);
   });
 
   // Scenarios whose final step is explicitly designed to deliver Checkmate
@@ -57,14 +57,14 @@ describe('Scenarios Data Integrity & Chess Rules Validation', () => {
     const scenario = SCENARIOS_MAP.get(scenarioId);
     expect(scenario, `Scenario ${scenarioId} must exist`).toBeDefined();
 
-    const lastStep = scenario!.steps[scenario!.steps.length - 1];
+    const lastStep = scenario!.steps[scenario!.steps.length - 1]!;
     expect(lastStep.allowedMoves, `Step ${lastStep.id} must have allowedMoves`).toBeDefined();
     expect(lastStep.allowedMoves!.length).toBeGreaterThan(0);
 
     const chess = new Chess();
     chess.load(lastStep.setupFen);
 
-    const move = lastStep.allowedMoves![0];
+    const move = lastStep.allowedMoves![0]!;
     const moveResult = chess.move({
       from: move.from,
       to: move.to,
@@ -124,7 +124,7 @@ describe('Scenarios Data Integrity & Chess Rules Validation', () => {
         const testChess = new Chess();
         testChess.load(step.setupFen);
 
-        const primaryMove = step.allowedMoves[0];
+        const primaryMove = step.allowedMoves[0]!;
         testChess.move({
           from: primaryMove.from,
           to: primaryMove.to,
@@ -147,8 +147,8 @@ describe('Scenarios Data Integrity & Chess Rules Validation', () => {
         const nextStep = scenario.steps[index + 1];
         if (nextStep && step.opponentResponse) {
           // Compare board piece placements (first token of FEN)
-          const resultingPiecePlacement = testChess.fen().split(' ')[0];
-          const expectedPiecePlacement = nextStep.setupFen.split(' ')[0];
+          const resultingPiecePlacement = testChess.fen().split(' ')[0]!;
+          const expectedPiecePlacement = nextStep.setupFen.split(' ')[0]!;
           expect(
             resultingPiecePlacement,
             `Step continuity mismatch between step ${step.id} and step ${nextStep.id} in ${scenario.id}`

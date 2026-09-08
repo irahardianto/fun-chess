@@ -62,25 +62,20 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
       expect(res.status).toBe(500);
       expect(res.headers.get("content-type")).toContain("application/json");
 
-      const body = (await res.json()) as {
-        code: number;
-        error: string;
-        message: string;
-        correlationId?: string;
-        timestamp: number;
-      };
+      const body = (await res.json()) as any;
 
+      expect(body.status).toBe("error");
       expect(body.code).toBe(500);
-      expect(body.error).toBe("ERR_INTERNAL_SERVER");
-      expect(body.message).toBe("Internal server error");
-      expect(body.correlationId).toBeDefined();
+      expect(body.error.code).toBe("ERR_INTERNAL_SERVER_ERROR");
+      expect(body.error.message).toBe("Internal server error");
+      expect(body.error.correlationId).toBeDefined();
 
       // Assert: Structured 3-point error logging (logging-and-observability-mandate)
       const errorLog = logger.errorLogs.find(
         (l) => l.context?.operation === "http_error",
       );
       expect(errorLog).toBeDefined();
-      expect(errorLog?.context?.correlationId).toBe(body.correlationId);
+      expect(errorLog?.context?.correlationId).toBe(body.error.correlationId);
       expect(errorLog?.context?.method).toBe("GET");
       expect(errorLog?.context?.path).toBe("/metrics");
       expect(errorLog?.context?.duration).toBeGreaterThanOrEqual(0);
@@ -100,17 +95,12 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
 
       // Assert
       expect(res.status).toBe(500);
-      const body = (await res.json()) as {
-        code: number;
-        error: string;
-        message: string;
-        correlationId?: string;
-        timestamp: number;
-      };
+      const body = (await res.json()) as any;
 
+      expect(body.status).toBe("error");
       expect(body.code).toBe(500);
-      expect(body.error).toBe("ERR_INTERNAL_SERVER");
-      expect(body.message).toBe("Internal server error");
+      expect(body.error.code).toBe("ERR_INTERNAL_SERVER_ERROR");
+      expect(body.error.message).toBe("Internal server error");
 
       const errorLog = logger.errorLogs.find(
         (l) => l.context?.operation === "http_error",

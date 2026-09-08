@@ -464,7 +464,7 @@ describe('PuzzleArena.vue', () => {
 
       // Solve the ladder puzzle plies
       for (let i = 0; i < puzzle.moves.length; i += 2) {
-        const uci = puzzle.moves[i];
+        const uci = puzzle.moves[i]!;
         const from = uci.slice(0, 2);
         const to = uci.slice(2, 4);
         const promo = uci.length > 4 ? uci.charAt(4) : undefined;

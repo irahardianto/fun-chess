@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { LocalStorageProgressStore } from '../local_storage_progress.store';
+import { safeLocalStorage } from '@/platform/storage';
 
 describe('LocalStorageProgressStore', () => {
   const TEST_STORAGE_KEY = 'test_fun_chess_scenario_progress';
@@ -8,6 +9,7 @@ describe('LocalStorageProgressStore', () => {
 
   beforeEach(() => {
     mockStorage = {};
+    safeLocalStorage.clear();
 
     vi.stubGlobal('localStorage', {
       getItem: vi.fn((key: string) => mockStorage[key] ?? null),

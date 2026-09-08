@@ -377,4 +377,208 @@ test.describe('Multiplayer LAN / Online Journey', () => {
       await guestContext.close();
     }
   });
+
+  test('handles pawn promotion flow synchronized across Host and Guest', async ({ browser }) => {
+    const hostContext = await browser.newContext();
+    const guestContext = await browser.newContext();
+
+    const hostPage = await hostContext.newPage();
+    const guestPage = await guestContext.newPage();
+
+    try {
+      const hostLobby = new LobbyPage(hostPage);
+      const guestLobby = new LobbyPage(guestPage);
+      const hostGame = new GamePage(hostPage);
+      const guestGame = new GamePage(guestPage);
+
+      // 1. Host creates room and Guest joins
+      await hostLobby.goto();
+      await hostLobby.hostGame('PromoteHost', 'w');
+      const roomCode = await hostLobby.getRoomCode();
+
+      await guestLobby.goto();
+      await guestLobby.joinGame('PromoteGuest', roomCode);
+
+      await Promise.all([
+        hostGame.waitForArena(),
+        guestGame.waitForArena(),
+      ]);
+
+      // Move 1: White a2 -> a4, Black b7 -> b5
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 15_000 });
+      await hostGame.makeMove('a2', 'a4');
+      await expect(guestPage.locator('[data-square="a4"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(guestPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+      await guestGame.makeMove('b7', 'b5');
+
+      // Move 2: White a4 -> b5 (capture), Black h7 -> h6
+      await expect(hostPage.locator('[data-square="b5"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+      await hostGame.makeMove('a4', 'b5');
+      await expect(guestPage.locator('[data-square="b5"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(guestPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+      await guestGame.makeMove('h7', 'h6');
+
+      // Move 3: White b5 -> b6, Black h6 -> h5
+      await expect(hostPage.locator('[data-square="h6"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+      await hostGame.makeMove('b5', 'b6');
+      await expect(guestPage.locator('[data-square="b6"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(guestPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+      await guestGame.makeMove('h6', 'h5');
+
+      // Move 4: White b6 -> c7 (capture), Black h5 -> h4
+      await expect(hostPage.locator('[data-square="h5"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+      await hostGame.makeMove('b6', 'c7');
+      await expect(guestPage.locator('[data-square="c7"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(guestPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+      await guestGame.makeMove('h5', 'h4');
+
+      // Move 5: White c7 -> b8 (capture knight, pawn advances to 8th rank)
+      await expect(hostPage.locator('[data-square="h4"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+      await hostGame.makeMove('c7', 'b8');
+
+      // 2. Host sees PromotionModal dialog with choices (Queen, Knight, Rook, Bishop); Guest does not
+      const promoteQueenBtn = hostPage.locator('[data-testid="promote-q"]');
+      await expect(promoteQueenBtn).toBeVisible({ timeout: 10_000 });
+      await expect(guestPage.locator('[data-testid="promote-q"]')).not.toBeVisible();
+
+      // 3. Host selects Queen
+      await promoteQueenBtn.click();
+
+      // 4. Modal dismisses and both clients observe promoted White Queen on b8
+      await expect(promoteQueenBtn).not.toBeVisible({ timeout: 5_000 });
+      await expect(hostPage.locator('[data-square="b8"] [data-testid="chess-piece"][data-piece="wQ"]')).toBeVisible({ timeout: 10_000 });
+      await expect(guestPage.locator('[data-square="b8"] [data-testid="chess-piece"][data-piece="wQ"]')).toBeVisible({ timeout: 10_000 });
+
+      // 5. Turn transfers to Guest (Black)
+      await expect(guestPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+    } finally {
+      await hostContext.close();
+      await guestContext.close();
+    }
+  });
+
+  test('handles rematch decline flow with dialog dismissal and exit to lobby', async ({ browser }) => {
+    const hostContext = await browser.newContext();
+    const guestContext = await browser.newContext();
+
+    const hostPage = await hostContext.newPage();
+    const guestPage = await guestContext.newPage();
+
+    try {
+      const hostLobby = new LobbyPage(hostPage);
+      const guestLobby = new LobbyPage(guestPage);
+      const hostGame = new GamePage(hostPage);
+      const guestGame = new GamePage(guestPage);
+
+      // 1. Host creates room and Guest joins
+      await hostLobby.goto();
+      await hostLobby.hostGame('DeclineHost', 'w');
+      const roomCode = await hostLobby.getRoomCode();
+
+      await guestLobby.goto();
+      await guestLobby.joinGame('DeclineGuest', roomCode);
+
+      await Promise.all([
+        hostGame.waitForArena(),
+        guestGame.waitForArena(),
+      ]);
+
+      // 2. Complete game via resignation
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 15_000 });
+      await hostGame.resign();
+
+      await Promise.all([
+        hostGame.expectGameOver(),
+        guestGame.expectGameOver(),
+      ]);
+
+      // 3. Host requests rematch
+      const hostRematchBtn = hostPage.locator('[data-testid="request-rematch-btn"]');
+      await expect(hostRematchBtn).toBeVisible({ timeout: 10_000 });
+      await hostRematchBtn.click();
+
+      // 4. Guest receives RematchModal challenge dialog
+      const rematchModal = guestPage.locator('[data-testid="rematch-modal"]');
+      await expect(rematchModal).toBeVisible({ timeout: 10_000 });
+
+      // 5. Guest declines rematch
+      const declineRematchBtn = guestPage.locator('[data-testid="decline-rematch-btn"]');
+      await expect(declineRematchBtn).toBeVisible({ timeout: 5_000 });
+      await declineRematchBtn.click();
+
+      // 6. Guest's RematchModal dismisses
+      await expect(rematchModal).not.toBeVisible({ timeout: 10_000 });
+
+      // 7. Both players can safely return to lobby
+      const guestLobbyBtn = guestPage.locator('[data-testid="return-lobby-btn"]');
+      await expect(guestLobbyBtn).toBeVisible({ timeout: 10_000 });
+      await guestLobbyBtn.click();
+      await expect(guestPage.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 10_000 });
+
+      const hostLobbyBtn = hostPage.locator('[data-testid="return-lobby-btn"]');
+      await expect(hostLobbyBtn).toBeVisible({ timeout: 10_000 });
+      await hostLobbyBtn.click();
+      await expect(hostPage.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 10_000 });
+    } finally {
+      await hostContext.close();
+      await guestContext.close();
+    }
+  });
+
+  test('handles player disconnect with countdown banner and forfeiture on grace period expiry', async ({ browser }) => {
+    test.setTimeout(90_000);
+
+    const hostContext = await browser.newContext();
+    const guestContext = await browser.newContext();
+
+    const hostPage = await hostContext.newPage();
+    const guestPage = await guestContext.newPage();
+
+    try {
+      const hostLobby = new LobbyPage(hostPage);
+      const guestLobby = new LobbyPage(guestPage);
+      const hostGame = new GamePage(hostPage);
+      const guestGame = new GamePage(guestPage);
+
+      // 1. Host creates room and Guest joins
+      await hostLobby.goto();
+      await hostLobby.hostGame('ForfeitHost', 'w');
+      const roomCode = await hostLobby.getRoomCode();
+
+      await guestLobby.goto();
+      await guestLobby.joinGame('ForfeitGuest', roomCode);
+
+      await Promise.all([
+        hostGame.waitForArena(),
+        guestGame.waitForArena(),
+      ]);
+
+      // 2. Host plays opening move e2 -> e4
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 15_000 });
+      await hostGame.makeMove('e2', 'e4');
+
+      await expect(guestPage.locator('[data-square="e4"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+
+      // 3. Guest closes browser window (disconnecting socket)
+      await guestContext.close();
+
+      // 4. Host observes disconnect warning banner
+      const disconnectBanner = hostPage.locator('.disconnect-warning-banner');
+      await expect(disconnectBanner).toBeVisible({ timeout: 10_000 });
+      await expect(disconnectBanner).toContainText(/Opponent disconnected.*Waiting for reconnection/i);
+
+      // 5. Host waits for the 60-second grace period to expire, leading to forfeit victory
+      await hostGame.expectGameOver(75_000);
+
+      // 6. Host sees victory headline and abandonment game over message
+      await expect(hostPage.locator('.banner-headline.is-victory')).toBeVisible({ timeout: 10_000 });
+      await expect(hostPage.locator('[data-testid="game-over-message"]')).toContainText(/abandonment|forfeit/i);
+    } finally {
+      await hostContext.close();
+    }
+  });
 });

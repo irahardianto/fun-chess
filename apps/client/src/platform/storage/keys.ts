@@ -1,5 +1,5 @@
 import type { KeyValueStorage } from './key_value_storage';
-import { logger as defaultLogger, type ILogger } from '../telemetry';
+import { generateCorrelationId, logger as defaultLogger, type ILogger } from '../telemetry';
 
 /**
  * Centralized local and session storage keys used across Fun Chess client.
@@ -24,7 +24,7 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Migrates stored puzzle and user progress from legacy v1 schema to canonical v2 schema.
- * Implements 30-day non-destructive retention window (CRIT-001) and structured logging (MIN-006).
+ * Implements 30-day non-destructive retention window (CRIT-001) and structured logging (MIN-006, MIN-015).
  *
  * @param storage - Target KeyValueStorage implementation (safeLocalStorage or test double)
  * @param logger - Optional logger implementation (defaults to platform logger)
@@ -33,6 +33,9 @@ export function migrateStorageV1ToV2(
   storage: KeyValueStorage,
   logger: ILogger = defaultLogger
 ): void {
+  const correlationId = generateCorrelationId();
+  const startTime = Date.now();
+
   try {
     if (!storage.isAvailable()) return;
 
@@ -49,6 +52,9 @@ export function migrateStorageV1ToV2(
           storage.removeItem(STORAGE_KEYS.MIGRATION_V1_V2_TIMESTAMP);
           logger.info('Pruned legacy v1 storage after 30-day retention window', {
             operation: 'storage_migration_v1_v2',
+            correlationId,
+            duration: Date.now() - startTime,
+            durationMs: Date.now() - startTime,
           });
         }
       }
@@ -70,17 +76,26 @@ export function migrateStorageV1ToV2(
         // Legacy keys (PUZZLE_PROGRESS_V1, PUZZLE_PROGRESS_LEGACY) are RETAINED and not removed here.
         logger.info('Migrated storage v1 to v2 successfully with 30-day retention window', {
           operation: 'storage_migration_v1_v2',
+          correlationId,
+          duration: Date.now() - startTime,
+          durationMs: Date.now() - startTime,
         });
       }
     } catch (err) {
       logger.warn('Corrupted legacy v1 puzzle storage during migration', {
         operation: 'storage_migration_v1_v2',
+        correlationId,
+        duration: Date.now() - startTime,
+        durationMs: Date.now() - startTime,
         error: err instanceof Error ? err.message : String(err),
       });
     }
   } catch (err) {
     logger.error('Storage migration failed unexpectedly', {
       operation: 'storage_migration_v1_v2',
+      correlationId,
+      duration: Date.now() - startTime,
+      durationMs: Date.now() - startTime,
       error: err instanceof Error ? err.message : String(err),
     });
   }

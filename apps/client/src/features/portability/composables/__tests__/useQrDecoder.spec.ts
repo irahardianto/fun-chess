@@ -88,7 +88,7 @@ describe('useQrDecoder', () => {
 
     // Execute the queued animation frame callback
     expect(rafCallbacks.length).toBeGreaterThan(0);
-    rafCallbacks[0]();
+    rafCallbacks[0]!();
 
     expect(mockCtx.drawImage).toHaveBeenCalledWith(mockVideo, 0, 0, 640, 480);
     expect(jsQR).toHaveBeenCalled();
@@ -107,7 +107,7 @@ describe('useQrDecoder', () => {
     const { startDecoding } = useQrDecoder();
     startDecoding(lowDataVideo, mockCanvas, onScan);
 
-    rafCallbacks[0]();
+    rafCallbacks[0]!();
 
     expect(mockCtx.drawImage).not.toHaveBeenCalled();
     expect(jsQR).not.toHaveBeenCalled();

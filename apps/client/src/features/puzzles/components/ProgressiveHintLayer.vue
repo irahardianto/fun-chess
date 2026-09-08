@@ -31,8 +31,7 @@ export function squareToCoordinates(
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Chess } from 'chess.js';
-import type { HintData, HintLevel, PieceType } from '@fun-chess/shared';
+import { type HintData, type HintLevel, type PieceType, createSafeChess } from '@fun-chess/shared';
 import { logger } from '@/platform/telemetry/index.js';
 import BaseButton from '../../../components/base/BaseButton.vue';
 import ChessPieceSvg from '../../../components/base/ChessPieceSvg.vue';
@@ -107,7 +106,7 @@ const resolvedMovingPiece = computed<{ type: PieceType; color: PieceColor } | nu
   }
   if (props.fen && effectiveSource.value) {
     try {
-      const chess = new Chess(props.fen);
+      const chess = createSafeChess(props.fen);
       const piece = chess.get(effectiveSource.value as import('chess.js').Square);
       if (piece) {
         return {

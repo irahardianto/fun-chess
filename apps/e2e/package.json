@@ -12,12 +12,10 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@fun-chess/shared": "workspace:*",
     "@playwright/test": "1.55.1",
     "@types/node": "22.13.5",
     "chess.js": "1.4.0",
     "typescript": "5.9.3"
-  },
-  "dependencies": {
-    "@fun-chess/shared": "workspace:*"
   }
 }

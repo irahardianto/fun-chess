@@ -44,6 +44,6 @@ describe('Server ChessEngine Benchmark', () => {
   });
 
   bench('validateAndApplyMove with 20-move history', () => {
-    ChessEngine.validateAndApplyMove(currentFen, legalMove, 'w', moveHistory);
+    ChessEngine.validateAndApplyMove(currentFen, legalMove, 'w', moveHistory, Date.now());
   });
 });

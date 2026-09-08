@@ -426,16 +426,16 @@ describe("InMemoryRoomStore", () => {
       });
 
       // Call delete while action2 is waiting
-      const deleted = await store.delete("HOLD");
-      expect(deleted).toBe(true);
+      const deletePromise = store.delete("HOLD");
 
-      // Lock queue must NOT be deleted immediately because action2 is queued
+      // Lock queue must NOT be deleted immediately because action2 and delete are queued
       const queueEntry = (store as any).lockQueues.get("HOLD");
       expect(queueEntry).toBeDefined();
 
-      const [res1, res2] = await Promise.all([action1, action2]);
+      const [res1, res2, deleted] = await Promise.all([action1, action2, deletePromise]);
       expect(res1).toBe("action1");
       expect(res2).toBe("action2");
+      expect(deleted).toBe(true);
       expect(secondWaiterExecuted).toBe(true);
 
       // Wait for next tick for the finally cleanup
@@ -472,6 +472,28 @@ describe("InMemoryRoomStore", () => {
 
       const mutated = await updatingStore.findByCode("MUT8");
       expect(mutated?.lastActivityAt).toBe(updatedTime);
+    });
+  });
+
+  describe("Memory bounds for cancelledTickets", () => {
+    it("bounds cancelledTickets set to MAX_CANCELLED_TICKETS to prevent memory leaks", () => {
+      const store = new InMemoryRoomStore();
+      const max = store.MAX_CANCELLED_TICKETS;
+      expect(max).toBe(5000);
+
+      // Simulate inserting max + 100 cancelled tickets
+      for (let i = 1; i <= max + 100; i++) {
+        (store as any).trackCancelledTicket(i);
+      }
+
+      const set = (store as any).cancelledTickets as Set<number>;
+      expect(set.size).toBe(max);
+      // Earliest 100 tickets should have been evicted
+      expect(set.has(1)).toBe(false);
+      expect(set.has(100)).toBe(false);
+      // Newer tickets must remain present
+      expect(set.has(101)).toBe(true);
+      expect(set.has(max + 100)).toBe(true);
     });
   });
 });

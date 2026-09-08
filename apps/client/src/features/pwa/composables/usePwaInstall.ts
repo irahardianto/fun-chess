@@ -48,7 +48,7 @@ function checkStandalone(): boolean {
   return isMediaStandalone || isNavStandalone;
 }
 
-function handleBeforeInstallPrompt(e: Event) {
+function handleBeforeInstallPrompt(e: Event): void {
   e.preventDefault();
   isAppInstalledFlag.value = false;
   deferredPrompt.value = e as BeforeInstallPromptEvent;
@@ -57,7 +57,7 @@ function handleBeforeInstallPrompt(e: Event) {
   });
 }
 
-function handleAppInstalled() {
+function handleAppInstalled(): void {
   isAppInstalledFlag.value = true;
   deferredPrompt.value = null;
   logger.info('App installed successfully into standalone mode', {
@@ -65,8 +65,7 @@ function handleAppInstalled() {
   });
 }
 
-
-function setupPwaListeners() {
+function setupPwaListeners(): void {
   if (typeof window === 'undefined' || initialized) return;
 
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -74,11 +73,25 @@ function setupPwaListeners() {
   initialized = true;
 }
 
-function removePwaListeners() {
+function removePwaListeners(): void {
   if (typeof window === 'undefined' || !initialized) return;
 
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.removeEventListener('appinstalled', handleAppInstalled);
+  initialized = false;
+}
+
+/**
+ * Explicit reset hook for module-level PWA installation reactive state (MAJ-011 & MIN-010).
+ * Resets all module-level reactive refs and detaches global window event listeners.
+ */
+export function resetPwaInstallState(): void {
+  removePwaListeners();
+  deferredPrompt.value = null;
+  isInstallModalOpen.value = false;
+  isAppInstalledFlag.value = false;
+  snoozeTrigger.value = 0;
+  listenerCount = 0;
   initialized = false;
 }
 

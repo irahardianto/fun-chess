@@ -108,4 +108,40 @@ describe('ConfettiTrigger', () => {
       errorTrigger.triggerCustom();
     }).not.toThrow();
   });
+
+  it('clear cancels pending victory center burst timeout [MIN-033]', () => {
+    vi.useFakeTimers();
+
+    trigger.triggerVictoryConfetti();
+    expect(mockConfetti).toHaveBeenCalledTimes(2);
+
+    // Call clear before the 300ms timeout
+    trigger.clear();
+
+    vi.advanceTimersByTime(500);
+    // Center burst should not have fired
+    expect(mockConfetti).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it('clear calls reset on confettiFn if available and handles errors gracefully [MIN-033]', () => {
+    const mockReset = vi.fn();
+    (mockConfetti as any).reset = mockReset;
+
+    expect(() => trigger.clear()).not.toThrow();
+    expect(mockReset).toHaveBeenCalledTimes(1);
+
+    // If reset throws, clear should swallow error and not crash
+    mockReset.mockImplementationOnce(() => {
+      throw new Error('Reset failed');
+    });
+    expect(() => trigger.clear()).not.toThrow();
+  });
+
+  it('dispose delegates to clear and cleans up resources [MIN-033]', () => {
+    const clearSpy = vi.spyOn(trigger, 'clear');
+    trigger.dispose();
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+  });
 });

@@ -62,11 +62,11 @@ describe('MoveHistoryList.vue', () => {
     const rows = wrapper.findAll('[data-testid="move-history-row"]');
     expect(rows).toHaveLength(2);
 
-    expect(rows[0].text()).toContain('1.');
-    expect(rows[0].text()).toContain('e4');
-    expect(rows[0].text()).toContain('e5');
+    expect(rows[0]!.text()).toContain('1.');
+    expect(rows[0]!.text()).toContain('e4');
+    expect(rows[0]!.text()).toContain('e5');
 
-    expect(rows[1].text()).toContain('2.');
-    expect(rows[1].text()).toContain('Nf3');
+    expect(rows[1]!.text()).toContain('2.');
+    expect(rows[1]!.text()).toContain('Nf3');
   });
 });

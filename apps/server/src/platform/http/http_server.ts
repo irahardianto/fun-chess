@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
-import { extractClientIp } from "./static_handler.js";
+import { extractClientIp } from "./ip_utils.js";
 import { IFileStorage } from "./file_storage.js";
 import { LanInfoResponse, AppError } from "@fun-chess/shared";
 import { isOriginAllowed, resolveAllowedOrigins, type ServerEnv } from "../config/index.js";
@@ -13,36 +13,21 @@ import {
   LanInfoController,
   StaticController,
 } from "./controllers/index.js";
+import {
+  IRoomCountProvider,
+  IAddressingInfoProvider,
+  HttpServerConfig,
+  HttpErrorEnvelope,
+  HttpErrorBody,
+} from "./http.interface.js";
 
-/**
- * Storage count provider contract for health checks (MAJ-005).
- */
-export interface IRoomCountProvider {
-  count(): Promise<number>;
-}
-
-/**
- * Addressing provider contract for network info and relay status (MAJ-005).
- */
-export interface IAddressingInfoProvider {
-  getAddressingInfo(port: number): LanInfoResponse;
-  isCloudRelay?(): boolean;
-}
-
-export interface HttpServerConfig {
-  roomStore: IRoomCountProvider;
-  relayAddressService?: IAddressingInfoProvider;
-  /** @deprecated Use relayAddressService */
-  lanService?: IAddressingInfoProvider;
-  logger: Logger;
-  port?: number;
-  distPath?: string;
-  allowedOrigins?: string[];
-  env?: ServerEnv;
-  fileStorage?: IFileStorage;
-  getActiveSocketCount?: () => number;
-  rateLimiter?: HttpRateLimiter;
-}
+export type {
+  IRoomCountProvider,
+  IAddressingInfoProvider,
+  HttpServerConfig,
+  HttpErrorEnvelope,
+  HttpErrorBody,
+};
 
 const START_TIME = Date.now();
 
@@ -57,39 +42,31 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=()",
 };
 
-// --- Extracted HTTP Helpers (MAJ-038) ---
-
-export interface HttpErrorResponse {
-  code: number;
-  error: string;
-  message: string;
-  correlationId?: string;
-  timestamp: number;
-}
-
-export type HttpErrorEnvelope = HttpErrorResponse;
+// --- Extracted HTTP Helpers (MAJ-038, MIN-009, MAJ-033) ---
 
 export function formatHttpError(
-  code: number,
-  error: string,
+  statusCode: number,
+  errorCode: string,
   message: string,
   correlationId?: string,
-  timestamp: number = Date.now(),
-): HttpErrorResponse {
+  details?: Record<string, unknown>,
+): HttpErrorEnvelope {
   return {
-    code,
-    error,
-    message,
-    ...(correlationId ? { correlationId } : {}),
-    timestamp,
+    status: "error",
+    code: statusCode,
+    error: {
+      code: errorCode,
+      message,
+      ...(details ? { details } : {}),
+      ...(correlationId ? { correlationId } : {}),
+    },
   };
 }
 
 export function formatHttpErrorFromException(
   err: unknown,
   correlationId?: string,
-  timestamp: number = Date.now(),
-): { statusCode: number; payload: HttpErrorResponse } {
+): { statusCode: number; payload: HttpErrorEnvelope } {
   if (err instanceof AppError) {
     return {
       statusCode: err.statusCode,
@@ -98,20 +75,19 @@ export function formatHttpErrorFromException(
         err.code,
         err.message,
         correlationId,
-        timestamp,
+        err.details,
       ),
     };
   }
 
-  // Generic unhandled exception: sanitized to never leak internal details or exceptions
+  const message = "Internal server error";
   return {
     statusCode: 500,
     payload: formatHttpError(
       500,
-      "ERR_INTERNAL_SERVER",
-      "Internal server error",
+      "ERR_INTERNAL_SERVER_ERROR",
+      message,
       correlationId,
-      timestamp,
     ),
   };
 }
@@ -120,13 +96,13 @@ function applySecurityHeaders(
   res: ServerResponse,
   correlationId: string,
   req?: IncomingMessage,
-  _isProduction?: boolean,
+  trustProxy = false,
 ): void {
   for (const [headerKey, headerVal] of Object.entries(SECURITY_HEADERS)) {
     if (headerKey === "Strict-Transport-Security") {
       const isHttps =
-        Boolean((req?.socket as any)?.encrypted) ||
-        req?.headers["x-forwarded-proto"] === "https";
+        Boolean((req?.socket as { encrypted?: boolean } | undefined)?.encrypted) ||
+        (trustProxy === true && req?.headers["x-forwarded-proto"] === "https");
       if (!isHttps) {
         continue;
       }
@@ -203,8 +179,8 @@ function createFallbackHtml(port: number): string {
  * Validates configuration via caller injection without concrete class defaults (MAJ-005).
  * Logs preflight OPTIONS requests with start, reject, and allow events (MAJ-014).
  * Extracts client IP in entry logs (ENH-008).
- * Provides IP-based rate limiting on native HTTP endpoints (MIN-002).
- * Formats standardized JSON error envelopes (MIN-032).
+ * Provides IP-based rate limiting on native HTTP API endpoints (MIN-002).
+ * Formats standardized JSON error envelopes (MAJ-033).
  * Decomposed into modular route controllers (MIN-029).
  */
 export function createHttpServer(config: HttpServerConfig): RequestListener {
@@ -223,6 +199,8 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       pruneIntervalMs: 0,
     }),
   } = config;
+
+  const trustProxy = env?.TRUST_PROXY ?? false;
 
   const effectiveAllowedOrigins =
     configuredAllowedOrigins ??
@@ -267,7 +245,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     distPath,
     fallbackHtml,
     fileStorage,
-    trustProxy: env?.TRUST_PROXY,
+    trustProxy,
   });
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -277,10 +255,10 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     const method = req.method?.toUpperCase() || "GET";
     const url = req.url || "/";
     const [pathname = ""] = url.split("?");
-    const clientIp = extractClientIp(req, env?.TRUST_PROXY);
+    const clientIp = extractClientIp(req, trustProxy);
 
-    // 1. Security Headers (SEC-02, MAJ-001)
-    applySecurityHeaders(res, correlationId, req, isProduction);
+    // 1. Security Headers (SEC-02, MAJ-001, MAJ-003)
+    applySecurityHeaders(res, correlationId, req, trustProxy);
 
     // 2. CORS Handling (MAJ-005)
     const { origin, isOriginPermitted } = applyCorsHeaders(
@@ -289,7 +267,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       effectiveAllowedOrigins,
     );
 
-    // 3. Preflight OPTIONS Request Logging & Dispatch (MAJ-014)
+    // 3. Preflight OPTIONS Request Logging & Dispatch (MAJ-014, MAJ-033)
     if (method === "OPTIONS") {
       logger.info("HTTP OPTIONS preflight started", {
         operation: "http_options_preflight",
@@ -312,8 +290,19 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
           status: "rejected",
         });
 
-        res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("CORS origin not allowed");
+        const errorBody = JSON.stringify(
+          formatHttpError(
+            403,
+            "ERR_CORS_FORBIDDEN",
+            "CORS origin not allowed",
+            correlationId,
+          ),
+        );
+        res.writeHead(403, {
+          "Content-Type": "application/json; charset=utf-8",
+          "Content-Length": Buffer.byteLength(errorBody),
+        });
+        res.end(errorBody);
         return;
       }
 
@@ -334,8 +323,8 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       return;
     }
 
-    // 4. Request Entry Logging with Client IP (ENH-008)
-    logger.info(`HTTP Request: ${method} ${pathname}`, {
+    // 4. Request Entry Logging with Client IP (ENH-008, MAJ-020)
+    logger.info("HTTP request received", {
       operation: "http_request",
       correlationId,
       clientIp,
@@ -357,7 +346,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       }
 
       const duration = Math.round(performance.now() - startTime);
-      logger.info(`HTTP Response: ${method} ${pathname} [${statusCode}]`, {
+      const logContext = {
         operation: "http_response",
         correlationId,
         clientIp,
@@ -366,7 +355,14 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         statusCode,
         duration,
         durationMs: duration,
-      });
+      };
+      if (statusCode >= 500) {
+        logger.error("HTTP request error", logContext);
+      } else if (statusCode >= 400) {
+        logger.warn("HTTP request rejected", logContext);
+      } else {
+        logger.info("HTTP response sent", logContext);
+      }
     };
 
     const sendTextResponse = (statusCode: number, text: string) => {
@@ -381,7 +377,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       }
 
       const duration = Math.round(performance.now() - startTime);
-      logger.info(`HTTP Response: ${method} ${pathname} [${statusCode}]`, {
+      const logContext = {
         operation: "http_response",
         correlationId,
         clientIp,
@@ -390,7 +386,14 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         statusCode,
         duration,
         durationMs: duration,
-      });
+      };
+      if (statusCode >= 500) {
+        logger.error("HTTP request error", logContext);
+      } else if (statusCode >= 400) {
+        logger.warn("HTTP request rejected", logContext);
+      } else {
+        logger.info("HTTP response sent", logContext);
+      }
     };
 
     try {
@@ -400,7 +403,46 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         return;
       }
 
-      // 6. Rate Limiting Check on non-healthz native endpoints (MIN-002)
+      // 6. GET / HEAD /health & /api/health - Public lightweight LivenessHealthResponse (ENH-003, CRIT-001)
+      if (
+        (method === "GET" || method === "HEAD") &&
+        (pathname === "/health" || pathname === "/api/health")
+      ) {
+        const liveness = healthController.getLiveness();
+        sendJsonResponse(200, liveness);
+        return;
+      }
+
+      // 7. GET / HEAD /metrics & /health/detail - Operational DetailedHealthResponse (ENH-003, CRIT-001)
+      if (
+        (method === "GET" || method === "HEAD") &&
+        (pathname === "/metrics" || pathname === "/health/detail")
+      ) {
+        const detailed = await healthController.getDetailedHealth();
+        sendJsonResponse(200, detailed);
+        return;
+      }
+
+      // 8. Static Assets / SPA Fallback (non-API routes) (ENH-003)
+      // Excluded from API rate limiter quota to prevent static asset navigation starvation
+      if ((method === "GET" || method === "HEAD") && !pathname.startsWith("/api/")) {
+        const served = await staticController.serve(req, res, logger, correlationId);
+
+        if (served) {
+          const duration = Math.round(performance.now() - startTime);
+          logger.info("HTTP Static served", {
+            operation: "http_static",
+            correlationId,
+            clientIp,
+            path: pathname,
+            duration,
+            durationMs: duration,
+          });
+          return;
+        }
+      }
+
+      // 9. Rate Limiting Check on API & Dynamic Endpoints (MIN-002, ENH-003)
       if (rateLimiter && !rateLimiter.consume(clientIp)) {
         logger.warn("HTTP rate limit exceeded", {
           operation: "http_rate_limited",
@@ -432,27 +474,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         return;
       }
 
-      // 7. GET / HEAD /health & /api/health - Public lightweight LivenessHealthResponse (ENH-003)
-      if (
-        (method === "GET" || method === "HEAD") &&
-        (pathname === "/health" || pathname === "/api/health")
-      ) {
-        const liveness = healthController.getLiveness();
-        sendJsonResponse(200, liveness);
-        return;
-      }
-
-      // GET / HEAD /metrics & /health/detail - Operational DetailedHealthResponse (ENH-003)
-      if (
-        (method === "GET" || method === "HEAD") &&
-        (pathname === "/metrics" || pathname === "/health/detail")
-      ) {
-        const detailed = await healthController.getDetailedHealth();
-        sendJsonResponse(200, detailed);
-        return;
-      }
-
-      // 8. GET / HEAD /api/lan-info - Host Addressing & QR Discovery
+      // 10. GET / HEAD /api/lan-info - Host Addressing & QR Discovery
       if ((method === "GET" || method === "HEAD") && pathname === "/api/lan-info") {
         const requestPort = port || req.socket?.localPort || 3000;
         const lanInfo = lanInfoController.getLanInfo(requestPort);
@@ -460,25 +482,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         return;
       }
 
-      // 9. Static Assets / SPA Fallback (non-API routes)
-      if ((method === "GET" || method === "HEAD") && !pathname.startsWith("/api/")) {
-        const served = await staticController.serve(req, res, logger, correlationId);
-
-        if (served) {
-          const duration = Math.round(performance.now() - startTime);
-          logger.info(`HTTP Static served: ${pathname}`, {
-            operation: "http_static",
-            correlationId,
-            clientIp,
-            path: pathname,
-            duration,
-            durationMs: duration,
-          });
-          return;
-        }
-      }
-
-      // 10. Unhandled 404 with standardized error envelope (MIN-032)
+      // 11. Unhandled 404 with standardized error envelope (MIN-032, MAJ-033)
       sendJsonResponse(
         404,
         formatHttpError(
@@ -492,10 +496,15 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       const duration = Math.round(performance.now() - startTime);
       const errorObj =
         err instanceof Error
-          ? { message: err.message, stack: err.stack }
+          ? { name: err.name, message: err.message, stack: err.stack }
           : { raw: err };
 
-      logger.error(`HTTP Request Error: ${method} ${pathname}`, {
+      const { statusCode, payload } = formatHttpErrorFromException(
+        err,
+        correlationId,
+      );
+
+      const logContext = {
         operation: "http_error",
         correlationId,
         clientIp,
@@ -503,14 +512,17 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
         path: pathname,
         duration,
         durationMs: duration,
+        statusCode,
         error: errorObj,
-      });
+      };
+
+      if (statusCode >= 500) {
+        logger.error("HTTP request error", logContext);
+      } else {
+        logger.warn("HTTP request rejected", logContext);
+      }
 
       if (!res.headersSent) {
-        const { statusCode, payload } = formatHttpErrorFromException(
-          err,
-          correlationId,
-        );
         sendJsonResponse(statusCode, payload);
       }
     }

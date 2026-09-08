@@ -17,7 +17,9 @@ describe("HTTP API Contracts", () => {
   let serverInstance: TestServerInstance;
 
   beforeAll(async () => {
-    serverInstance = await createTestServer();
+    serverInstance = await createTestServer({
+      env: { TRUST_PROXY: true },
+    });
   });
 
   afterAll(async () => {
@@ -168,6 +170,7 @@ describe("HTTP API Contracts", () => {
         env: {
           NODE_ENV: "production",
           CORS_ORIGIN: "https://fun-chess.example.com",
+          TRUST_PROXY: true,
         } as any,
       });
 
@@ -185,6 +188,25 @@ describe("HTTP API Contracts", () => {
         );
       } finally {
         await prodServer.close();
+      }
+    });
+
+    it("should omit Strict-Transport-Security when x-forwarded-proto is https but TRUST_PROXY is disabled (MAJ-003)", async () => {
+      const untrustedServer = await createTestServer({
+        env: {
+          TRUST_PROXY: false,
+        } as any,
+      });
+
+      try {
+        const res = await fetch(`${untrustedServer.url}/healthz`, {
+          headers: {
+            "x-forwarded-proto": "https",
+          },
+        });
+        expect(res.headers.get("strict-transport-security")).toBeNull();
+      } finally {
+        await untrustedServer.close();
       }
     });
   });
@@ -231,25 +253,17 @@ describe("HTTP API Contracts", () => {
       expect(res.status).toBe(204);
     });
 
-    it("should return 404 for unknown API endpoints with standardized error envelope (MIN-032, MAJ-028)", async () => {
+    it("should return 404 for unknown API endpoints with standardized error envelope (MIN-032, MAJ-028, MAJ-033)", async () => {
       const res = await fetch(`${serverInstance.url}/api/nonexistent-route`);
       expect(res.status).toBe(404);
-      const data = (await res.json()) as {
-        code: number;
-        error: string;
-        message: string;
-        correlationId: string;
-        timestamp: number;
-      };
+      const data = (await res.json()) as any;
+      expect(data.status).toBe("error");
       expect(data.code).toBe(404);
-      expect(data.error).toBe("ERR_NOT_FOUND");
-      expect(data.message).toContain("Cannot GET /api/nonexistent-route");
-      expect(data.correlationId).toBeDefined();
-      expect(typeof data.correlationId).toBe("string");
-      expect(data.timestamp).toBeDefined();
-      expect(typeof data.timestamp).toBe("number");
-      expect(data.timestamp).toBeGreaterThan(0);
-      expect(res.headers.get("x-correlation-id")).toBe(data.correlationId);
+      expect(data.error.code).toBe("ERR_NOT_FOUND");
+      expect(data.error.message).toContain("Cannot GET /api/nonexistent-route");
+      expect(data.error.correlationId).toBeDefined();
+      expect(typeof data.error.correlationId).toBe("string");
+      expect(res.headers.get("x-correlation-id")).toBe(data.error.correlationId);
     });
   });
 
@@ -361,8 +375,11 @@ describe("HTTP API Contracts", () => {
       });
 
       expect(res.status).toBe(403);
-      const text = await res.text();
-      expect(text).toContain("CORS origin not allowed");
+      const data = (await res.json()) as any;
+      expect(data.status).toBe("error");
+      expect(data.code).toBe(403);
+      expect(data.error.code).toBe("ERR_CORS_FORBIDDEN");
+      expect(data.error.message).toContain("CORS origin not allowed");
 
       const rejectLog = corsServerInstance.logger.warnLogs.find(
         (l) =>
@@ -376,7 +393,7 @@ describe("HTTP API Contracts", () => {
     });
   });
 
-  describe("HTTP Rate Limiting on API and Static Endpoints (MIN-002, MAJ-028)", () => {
+  describe("HTTP Rate Limiting on API Endpoints (MIN-002, MAJ-028, ENH-003)", () => {
     let rateLimitedServerInstance: TestServerInstance;
     let testRateLimiter: HttpRateLimiter;
 
@@ -402,26 +419,17 @@ describe("HTTP API Contracts", () => {
       }
     });
 
-    it("should return 429 with standardized error envelope once limit is exceeded (MAJ-028)", async () => {
+    it("should return 429 with standardized error envelope once limit is exceeded (MAJ-028, MAJ-033)", async () => {
       const res = await fetch(`${rateLimitedServerInstance.url}/api/lan-info`);
       expect(res.status).toBe(429);
       expect(res.headers.get("content-type")).toContain("application/json");
 
-      const body = (await res.json()) as {
-        code: number;
-        error: string;
-        message: string;
-        correlationId: string;
-        timestamp: number;
-      };
-
+      const body = (await res.json()) as any;
+      expect(body.status).toBe("error");
       expect(body.code).toBe(429);
-      expect(body.error).toBe("ERR_RATE_LIMITED");
-      expect(body.message).toContain("Rate limit exceeded");
-      expect(body.correlationId).toBeDefined();
-      expect(body.timestamp).toBeDefined();
-      expect(typeof body.timestamp).toBe("number");
-      expect(body.timestamp).toBeGreaterThan(0);
+      expect(body.error.code).toBe("ERR_RATE_LIMITED");
+      expect(body.error.message).toContain("Rate limit exceeded");
+      expect(body.error.correlationId).toBeDefined();
 
       const rateLimitLog = rateLimitedServerInstance.logger.warnLogs.find(
         (l) => l.context?.operation === "http_rate_limited",
@@ -430,15 +438,10 @@ describe("HTTP API Contracts", () => {
       expect(rateLimitLog?.context?.clientIp).toBeDefined();
     });
 
-    it("should also block static/SPA requests when rate limit is active", async () => {
+    it("does not consume API rate limit quota or block static asset requests (ENH-003)", async () => {
       const res = await fetch(`${rateLimitedServerInstance.url}/some-page`);
-      expect(res.status).toBe(429);
-      const body = (await res.json()) as {
-        code: number;
-        error: string;
-      };
-      expect(body.code).toBe(429);
-      expect(body.error).toBe("ERR_RATE_LIMITED");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/html");
     });
 
     it("should allow container probe /healthz even when rate limited", async () => {

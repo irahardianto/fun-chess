@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { deflate } from "pako";
 import {
   DefaultProgressCodec,
   progressCodec,
@@ -8,7 +9,9 @@ import {
   encodeProgressToEnvelope,
   bytesToBase64Url,
   base64UrlToBytes,
+  MAX_DECOMPRESSED_SIZE_BYTES,
 } from "../progress_codec.js";
+import { crc32Checksum } from "../checksum_crc32.js";
 import type { UnifiedProgressPayload } from "../../types/progress_sync.js";
 import { FUN_CHESS_PAYLOAD_MAGIC_PREFIX } from "../../types/progress_sync.js";
 
@@ -237,6 +240,71 @@ describe("Progress Codec (Deflate + CRC-32 + Base64URL QR & JSON Envelope)", () 
 
       // Act & Assert
       await expect(codec.decodeFromQrString(truncated)).rejects.toThrow();
+    });
+  });
+
+  describe("Decompression Error Handling & Bomb Protection (MIN-002, MIN-028)", () => {
+    it("exports MAX_DECOMPRESSED_SIZE_BYTES configured to 5MB limit", () => {
+      expect(MAX_DECOMPRESSED_SIZE_BYTES).toBe(5 * 1024 * 1024);
+    });
+
+    it("guards against decompression bomb payloads exceeding 5MB decompressed size limit", async () => {
+      // 5.5MB of repeating zero bytes compresses to only a few KB with Deflate
+      const bombData = new Uint8Array(5.5 * 1024 * 1024);
+      const deflated = deflate(bombData);
+      const crc = crc32Checksum.calculate(deflated);
+
+      const packed = new Uint8Array(4 + deflated.length);
+      packed[0] = (crc >>> 24) & 0xff;
+      packed[1] = (crc >>> 16) & 0xff;
+      packed[2] = (crc >>> 8) & 0xff;
+      packed[3] = crc & 0xff;
+      packed.set(deflated, 4);
+
+      const bombQr = `${FUN_CHESS_PAYLOAD_MAGIC_PREFIX}${bytesToBase64Url(packed)}`;
+
+      await expect(codec.decodeFromQrString(bombQr)).rejects.toThrowError(
+        /Failed to decompress Deflate stream: Decompressed payload exceeds maximum size limit/,
+      );
+    });
+
+    it("rejects corrupted Deflate stream with descriptive error when CRC matches but inflation fails", async () => {
+      // Invalid deflate payload where CRC-32 header matches but deflate stream itself is malformed
+      const invalidDeflate = new Uint8Array([0x1f, 0x8b, 0x00, 0x99, 0x88, 0x77, 0x66, 0x55]);
+      const crc = crc32Checksum.calculate(invalidDeflate);
+
+      const packed = new Uint8Array(4 + invalidDeflate.length);
+      packed[0] = (crc >>> 24) & 0xff;
+      packed[1] = (crc >>> 16) & 0xff;
+      packed[2] = (crc >>> 8) & 0xff;
+      packed[3] = crc & 0xff;
+      packed.set(invalidDeflate, 4);
+
+      const corruptedQr = `${FUN_CHESS_PAYLOAD_MAGIC_PREFIX}${bytesToBase64Url(packed)}`;
+
+      await expect(codec.decodeFromQrString(corruptedQr)).rejects.toThrowError(
+        /Failed to decompress Deflate stream/,
+      );
+    });
+
+    it("rejects payloads that decompress into invalid JSON", async () => {
+      const invalidJsonText = "Not a valid json { foo:";
+      const textBytes = new TextEncoder().encode(invalidJsonText);
+      const deflated = deflate(textBytes);
+      const crc = crc32Checksum.calculate(deflated);
+
+      const packed = new Uint8Array(4 + deflated.length);
+      packed[0] = (crc >>> 24) & 0xff;
+      packed[1] = (crc >>> 16) & 0xff;
+      packed[2] = (crc >>> 8) & 0xff;
+      packed[3] = crc & 0xff;
+      packed.set(deflated, 4);
+
+      const invalidJsonQr = `${FUN_CHESS_PAYLOAD_MAGIC_PREFIX}${bytesToBase64Url(packed)}`;
+
+      await expect(codec.decodeFromQrString(invalidJsonQr)).rejects.toThrowError(
+        /Failed to parse decompressed JSON payload/,
+      );
     });
   });
 

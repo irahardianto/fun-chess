@@ -61,11 +61,11 @@ export const ServerEnvSchema = BaseServerEnvSchema.extend({
   ),
 }).superRefine((val, ctx) => {
   if (val.NODE_ENV === "production") {
-    if (!val.CORS_ORIGIN && !val.PUBLIC_URL) {
+    if (!val.CORS_ORIGIN && !val.PUBLIC_URL && !val.CLIENT_URL) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["CORS_ORIGIN"],
-        message: "Either CORS_ORIGIN or PUBLIC_URL must be configured in production mode.",
+        message: "Either CORS_ORIGIN, PUBLIC_URL, or CLIENT_URL must be configured in production mode.",
       });
     }
     if (val.CORS_ORIGIN) {
@@ -134,7 +134,7 @@ export function resolveAllowedOrigins(env?: Partial<ServerEnv>): string[] {
     }
   }
   if (nodeEnv === "production") {
-    throw new Error("FATAL: CORS_ORIGIN or PUBLIC_URL must be configured in production mode.");
+    throw new Error("FATAL: CORS_ORIGIN, PUBLIC_URL, or CLIENT_URL must be configured in production mode.");
   }
   // Safe development fallbacks
   return ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"];

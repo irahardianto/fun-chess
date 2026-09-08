@@ -13,6 +13,8 @@ import {
   FILE_DOWNLOADER_KEY,
   HAPTICS_KEY,
   WEBRTC_DISCOVERY_KEY,
+  CLIPBOARD_SERVICE_KEY,
+  CAMERA_SERVICE_KEY,
   useInjectApiClient,
   useInjectStorage,
   useInjectSessionStorage,
@@ -24,13 +26,34 @@ import {
   useInjectFileDownloader,
   useInjectHaptics,
   useInjectWebRtcDiscovery,
+  useInjectClipboardService,
+  useInjectCameraService,
+  useApiClient,
+  useStorage,
+  useSessionStorage,
+  useAudioService,
+  useLogger,
+  useScenarioStore,
+  usePuzzleStore,
+  useProgressStorage,
+  useFileDownloader,
+  useHaptics,
+  useWebRtcDiscovery,
+  useClipboardService,
+  useCameraService,
   registerDefaultDomainStores,
 } from '../index';
 import type { IApiClient } from '../../api/api_client.interface';
 import type { KeyValueStorage } from '../../storage/key_value_storage';
 import type { IAudioService } from '../../audio/audio.interface';
 import type { ILogger } from '../../telemetry';
-import type { IFileDownloader, IHapticsService, IWebRtcDiscovery } from '../../hardware';
+import type {
+  IFileDownloader,
+  IHapticsService,
+  IWebRtcDiscovery,
+  IClipboardService,
+  ICameraService,
+} from '../../hardware';
 import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
 import { apiClient } from '../../api';
 import { safeLocalStorage, safeSessionStorage } from '../../storage';
@@ -40,6 +63,8 @@ import {
   defaultFileDownloader,
   defaultHapticsService,
   defaultWebRtcDiscovery,
+  defaultClipboardService,
+  defaultCameraService,
 } from '../../hardware';
 
 describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
@@ -56,6 +81,8 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       { name: 'FILE_DOWNLOADER_KEY', key: FILE_DOWNLOADER_KEY, expectedDesc: 'FILE_DOWNLOADER' },
       { name: 'HAPTICS_KEY', key: HAPTICS_KEY, expectedDesc: 'HAPTICS' },
       { name: 'WEBRTC_DISCOVERY_KEY', key: WEBRTC_DISCOVERY_KEY, expectedDesc: 'WEBRTC_DISCOVERY' },
+      { name: 'CLIPBOARD_SERVICE_KEY', key: CLIPBOARD_SERVICE_KEY, expectedDesc: 'CLIPBOARD_SERVICE' },
+      { name: 'CAMERA_SERVICE_KEY', key: CAMERA_SERVICE_KEY, expectedDesc: 'CAMERA_SERVICE' },
     ];
 
     it.each(tokens)('$name is a valid Symbol with expected description "$expectedDesc"', ({ key, expectedDesc }) => {
@@ -83,6 +110,8 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       const mockFileDownloader = { download: () => {} } as unknown as IFileDownloader;
       const mockHaptics = { vibrate: () => true, isSupported: () => true } as unknown as IHapticsService;
       const mockWebRtcDiscovery = { discoverLocalIp: () => Promise.resolve('192.168.1.100') } as unknown as IWebRtcDiscovery;
+      const mockClipboard = { copyText: () => Promise.resolve(true), readText: () => Promise.resolve(''), isSupported: () => true } as unknown as IClipboardService;
+      const mockCamera = { getUserMedia: () => Promise.resolve({} as MediaStream), isSupported: () => true } as unknown as ICameraService;
 
       const app = createApp({});
       app.provide(API_CLIENT_KEY, mockApiClient);
@@ -96,6 +125,8 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       app.provide(FILE_DOWNLOADER_KEY, mockFileDownloader);
       app.provide(HAPTICS_KEY, mockHaptics);
       app.provide(WEBRTC_DISCOVERY_KEY, mockWebRtcDiscovery);
+      app.provide(CLIPBOARD_SERVICE_KEY, mockClipboard);
+      app.provide(CAMERA_SERVICE_KEY, mockCamera);
 
       app.runWithContext(() => {
         expect(useInjectApiClient()).toBe(mockApiClient);
@@ -109,6 +140,8 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectFileDownloader()).toBe(mockFileDownloader);
         expect(useInjectHaptics()).toBe(mockHaptics);
         expect(useInjectWebRtcDiscovery()).toBe(mockWebRtcDiscovery);
+        expect(useInjectClipboardService()).toBe(mockClipboard);
+        expect(useInjectCameraService()).toBe(mockCamera);
       });
     });
 
@@ -148,6 +181,8 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectFileDownloader()).toBe(defaultFileDownloader);
         expect(useInjectHaptics()).toBe(defaultHapticsService);
         expect(useInjectWebRtcDiscovery()).toBe(defaultWebRtcDiscovery);
+        expect(useInjectClipboardService()).toBe(defaultClipboardService);
+        expect(useInjectCameraService()).toBe(defaultCameraService);
       });
     });
 
@@ -212,6 +247,105 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectScenarioStore()).toBe(mockScenario);
         expect(useInjectPuzzleStore()).toBe(mockPuzzle);
         expect(useInjectProgressStorage()).toBe(mockProgress);
+      });
+    });
+  });
+
+  describe('Typed Injection Helpers (helpers.ts) (MAJ-014)', () => {
+    it('returns provided instances when available in Vue injection context', () => {
+      const mockApiClient = { checkHealth: () => Promise.resolve() } as unknown as IApiClient;
+      const mockStorage = { getItem: () => null } as unknown as KeyValueStorage;
+      const mockSessionStorage = { setItem: () => {} } as unknown as KeyValueStorage;
+      const mockAudio = { playMove: () => {} } as unknown as IAudioService;
+      const mockLogger = { info: () => {} } as unknown as ILogger;
+      const mockScenarioStore = {} as ScenarioProgressStore;
+      const mockPuzzleStore = {} as PuzzleProgressStore;
+      const mockProgressStorage = {} as ProgressStorage;
+      const mockFileDownloader = { download: () => {} } as unknown as IFileDownloader;
+      const mockHaptics = { vibrate: () => true, isSupported: () => true } as unknown as IHapticsService;
+      const mockWebRtc = { discoverLocalIp: () => Promise.resolve('10.0.0.1') } as unknown as IWebRtcDiscovery;
+      const mockClipboard = { copyText: () => Promise.resolve(true), readText: () => Promise.resolve(''), isSupported: () => true } as unknown as IClipboardService;
+      const mockCamera = { getUserMedia: () => Promise.resolve({} as MediaStream), isSupported: () => true } as unknown as ICameraService;
+
+      const app = createApp({});
+      app.provide(API_CLIENT_KEY, mockApiClient);
+      app.provide(STORAGE_KEY, mockStorage);
+      app.provide(SESSION_STORAGE_KEY, mockSessionStorage);
+      app.provide(AUDIO_SERVICE_KEY, mockAudio);
+      app.provide(LOGGER_KEY, mockLogger);
+      app.provide(SCENARIO_STORE_KEY, mockScenarioStore);
+      app.provide(PUZZLE_STORE_KEY, mockPuzzleStore);
+      app.provide(PROGRESS_STORAGE_KEY, mockProgressStorage);
+      app.provide(FILE_DOWNLOADER_KEY, mockFileDownloader);
+      app.provide(HAPTICS_KEY, mockHaptics);
+      app.provide(WEBRTC_DISCOVERY_KEY, mockWebRtc);
+      app.provide(CLIPBOARD_SERVICE_KEY, mockClipboard);
+      app.provide(CAMERA_SERVICE_KEY, mockCamera);
+
+      app.runWithContext(() => {
+        expect(useApiClient()).toBe(mockApiClient);
+        expect(useStorage()).toBe(mockStorage);
+        expect(useSessionStorage()).toBe(mockSessionStorage);
+        expect(useAudioService()).toBe(mockAudio);
+        expect(useLogger()).toBe(mockLogger);
+        expect(useScenarioStore()).toBe(mockScenarioStore);
+        expect(usePuzzleStore()).toBe(mockPuzzleStore);
+        expect(useProgressStorage()).toBe(mockProgressStorage);
+        expect(useFileDownloader()).toBe(mockFileDownloader);
+        expect(useHaptics()).toBe(mockHaptics);
+        expect(useWebRtcDiscovery()).toBe(mockWebRtc);
+        expect(useClipboardService()).toBe(mockClipboard);
+        expect(useCameraService()).toBe(mockCamera);
+      });
+    });
+
+    it('prefers custom instance when provided as parameter', () => {
+      const customApi = {} as IApiClient;
+      const customStorage = {} as KeyValueStorage;
+      const customSessionStorage = {} as KeyValueStorage;
+      const customAudio = {} as IAudioService;
+      const customLogger = {} as ILogger;
+      const customScenario = {} as ScenarioProgressStore;
+      const customPuzzle = {} as PuzzleProgressStore;
+      const customProgress = {} as ProgressStorage;
+      const customDownloader = {} as IFileDownloader;
+      const customHaptics = {} as IHapticsService;
+      const customWebRtc = {} as IWebRtcDiscovery;
+      const customClipboard = {} as IClipboardService;
+      const customCamera = {} as ICameraService;
+
+      expect(useApiClient(customApi)).toBe(customApi);
+      expect(useStorage(customStorage)).toBe(customStorage);
+      expect(useSessionStorage(customSessionStorage)).toBe(customSessionStorage);
+      expect(useAudioService(customAudio)).toBe(customAudio);
+      expect(useLogger(customLogger)).toBe(customLogger);
+      expect(useScenarioStore(customScenario)).toBe(customScenario);
+      expect(usePuzzleStore(customPuzzle)).toBe(customPuzzle);
+      expect(useProgressStorage(customProgress)).toBe(customProgress);
+      expect(useFileDownloader(customDownloader)).toBe(customDownloader);
+      expect(useHaptics(customHaptics)).toBe(customHaptics);
+      expect(useWebRtcDiscovery(customWebRtc)).toBe(customWebRtc);
+      expect(useClipboardService(customClipboard)).toBe(customClipboard);
+      expect(useCameraService(customCamera)).toBe(customCamera);
+    });
+
+    it('throws informative error when token is not provided in context and no custom instance given', () => {
+      const app = createApp({});
+
+      app.runWithContext(() => {
+        expect(() => useApiClient()).toThrow('Vue DI binding [API_CLIENT] not provided');
+        expect(() => useStorage()).toThrow('Vue DI binding [STORAGE] not provided');
+        expect(() => useSessionStorage()).toThrow('Vue DI binding [SESSION_STORAGE] not provided');
+        expect(() => useAudioService()).toThrow('Vue DI binding [AUDIO_SERVICE] not provided');
+        expect(() => useLogger()).toThrow('Vue DI binding [LOGGER] not provided');
+        expect(() => useScenarioStore()).toThrow('Vue DI binding [SCENARIO_STORE] not provided');
+        expect(() => usePuzzleStore()).toThrow('Vue DI binding [PUZZLE_STORE] not provided');
+        expect(() => useProgressStorage()).toThrow('Vue DI binding [PROGRESS_STORAGE] not provided');
+        expect(() => useFileDownloader()).toThrow('Vue DI binding [FILE_DOWNLOADER] not provided');
+        expect(() => useHaptics()).toThrow('Vue DI binding [HAPTICS] not provided');
+        expect(() => useWebRtcDiscovery()).toThrow('Vue DI binding [WEBRTC_DISCOVERY] not provided');
+        expect(() => useClipboardService()).toThrow('Vue DI binding [CLIPBOARD_SERVICE] not provided');
+        expect(() => useCameraService()).toThrow('Vue DI binding [CAMERA_SERVICE] not provided');
       });
     });
   });

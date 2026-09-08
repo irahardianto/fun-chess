@@ -150,7 +150,7 @@ export interface ClientToServerEvents {
     callback?: (
       res:
         | { success: true }
-        | { success: false; error: SocketErrorPayload | string },
+        | { success: false; error: SocketErrorPayload },
     ) => void,
   ) => void;
   /** Executes a chess move in an active match */

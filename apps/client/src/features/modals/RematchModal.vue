@@ -3,7 +3,7 @@ import { BaseModal, BaseButton } from '@/components/base';
 
 withDefaults(
   defineProps<{
-    modelValue: boolean;
+    modelValue?: boolean;
     requesterName?: string;
   }>(),
   {

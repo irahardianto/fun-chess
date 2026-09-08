@@ -170,12 +170,12 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
     });
 
     describe("Production Cloud Run Validation (CRIT-007)", () => {
-      it("fails fast in production mode when neither CORS_ORIGIN nor PUBLIC_URL is provided", () => {
+      it("fails fast in production mode when neither CORS_ORIGIN, PUBLIC_URL, nor CLIENT_URL is provided", () => {
         expect(() =>
           loadServerConfig({
             NODE_ENV: "production",
           }),
-        ).toThrowError(/Either CORS_ORIGIN or PUBLIC_URL must be configured in production mode/);
+        ).toThrowError(/Either CORS_ORIGIN, PUBLIC_URL, or CLIENT_URL must be configured in production mode/);
       });
 
       it("fails fast in production mode when CORS_ORIGIN contains wildcard '*'", () => {
@@ -345,7 +345,7 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       };
 
       expect(() => resolveAllowedOrigins(env)).toThrowError(
-        /FATAL: CORS_ORIGIN or PUBLIC_URL must be configured in production mode/,
+        /FATAL: CORS_ORIGIN, PUBLIC_URL, or CLIENT_URL must be configured in production mode/,
       );
     });
 
@@ -363,6 +363,19 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
         "https://fun-chess.com",
         "https://www.fun-chess.com",
       ]);
+    });
+
+    it("resolves CLIENT_URL in production mode without throwing (MAJ-002)", () => {
+      const env: ServerEnv = {
+        NODE_ENV: "production",
+        PORT: 8080,
+        HOST: "0.0.0.0",
+        LOG_LEVEL: "info",
+        CLIENT_URL: "https://chess.fun.app",
+      };
+
+      const origins = resolveAllowedOrigins(env);
+      expect(origins).toEqual(["https://chess.fun.app"]);
     });
 
     it("resolves PUBLIC_URL in production mode without throwing", () => {

@@ -32,14 +32,14 @@ describe('usePuzzleReplay Composable', () => {
     expect(replay.replayTotalSteps.value).toBe(3);
 
     // Initial setup step
-    const step0 = replay.replaySteps.value[0];
+    const step0 = replay.replaySteps.value[0]!;
     expect(step0.stepIndex).toBe(0);
     expect(step0.plyIndex).toBe(-1);
     expect(step0.fen).toBe(multiPlyPuzzle.fen);
     expect(step0.san).toBe('Start');
 
     // Ply 0 (White plays Nc7+)
-    const step1 = replay.replaySteps.value[1];
+    const step1 = replay.replaySteps.value[1]!;
     expect(step1.stepIndex).toBe(1);
     expect(step1.plyIndex).toBe(0);
     expect(step1.uci).toBe('d5c7');
@@ -47,7 +47,7 @@ describe('usePuzzleReplay Composable', () => {
     expect(step1.actor).toBe('w');
 
     // Ply 1 (Black plays Kd8)
-    const step2 = replay.replaySteps.value[2];
+    const step2 = replay.replaySteps.value[2]!;
     expect(step2.stepIndex).toBe(2);
     expect(step2.plyIndex).toBe(1);
     expect(step2.uci).toBe('e8d8');
@@ -55,7 +55,7 @@ describe('usePuzzleReplay Composable', () => {
     expect(step2.actor).toBe('b');
 
     // Ply 2 (White plays Nxa8)
-    const step3 = replay.replaySteps.value[3];
+    const step3 = replay.replaySteps.value[3]!;
     expect(step3.stepIndex).toBe(3);
     expect(step3.plyIndex).toBe(2);
     expect(step3.uci).toBe('c7a8');

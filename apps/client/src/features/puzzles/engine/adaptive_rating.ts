@@ -163,7 +163,7 @@ export function getRankTier(rating: number): KidRankTier {
       return tier;
     }
   }
-  return KID_RANK_TIERS[KID_RANK_TIERS.length - 1] ?? KID_RANK_TIERS[0];
+  return KID_RANK_TIERS[KID_RANK_TIERS.length - 1] ?? (KID_RANK_TIERS[0] as KidRankTier);
 }
 
 export function getRankTierForElo(rating: number): KidRankTier {

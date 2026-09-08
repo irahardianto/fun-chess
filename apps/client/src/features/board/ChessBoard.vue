@@ -61,7 +61,8 @@ watch(
 
 // Parse board grid from FEN
 const boardMatrix = computed(() => {
-  const ranksFen = props.fen.split(' ')[0].split('/');
+  const fenPlacement = props.fen.split(' ')[0] ?? '';
+  const ranksFen = fenPlacement.split('/');
   const matrix: Array<Array<{ type: PieceType; color: PieceColor } | null>> = [];
 
   for (const row of ranksFen) {
@@ -113,10 +114,12 @@ const squaresList = computed(() => {
 
   for (let rIdx = 0; rIdx < 8; rIdx++) {
     const rank = rankArr[rIdx];
+    if (!rank) continue;
     const matrixRowIdx = 8 - parseInt(rank, 10);
 
     for (let fIdx = 0; fIdx < 8; fIdx++) {
       const file = fileArr[fIdx];
+      if (!file) continue;
       const square = `${file}${rank}` as Square;
       const matrixColIdx = file.charCodeAt(0) - 'a'.charCodeAt(0);
 

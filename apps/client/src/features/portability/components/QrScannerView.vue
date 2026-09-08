@@ -62,7 +62,9 @@ function handleDrop(e: DragEvent) {
 
   if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
     const droppedFile = e.dataTransfer.files[0];
-    emit('file', droppedFile);
+    if (droppedFile) {
+      emit('file', droppedFile);
+    }
   }
 }
 
@@ -70,7 +72,9 @@ function handleFileChange(e: Event) {
   const target = e.target as HTMLInputElement;
   if (target.files && target.files.length > 0) {
     const selectedFile = target.files[0];
-    emit('file', selectedFile);
+    if (selectedFile) {
+      emit('file', selectedFile);
+    }
     target.value = '';
   }
 }

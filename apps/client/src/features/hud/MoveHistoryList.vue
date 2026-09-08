@@ -24,17 +24,20 @@ const movePairs = computed<MovePair[]>(() => {
 
   for (let i = 0; i < moves.length; i++) {
     const move = moves[i];
+    if (!move) continue;
     const pairIndex = Math.floor(i / 2);
     const moveNumber = pairIndex + 1;
 
-    if (!pairs[pairIndex]) {
-      pairs[pairIndex] = { moveNumber };
+    let pair = pairs[pairIndex];
+    if (!pair) {
+      pair = { moveNumber };
+      pairs[pairIndex] = pair;
     }
 
     if (move.color === 'w') {
-      pairs[pairIndex].white = move;
+      pair.white = move;
     } else {
-      pairs[pairIndex].black = move;
+      pair.black = move;
     }
   }
 

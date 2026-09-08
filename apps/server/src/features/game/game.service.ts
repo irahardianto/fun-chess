@@ -1,4 +1,3 @@
-import { Chess } from "chess.js";
 import {
   GameOverPayload,
   GameOverReason,
@@ -16,15 +15,9 @@ import {
   NotYourTurnError,
   InvalidMoveError,
   InvalidPayloadError,
+  OptimisticLockConflictError,
 } from "@fun-chess/shared";
-import type { RoomStore } from "../rooms/room.store.js";
-import type { SessionRegistry } from "../rooms/session_registry.js";
-import {
-  applyGameMoveTransition,
-  finalizeGameTransition,
-  updateDrawOfferTransition,
-  updateRematchTransition,
-} from "../rooms/room.logic.js";
+import type { IRoomGameAdapter } from "../rooms/index.js";
 import { ChessEngine } from "./chess_engine.js";
 import {
   IClock,
@@ -41,100 +34,113 @@ export type { MoveApplicationResult };
 
 /**
  * Service orchestrating chess game actions (moves, resignations, draws, and rematches).
- * Executes state transitions atomically under RoomStore.mutate lock with pure transition delegates.
+ * Delegates all room persistence and mutation operations strictly through IRoomGameAdapter (MAJ-012).
  */
 export class GameService implements IGameService {
-  private readonly store: RoomStore;
+  private readonly roomAdapter: IRoomGameAdapter;
   private readonly clock: IClock;
   private readonly idGenerator: IIdGenerator;
-  private readonly sessionRegistry?: SessionRegistry;
 
   constructor(
-    store: RoomStore,
-    clock?: IClock | SessionRegistry,
+    roomAdapter: IRoomGameAdapter,
+    clock?: IClock,
     idGenerator?: IIdGenerator,
-    sessionRegistry?: SessionRegistry,
   ) {
-    this.store = store;
-    if (clock && ("createSession" in clock || "validateSession" in clock)) {
-      this.sessionRegistry = clock as SessionRegistry;
-      this.clock = new SystemClock();
-      this.idGenerator = idGenerator ?? new UuidGenerator();
-    } else {
-      this.clock = (clock as IClock) ?? new SystemClock();
-      this.idGenerator = idGenerator ?? new UuidGenerator();
-      this.sessionRegistry = sessionRegistry;
-    }
+    this.roomAdapter = roomAdapter;
+    this.clock = clock ?? new SystemClock();
+    this.idGenerator = idGenerator ?? new UuidGenerator();
   }
 
   /**
-   * Validates and applies a move from a player socket atomically under store lock.
+   * Validates and applies a move from a player socket through roomAdapter.
+   * Handles expectedMoveNumber idempotency and sequencing guards (MAJ-031).
    */
   public async makeMove(
     req: MakeMoveRequest,
     socketId: string,
   ): Promise<MoveApplicationResult> {
     const roomCode = (req.roomCode || "").trim().toUpperCase();
+    const room = await this.roomAdapter.getRoom(roomCode);
 
-    return this.store.mutate(roomCode, async (room) => {
-      if (room.status !== "playing") {
-        throw new GameNotActiveError(room.status);
+    if (!room) {
+      throw new RoomNotFoundError(roomCode);
+    }
+
+    if (room.status !== "playing") {
+      throw new GameNotActiveError(room.status);
+    }
+
+    const player = this.getPlayerBySocketId(room, socketId);
+    if (!player) {
+      throw new PlayerNotInRoomError(socketId);
+    }
+
+    // Handle expectedMoveNumber and idempotencyKey (MAJ-031)
+    if (
+      req.expectedMoveNumber !== undefined &&
+      req.expectedMoveNumber !== room.game.moveCount
+    ) {
+      if (req.expectedMoveNumber < room.game.moveCount) {
+        const isMatchingLastMove =
+          room.game.lastMove !== null &&
+          room.game.lastMove.from === req.move.from &&
+          room.game.lastMove.to === req.move.to;
+
+        if (isMatchingLastMove && room.game.moveHistory.length > 0) {
+          const lastMoveResult =
+            room.game.moveHistory[room.game.moveHistory.length - 1]!;
+
+          let checkInfo: { inCheck: PieceColor; kingSquare: string } | undefined;
+          if (room.game.isCheck) {
+            const checkedColor: PieceColor = room.game.turn;
+            const kingSquare = ChessEngine.findKingSquare(
+              room.game.fen,
+              checkedColor,
+            );
+            if (kingSquare) {
+              checkInfo = { inCheck: checkedColor, kingSquare };
+            }
+          }
+
+          return {
+            room,
+            moveResult: lastMoveResult,
+            gameState: room.game,
+            checkInfo,
+          };
+        }
+
+        throw new OptimisticLockConflictError(
+          roomCode,
+          req.expectedMoveNumber,
+          room.game.moveCount,
+        );
       }
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
+      if (req.expectedMoveNumber > room.game.moveCount) {
+        throw new InvalidMoveError(
+          "Move out of sequence: expectedMoveNumber is in the future",
+        );
       }
+    }
 
-      if (player.color !== room.game.turn) {
-        throw new NotYourTurnError();
-      }
-
-      const outcome = ChessEngine.validateAndApplyMove(
-        room.game.fen,
-        req.move,
-        player.color,
-        room.game.moveHistory,
-      );
-
-      if (!outcome.success) {
-        throw new InvalidMoveError(outcome.error);
-      }
+    // Also handle idempotencyKey deduplication if client resubmitted without expectedMoveNumber
+    if (
+      req.idempotencyKey &&
+      player.color !== room.game.turn &&
+      room.game.lastMove !== null &&
+      room.game.lastMove.from === req.move.from &&
+      room.game.lastMove.to === req.move.to &&
+      room.game.moveHistory.length > 0
+    ) {
+      const lastMoveResult =
+        room.game.moveHistory[room.game.moveHistory.length - 1]!;
 
       let checkInfo: { inCheck: PieceColor; kingSquare: string } | undefined;
-      let gameOverPayload: GameOverPayload | undefined;
-
-      if (outcome.nextState.isCheckmate) {
-        gameOverPayload = createGameOverPayload({
-          winner: player.color,
-          winnerName: player.name,
-          reason: "checkmate",
-          finalFen: outcome.nextState.fen,
-          totalMoves: outcome.nextState.moveCount,
-          startTimeMs: room.createdAt,
-        });
-      } else if (outcome.nextState.isDraw) {
-        const reason: GameOverReason = outcome.nextState.isStalemate
-          ? "stalemate"
-          : outcome.nextState.isThreefoldRepetition
-            ? "threefold_repetition"
-            : outcome.nextState.isInsufficientMaterial
-              ? "insufficient_material"
-              : outcome.nextState.isFiftyMoveRule
-                ? "fifty_move_rule"
-                : "draw_agreement";
-
-        gameOverPayload = createGameOverPayload({
-          winner: "draw",
-          reason,
-          finalFen: outcome.nextState.fen,
-          totalMoves: outcome.nextState.moveCount,
-          startTimeMs: room.createdAt,
-        });
-      } else if (outcome.nextState.isCheck) {
-        const checkedColor: PieceColor = outcome.nextState.turn;
+      if (room.game.isCheck) {
+        const checkedColor: PieceColor = room.game.turn;
         const kingSquare = ChessEngine.findKingSquare(
-          outcome.nextState.fen,
+          room.game.fen,
           checkedColor,
         );
         if (kingSquare) {
@@ -142,74 +148,134 @@ export class GameService implements IGameService {
         }
       }
 
-      const updated = applyGameMoveTransition(
-        room,
-        outcome.nextState,
-        gameOverPayload,
-        this.clock.now(),
-      );
-
       return {
-        updatedRoom: updated,
-        result: {
-          room: updated,
-          moveResult: outcome.moveResult,
-          gameState: outcome.nextState,
-          checkInfo,
-          gameOverPayload,
-        },
+        room,
+        moveResult: lastMoveResult,
+        gameState: room.game,
+        checkInfo,
       };
-    });
+    }
+
+    if (player.color !== room.game.turn) {
+      throw new NotYourTurnError();
+    }
+
+    const outcome = ChessEngine.validateAndApplyMove(
+      room.game.fen,
+      req.move,
+      player.color,
+      room.game.moveHistory,
+      this.clock.now(),
+    );
+
+    if (!outcome.success) {
+      throw new InvalidMoveError(outcome.error);
+    }
+
+    let checkInfo: { inCheck: PieceColor; kingSquare: string } | undefined;
+    let gameOverPayload: GameOverPayload | undefined;
+
+    if (outcome.nextState.isCheckmate) {
+      gameOverPayload = createGameOverPayload({
+        winner: player.color,
+        winnerName: player.name,
+        reason: "checkmate",
+        finalFen: outcome.nextState.fen,
+        totalMoves: outcome.nextState.moveCount,
+        startTimeMs: room.createdAt,
+      });
+    } else if (outcome.nextState.isDraw) {
+      const reason: GameOverReason = outcome.nextState.isStalemate
+        ? "stalemate"
+        : outcome.nextState.isThreefoldRepetition
+          ? "threefold_repetition"
+          : outcome.nextState.isInsufficientMaterial
+            ? "insufficient_material"
+            : outcome.nextState.isFiftyMoveRule
+              ? "fifty_move_rule"
+              : "draw_agreement";
+
+      gameOverPayload = createGameOverPayload({
+        winner: "draw",
+        reason,
+        finalFen: outcome.nextState.fen,
+        totalMoves: outcome.nextState.moveCount,
+        startTimeMs: room.createdAt,
+      });
+    } else if (outcome.nextState.isCheck) {
+      const checkedColor: PieceColor = outcome.nextState.turn;
+      const kingSquare = ChessEngine.findKingSquare(
+        outcome.nextState.fen,
+        checkedColor,
+      );
+      if (kingSquare) {
+        checkInfo = { inCheck: checkedColor, kingSquare };
+      }
+    }
+
+    const updatedRoom = await this.roomAdapter.applyGameMove(
+      roomCode,
+      outcome.nextState,
+      gameOverPayload,
+    );
+
+    return {
+      room: updatedRoom,
+      moveResult: outcome.moveResult,
+      gameState: outcome.nextState,
+      checkInfo,
+      gameOverPayload,
+    };
   }
 
   /**
-   * Concedes active match to the opponent under store lock.
+   * Concedes active match to the opponent through roomAdapter.
    */
   public async resign(
     roomCode: string,
     socketId: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload }> {
     const code = roomCode.trim().toUpperCase();
-    return this.store.mutate(code, async (room) => {
-      if (room.status !== "playing") {
-        throw new GameNotActiveError(room.status);
-      }
+    const room = await this.roomAdapter.getRoom(code);
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+    if (!room) {
+      throw new RoomNotFoundError(code);
+    }
 
-      const winnerColor: PieceColor = player.color === "w" ? "b" : "w";
-      const winnerPlayer =
-        winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
-      const winnerName = winnerPlayer?.name || "Opponent";
+    if (room.status !== "playing") {
+      throw new GameNotActiveError(room.status);
+    }
 
-      const gameOverPayload: GameOverPayload = createGameOverPayload({
-        winner: winnerColor,
-        winnerName,
-        loserName: player.name,
-        reason: "resignation",
-        finalFen: room.game.fen,
-        totalMoves: room.game.moveCount,
-        startTimeMs: room.createdAt,
-      });
+    const player = this.getPlayerBySocketId(room, socketId);
+    if (!player) {
+      throw new PlayerNotInRoomError(socketId);
+    }
 
-      const updated = finalizeGameTransition(
-        room,
-        gameOverPayload,
-        this.clock.now(),
-      );
+    const winnerColor: PieceColor = player.color === "w" ? "b" : "w";
+    const winnerPlayer =
+      winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
+    const winnerName = winnerPlayer?.name || "Opponent";
 
-      return {
-        updatedRoom: updated,
-        result: { room: updated, gameOverPayload },
-      };
+    const gameOverPayload: GameOverPayload = createGameOverPayload({
+      winner: winnerColor,
+      winnerName,
+      loserName: player.name,
+      reason: "resignation",
+      finalFen: room.game.fen,
+      totalMoves: room.game.moveCount,
+      startTimeMs: room.createdAt,
     });
+
+    const updatedRoom = await this.roomAdapter.finalizeGame(
+      code,
+      gameOverPayload,
+    );
+
+    return { room: updatedRoom, gameOverPayload };
   }
 
   /**
-   * Proposes a peaceful draw to opponent under store lock.
+   * Proposes a peaceful draw to opponent through roomAdapter.
    */
   public async offerDraw(
     roomCode: string,
@@ -220,34 +286,38 @@ export class GameService implements IGameService {
     opponentPlayer: Player | null;
   }> {
     const code = roomCode.trim().toUpperCase();
-    return this.store.mutate(code, async (room) => {
-      if (room.status !== "playing") {
-        throw new GameNotActiveError(room.status);
-      }
+    const room = await this.roomAdapter.getRoom(code);
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+    if (!room) {
+      throw new RoomNotFoundError(code);
+    }
 
-      const opponent =
-        player.color === "w" ? room.blackPlayer : room.whitePlayer;
+    if (room.status !== "playing") {
+      throw new GameNotActiveError(room.status);
+    }
 
-      const updated = updateDrawOfferTransition(
-        room,
-        { offeredBy: player.id, offeredAt: this.clock.now() },
-        this.clock.now(),
-      );
+    const player = this.getPlayerBySocketId(room, socketId);
+    if (!player) {
+      throw new PlayerNotInRoomError(socketId);
+    }
 
-      return {
-        updatedRoom: updated,
-        result: { room: updated, fromPlayer: player, opponentPlayer: opponent },
-      };
+    const opponent =
+      player.color === "w" ? room.blackPlayer : room.whitePlayer;
+
+    const updatedRoom = await this.roomAdapter.updateDrawOffer(code, {
+      offeredBy: player.id,
+      offeredAt: this.clock.now(),
     });
+
+    return {
+      room: updatedRoom,
+      fromPlayer: player,
+      opponentPlayer: opponent,
+    };
   }
 
   /**
-   * Responds to draw offer under store lock.
+   * Responds to draw offer through roomAdapter.
    */
   public async respondDraw(
     roomCode: string,
@@ -260,110 +330,102 @@ export class GameService implements IGameService {
     gameOverPayload?: GameOverPayload;
   }> {
     const code = roomCode.trim().toUpperCase();
-    return this.store.mutate<{
-      room: RoomState;
-      accept: boolean;
-      byPlayerId: string;
-      gameOverPayload?: GameOverPayload;
-    }>(code, async (room) => {
-      if (room.status !== "playing") {
-        throw new GameNotActiveError(room.status);
-      }
+    const room = await this.roomAdapter.getRoom(code);
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+    if (!room) {
+      throw new RoomNotFoundError(code);
+    }
 
-      if (!room.drawOffer) {
-        throw new GameNotActiveError("No draw offer is currently pending");
-      }
+    if (room.status !== "playing") {
+      throw new GameNotActiveError(room.status);
+    }
 
-      if (room.drawOffer.offeredBy === player.id) {
-        throw new InvalidPayloadError(
-          "draw",
-          "Cannot accept or decline your own draw offer",
-        );
-      }
+    const player = this.getPlayerBySocketId(room, socketId);
+    if (!player) {
+      throw new PlayerNotInRoomError(socketId);
+    }
 
-      if (!accept) {
-        const updated = updateDrawOfferTransition(room, null, this.clock.now());
-        return {
-          updatedRoom: updated,
-          result: { room: updated, accept: false, byPlayerId: player.id },
-        };
-      }
+    if (!room.drawOffer) {
+      throw new GameNotActiveError("No draw offer is currently pending");
+    }
 
-      const gameOverPayload: GameOverPayload = createGameOverPayload({
-        winner: "draw",
-        reason: "draw_agreement",
-        finalFen: room.game.fen,
-        totalMoves: room.game.moveCount,
-        startTimeMs: room.createdAt,
-      });
-
-      const updated = finalizeGameTransition(
-        room,
-        gameOverPayload,
-        this.clock.now(),
+    if (room.drawOffer.offeredBy === player.id) {
+      throw new InvalidPayloadError(
+        "draw",
+        "Cannot accept or decline your own draw offer",
       );
+    }
 
+    if (!accept) {
+      const updatedRoom = await this.roomAdapter.updateDrawOffer(code, null);
       return {
-        updatedRoom: updated,
-        result: {
-          room: updated,
-          accept: true,
-          byPlayerId: player.id,
-          gameOverPayload,
-        },
+        room: updatedRoom,
+        accept: false,
+        byPlayerId: player.id,
       };
+    }
+
+    const gameOverPayload: GameOverPayload = createGameOverPayload({
+      winner: "draw",
+      reason: "draw_agreement",
+      finalFen: room.game.fen,
+      totalMoves: room.game.moveCount,
+      startTimeMs: room.createdAt,
     });
+
+    const updatedRoom = await this.roomAdapter.finalizeGame(
+      code,
+      gameOverPayload,
+    );
+
+    return {
+      room: updatedRoom,
+      accept: true,
+      byPlayerId: player.id,
+      gameOverPayload,
+    };
   }
 
   /**
-   * Initiates a rematch request following game over under store lock.
+   * Initiates a rematch request following game over through roomAdapter.
    */
   public async requestRematch(
     roomCode: string,
     socketId: string,
   ): Promise<{ room: RoomState; requestedBy: string; requesterName: string }> {
     const code = roomCode.trim().toUpperCase();
-    return this.store.mutate(code, async (room) => {
-      if (room.status !== "game_over" && room.status !== "rematch_pending") {
-        throw new GameNotActiveError(
-          "Rematches can only be requested after game over",
-        );
-      }
+    const room = await this.roomAdapter.getRoom(code);
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+    if (!room) {
+      throw new RoomNotFoundError(code);
+    }
 
-      const updated = updateRematchTransition(
-        room,
-        {
-          requestedBy: player.id,
-          requestedAt: this.clock.now(),
-          status: "pending",
-        },
-        undefined,
-        this.clock.now(),
+    if (room.status !== "game_over" && room.status !== "rematch_pending") {
+      throw new GameNotActiveError(
+        "Rematches can only be requested after game over",
       );
+    }
 
-      return {
-        updatedRoom: updated,
-        result: {
-          room: updated,
-          requestedBy: player.id,
-          requesterName: player.name,
-        },
-      };
+    const player = this.getPlayerBySocketId(room, socketId);
+    if (!player) {
+      throw new PlayerNotInRoomError(socketId);
+    }
+
+    const updatedRoom = await this.roomAdapter.updateRematch(code, {
+      requestedBy: player.id,
+      requestedAt: this.clock.now(),
+      status: "pending",
     });
+
+    return {
+      room: updatedRoom,
+      requestedBy: player.id,
+      requesterName: player.name,
+    };
   }
 
   /**
-   * Accepts or declines rematch proposal under store lock. If accepted, player piece colors are swapped.
+   * Accepts or declines rematch proposal through roomAdapter. If accepted, player piece colors are swapped.
    */
   public async respondRematch(
     roomCode: string,
@@ -376,91 +438,77 @@ export class GameService implements IGameService {
     nextGameState?: GameState;
   }> {
     const code = roomCode.trim().toUpperCase();
-    return this.store.mutate<{
-      room: RoomState;
-      accept: boolean;
-      byPlayerId: string;
-      nextGameState?: GameState;
-    }>(code, async (room) => {
-      if (!room.rematch || room.rematch.status !== "pending") {
-        throw new GameNotActiveError(
-          "No pending rematch request found for this room",
-        );
-      }
+    const room = await this.roomAdapter.getRoom(code);
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+    if (!room) {
+      throw new RoomNotFoundError(code);
+    }
 
-      if (player.id === room.rematch.requestedBy) {
-        throw new InvalidPayloadError(
-          "rematch",
-          "Cannot accept or decline your own rematch request",
-        );
-      }
-
-      if (!accept) {
-        const updated = updateRematchTransition(
-          room,
-          {
-            ...room.rematch,
-            status: "declined",
-          },
-          undefined,
-          this.clock.now(),
-        );
-        return {
-          updatedRoom: updated,
-          result: { room: updated, accept: false, byPlayerId: player.id },
-        };
-      }
-
-      // Accept rematch: swap piece colors
-      const whitePlayer = room.whitePlayer;
-      const blackPlayer = room.blackPlayer;
-
-      if (
-        !whitePlayer ||
-        !blackPlayer ||
-        !whitePlayer.isConnected ||
-        !blackPlayer.isConnected
-      ) {
-        throw new GameNotActiveError(
-          "Both players must be connected to start a rematch",
-        );
-      }
-
-      const swappedWhite: Player = { ...blackPlayer, color: "w" };
-      const swappedBlack: Player = { ...whitePlayer, color: "b" };
-
-      if (this.sessionRegistry?.updateSessionColor) {
-        await this.sessionRegistry.updateSessionColor(code, whitePlayer.id, "b");
-        await this.sessionRegistry.updateSessionColor(code, blackPlayer.id, "w");
-      }
-
-      const nextGameState = createInitialGameState();
-      const updated = updateRematchTransition(
-        room,
-        {
-          ...room.rematch,
-          status: "accepted",
-        },
-        nextGameState,
-        this.clock.now(),
-        { whitePlayer: swappedWhite, blackPlayer: swappedBlack },
+    if (!room.rematch || room.rematch.status !== "pending") {
+      throw new GameNotActiveError(
+        "No pending rematch request found for this room",
       );
+    }
 
+    const player = this.getPlayerBySocketId(room, socketId);
+    if (!player) {
+      throw new PlayerNotInRoomError(socketId);
+    }
+
+    if (player.id === room.rematch.requestedBy) {
+      throw new InvalidPayloadError(
+        "rematch",
+        "Cannot accept or decline your own rematch request",
+      );
+    }
+
+    if (!accept) {
+      const updatedRoom = await this.roomAdapter.updateRematch(code, {
+        ...room.rematch,
+        status: "declined",
+      });
       return {
-        updatedRoom: updated,
-        result: {
-          room: updated,
-          accept: true,
-          byPlayerId: player.id,
-          nextGameState: updated.game,
-        },
+        room: updatedRoom,
+        accept: false,
+        byPlayerId: player.id,
       };
-    });
+    }
+
+    // Accept rematch: swap piece colors
+    const whitePlayer = room.whitePlayer;
+    const blackPlayer = room.blackPlayer;
+
+    if (
+      !whitePlayer ||
+      !blackPlayer ||
+      !whitePlayer.isConnected ||
+      !blackPlayer.isConnected
+    ) {
+      throw new GameNotActiveError(
+        "Both players must be connected to start a rematch",
+      );
+    }
+
+    const swappedWhite: Player = { ...blackPlayer, color: "w" };
+    const swappedBlack: Player = { ...whitePlayer, color: "b" };
+    const nextGameState = createInitialGameState();
+
+    const updatedRoom = await this.roomAdapter.updateRematch(
+      code,
+      {
+        ...room.rematch,
+        status: "accepted",
+      },
+      nextGameState,
+      { whitePlayer: swappedWhite, blackPlayer: swappedBlack },
+    );
+
+    return {
+      room: updatedRoom,
+      accept: true,
+      byPlayerId: player.id,
+      nextGameState: updatedRoom.game,
+    };
   }
 
   private getPlayerBySocketId(

@@ -93,7 +93,7 @@ describe('PuzzleBoardWrapper.vue', () => {
       const chessBoard = wrapper.findComponent(ChessBoard);
       expect(chessBoard.props('orientation')).toBe('w');
 
-      const firstSquare = wrapper.findAllComponents({ name: 'ChessSquare' })[0];
+      const firstSquare = wrapper.findAllComponents({ name: 'ChessSquare' })[0]!;
       expect(firstSquare.props('square')).toBe('a8');
 
       const hintLayer = wrapper.findComponent(ProgressiveHintLayer);
@@ -109,7 +109,7 @@ describe('PuzzleBoardWrapper.vue', () => {
       const chessBoard = wrapper.findComponent(ChessBoard);
       expect(chessBoard.props('orientation')).toBe('b');
 
-      const firstSquare = wrapper.findAllComponents({ name: 'ChessSquare' })[0];
+      const firstSquare = wrapper.findAllComponents({ name: 'ChessSquare' })[0]!;
       expect(firstSquare.props('square')).toBe('h1');
 
       const hintLayer = wrapper.findComponent(ProgressiveHintLayer);

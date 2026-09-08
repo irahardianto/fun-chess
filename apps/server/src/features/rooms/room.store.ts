@@ -1,4 +1,5 @@
 import { RoomState } from "@fun-chess/shared";
+import { IRoomGameAdapter } from "./room.interface.js";
 
 /**
  * Mutation function callback executed inside the room's exclusive lock.
@@ -12,7 +13,7 @@ export type RoomMutator<T> = (
  * Storage boundary abstraction for room persistence.
  * Adheres to Architectural Patterns Rule 1: I/O Isolation.
  */
-export interface RoomStore {
+export interface RoomStore extends IRoomGameAdapter {
   /**
    * Retrieves a deep-cloned snapshot of the room state.
    */
@@ -50,6 +51,15 @@ export interface RoomStore {
   save(room: RoomState, expectedVersion?: number): Promise<void>;
 
   /**
+   * Atomically creates and persists a room if and only if no room with this roomCode currently exists.
+   * Guaranteed atomic under the room code's exclusive lock.
+   *
+   * @param room - The initial room state to persist
+   * @throws RoomAlreadyExistsError if a room with this code already exists
+   */
+  createIfAbsent(room: RoomState): Promise<void>;
+
+  /**
    * Deletes a room from storage and clears its pending lock queue.
    */
   delete(roomCode: string): Promise<boolean>;
@@ -69,3 +79,5 @@ export interface RoomStore {
    */
   clear(): Promise<void>;
 }
+
+export type IRoomStore = RoomStore;

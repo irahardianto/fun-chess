@@ -12,6 +12,12 @@ services:
       - HOST_IP=${HOST_IP:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-}
       - PUBLIC_URL=${PUBLIC_URL:-http://localhost:3000}
+      - CLIENT_URL=${CLIENT_URL:-}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-10000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      - RATE_LIMIT_MAX_KEYS=${RATE_LIMIT_MAX_KEYS:-10000}
     restart: unless-stopped
     healthcheck:
       test:

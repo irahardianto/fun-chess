@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import type { AppGameMode, SoloAiLaunchConfig, ChessScenario, PuzzleTheme, Square } from '@fun-chess/shared';
-import { DEFAULT_PLAYER_AVATAR } from '@fun-chess/shared';
-import { AppNavbar, AppViewRouter, AppToastManager, AppModalContainer, useTheme, useNotification } from '@/components/layout';
+import { computed, watch, onMounted, onUnmounted } from 'vue';
+import type { Square } from '@fun-chess/shared';
+import {
+  AppNavbar,
+  AppViewRouter,
+  AppToastManager,
+  AppModalContainer,
+  useTheme,
+  useNotification,
+} from '@/components/layout';
+import { useModalManager, useAppNavigation } from '@/components/layout/composables';
 import { OfflineIndicator, usePwaInstall, useNetworkStatus } from '@/features/pwa';
 import { useProgressSync } from '@/features/portability';
 import { useSocket, useChessGame, useAudio, useConfetti } from '@/composables';
@@ -10,112 +17,145 @@ import { useInjectApiClient, useInjectStorage, useInjectLogger } from '@/platfor
 import { STORAGE_KEYS } from '@/platform/storage';
 import { defaultLocalStorageProgressStore } from '@/features/scenarios';
 
+// ----------------------------------------------------------------------------
+// Dependency Injections
+// ----------------------------------------------------------------------------
 const apiClient = useInjectApiClient();
 const safeLocalStorage = useInjectStorage();
 const logger = useInjectLogger();
 
+// ----------------------------------------------------------------------------
+// Feature Composables
+// ----------------------------------------------------------------------------
 const { isDarkMode, toggleTheme, initTheme } = useTheme();
 const { notifications, notificationAnnouncement, showNotification, dismissNotification } = useNotification();
-const { isMuted, toggleMute, playMove, playCapture, playCheck, playVictory, playDraw, playStart, playError, playStarEarned, playClick, attachGameEventListeners } = useAudio();
+const {
+  isMuted,
+  toggleMute,
+  playMove,
+  playCapture,
+  playCheck,
+  playVictory,
+  playDraw,
+  playStart,
+  playError,
+  playStarEarned,
+  playClick,
+  attachGameEventListeners,
+} = useAudio();
 const { celebrate } = useConfetti();
 useNetworkStatus();
+
 const { canInstall, isStandalone, promptInstall, snoozePrompt, isInstallModalOpen, showInstallBanner } = usePwaInstall();
-const { isSyncModalOpen, isConflictModalOpen, diffPreview, currentProgress, incomingPayload, openSyncModal, closeConflictModal, executeMerge } = useProgressSync();
-function getInitialLobbyMode(): AppGameMode {
-  try {
-    const raw = safeLocalStorage.getItem(STORAGE_KEYS.SCENARIO_PROGRESS);
-    if (!raw) return 'academy';
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return 'academy';
-    const completed = Object.values(parsed).filter((item: any) => item && item.starsEarned > 0).length;
-    return completed > 0 ? 'multiplayer_lan' : 'academy';
-  } catch (err) {
-    logger.warn('Failed to parse scenario progress for initial lobby mode', {
-      operation: 'app_get_initial_lobby_mode',
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return 'academy';
-  }
-}
+const {
+  isSyncModalOpen,
+  isConflictModalOpen,
+  diffPreview,
+  currentProgress,
+  incomingPayload,
+  openSyncModal,
+  closeConflictModal,
+  executeMerge,
+} = useProgressSync();
 
-function getInitialRoomCode(): string {
-  if (typeof window !== 'undefined' && window.location?.search) {
-    try {
-      const p = new URLSearchParams(window.location.search).get('join') || new URLSearchParams(window.location.search).get('room');
-      return p ? p.toUpperCase() : '';
-    } catch (err) {
-      logger.debug('Failed to parse URL query params for initial room code', {
-        operation: 'app_get_initial_room_code',
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return '';
-    }
-  }
-  return '';
-}
+// Modal & Confirmation manager (MAJ-022)
+const modalManager = useModalManager({ playClick });
+const {
+  showQrModal,
+  showGameOverModal,
+  showConfirmModal,
+  confirmTitle,
+  confirmMessage,
+  confirmButtonText,
+  cancelButtonText,
+  confirmVariant,
+  requestConfirmation,
+  handleConfirmProceed,
+  handleConfirmCancel,
+} = modalManager;
 
-const currentAppMode = ref<AppGameMode>('lobby');
-const lobbyActiveMode = ref<AppGameMode>(getInitialLobbyMode());
-const soloAiConfig = ref<SoloAiLaunchConfig | null>(null);
-const activeScenario = ref<ChessScenario | null>(null);
-const puzzleSubMode = ref<'hub' | 'themed_drills' | 'adaptive_ladder' | 'puzzle_rush' | 'streak_survivor'>('hub');
-const puzzleDrillTheme = ref<PuzzleTheme>('fork');
-const initialRoomCode = ref(getInitialRoomCode());
-const lanInfo = ref<any>(null);
-const isActionLoading = ref(false);
-const showQrModal = ref(false);
-const showGameOverModal = ref(false);
+// Navigation and view routing manager (MAJ-022)
+const navigation = useAppNavigation({
+  storage: safeLocalStorage,
+  apiClient,
+  logger,
+  onLeaveRoom: () => handleLeaveRoom(),
+  playStart,
+});
+const {
+  currentAppMode,
+  lobbyActiveMode,
+  soloAiConfig,
+  activeScenario,
+  puzzleSubMode,
+  puzzleDrillTheme,
+  initialRoomCode,
+  lanInfo,
+  isActionLoading,
+  myPlayerAvatar,
+  loadInitialNetworkAndProgress,
+  startSoloAi,
+  selectScenario,
+  launchDrills,
+  launchLadder,
+  launchRush,
+  exitSoloAi,
+  exitAcademy,
+  exitPuzzle,
+} = navigation;
 
-// Accessible confirmation modal state (replaces raw window.confirm per CRIT-005 & MIN-010)
-const showConfirmModal = ref(false);
-const confirmTitle = ref('');
-const confirmMessage = ref('');
-const confirmButtonText = ref('Confirm');
-const cancelButtonText = ref('Cancel');
-const confirmVariant = ref<'primary' | 'danger'>('danger');
-let pendingConfirmAction: (() => void) | null = null;
-
-function requestConfirmation(opts: {
-  title: string;
-  message: string;
-  confirmButtonText?: string;
-  cancelButtonText?: string;
-  variant?: 'primary' | 'danger';
-  onConfirm: () => void;
-}) {
-  confirmTitle.value = opts.title;
-  confirmMessage.value = opts.message;
-  confirmButtonText.value = opts.confirmButtonText ?? 'Confirm';
-  cancelButtonText.value = opts.cancelButtonText ?? 'Cancel';
-  confirmVariant.value = opts.variant ?? 'danger';
-  pendingConfirmAction = opts.onConfirm;
-  showConfirmModal.value = true;
-  playClick();
-}
-
-function handleConfirmProceed() {
-  playClick();
-  const action = pendingConfirmAction;
-  pendingConfirmAction = null;
-  showConfirmModal.value = false;
-  if (action) action();
-}
-
-function handleConfirmCancel() {
-  playClick();
-  pendingConfirmAction = null;
-  showConfirmModal.value = false;
-}
-
-function getInitialAvatar(): string {
-  const saved = safeLocalStorage.getItem(STORAGE_KEYS.PLAYER_AVATAR);
-  return saved || DEFAULT_PLAYER_AVATAR;
-}
-const myPlayerAvatar = ref<string>(getInitialAvatar());
+// Multiplayer transport, session & game actions (CRIT-005)
 const socketApi = useSocket();
-const { socketId, isConnected, currentRoom, currentPlayer, drawOfferedBy, rematchRequestedBy, lastGameOver, kingInCheck, connect, createRoom, joinRoom, makeMove, resign, offerDraw, respondDraw, requestRematch, respondRematch, leaveRoom } = socketApi;
+const {
+  socketId,
+  isConnected,
+  currentRoom,
+  currentPlayer,
+  drawOfferedBy,
+  rematchRequestedBy,
+  lastGameOver,
+  kingInCheck,
+  connect,
+  createRoom,
+  joinRoom,
+  makeMove,
+  resign,
+  offerDraw,
+  respondDraw,
+  requestRematch,
+  respondRematch,
+  leaveRoom,
+} = socketApi;
+
+// Chess rules engine composable
 const chessEngine = useChessGame();
-const { fen, turn, orientation, lastMove, myColor, isMyTurn, selectedSquare, legalMoves, capturedWhite, capturedBlack, materialAdvantage, kingInCheckSquare, pendingPromotion, selectSquare, completePromotion, cancelPromotion, syncGameState, resetGame, flipBoard, setPlayerColor, moveHistory } = chessEngine;
+const {
+  fen,
+  turn,
+  orientation,
+  lastMove,
+  myColor,
+  isMyTurn,
+  selectedSquare,
+  legalMoves,
+  capturedWhite,
+  capturedBlack,
+  materialAdvantage,
+  kingInCheckSquare,
+  pendingPromotion,
+  selectSquare,
+  completePromotion,
+  cancelPromotion,
+  syncGameState,
+  resetGame,
+  flipBoard,
+  setPlayerColor,
+  moveHistory,
+} = chessEngine;
+
+// ----------------------------------------------------------------------------
+// Computed Properties
+// ----------------------------------------------------------------------------
 const isHost = computed(() => {
   return Boolean(
     currentRoom.value &&
@@ -163,45 +203,16 @@ const showIncomingRematchModal = computed(() => {
   );
 });
 
+// ----------------------------------------------------------------------------
+// Lifecycle & Event Synchronization
+// ----------------------------------------------------------------------------
 let cleanupAudioListeners: (() => void) | null = null;
 
 onMounted(async () => {
   initTheme();
   connect();
   cleanupAudioListeners = attachGameEventListeners(socketApi);
-  if (typeof window !== 'undefined' && window.location?.search) {
-    try {
-      const roomParam = new URLSearchParams(window.location.search).get('join') || new URLSearchParams(window.location.search).get('room');
-      if (roomParam) {
-        initialRoomCode.value = roomParam.toUpperCase();
-      }
-    } catch (err) {
-      logger.debug('Failed to parse URL search params on mount', {
-        operation: 'app_mount_room_param',
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-  try {
-    lanInfo.value = await apiClient.getLanInfo();
-  } catch (err) {
-    logger.warn('Failed to fetch server LAN info in App.vue, using offline fallback', {
-      operation: 'app_fetch_lan_info',
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-  try {
-    const progressMap = await defaultLocalStorageProgressStore.getProgressMap();
-    const completedCount = Object.values(progressMap).filter((item) => item && item.starsEarned > 0).length;
-    if (completedCount > 0 && lobbyActiveMode.value === 'academy') {
-      lobbyActiveMode.value = 'multiplayer_lan';
-    }
-  } catch (err) {
-    logger.warn('Failed to load scenario progress map on mount', {
-      operation: 'app_mount_scenario_progress',
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+  await loadInitialNetworkAndProgress(defaultLocalStorageProgressStore);
 });
 
 onUnmounted(() => {
@@ -278,14 +289,11 @@ watch(
   }
 );
 
+// ----------------------------------------------------------------------------
+// Action Handlers
+// ----------------------------------------------------------------------------
 function handleNavbarBrandClick() {
-  if (currentRoom.value) {
-    handleLeaveRoom();
-  } else {
-    currentAppMode.value = 'lobby';
-    activeScenario.value = null;
-    puzzleSubMode.value = 'hub';
-  }
+  navigation.handleNavbarBrandClick(Boolean(currentRoom.value));
 }
 
 async function handleHostGame(payload: { playerName: string; avatar?: string; preferredColor: 'w' | 'b' | 'random' }) {
@@ -354,6 +362,7 @@ async function handleExecuteMove(move: { from: Square; to: Square; promotion?: '
     isSubmittingMove = false;
   }
 }
+
 function handleLeaveRoom(force = false) {
   if (!currentRoom.value) return;
   if (force || currentRoom.value.status !== 'playing') {
@@ -375,6 +384,7 @@ function handleLeaveRoom(force = false) {
     },
   });
 }
+
 function handleResign(force = false) {
   if (!currentRoom.value) return;
   if (force || currentRoom.value.status !== 'playing') {
@@ -392,8 +402,24 @@ function handleResign(force = false) {
     },
   });
 }
+
+// ----------------------------------------------------------------------------
+// Component Exports & Template Contracts
+// ----------------------------------------------------------------------------
 // Theme transition suppression contract: 'theme-transition-suppress', 'transition: none !important;', requestAnimationFrame
-defineExpose({ showNotification, dismissNotification, isDarkMode, toggleTheme, currentAppMode, handleNavbarBrandClick, handleResign, handleLeaveRoom, showConfirmModal, handleConfirmProceed, handleConfirmCancel });
+defineExpose({
+  showNotification,
+  dismissNotification,
+  isDarkMode,
+  toggleTheme,
+  currentAppMode,
+  handleNavbarBrandClick,
+  handleResign,
+  handleLeaveRoom,
+  showConfirmModal,
+  handleConfirmProceed,
+  handleConfirmCancel,
+});
 </script>
 
 <template>
@@ -403,63 +429,135 @@ defineExpose({ showNotification, dismissNotification, isDarkMode, toggleTheme, c
     <div class="sr-only" role="status" aria-live="polite">{{ notificationAnnouncement }}</div>
 
     <AppNavbar
-      :is-dark-mode="isDarkMode" :is-muted="isMuted" :can-install="canInstall && !isStandalone && !currentRoom && currentAppMode === 'lobby'"
-      :current-room="currentRoom" :current-player="currentPlayer" :current-app-mode="currentAppMode"
-      :is-my-turn="isMyTurn" :active-scenario="activeScenario" :puzzle-sub-mode="puzzleSubMode"
-      @toggle-theme="toggleTheme" @toggle-mute="toggleMute" @install-pwa="promptInstall" @prompt-install="promptInstall"
-      @navigate-home="handleNavbarBrandClick" @open-qr="showQrModal = true" @leave-room="handleLeaveRoom"
-      @exit-solo-ai="currentAppMode = 'lobby'; lobbyActiveMode = 'solo_ai'"
-      @exit-academy="currentAppMode = 'lobby'; activeScenario = null; lobbyActiveMode = 'academy'"
-      @exit-puzzle="currentAppMode = 'lobby'; lobbyActiveMode = 'puzzle_hub'; puzzleSubMode = 'hub'"
+      :is-dark-mode="isDarkMode"
+      :is-muted="isMuted"
+      :can-install="canInstall && !isStandalone && !currentRoom && currentAppMode === 'lobby'"
+      :current-room="currentRoom"
+      :current-player="currentPlayer"
+      :current-app-mode="currentAppMode"
+      :is-my-turn="isMyTurn"
+      :active-scenario="activeScenario"
+      :puzzle-sub-mode="puzzleSubMode"
+      @toggle-theme="toggleTheme"
+      @toggle-mute="toggleMute"
+      @install-pwa="promptInstall"
+      @prompt-install="promptInstall"
+      @navigate-home="handleNavbarBrandClick"
+      @open-qr="showQrModal = true"
+      @leave-room="handleLeaveRoom"
+      @exit-solo-ai="exitSoloAi"
+      @exit-academy="exitAcademy"
+      @exit-puzzle="exitPuzzle"
       @open-sync="openSyncModal"
     />
 
     <main id="main-content" class="app-viewport">
-      <AppToastManager :notifications="notifications" :latest-announcement="notificationAnnouncement" @dismiss="dismissNotification" />
+      <AppToastManager
+        :notifications="notifications"
+        :latest-announcement="notificationAnnouncement"
+        @dismiss="dismissNotification"
+      />
       <AppViewRouter
-        :current-app-mode="currentAppMode" :current-mode="currentAppMode" :lobby-active-mode="lobbyActiveMode"
-        :current-room="currentRoom" :current-player="currentPlayer" :opponent-player="opponentPlayer"
-        :solo-ai-config="soloAiConfig" :active-scenario="activeScenario" :puzzle-sub-mode="puzzleSubMode" :puzzle-drill-theme="puzzleDrillTheme"
-        :initial-room-code="initialRoomCode" :lan-info="lanInfo" :is-action-loading="isActionLoading"
-        :socket-id="socketId" :is-connected="isConnected" :fen="fen" :turn="turn" :orientation="orientation" :my-color="myColor"
-        :is-my-turn="isMyTurn" :selected-square="selectedSquare" :legal-moves="legalMoves" :last-move="lastMove"
-        :king-in-check-square="kingInCheckSquare" :captured-white="capturedWhite" :captured-black="capturedBlack"
-        :material-advantage="materialAdvantage" :move-history="moveHistory" :my-player-avatar="myPlayerAvatar" :draw-offered-by="drawOfferedBy"
-        @update:current-mode="currentAppMode = $event" @update:current-app-mode="currentAppMode = $event" @mode-change="lobbyActiveMode = $event"
-        @host="handleHostGame" @join="handleJoinGame"
-        @create-room="$event.avatar && (myPlayerAvatar = $event.avatar)" @join-room="$event.avatar && (myPlayerAvatar = $event.avatar)"
-        @start-solo-ai="soloAiConfig = $event; if ($event.playerAvatar) myPlayerAvatar = $event.playerAvatar; currentAppMode = 'solo_ai'; playStart();"
-        @select-scenario="activeScenario = $event; currentAppMode = 'academy'; playStart();"
-        @launch-drills="puzzleDrillTheme = $event || 'fork'; puzzleSubMode = 'themed_drills'; currentAppMode = 'puzzle_hub'; playStart();"
-        @launch-ladder="puzzleSubMode = 'adaptive_ladder'; currentAppMode = 'puzzle_hub'; playStart();"
-        @launch-rush="puzzleSubMode = $event || 'puzzle_rush'; currentAppMode = 'puzzle_hub'; playStart();"
-        @exit-solo-ai="currentAppMode = 'lobby'; lobbyActiveMode = 'solo_ai'" @change-opponent="currentAppMode = 'lobby'; lobbyActiveMode = 'solo_ai'"
-        @academy-back="currentAppMode = 'lobby'; activeScenario = null; lobbyActiveMode = 'academy'" @next-lesson="activeScenario = $event; playStart();"
-        @scenario-completed="playStarEarned(); celebrate();" @puzzle-exit="currentAppMode = 'lobby'; lobbyActiveMode = 'puzzle_hub'; puzzleSubMode = 'hub'"
-        @select-square="selectSquare($event, handleExecuteMove)" @square-click="selectSquare($event, handleExecuteMove)" @execute-move="handleExecuteMove" @promotion-required="pendingPromotion = $event"
-        @accept-draw="respondDraw(currentRoom?.roomCode || '', true)" @decline-draw="respondDraw(currentRoom?.roomCode || '', false)"
+        :current-app-mode="currentAppMode"
+        :current-mode="currentAppMode"
+        :lobby-active-mode="lobbyActiveMode"
+        :current-room="currentRoom"
+        :current-player="currentPlayer"
+        :opponent-player="opponentPlayer"
+        :solo-ai-config="soloAiConfig"
+        :active-scenario="activeScenario"
+        :puzzle-sub-mode="puzzleSubMode"
+        :puzzle-drill-theme="puzzleDrillTheme"
+        :initial-room-code="initialRoomCode"
+        :lan-info="lanInfo"
+        :is-action-loading="isActionLoading"
+        :socket-id="socketId"
+        :is-connected="isConnected"
+        :fen="fen"
+        :turn="turn"
+        :orientation="orientation"
+        :my-color="myColor"
+        :is-my-turn="isMyTurn"
+        :selected-square="selectedSquare"
+        :legal-moves="legalMoves"
+        :last-move="lastMove"
+        :king-in-check-square="kingInCheckSquare"
+        :captured-white="capturedWhite"
+        :captured-black="capturedBlack"
+        :material-advantage="materialAdvantage"
+        :move-history="moveHistory"
+        :my-player-avatar="myPlayerAvatar"
+        :draw-offered-by="drawOfferedBy"
+        @update:current-mode="currentAppMode = $event"
+        @update:current-app-mode="currentAppMode = $event"
+        @mode-change="lobbyActiveMode = $event"
+        @host="handleHostGame"
+        @join="handleJoinGame"
+        @create-room="$event.avatar && (myPlayerAvatar = $event.avatar)"
+        @join-room="$event.avatar && (myPlayerAvatar = $event.avatar)"
+        @start-solo-ai="startSoloAi($event)"
+        @select-scenario="selectScenario($event)"
+        @launch-drills="launchDrills($event)"
+        @launch-ladder="launchLadder"
+        @launch-rush="launchRush($event)"
+        @exit-solo-ai="exitSoloAi"
+        @change-opponent="exitSoloAi"
+        @academy-back="exitAcademy"
+        @next-lesson="selectScenario($event)"
+        @scenario-completed="playStarEarned(); celebrate();"
+        @puzzle-exit="exitPuzzle"
+        @select-square="selectSquare($event, handleExecuteMove)"
+        @square-click="selectSquare($event, handleExecuteMove)"
+        @execute-move="handleExecuteMove"
+        @promotion-required="pendingPromotion = $event"
+        @accept-draw="respondDraw(currentRoom?.roomCode || '', true)"
+        @decline-draw="respondDraw(currentRoom?.roomCode || '', false)"
         @offer-draw="offerDraw(currentRoom?.roomCode || ''); showNotification('Draw offer sent to opponent! 🤝', 'info');"
         @resign="handleResign"
-        @flip-board="flipBoard" @open-sync="openSyncModal"
+        @flip-board="flipBoard"
+        @open-sync="openSyncModal"
       />
     </main>
 
     <AppModalContainer
-      v-model:show-qr-modal="showQrModal" v-model:show-game-over-modal="showGameOverModal" v-model:is-sync-modal-open="isSyncModalOpen"
-      v-model:is-conflict-modal-open="isConflictModalOpen" v-model:is-install-modal-open="isInstallModalOpen"
+      v-model:show-qr-modal="showQrModal"
+      v-model:show-game-over-modal="showGameOverModal"
+      v-model:is-sync-modal-open="isSyncModalOpen"
+      v-model:is-conflict-modal-open="isConflictModalOpen"
+      v-model:is-install-modal-open="isInstallModalOpen"
       v-model:show-confirm-modal="showConfirmModal"
-      :confirm-title="confirmTitle" :confirm-message="confirmMessage"
-      :confirm-button-text="confirmButtonText" :cancel-button-text="cancelButtonText"
+      :confirm-title="confirmTitle"
+      :confirm-message="confirmMessage"
+      :confirm-button-text="confirmButtonText"
+      :cancel-button-text="cancelButtonText"
       :confirm-variant="confirmVariant"
-      :current-room="currentRoom" :lan-info="lanInfo" :pending-promotion="pendingPromotion" :turn="turn" :last-game-over="lastGameOver"
-      :is-winner="isWinner" :is-draw-result="isDrawResult" :is-rematch-requested-by-me="isRematchRequestedByMe"
-      :show-incoming-rematch-modal="showIncomingRematchModal" :rematch-requested-by="rematchRequestedBy"
-      :current-progress="currentProgress" :incoming-payload="incomingPayload" :diff-preview="diffPreview" :show-install-banner="showInstallBanner"
-      @promotion-select="completePromotion($event, handleExecuteMove)" @promotion-cancel="cancelPromotion"
-      @request-rematch="requestRematch(currentRoom?.roomCode || '')" @accept-rematch="respondRematch(currentRoom?.roomCode || '', true); showGameOverModal = false;"
-      @decline-rematch="respondRematch(currentRoom?.roomCode || '', false)" @leave-room="handleLeaveRoom"
-      @resolve-conflict="executeMerge" @cancel-conflict="closeConflictModal" @dismiss-conflict="closeConflictModal" @prompt-install="promptInstall" @snooze-prompt="snoozePrompt"
-      @confirm-proceed="handleConfirmProceed" @confirm-cancel="handleConfirmCancel"
+      :current-room="currentRoom"
+      :lan-info="lanInfo"
+      :pending-promotion="pendingPromotion"
+      :turn="turn"
+      :last-game-over="lastGameOver"
+      :is-winner="isWinner"
+      :is-draw-result="isDrawResult"
+      :is-rematch-requested-by-me="isRematchRequestedByMe"
+      :show-incoming-rematch-modal="showIncomingRematchModal"
+      :rematch-requested-by="rematchRequestedBy"
+      :current-progress="currentProgress"
+      :incoming-payload="incomingPayload"
+      :diff-preview="diffPreview"
+      :show-install-banner="showInstallBanner"
+      @promotion-select="completePromotion($event, handleExecuteMove)"
+      @promotion-cancel="cancelPromotion"
+      @request-rematch="requestRematch(currentRoom?.roomCode || '')"
+      @accept-rematch="respondRematch(currentRoom?.roomCode || '', true); showGameOverModal = false;"
+      @decline-rematch="respondRematch(currentRoom?.roomCode || '', false)"
+      @leave-room="handleLeaveRoom"
+      @resolve-conflict="executeMerge"
+      @cancel-conflict="closeConflictModal"
+      @dismiss-conflict="closeConflictModal"
+      @prompt-install="promptInstall"
+      @snooze-prompt="snoozePrompt"
+      @confirm-proceed="handleConfirmProceed"
+      @confirm-cancel="handleConfirmCancel"
     />
     <!-- Contracts: data-testid="app-notification-banner", 'Flip board' 'Offer draw' 'Hide moves' : 'View moves' -->
     <span class="action-btn--subdued-danger" data-testid="resign-action" style="display:none"></span>

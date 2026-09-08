@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Chess } from "chess.js";
 import { ChessEngine } from "../chess_engine.js";
 
@@ -19,12 +19,15 @@ describe("ChessEngine", () => {
   });
 
   describe("validateAndApplyMove", () => {
-    it("applies a legal opening pawn move (e2 to e4)", () => {
+    it("applies a legal opening pawn move (e2 to e4) and records explicit timestamp (MAJ-016)", () => {
       const initialFen = new Chess().fen();
+      const testTimestamp = 1700000000000;
       const outcome = ChessEngine.validateAndApplyMove(
         initialFen,
         { from: "e2", to: "e4" },
         "w",
+        [],
+        testTimestamp,
       );
 
       expect(outcome.success).toBe(true);
@@ -34,6 +37,7 @@ describe("ChessEngine", () => {
         expect(outcome.moveResult.san).toBe("e4");
         expect(outcome.moveResult.piece).toBe("p");
         expect(outcome.moveResult.color).toBe("w");
+        expect(outcome.moveResult.timestamp).toBe(testTimestamp);
         expect(outcome.nextState.turn).toBe("b");
         expect(outcome.nextState.lastMove).toEqual({ from: "e2", to: "e4" });
         expect(outcome.nextState.moveHistory).toHaveLength(1);
@@ -46,6 +50,8 @@ describe("ChessEngine", () => {
         initialFen,
         { from: "e7", to: "e5" },
         "b",
+        [],
+        1700000000000,
       );
 
       expect(outcome.success).toBe(false);
@@ -60,6 +66,8 @@ describe("ChessEngine", () => {
         initialFen,
         { from: "e2", to: "e5" },
         "w",
+        [],
+        1700000000000,
       );
 
       expect(outcome.success).toBe(false);
@@ -75,6 +83,8 @@ describe("ChessEngine", () => {
         promotionFen,
         { from: "e7", to: "e8", promotion: "q" },
         "w",
+        [],
+        1700000000000,
       );
 
       expect(outcome.success).toBe(true);
@@ -91,6 +101,8 @@ describe("ChessEngine", () => {
         castleFen,
         { from: "e1", to: "g1" },
         "w",
+        [],
+        1700000000000,
       );
 
       expect(outcome.success).toBe(true);
@@ -108,6 +120,8 @@ describe("ChessEngine", () => {
         enPassantFen,
         { from: "e5", to: "d6" },
         "w",
+        [],
+        1700000000000,
       );
 
       expect(outcome.success).toBe(true);
@@ -227,6 +241,7 @@ describe("ChessEngine", () => {
           { from: m.from, to: m.to },
           m.turn,
           history,
+          1700000000000 + i * 1000,
         );
 
         expect(outcome.success).toBe(true);
@@ -272,6 +287,7 @@ describe("ChessEngine", () => {
           { from: m.from, to: m.to },
           m.turn,
           history,
+          1700000000000 + i * 1000,
         );
 
         expect(outcome.success).toBe(true);
@@ -438,6 +454,8 @@ describe("ChessEngine", () => {
         preStalemateFen,
         { from: "b6", to: "a6" },
         "w",
+        [],
+        1700000000000,
       );
 
       expect(outcome.success).toBe(true);
@@ -474,6 +492,8 @@ describe("ChessEngine", () => {
         preInsufficientFen,
         { from: "e4", to: "d5" },
         "w",
+        [],
+        1700000000000,
       );
 
       expect(outcome.success).toBe(true);
@@ -503,6 +523,8 @@ describe("ChessEngine", () => {
         preFiftyMoveFen,
         { from: "h1", to: "g1" },
         "w",
+        [],
+        1700000000000,
       );
 
       expect(outcome.success).toBe(true);
@@ -512,6 +534,68 @@ describe("ChessEngine", () => {
         expect(outcome.nextState.isInsufficientMaterial).toBe(false);
         expect(outcome.nextState.isStalemate).toBe(false);
       }
+    });
+  });
+
+  describe("Pure Engine & Purity Invariants (MAJ-013)", () => {
+    it("returns pure outcome object without side effects on invalid FEN", () => {
+      const outcome = ChessEngine.validateMove(
+        "totally-invalid-fen-string",
+        { from: "e2", to: "e4" },
+        "w",
+      );
+
+      expect(outcome.success).toBe(false);
+      if (!outcome.success) {
+        expect(outcome.error).toBe("Invalid board FEN string");
+      }
+    });
+
+    it("returns pure failure outcome on validateAndApplyMove with invalid FEN", () => {
+      const outcome = ChessEngine.validateAndApplyMove(
+        "invalid-fen",
+        { from: "e2", to: "e4" },
+        "w",
+        [],
+        Date.now(),
+      );
+
+      expect(outcome.success).toBe(false);
+      if (!outcome.success) {
+        expect(outcome.error).toBe("Invalid board FEN string");
+      }
+    });
+  });
+
+  describe("King Square Coordinates Delegation (MIN-019)", () => {
+    it("locates white king at e1 and black king at e8 on starting board", () => {
+      const chess = new Chess();
+      expect(ChessEngine.getKingSquare(chess, "w")).toBe("e1");
+      expect(ChessEngine.getKingSquare(chess, "b")).toBe("e8");
+    });
+
+    it("locates kings after moves", () => {
+      const fen = "8/8/4k3/8/8/4K3/8/8 w - - 0 1";
+      const chess = new Chess(fen);
+      expect(ChessEngine.getKingSquare(chess, "w")).toBe("e3");
+      expect(ChessEngine.getKingSquare(chess, "b")).toBe("e6");
+    });
+
+    it("returns null when king is absent", () => {
+      const chess = new Chess();
+      const customBoard = chess.board().map((row) =>
+        row.map((piece) => (piece?.type === "k" && piece.color === "b" ? null : piece)),
+      );
+      vi.spyOn(chess, "board").mockReturnValue(customBoard);
+      expect(ChessEngine.getKingSquare(chess, "w")).toBe("e1");
+      expect(ChessEngine.getKingSquare(chess, "b")).toBeNull();
+    });
+
+    it("finds king square from FEN using findKingSquare", () => {
+      const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+      expect(ChessEngine.findKingSquare(fen, "w")).toBe("e1");
+      expect(ChessEngine.findKingSquare(fen, "b")).toBe("e8");
+      expect(ChessEngine.findKingSquare("invalid-fen", "w")).toBeNull();
     });
   });
 });

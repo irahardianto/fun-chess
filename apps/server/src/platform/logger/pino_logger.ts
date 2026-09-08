@@ -9,6 +9,9 @@ const DEFAULT_REDACT_PATHS = [
   "sessionToken",
   "*.sessionToken",
   "*.*.sessionToken",
+  "session_token",
+  "*.session_token",
+  "*.*.session_token",
   "password",
   "*.password",
   "token",
@@ -23,6 +26,12 @@ const DEFAULT_REDACT_PATHS = [
   "*.key",
   "apiKey",
   "*.apiKey",
+  "bearer",
+  "*.bearer",
+  "credential",
+  "*.credential",
+  "credentials",
+  "*.credentials",
 ];
 
 /**

@@ -1,10 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Chess } from "chess.js";
+import { Chess, validateFen } from "chess.js";
+
+vi.mock("chess.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("chess.js")>();
+  return {
+    ...actual,
+    validateFen: vi.fn(actual.validateFen),
+  };
+});
+
 import {
   DEFAULT_CHESS_FEN,
   isValidFen,
   createSafeChess,
   safeLoadFen,
+  DEFAULT_CHESS_LOGGER,
+  SILENT_CHESS_LOGGER,
   type ChessLogger,
 } from "../chess_factory.js";
 
@@ -115,6 +126,12 @@ describe("Safe Chess Factory & FEN Validator", () => {
         expect(chess.turn()).toBe("w");
       }
 
+      expect(console.warn).toHaveBeenCalledTimes(4);
+    });
+
+    it("suppresses console.warn when a custom silent logger is explicitly provided", () => {
+      const silentLogger: ChessLogger = { warn: () => {} };
+      createSafeChess("invalid-fen-string", silentLogger);
       expect(console.warn).not.toHaveBeenCalled();
     });
 
@@ -198,6 +215,85 @@ describe("Safe Chess Factory & FEN Validator", () => {
 
     it("returns false gracefully if chess instance is null or undefined", () => {
       expect(safeLoadFen(null as unknown as Chess, DEFAULT_CHESS_FEN)).toBe(false);
+    });
+
+    it("recovers safely when position initialization throws in createSafeChess (MIN-034)", () => {
+      vi.mocked(validateFen).mockImplementationOnce(() => {
+        throw new Error("Validation engine crashed");
+      });
+      const mockLogger: ChessLogger = { warn: vi.fn() };
+
+      const chess = createSafeChess("bad-fen", mockLogger);
+      expect(chess).toBeInstanceOf(Chess);
+      expect(chess.fen()).toBe(DEFAULT_CHESS_FEN);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[createSafeChess] Failed to initialize position"),
+        expect.objectContaining({
+          operation: "create_safe_chess",
+          fen: "bad-fen",
+          error: "Validation engine crashed",
+        }),
+      );
+    });
+
+    it("recovers safely when chess.load throws in safeLoadFen and restores previous state (MIN-034)", () => {
+      const chess = new Chess();
+      const initialFen = chess.fen();
+      const mockLogger: ChessLogger = { warn: vi.fn() };
+
+      let callCount = 0;
+      const originalLoad = chess.load.bind(chess);
+      vi.spyOn(chess, "load").mockImplementation((fen: string) => {
+        callCount++;
+        if (callCount === 1) {
+          throw new Error("Simulated load failure");
+        }
+        return originalLoad(fen);
+      });
+
+      const validFen = "8/5k2/8/8/8/8/4K3/8 w - - 0 1";
+      const result = safeLoadFen(chess, validFen, mockLogger);
+
+      expect(result).toBe(false);
+      expect(chess.fen()).toBe(initialFen);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[safeLoadFen] Failed to load FEN"),
+        expect.objectContaining({
+          operation: "safe_load_fen",
+          fen: validFen,
+          error: "Simulated load failure",
+        }),
+      );
+    });
+
+    it("falls back to chess.reset() when restoring previous state also throws in safeLoadFen (MIN-034)", () => {
+      const chess = new Chess();
+      const resetSpy = vi.spyOn(chess, "reset");
+      let callCount = 0;
+      vi.spyOn(chess, "load").mockImplementation(() => {
+        callCount++;
+        throw new Error(`Load attempt ${callCount} failed`);
+      });
+
+      const validFen = "8/5k2/8/8/8/8/4K3/8 w - - 0 1";
+      const result = safeLoadFen(chess, validFen);
+
+      expect(result).toBe(false);
+      expect(resetSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("DEFAULT_CHESS_LOGGER & SILENT_CHESS_LOGGER (MIN-004)", () => {
+    it("logs to console.warn via DEFAULT_CHESS_LOGGER with and without metadata", () => {
+      DEFAULT_CHESS_LOGGER.warn("Warning without meta");
+      expect(console.warn).toHaveBeenCalledWith("Warning without meta");
+
+      DEFAULT_CHESS_LOGGER.warn("Warning with meta", { operation: "test" });
+      expect(console.warn).toHaveBeenCalledWith("Warning with meta", { operation: "test" });
+    });
+
+    it("aliases SILENT_CHESS_LOGGER to DEFAULT_CHESS_LOGGER", () => {
+      expect(SILENT_CHESS_LOGGER).toBe(DEFAULT_CHESS_LOGGER);
     });
   });
 });

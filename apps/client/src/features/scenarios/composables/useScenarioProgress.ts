@@ -8,6 +8,7 @@ import type {
 } from '@fun-chess/shared';
 import { defaultLocalStorageProgressStore } from '../store/local_storage_progress.store';
 import { ALL_SCENARIOS, CURRICULUM_SECTIONS } from '../data';
+import { logger } from '@/platform/telemetry';
 
 export function useScenarioProgress(customStore?: ScenarioProgressStore) {
   const store = customStore || defaultLocalStorageProgressStore;
@@ -19,7 +20,12 @@ export function useScenarioProgress(customStore?: ScenarioProgressStore) {
     isLoading.value = true;
     try {
       progressMap.value = await store.getProgressMap();
-    } catch {
+    } catch (err: unknown) {
+      logger.error('Failed to load scenario progress', {
+        operation: 'scenario_load_progress',
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       progressMap.value = {};
     } finally {
       isLoading.value = false;

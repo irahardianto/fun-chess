@@ -105,8 +105,8 @@ async function handleImportFile(file: File) {
     if (success) {
       modelValue.value = false;
     }
-  } catch (err: any) {
-    syncError.value = err?.message || 'Failed to read save file.';
+  } catch (err: unknown) {
+    syncError.value = err instanceof Error ? err.message : 'Failed to read save file.';
   }
 }
 

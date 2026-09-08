@@ -9,7 +9,8 @@ import {
   puzzleAnalysisEngine,
   getMaterialCount,
 } from '../puzzle_analysis_engine';
-import { Chess, type Square } from 'chess.js';
+import { createSafeChess } from '@fun-chess/shared';
+import type { Square } from 'chess.js';
 
 describe('PuzzleAnalysisEngine', () => {
   // Royal Knight Fork: White plays c3b5, Black plays e8d8, White plays b5c7 winning rook on a8
@@ -63,7 +64,7 @@ describe('PuzzleAnalysisEngine', () => {
     it('calculates +5 Rook advantage correctly on fork puzzle final FEN', () => {
       // Initial: White and Black have standard pieces
       // Final: Black has lost a pawn on c7 (100) and rook on a8 (500) = 600 cp total
-      const chess = new Chess(forkPuzzle.fen);
+      const chess = createSafeChess(forkPuzzle.fen);
       for (const m of forkPuzzle.moves) {
         const from = m.slice(0, 2);
         const to = m.slice(2, 4);
@@ -207,7 +208,7 @@ describe('PuzzleAnalysisEngine', () => {
     it('generates complete analysis for fork puzzle', () => {
       const analysis = analyzePuzzleSolution(forkPuzzle);
 
-      expect(analysis.initialMaterial.white).toBe(getMaterialCount(new Chess(forkPuzzle.fen)).white);
+      expect(analysis.initialMaterial.white).toBe(getMaterialCount(createSafeChess(forkPuzzle.fen)).white);
       expect(analysis.materialDeltaCentipawns).toBe(600);
       expect(analysis.netPointsDelta).toBe(5);
       expect(analysis.advantageSummary.formattedAdvantage).toBe('+5 Rook ♜');

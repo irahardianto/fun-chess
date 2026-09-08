@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { encodeProgressToEnvelope, encodeProgressToQr } from '@fun-chess/shared';
 import { LobbyPage } from '../src/index.js';
 
 test.describe('Progress Sync & Data Portability Journey', () => {
@@ -51,37 +52,31 @@ test.describe('Progress Sync & Data Portability Journey', () => {
     // If clipboard read succeeded with FC1:, use it; otherwise fallback to valid backup envelope JSON
     const payloadToImport = exportedCode.startsWith('FC1:')
       ? exportedCode
-      : JSON.stringify({
-          magic: 'FC_PROGRESS_V1',
-          schemaVersion: 1,
-          exportedAt: new Date().toISOString(),
-          checksum: '00000000',
-          payload: {
-            version: 1,
-            exportedAt: Date.now(),
-            clientVersion: '1.0.0',
-            scenarios: {},
-            puzzles: {
-              ratingProfile: {
-                rating: 800,
-                ratingDeviation: 350,
-                peakRating: 800,
-                totalAttempted: 0,
-                totalSolved: 0,
-                bestStreak: 0,
-                ratingHistory: [],
-              },
-              themeMastery: {},
-              arcadeStats: {
-                puzzleRushHighScore: 0,
-                puzzleRushBestStreak: 0,
-                streakSurvivorHighScore: 0,
-                totalRushRuns: 0,
-              },
-              solvedPuzzles: {},
-              createdAt: Date.now(),
-              lastActiveAt: Date.now(),
+      : encodeProgressToEnvelope({
+          version: 1,
+          exportedAt: Date.now(),
+          clientVersion: '1.0.0',
+          scenarios: {},
+          puzzles: {
+            ratingProfile: {
+              rating: 800,
+              ratingDeviation: 350,
+              peakRating: 800,
+              totalAttempted: 0,
+              totalSolved: 0,
+              bestStreak: 0,
+              ratingHistory: [],
             },
+            themeMastery: {},
+            arcadeStats: {
+              puzzleRushHighScore: 0,
+              puzzleRushBestStreak: 0,
+              streakSurvivorHighScore: 0,
+              totalRushRuns: 0,
+            },
+            solvedPuzzles: {},
+            createdAt: Date.now(),
+            lastActiveAt: Date.now(),
           },
         });
 
@@ -96,5 +91,123 @@ test.describe('Progress Sync & Data Portability Journey', () => {
 
     // 9. Verify progress loads cleanly without error banner
     await expect(page.locator('.sync-error-banner')).not.toBeVisible({ timeout: 10_000 });
+  });
+
+  test('displays 3-way conflict resolution modal on divergent save import and completes smart merge', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+
+    await lobbyPage.goto();
+    await lobbyPage.openProgressSync();
+
+    // 1. Switch to Import tab
+    const importTab = page.locator('#tab-import');
+    await expect(importTab).toBeVisible({ timeout: 10_000 });
+    await importTab.click();
+
+    // 2. Open manual code input drawer
+    const drawerToggle = page.locator('button:has-text("Paste Code / Manual Text Fallback"), .manual-drawer-toggle');
+    await expect(drawerToggle).toBeVisible({ timeout: 10_000 });
+    await drawerToggle.click();
+
+    // 3. Prepare divergent payload with different rating, stars, and future timestamp
+    const divergentQr = await encodeProgressToQr({
+      version: 1,
+      exportedAt: Date.now() + 86400000,
+      clientVersion: '1.0.0',
+      scenarios: {
+        rook_maze: {
+          scenarioId: 'rook_maze',
+          starsEarned: 3,
+          firstCompletedAt: Date.now() + 86400000,
+          lastCompletedAt: Date.now() + 86400000,
+          attemptsCount: 1,
+          hintsUsedTotal: 0,
+        },
+      },
+      puzzles: {
+        ratingProfile: {
+          rating: 1250,
+          ratingDeviation: 120,
+          peakRating: 1250,
+          totalAttempted: 25,
+          totalSolved: 20,
+          bestStreak: 8,
+          ratingHistory: [],
+        },
+        themeMastery: {},
+        arcadeStats: {
+          puzzleRushHighScore: 15,
+          puzzleRushBestStreak: 12,
+          streakSurvivorHighScore: 18,
+          totalRushRuns: 5,
+        },
+        solvedPuzzles: {},
+        createdAt: Date.now(),
+        lastActiveAt: Date.now() + 86400000,
+      },
+    });
+
+    const manualInput = page.locator('#manual-backup-input');
+    await expect(manualInput).toBeVisible({ timeout: 10_000 });
+    await manualInput.fill(divergentQr);
+
+    // 4. Click "Load Progress"
+    const loadProgressBtn = page.locator('button:has-text("Load Progress")');
+    await expect(loadProgressBtn).toBeVisible({ timeout: 10_000 });
+    await loadProgressBtn.click();
+
+    // 5. Verify ProgressConflictModal opens displaying conflict diff
+    const conflictModal = page.locator('.conflict-modal-content');
+    await expect(conflictModal).toBeVisible({ timeout: 10_000 });
+
+    // 6. Verify 3 conflict resolution actions: Smart Merge, Replace Device, Keep Local
+    const smartMergeBtn = page.locator('button:has-text("Smart Merge (Recommended)")');
+    const replaceBtn = page.locator('button:has-text("Replace Device Progress")');
+    const keepLocalBtn = page.locator('button:has-text("Keep current progress")');
+
+    await expect(smartMergeBtn).toBeVisible({ timeout: 5_000 });
+    await expect(replaceBtn).toBeVisible({ timeout: 5_000 });
+    await expect(keepLocalBtn).toBeVisible({ timeout: 5_000 });
+
+    // 7. Verify Projected Smart Merge preview card is present
+    await expect(page.locator('[data-testid="projected-merge-outcome"]')).toBeVisible({ timeout: 5_000 });
+
+    // 8. Click Smart Merge to safely unify progress
+    await smartMergeBtn.click();
+
+    // 9. Conflict modal dismisses after resolving
+    await expect(conflictModal).not.toBeVisible({ timeout: 10_000 });
+  });
+
+  test('displays corrupted save rejection banner when importing invalid or malformed JSON payload', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+
+    await lobbyPage.goto();
+    await lobbyPage.openProgressSync();
+
+    // 1. Switch to Import tab
+    const importTab = page.locator('#tab-import');
+    await expect(importTab).toBeVisible({ timeout: 10_000 });
+    await importTab.click();
+
+    // 2. Open manual code input drawer
+    const drawerToggle = page.locator('button:has-text("Paste Code / Manual Text Fallback"), .manual-drawer-toggle');
+    await expect(drawerToggle).toBeVisible({ timeout: 10_000 });
+    await drawerToggle.click();
+
+    // 3. Fill with corrupted / malformed save payload
+    const manualInput = page.locator('#manual-backup-input');
+    await expect(manualInput).toBeVisible({ timeout: 10_000 });
+    await manualInput.fill('{"invalid_save_data": true, "corrupted": [unclosed');
+
+    // 4. Click "Load Progress"
+    const loadProgressBtn = page.locator('button:has-text("Load Progress")');
+    await expect(loadProgressBtn).toBeVisible({ timeout: 10_000 });
+    await loadProgressBtn.click();
+
+    // 5. Verify .sync-error-banner appears with rejection message
+    const errorBanner = page.locator('.sync-error-banner');
+    await expect(errorBanner).toBeVisible({ timeout: 10_000 });
+    await expect(errorBanner).toContainText(/invalid|unrecognized|validation|format/i);
   });
 });

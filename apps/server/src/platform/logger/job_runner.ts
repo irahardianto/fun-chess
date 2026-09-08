@@ -13,6 +13,9 @@ const SENSITIVE_KEYS = new Set([
   "key",
   "apikey",
   "api_key",
+  "bearer",
+  "credential",
+  "credentials",
 ]);
 
 function sanitizeJobResult(data: unknown, seen = new WeakSet<object>()): unknown {
@@ -32,7 +35,9 @@ function sanitizeJobResult(data: unknown, seen = new WeakSet<object>()): unknown
       SENSITIVE_KEYS.has(key.toLowerCase()) ||
       lower.includes("secret") ||
       lower.includes("token") ||
-      lower.includes("password")
+      lower.includes("password") ||
+      lower.includes("credential") ||
+      lower.includes("bearer")
     ) {
       result[key] = "[REDACTED]";
     } else if (typeof value === "object" && value !== null) {

@@ -19,7 +19,7 @@ describe('InMemoryPuzzleProgressStore (Test Adapter)', () => {
     const updated = await store.getProgress();
 
     expect(updated.solvedPuzzles['puz_001']).toBeDefined();
-    expect(updated.solvedPuzzles['puz_001'].stars).toBe(3);
+    expect(updated.solvedPuzzles['puz_001']?.stars).toBe(3);
     expect(updated.ratingProfile.totalSolved).toBe(1);
   });
 

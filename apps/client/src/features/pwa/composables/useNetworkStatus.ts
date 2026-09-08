@@ -1,5 +1,6 @@
 import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
 import { apiClient, type IApiClient } from '@/platform/api';
+import { logger } from '@/platform/telemetry';
 
 const isOnlineState = ref<boolean>(
   typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -8,37 +9,44 @@ const isOnlineState = ref<boolean>(
 let listenerCount = 0;
 let initialized = false;
 
-function handleOnline() {
+function handleOnline(): void {
   isOnlineState.value = true;
-  if (typeof console !== 'undefined') {
-    console.info('[FC_PWA] Network status changed: Online', {
-      isOnline: true,
-      timestamp: Date.now(),
-    });
-  }
+  logger.info('Network status changed to online', {
+    operation: 'network_status_change',
+    isOnline: true,
+  });
 }
 
-function handleOffline() {
+function handleOffline(): void {
   isOnlineState.value = false;
-  if (typeof console !== 'undefined') {
-    console.info('[FC_PWA] Network status changed: Offline', {
-      isOnline: false,
-      timestamp: Date.now(),
-    });
-  }
+  logger.info('Network status changed to offline', {
+    operation: 'network_status_change',
+    isOnline: false,
+  });
 }
 
-function setupNetworkListeners() {
+function setupNetworkListeners(): void {
   if (typeof window === 'undefined' || initialized) return;
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   initialized = true;
 }
 
-function removeNetworkListeners() {
+function removeNetworkListeners(): void {
   if (typeof window === 'undefined' || !initialized) return;
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
+  initialized = false;
+}
+
+/**
+ * Explicit reset hook for module-level network status reactive state (MAJ-011 & MIN-010).
+ * Cleans up reactive refs and tears down global window event listeners.
+ */
+export function resetNetworkStatusState(): void {
+  removeNetworkListeners();
+  isOnlineState.value = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  listenerCount = 0;
   initialized = false;
 }
 
@@ -47,12 +55,11 @@ function removeNetworkListeners() {
  * Uses centralized IApiClient for connectivity probing per MAJ-007.
  */
 export function useNetworkStatus(client: IApiClient = apiClient) {
-  setupNetworkListeners();
-  listenerCount++;
-
-  if (typeof navigator !== 'undefined') {
+  if (!initialized && typeof navigator !== 'undefined') {
     isOnlineState.value = navigator.onLine;
   }
+  setupNetworkListeners();
+  listenerCount++;
 
   const cleanup = () => {
     listenerCount = Math.max(0, listenerCount - 1);
@@ -87,7 +94,11 @@ export function useNetworkStatus(client: IApiClient = apiClient) {
       isOnlineState.value = online;
       return online;
     } catch (err) {
-      console.warn('[FC_PWA] Connectivity probe failed', err);
+      logger.warn('Connectivity probe failed', {
+        operation: 'check_connectivity',
+        probeUrl,
+        error: err instanceof Error ? err.message : String(err),
+      });
       isOnlineState.value = false;
       return false;
     }
@@ -110,7 +121,10 @@ export function useNetworkStatus(client: IApiClient = apiClient) {
             writable: true,
           });
         } catch (err) {
-          console.warn('[FC_PWA] Could not redefine navigator.onLine', err);
+          logger.warn('Could not redefine navigator.onLine', {
+            operation: 'pwa_set_online_status',
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
       isOnlineState.value = status;

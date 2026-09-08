@@ -51,6 +51,7 @@ export default defineConfig({
       env: {
         ...process.env,
         RATE_LIMIT_MAX_REQUESTS: '1000',
+        TRUST_PROXY: 'true',
       },
     },
     {

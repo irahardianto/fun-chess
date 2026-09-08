@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, onUnmounted, getCurrentInstance } from 'vue';
 import type { UnifiedProgressPayload } from '@fun-chess/shared';
 import QRCode from 'qrcode';
 import BaseButton from '@/components/base/BaseButton.vue';
+import { useClipboardService } from '@/platform/di/helpers';
+import { defaultClipboardService, type IClipboardService } from '@/platform/hardware/clipboard.interface';
+import { logger } from '@/platform/telemetry';
 
 const props = defineProps<{
   payload: UnifiedProgressPayload | null;
@@ -14,8 +17,21 @@ const emit = defineEmits<{
   downloadJson: [];
 }>();
 
+function resolveClipboardService(): IClipboardService {
+  if (getCurrentInstance()) {
+    try {
+      return useClipboardService();
+    } catch {
+      return defaultClipboardService;
+    }
+  }
+  return defaultClipboardService;
+}
+
+const clipboardService = resolveClipboardService();
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const isCopied = ref(false);
+let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const totalStars = computed(() => {
   if (!props.payload?.scenarios) return 0;
@@ -51,8 +67,11 @@ async function renderQrCode() {
         },
       });
     }
-  } catch (err) {
-    console.warn('[FC_PROGRESS_SYNC] QR canvas generation note:', err);
+  } catch (err: unknown) {
+    logger.warn('QR canvas generation note', {
+      operation: 'qr_export_canvas_render',
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -69,17 +88,29 @@ watch(
 async function handleCopy() {
   if (!props.qrString) return;
   try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      await navigator.clipboard.writeText(props.qrString);
+    const success = await clipboardService.copyText(props.qrString);
+    if (success) {
       isCopied.value = true;
-      setTimeout(() => {
+      if (copyTimeout) clearTimeout(copyTimeout);
+      copyTimeout = setTimeout(() => {
         isCopied.value = false;
+        copyTimeout = null;
       }, 2500);
     }
-  } catch (err) {
-    console.warn('[FC_PROGRESS_SYNC] Failed to copy to clipboard', err);
+  } catch (err: unknown) {
+    logger.warn('Failed to copy to clipboard', {
+      operation: 'qr_export_copy_clipboard',
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
+
+onUnmounted(() => {
+  if (copyTimeout) {
+    clearTimeout(copyTimeout);
+    copyTimeout = null;
+  }
+});
 </script>
 
 <template>

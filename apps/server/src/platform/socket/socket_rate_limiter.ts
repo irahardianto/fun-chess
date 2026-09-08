@@ -28,35 +28,7 @@ export interface SocketRateLimiterOptions {
   logger?: Logger;
 }
 
-/**
- * Extracts a reliable client IP address from a Socket.io socket instance.
- * When trustProxy is true, evaluates x-forwarded-for header (proxies/Cloud Run)
- * taking the RIGHTMOST IP before proxy (CRIT-006) to prevent rate limiting bypass and spoofing.
- * When trustProxy is false, ignores x-forwarded-for to prevent spoofing (CRIT-001).
- */
-export function extractClientIp(socket: unknown, trustProxy = false): string {
-  if (!socket || typeof socket !== "object") return "127.0.0.1";
-  const s = socket as {
-    handshake?: {
-      headers?: Record<string, string | string[] | undefined>;
-      address?: string;
-    };
-    conn?: {
-      remoteAddress?: string;
-    };
-  };
-
-  if (trustProxy) {
-    const rawForwarded = s.handshake?.headers?.["x-forwarded-for"];
-    const forwarded = Array.isArray(rawForwarded) ? rawForwarded.join(",") : rawForwarded;
-    if (typeof forwarded === "string" && forwarded.trim()) {
-      const parts = forwarded.split(",");
-      return parts[parts.length - 1]?.trim() || "127.0.0.1";
-    }
-  }
-
-  return s.handshake?.address || s.conn?.remoteAddress || "127.0.0.1";
-}
+export { extractClientIp } from "../http/ip_utils.js";
 
 /**
  * Creates a configured SocketRateLimiter instance.
@@ -97,7 +69,12 @@ export class SocketRateLimiter {
         if (this.logger) {
           void runLoggedJob(this.logger, "rate_limiter_prune", async () => {
             return this.prune();
-          }).catch(() => {});
+          }).catch((err: unknown) => {
+            this.logger?.error("Unhandled failure in rate limiter prune job", {
+              operation: "rate_limiter_prune_error",
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
         } else {
           this.prune();
         }
@@ -198,20 +175,31 @@ export class SocketRateLimiter {
    * Returns the count of deleted keys.
    */
   public prune(now = Date.now()): number {
-    const cutoff = now - this.windowMs;
-    let deletedCount = 0;
+    try {
+      const cutoff = now - this.windowMs;
+      let deletedCount = 0;
 
-    for (const [key, list] of this.timestamps.entries()) {
-      const valid = list.filter((t) => t > cutoff);
-      if (valid.length === 0) {
-        this.timestamps.delete(key);
-        deletedCount++;
-      } else if (valid.length < list.length) {
-        this.timestamps.set(key, valid);
+      for (const [key, list] of this.timestamps.entries()) {
+        const valid = list.filter((t) => t > cutoff);
+        if (valid.length === 0) {
+          this.timestamps.delete(key);
+          deletedCount++;
+        } else if (valid.length < list.length) {
+          this.timestamps.set(key, valid);
+        }
       }
-    }
 
-    return deletedCount;
+      return deletedCount;
+    } catch (err) {
+      this.logger?.error("Failed to prune socket rate limiter cache", {
+        operation: "rate_limiter_prune_error",
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message, stack: err.stack }
+            : { raw: err },
+      });
+      return 0;
+    }
   }
 
   /**

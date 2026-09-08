@@ -9,6 +9,12 @@ import {
   BrowserWebRtcDiscovery,
   MockWebRtcDiscovery,
   defaultWebRtcDiscovery,
+  BrowserClipboardService,
+  MockClipboardService,
+  defaultClipboardService,
+  BrowserCameraService,
+  MockCameraService,
+  defaultCameraService,
 } from '../index';
 
 describe('Hardware Platform Abstractions (MAJ-012)', () => {
@@ -213,6 +219,50 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
       vi.unstubAllGlobals();
     });
 
+    it('BrowserWebRtcDiscovery logs debug with operation webrtc_discover_ip on errors [MAJ-010]', async () => {
+      const mockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        child: vi.fn(),
+        getLevel: vi.fn(),
+        setLevel: vi.fn(),
+      };
+
+      class FailingRTCPeerConnection {
+        createDataChannel = vi.fn();
+        createOffer = vi.fn().mockRejectedValue(new Error('SDP negotiation failed'));
+        setLocalDescription = vi.fn();
+        close = vi.fn().mockImplementation(() => {
+          throw new Error('Close failed');
+        });
+      }
+
+      vi.stubGlobal('RTCPeerConnection', FailingRTCPeerConnection);
+
+      const discovery = new BrowserWebRtcDiscovery(mockLogger as any);
+      const ip = await discovery.discoverLocalIp(100);
+
+      expect(ip).toBeNull();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'WebRTC offer creation or local description failed',
+        expect.objectContaining({
+          operation: 'webrtc_discover_ip',
+          error: expect.any(String),
+        })
+      );
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Failed to close RTCPeerConnection cleanly',
+        expect.objectContaining({
+          operation: 'webrtc_discover_ip',
+          error: expect.any(String),
+        })
+      );
+
+      vi.unstubAllGlobals();
+    });
+
     it('MockWebRtcDiscovery returns configured IP', async () => {
       const mock = new MockWebRtcDiscovery('10.0.0.42');
       expect(await mock.discoverLocalIp()).toBe('10.0.0.42');
@@ -223,6 +273,162 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
 
     it('exports defaultWebRtcDiscovery singleton', () => {
       expect(defaultWebRtcDiscovery).toBeInstanceOf(BrowserWebRtcDiscovery);
+    });
+  });
+
+  describe('Clipboard Service (MAJ-015)', () => {
+    it('BrowserClipboardService uses navigator.clipboard when available', async () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      const readTextMock = vi.fn().mockResolvedValue('clipboard content');
+
+      vi.stubGlobal('navigator', {
+        clipboard: {
+          writeText: writeTextMock,
+          readText: readTextMock,
+        },
+      });
+
+      const service = new BrowserClipboardService();
+      expect(service.isSupported()).toBe(true);
+
+      const copySuccess = await service.copyText('hello world');
+      expect(copySuccess).toBe(true);
+      expect(writeTextMock).toHaveBeenCalledWith('hello world');
+
+      const text = await service.readText();
+      expect(text).toBe('clipboard content');
+      expect(readTextMock).toHaveBeenCalled();
+
+      vi.unstubAllGlobals();
+    });
+
+    it('BrowserClipboardService falls back to document.execCommand when navigator.clipboard fails', async () => {
+      vi.stubGlobal('navigator', {
+        clipboard: {
+          writeText: vi.fn().mockRejectedValue(new Error('Permission denied')),
+        },
+      });
+
+      const execCommandMock = vi.fn().mockReturnValue(true);
+      const appendChildSpy = vi.spyOn(document.body, 'appendChild');
+      const removeChildSpy = vi.spyOn(document.body, 'removeChild');
+      document.execCommand = execCommandMock;
+
+      const service = new BrowserClipboardService();
+      const success = await service.copyText('fallback text');
+
+      expect(success).toBe(true);
+      expect(execCommandMock).toHaveBeenCalledWith('copy');
+      expect(appendChildSpy).toHaveBeenCalled();
+      expect(removeChildSpy).toHaveBeenCalled();
+
+      appendChildSpy.mockRestore();
+      removeChildSpy.mockRestore();
+      vi.unstubAllGlobals();
+    });
+
+    it('BrowserClipboardService returns false when both modern and legacy clipboard fail', async () => {
+      vi.stubGlobal('navigator', {});
+      document.execCommand = vi.fn().mockImplementation(() => {
+        throw new Error('Not allowed');
+      });
+
+      const service = new BrowserClipboardService();
+      const success = await service.copyText('fail');
+      expect(success).toBe(false);
+
+      vi.unstubAllGlobals();
+    });
+
+    it('BrowserClipboardService readText returns empty string when unsupported', async () => {
+      vi.stubGlobal('navigator', {});
+
+      const service = new BrowserClipboardService();
+      expect(await service.readText()).toBe('');
+
+      vi.unstubAllGlobals();
+    });
+
+    it('MockClipboardService stores text and tracks history', async () => {
+      const mock = new MockClipboardService('initial');
+      expect(mock.isSupported()).toBe(true);
+      expect(await mock.readText()).toBe('initial');
+
+      expect(await mock.copyText('first copy')).toBe(true);
+      expect(await mock.copyText('second copy')).toBe(true);
+      expect(mock.history).toEqual(['first copy', 'second copy']);
+      expect(await mock.readText()).toBe('second copy');
+
+      mock.clear();
+      expect(mock.history).toHaveLength(0);
+      expect(await mock.readText()).toBe('');
+
+      mock.supported = false;
+      expect(mock.isSupported()).toBe(false);
+      expect(await mock.copyText('unsupported')).toBe(false);
+      expect(await mock.readText()).toBe('');
+    });
+
+    it('exports defaultClipboardService singleton', () => {
+      expect(defaultClipboardService).toBeInstanceOf(BrowserClipboardService);
+    });
+  });
+
+  describe('Camera Service (MAJ-015)', () => {
+    it('BrowserCameraService queries support and delegates getUserMedia', async () => {
+      const mockStream = { active: true, getTracks: () => [] } as unknown as MediaStream;
+      const getUserMediaMock = vi.fn().mockResolvedValue(mockStream);
+
+      vi.stubGlobal('navigator', {
+        mediaDevices: {
+          getUserMedia: getUserMediaMock,
+        },
+      });
+
+      const service = new BrowserCameraService();
+      expect(service.isSupported()).toBe(true);
+
+      const stream = await service.getUserMedia({ video: true });
+      expect(stream).toBe(mockStream);
+      expect(getUserMediaMock).toHaveBeenCalledWith({ video: true });
+
+      vi.unstubAllGlobals();
+    });
+
+    it('BrowserCameraService throws error when mediaDevices is unsupported', async () => {
+      vi.stubGlobal('navigator', {});
+
+      const service = new BrowserCameraService();
+      expect(service.isSupported()).toBe(false);
+      await expect(service.getUserMedia({ video: true })).rejects.toThrow(
+        'Camera/MediaDevices API is not supported in this environment'
+      );
+
+      vi.unstubAllGlobals();
+    });
+
+    it('MockCameraService returns configured stream and records constraints', async () => {
+      const customStream = { id: 'custom-stream' } as unknown as MediaStream;
+      const mock = new MockCameraService(true, customStream);
+
+      expect(mock.isSupported()).toBe(true);
+      const stream = await mock.getUserMedia({ video: { facingMode: 'environment' } });
+      expect(stream).toBe(customStream);
+      expect(mock.lastConstraints).toEqual({ video: { facingMode: 'environment' } });
+
+      // Default mock stream generation
+      const mockDefault = new MockCameraService(true);
+      const genStream = await mockDefault.getUserMedia({ video: true });
+      expect(genStream).toBeDefined();
+      expect(genStream.getVideoTracks()).toHaveLength(1);
+
+      // Unsupported mock throws NotAllowedError
+      mockDefault.supported = false;
+      await expect(mockDefault.getUserMedia({ video: true })).rejects.toThrow('Permission denied');
+    });
+
+    it('exports defaultCameraService singleton', () => {
+      expect(defaultCameraService).toBeInstanceOf(BrowserCameraService);
     });
   });
 });

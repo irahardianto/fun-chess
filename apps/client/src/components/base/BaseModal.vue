@@ -87,7 +87,7 @@ function autoFocusFirstElement() {
   nextTick(() => {
     if (!isVisible.value) return;
     const focusable = getFocusableElements();
-    if (focusable.length > 0) {
+    if (focusable.length > 0 && focusable[0]) {
       focusable[0].focus();
     } else if (modalContainerRef.value) {
       modalContainerRef.value.focus();
@@ -138,6 +138,7 @@ function handleKeyDown(event: KeyboardEvent) {
 
     const firstElement = focusable[0];
     const lastElement = focusable[focusable.length - 1];
+    if (!firstElement || !lastElement) return;
 
     if (event.shiftKey) {
       if (document.activeElement === firstElement || !modalContainerRef.value?.contains(document.activeElement)) {

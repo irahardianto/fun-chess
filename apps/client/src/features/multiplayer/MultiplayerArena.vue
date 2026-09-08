@@ -24,9 +24,9 @@ interface Props {
   capturedWhite: PieceType[];
   capturedBlack: PieceType[];
   materialAdvantage: { white: number; black: number };
-  moveHistory: MoveResult[];
+  moveHistory?: MoveResult[];
   myPlayerAvatar?: string;
-  drawOfferedBy: { fromPlayerId: string; fromPlayerName: string } | null;
+  drawOfferedBy?: { fromPlayerId: string; fromPlayerName: string } | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {

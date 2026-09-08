@@ -19,6 +19,7 @@ import { PuzzleHubView } from '../puzzles';
 import { useLanDiscovery } from '../../composables/useLanDiscovery';
 import { useNetworkStatus, usePwaInstall } from '../pwa';
 import { safeLocalStorage, STORAGE_KEYS } from '@/platform/storage';
+import { logger } from '@/platform/telemetry';
 import type { PuzzleTheme } from '@fun-chess/shared';
 
 interface Props {
@@ -126,7 +127,11 @@ function resolveInitialMode(): AppGameMode {
     if (completed === 0) {
       return 'academy';
     }
-  } catch {
+  } catch (error) {
+    logger.warn('Failed to resolve scenario progress for initial mode, defaulting to academy', {
+      operation: 'resolve_initial_mode',
+      error: error instanceof Error ? error.message : String(error),
+    });
     return 'academy';
   }
   return 'multiplayer_lan';

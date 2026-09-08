@@ -1,5 +1,5 @@
 import { ref, computed, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope } from 'vue';
-import type { MascotId } from '@fun-chess/shared';
+import type { MascotId, ChessAiEngine } from '@fun-chess/shared';
 import type { Move } from 'chess.js';
 import { logger, generateCorrelationId, type ILogger } from '@/platform/telemetry/index.js';
 import { getAiConfigForMascot } from '../data/index.js';
@@ -10,23 +10,30 @@ export interface UseAiWorkerOptions {
   onCalculationFailed?: (err: unknown) => void;
   simulateThinkDelay?: boolean;
   logger?: ILogger;
+  aiEngine?: ChessAiEngine;
 }
 
 /**
- * useAiWorker composable (MAJ-041, MAJ-007, MIN-015).
+ * useAiWorker composable (MAJ-041, MAJ-007, MIN-015, MAJ-004, ENH-011).
  * Encapsulates AI search execution, simulated think delay delegation,
  * isAiThinking state, blunder evaluation, 3-point structured logging, and operation cancellation.
  */
 export function useAiWorker(options: UseAiWorkerOptions = {}) {
   const log = options.logger ?? logger;
+  const engine = options.aiEngine ?? minimaxEngine;
   const isAiThinking = ref<boolean>(false);
   let activeOperationId = 0;
   let thinkTimeout: ReturnType<typeof setTimeout> | null = null;
+  let thinkResolve: (() => void) | null = null;
 
   function clearThinkTimeout(): void {
     if (thinkTimeout) {
       clearTimeout(thinkTimeout);
       thinkTimeout = null;
+    }
+    if (thinkResolve) {
+      thinkResolve();
+      thinkResolve = null;
     }
   }
 
@@ -57,13 +64,13 @@ export function useAiWorker(options: UseAiWorkerOptions = {}) {
 
     try {
       const config = getAiConfigForMascot(mascotId);
-      const evaluation = await minimaxEngine.findBestMove(fen, config);
+      const evaluation = await engine.findBestMove(fen, config);
 
       if (currentOpId !== activeOperationId) {
         return null;
       }
 
-      // Delegate simulated think delay to composable (MAJ-007)
+      // Delegate simulated think delay to composable (MAJ-007, MAJ-004)
       const [minThinkMs, maxThinkMs] = config.simulatedThinkTimeMs;
       if (maxThinkMs > 0 && options.simulateThinkDelay !== false) {
         const calculationDuration = performance.now() - startTime;
@@ -71,8 +78,10 @@ export function useAiWorker(options: UseAiWorkerOptions = {}) {
         const remainingDelay = Math.max(0, targetThinkMs - calculationDuration);
         if (remainingDelay > 0) {
           await new Promise<void>((resolve) => {
+            thinkResolve = resolve;
             thinkTimeout = setTimeout(() => {
               thinkTimeout = null;
+              thinkResolve = null;
               resolve();
             }, remainingDelay);
           });

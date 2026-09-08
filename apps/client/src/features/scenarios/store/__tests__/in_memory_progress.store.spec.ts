@@ -243,8 +243,8 @@ describe('InMemoryScenarioProgressStore', () => {
       const endgameScenarios = ['king-rook-mate', 'king-queen-mate', 'lucena-bridge'];
       const map = await store.getProgressMap();
 
-      const completed = endgameScenarios.filter((id) => map[id] !== undefined && map[id].starsEarned > 0);
-      const totalStars = completed.reduce((sum, id) => sum + map[id].starsEarned, 0);
+      const completed = endgameScenarios.filter((id) => map[id] !== undefined && (map[id]?.starsEarned ?? 0) > 0);
+      const totalStars = completed.reduce((sum, id) => sum + (map[id]?.starsEarned ?? 0), 0);
 
       expect(completed).toHaveLength(0);
       expect(totalStars).toBe(0);

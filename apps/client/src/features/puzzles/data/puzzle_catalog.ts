@@ -688,6 +688,7 @@ export function getRandomPuzzle(
     pool = ALL_PUZZLES;
   }
 
+  const defaultPuzzle = ALL_PUZZLES[0] as Puzzle;
   if (typeof targetRating === "number") {
     const sorted = [...pool].sort(
       (a, b) =>
@@ -695,10 +696,10 @@ export function getRandomPuzzle(
     );
     // Take from the top 5 closest
     const slice = sorted.slice(0, Math.min(5, sorted.length));
-    return slice[Math.floor(Math.random() * slice.length)] ?? ALL_PUZZLES[0];
+    return slice[Math.floor(Math.random() * slice.length)] ?? defaultPuzzle;
   }
 
-  return pool[Math.floor(Math.random() * pool.length)] ?? ALL_PUZZLES[0];
+  return pool[Math.floor(Math.random() * pool.length)] ?? defaultPuzzle;
 }
 
 /**

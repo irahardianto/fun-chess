@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import LobbyView from '../LobbyView.vue';
 import { STORAGE_KEYS } from '@/platform/storage/keys';
+import { safeLocalStorage } from '@/platform/storage';
 
 describe('LobbyView.vue', () => {
   let mockStorage: Record<string, string> = {};
 
   beforeEach(() => {
     mockStorage = {};
+    safeLocalStorage.clear();
     vi.stubGlobal('localStorage', {
       getItem: vi.fn((key: string) => mockStorage[key] ?? null),
       setItem: vi.fn((key: string, value: string) => {
@@ -24,6 +26,7 @@ describe('LobbyView.vue', () => {
 
   afterEach(() => {
     mockStorage = {};
+    safeLocalStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -128,8 +131,8 @@ describe('LobbyView.vue', () => {
     });
 
     const inputs = wrapper.find('.join-card').findAll('input');
-    await inputs[0].setValue('FastKnight'); // Nickname input
-    await inputs[1].setValue('STAR'); // Room code input
+    await inputs[0]!.setValue('FastKnight'); // Nickname input
+    await inputs[1]!.setValue('STAR'); // Room code input
 
     const joinBtn = wrapper.find('.join-card .btn-tactile');
     await joinBtn.trigger('click');

@@ -1,5 +1,5 @@
 import { LanInfoResponse } from "@fun-chess/shared";
-import { IAddressingInfoProvider } from "../http_server.js";
+import { IAddressingInfoProvider } from "../http.interface.js";
 
 export interface LanInfoControllerOptions {
   addressService: IAddressingInfoProvider;

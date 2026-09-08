@@ -8,7 +8,14 @@ import {
   NotYourTurnError,
   RoomFullError,
 } from "@fun-chess/shared";
-import { OptimisticLockConflictError } from "../room.errors.js";
+import {
+  OptimisticLockConflictError,
+  RoomAlreadyExistsError,
+  StaleLockExecutionError,
+  LockExecutionTimeoutError,
+} from "../room.errors.js";
+import { createInitialRoomState } from "../room.logic.js";
+import type { Player } from "@fun-chess/shared";
 
 describe("Room & Game Concurrency Control", () => {
   let store: InMemoryRoomStore;
@@ -262,6 +269,115 @@ describe("Room & Game Concurrency Control", () => {
 
       // Zero active lock queues lingering in memory
       expect((store as any).lockQueues.size).toBe(0);
+    });
+  });
+
+  describe("Atomic createIfAbsent Concurrency (CRIT-003)", () => {
+    it("rejects concurrent collision with RoomAlreadyExistsError", async () => {
+      const host1: Player = {
+        id: "p1",
+        socketId: "s1",
+        name: "Alice",
+        color: "w",
+        isHost: true,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+      const host2: Player = {
+        id: "p2",
+        socketId: "s2",
+        name: "Bob",
+        color: "w",
+        isHost: true,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+      const room1 = createInitialRoomState({
+        roomCode: "COLL",
+        hostPlayer: host1,
+        createdAt: 1000,
+      });
+      const room2 = createInitialRoomState({
+        roomCode: "COLL",
+        hostPlayer: host2,
+        createdAt: 1000,
+      });
+
+      const results = await Promise.allSettled([
+        store.createIfAbsent(room1),
+        store.createIfAbsent(room2),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter((r) => r.status === "rejected");
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+        RoomAlreadyExistsError,
+      );
+    });
+  });
+
+  describe("Ticket Cancellation & Stale Write Rejection (CRIT-002)", () => {
+    it("invalidates ticket on execution timeout and rejects subsequent stale write with StaleLockExecutionError", async () => {
+      const shortTimeoutStore = new InMemoryRoomStore(undefined, undefined, {
+        lockTimeoutMs: 1000,
+        executionTimeoutMs: 40,
+      });
+
+      const host: Player = {
+        id: "p_host",
+        socketId: "s_host",
+        name: "Host",
+        color: "w",
+        isHost: true,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+      const initialRoom = createInitialRoomState({
+        roomCode: "STAL",
+        hostPlayer: host,
+        createdAt: 1000,
+      });
+      await shortTimeoutStore.save(initialRoom);
+
+      let staleWriteError: unknown = null;
+
+      // Action 1: Takes lock, sleeps longer than executionTimeoutMs (40ms), then attempts stale write
+      const action1 = shortTimeoutStore.withLock("STAL", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        try {
+          // Attempt write using the expired ticket in context
+          await shortTimeoutStore.save({
+            ...initialRoom,
+            status: "game_over",
+          });
+        } catch (err) {
+          staleWriteError = err;
+        }
+      });
+
+      // Action 1 should reject with LockExecutionTimeoutError from withLock timeout
+      await expect(action1).rejects.toBeInstanceOf(LockExecutionTimeoutError);
+
+      // Now Action 2 acquires lock and performs valid write
+      await shortTimeoutStore.withLock("STAL", async () => {
+        await shortTimeoutStore.save({
+          ...initialRoom,
+          status: "playing",
+        });
+      });
+
+      // Wait for Action 1's delayed background write attempt to settle
+      await new Promise((resolve) => setTimeout(resolve, 60));
+
+      // Assert that Action 1's write was rejected with StaleLockExecutionError
+      expect(staleWriteError).toBeInstanceOf(StaleLockExecutionError);
+
+      // Assert that Action 2's write was preserved in store and not overwritten by stale write
+      const persisted = await shortTimeoutStore.findByCode("STAL");
+      expect(persisted?.status).toBe("playing");
     });
   });
 });

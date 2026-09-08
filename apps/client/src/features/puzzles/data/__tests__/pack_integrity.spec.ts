@@ -212,7 +212,7 @@ describe('Offline Puzzle Pack Integrity & Validation', () => {
 
   describe('Puzzle Catalog Queries', () => {
     it('retrieves puzzle by ID correctly', () => {
-      const p = ALL_PUZZLES[0];
+      const p = ALL_PUZZLES[0]!;
       const found = getPuzzleById(p.id);
       expect(found).toBeDefined();
       expect(found?.id).toBe(p.id);
@@ -244,7 +244,7 @@ describe('Offline Puzzle Pack Integrity & Validation', () => {
     });
 
     it('excludes specified puzzle IDs when finding closest puzzle', () => {
-      const first = ALL_PUZZLES[0];
+      const first = ALL_PUZZLES[0]!;
       const next = getClosestPuzzleToRating(first.rating, [first.id]);
       expect(next).toBeDefined();
       expect(next?.id).not.toBe(first.id);
@@ -253,7 +253,7 @@ describe('Offline Puzzle Pack Integrity & Validation', () => {
     it('returns a random puzzle within expected rating or theme', () => {
       const randomP = getRandomPuzzle('pin', 900);
       expect(randomP).toBeDefined();
-      expect(randomP.themes).toContain('pin');
+      expect(randomP!.themes).toContain('pin');
     });
 
     it('generates puzzle pack metadata accurately', () => {

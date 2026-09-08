@@ -1,4 +1,4 @@
-import { AppError } from "@fun-chess/shared";
+import { AppError, type ErrorCode } from "@fun-chess/shared";
 
 export {
   AppError,
@@ -13,6 +13,38 @@ export {
   InvalidPayloadError,
   RateLimitExceededError,
 } from "@fun-chess/shared";
+
+/**
+ * Thrown when attempting to create a room that already exists in storage.
+ * Addresses CRIT-003: Atomic createIfAbsent under lock.
+ */
+export class RoomAlreadyExistsError extends AppError {
+  constructor(roomCode: string) {
+    super(
+      "ERR_ROOM_ALREADY_EXISTS",
+      `Room with code '${roomCode}' already exists`,
+      409,
+      { roomCode },
+    );
+    this.name = "RoomAlreadyExistsError";
+  }
+}
+
+/**
+ * Thrown when an operation holding an expired or invalidated lock ticket attempts to persist state.
+ * Addresses CRIT-002: Rejects writes from backgrounded timed-out lock executions.
+ */
+export class StaleLockExecutionError extends AppError {
+  constructor(roomCode: string, ticket: number) {
+    super(
+      "ERR_STALE_LOCK_EXECUTION" as unknown as ErrorCode,
+      `Stale lock execution detected for room '${roomCode}' (ticket #${ticket}). Operation cancelled or expired.`,
+      409,
+      { roomCode, ticket },
+    );
+    this.name = "StaleLockExecutionError";
+  }
+}
 
 /**
  * Thrown when an optimistic concurrency control version check fails during a room mutation.
@@ -55,5 +87,20 @@ export class LockExecutionTimeoutError extends AppError {
       { roomCode, timeoutMs, phase: "execution" },
     );
     this.name = "LockExecutionTimeoutError";
+  }
+}
+
+/**
+ * Thrown when maximum server room capacity is reached.
+ */
+export class RoomCapacityExceededError extends AppError {
+  constructor(maxRooms: number) {
+    super(
+      "ERR_INTERNAL_SERVER",
+      `Maximum room capacity reached (${maxRooms})`,
+      507,
+      { maxRooms },
+    );
+    this.name = "RoomCapacityExceededError";
   }
 }

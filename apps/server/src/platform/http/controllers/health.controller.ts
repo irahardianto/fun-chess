@@ -3,7 +3,7 @@ import {
   LivenessHealthResponse,
   DetailedHealthResponse,
 } from "@fun-chess/shared";
-import { IRoomCountProvider, IAddressingInfoProvider } from "../http_server.js";
+import { IRoomCountProvider, IAddressingInfoProvider } from "../http.interface.js";
 
 export interface HealthControllerOptions {
   roomStore: IRoomCountProvider;

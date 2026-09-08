@@ -1,4 +1,5 @@
 // Domain Contracts
+export { z } from "zod";
 export * from "./contracts/models.js";
 export * from "./contracts/schemas.js";
 export * from "./contracts/errors.js";

@@ -48,20 +48,20 @@ describe('LocalStoragePuzzleProgressStore', () => {
     const updated = await store.recordPuzzleAttempt('puz_fork_001', 'fork', 'solved_first_try', 3);
 
     expect(updated.solvedPuzzles['puz_fork_001']).toBeDefined();
-    expect(updated.solvedPuzzles['puz_fork_001'].stars).toBe(3);
+    expect(updated.solvedPuzzles['puz_fork_001']?.stars).toBe(3);
     expect(updated.ratingProfile.totalSolved).toBe(1);
     expect(updated.ratingProfile.totalAttempted).toBe(1);
 
     const forkMastery = updated.themeMastery['fork'];
     expect(forkMastery).toBeDefined();
-    expect(forkMastery.solved).toBe(1);
-    expect(forkMastery.starsEarned).toBe(3);
-    expect(forkMastery.masteryLevel).toBe('novice');
+    expect(forkMastery!.solved).toBe(1);
+    expect(forkMastery!.starsEarned).toBe(3);
+    expect(forkMastery!.masteryLevel).toBe('novice');
 
     // Check persistence across instances
     const newInstance = new LocalStoragePuzzleProgressStore(PUZZLE_PROGRESS_STORAGE_KEY);
     const persisted = await newInstance.getProgress();
-    expect(persisted.solvedPuzzles['puz_fork_001'].stars).toBe(3);
+    expect(persisted.solvedPuzzles['puz_fork_001']?.stars).toBe(3);
   });
 
   it('upgrades mastery level when solving many puzzles in a theme', async () => {
@@ -70,7 +70,7 @@ describe('LocalStoragePuzzleProgressStore', () => {
     }
 
     const progress = await store.getProgress();
-    expect(progress.themeMastery['fork'].masteryLevel).toBe('apprentice');
+    expect(progress.themeMastery['fork']?.masteryLevel).toBe('apprentice');
   });
 
   it('updates adaptive rating state and tracks peak rating', async () => {
@@ -124,7 +124,7 @@ describe('LocalStoragePuzzleProgressStore', () => {
 
     const res = await store.recordPuzzleAttempt('puz_quota_001', 'pin', 'solved_first_try', 3);
     expect(res.solvedPuzzles['puz_quota_001']).toBeDefined();
-    expect(res.solvedPuzzles['puz_quota_001'].stars).toBe(3);
+    expect(res.solvedPuzzles['puz_quota_001']?.stars).toBe(3);
 
     const progress = await store.getProgress();
     expect(progress.solvedPuzzles['puz_quota_001']).toBeDefined();

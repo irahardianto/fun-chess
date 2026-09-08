@@ -153,6 +153,10 @@ describe("createHttpServer", () => {
       headers: { Origin: "https://evil-hacker.com" },
     });
     expect(res.status).toBe(403);
+    const errBody = (await res.json()) as any;
+    expect(errBody.status).toBe("error");
+    expect(errBody.code).toBe(403);
+    expect(errBody.error.code).toBe("ERR_CORS_FORBIDDEN");
 
     const rejectLog = logger.warnLogs.find(
       (l) => l.context?.["operation"] === "http_options_preflight" && l.context?.["status"] === "rejected",
@@ -316,19 +320,12 @@ describe("createHttpServer", () => {
       },
     );
     expect(res.status).toBe(404);
-    const json = (await res.json()) as {
-      code: number;
-      error: string;
-      message: string;
-      correlationId?: string;
-      timestamp: number;
-    };
+    const json = (await res.json()) as any;
+    expect(json.status).toBe("error");
     expect(json.code).toBe(404);
-    expect(json.error).toBe("ERR_NOT_FOUND");
-    expect(json.message).toContain("Cannot POST /api/non-existent-endpoint");
-    expect(json.correlationId).toBeDefined();
-    expect(typeof json.timestamp).toBe("number");
-    expect(json.timestamp).toBeGreaterThan(0);
+    expect(json.error.code).toBe("ERR_NOT_FOUND");
+    expect(json.error.message).toContain("Cannot POST /api/non-existent-endpoint");
+    expect(json.error.correlationId).toBeDefined();
   });
 
   it("enforces rate limiting on native HTTP endpoints (MIN-002)", async () => {
@@ -365,9 +362,9 @@ describe("createHttpServer", () => {
       const res3 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
       expect(res3.status).toBe(429);
       const data = (await res3.json()) as any;
+      expect(data.status).toBe("error");
       expect(data.code).toBe(429);
-      expect(data.error).toBe("ERR_RATE_LIMITED");
-      expect(typeof data.timestamp).toBe("number");
+      expect(data.error.code).toBe("ERR_RATE_LIMITED");
     } finally {
       await new Promise<void>((resolve) => rlServer.close(() => resolve()));
     }

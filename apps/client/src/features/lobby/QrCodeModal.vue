@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, useAttrs } from 'vue';
+import { ref, watch, computed, onMounted, onUnmounted, useAttrs } from 'vue';
 import QRCode from 'qrcode';
 import type { LanInfoResponse } from '@fun-chess/shared';
 import BaseModal from '../../components/base/BaseModal.vue';
@@ -105,7 +105,12 @@ const effectiveHost = computed(() => {
     try {
       const urlObj = new URL(info.publicUrl.startsWith('http') ? info.publicUrl : `https://${info.publicUrl}`);
       return urlObj.hostname;
-    } catch {
+    } catch (err: unknown) {
+      logger.warn('Failed to parse Cloud Relay publicUrl hostname', {
+        operation: 'qr_modal_resolve_url',
+        publicUrl: info.publicUrl,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // fallback
     }
   }
@@ -185,14 +190,13 @@ async function generateQr() {
     });
     qrDataUrl.value = url;
     qrStatus.value = 'ready';
-  } catch (err) {
+  } catch (err: unknown) {
     qrStatus.value = 'error';
     logger.error('Failed to generate QR code', {
       operation: 'qr_generate',
       roomCode: props.roomCode,
       error: err instanceof Error ? err.message : String(err),
     });
-    console.error('Failed to generate QR code', err);
   }
 }
 
@@ -250,7 +254,11 @@ async function copyLink() {
     try {
       await navigator.clipboard.writeText(text);
       succeeded = true;
-    } catch {
+    } catch (err: unknown) {
+      logger.warn('Failed to copy to clipboard via navigator.clipboard', {
+        operation: 'qr_modal_copy_clipboard',
+        error: err instanceof Error ? err.message : String(err),
+      });
       // Fallback for non-secure HTTP LAN contexts
     }
   }
@@ -274,7 +282,11 @@ async function copyLink() {
       textarea.focus();
       textarea.select();
       succeeded = document.execCommand('copy');
-    } catch {
+    } catch (err: unknown) {
+      logger.warn('Failed to copy to clipboard via legacy execCommand', {
+        operation: 'qr_modal_copy_legacy',
+        error: err instanceof Error ? err.message : String(err),
+      });
       succeeded = false;
     } finally {
       if (textarea.parentNode) {
@@ -289,15 +301,28 @@ async function copyLink() {
     if (copyTimeout) clearTimeout(copyTimeout);
     copyTimeout = setTimeout(() => {
       copied.value = false;
+      copyTimeout = null;
     }, 2000);
   } else {
     copyError.value = true;
     if (copyErrorTimeout) clearTimeout(copyErrorTimeout);
     copyErrorTimeout = setTimeout(() => {
       copyError.value = false;
+      copyErrorTimeout = null;
     }, 5000);
   }
 }
+
+onUnmounted(() => {
+  if (copyTimeout) {
+    clearTimeout(copyTimeout);
+    copyTimeout = null;
+  }
+  if (copyErrorTimeout) {
+    clearTimeout(copyErrorTimeout);
+    copyErrorTimeout = null;
+  }
+});
 
 function handleClose() {
   emit('update:modelValue', false);

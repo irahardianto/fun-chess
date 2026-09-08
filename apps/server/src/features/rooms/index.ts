@@ -3,11 +3,10 @@
  * Cross-module callers must import exclusively from this entry point.
  */
 export type { IRoomService, IRoomGameAdapter } from "./room.interface.js";
-export * from "./room.logic.js";
-export type { RoomStore, RoomMutator } from "./room.store.js";
+export type { RoomStore, IRoomStore, RoomMutator } from "./room.store.js";
 export type { SessionRecord, SessionRegistry } from "./session_registry.js";
 export { InMemorySessionRegistry } from "./in_memory_session_registry.js";
-export { InMemoryRoomStore } from "./in_memory_room.store.js";
+export { InMemoryRoomStore, MAX_ROOMS, type LockContext } from "./in_memory_room.store.js";
 export { MockRoomStore } from "./mock_room.store.js";
 export { RoomService } from "./room.service.js";
 export {
@@ -46,4 +45,7 @@ export {
   OptimisticLockConflictError,
   LockTimeoutError,
   LockExecutionTimeoutError,
+  RoomAlreadyExistsError,
+  StaleLockExecutionError,
+  RoomCapacityExceededError,
 } from "./room.errors.js";

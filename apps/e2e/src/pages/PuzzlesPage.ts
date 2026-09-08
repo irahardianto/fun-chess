@@ -26,6 +26,21 @@ export class PuzzlesPage {
   readonly expandModalBtn: Locator;
   readonly puzzleNextBtn: Locator;
   readonly dockedNextBtn: Locator;
+  readonly ladderCard: Locator;
+  readonly ladderPlayBtn: Locator;
+  readonly ratingClimbHud: Locator;
+  readonly ratingDisplay: Locator;
+  readonly streakDisplay: Locator;
+  readonly rushCard: Locator;
+  readonly startRushBlitzBtn: Locator;
+  readonly startRushSurvivorBtn: Locator;
+  readonly puzzleRushArena: Locator;
+  readonly rushHudBar: Locator;
+  readonly rushTimer: Locator;
+  readonly rushScore: Locator;
+  readonly rushStrikes: Locator;
+  readonly rushGameOver: Locator;
+  readonly rushExitBtn: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -49,6 +64,21 @@ export class PuzzlesPage {
     this.expandModalBtn = page.locator('[data-testid="expand-modal-btn"]');
     this.puzzleNextBtn = page.locator('[data-testid="puzzle-next-btn"]');
     this.dockedNextBtn = page.locator('[data-testid="docked-next-btn"]');
+    this.ladderCard = page.locator('[data-testid="adaptive-ladder-card"]');
+    this.ladderPlayBtn = page.locator('[data-testid="ladder-play-btn"]');
+    this.ratingClimbHud = page.locator('[data-testid="rating-climb-hud"]');
+    this.ratingDisplay = page.locator('[data-testid="rating-display"]');
+    this.streakDisplay = page.locator('[data-testid="streak-display"]');
+    this.rushCard = page.locator('[data-testid="mode-card-rush"]');
+    this.startRushBlitzBtn = page.locator('[data-testid="start-rush-blitz-btn"]');
+    this.startRushSurvivorBtn = page.locator('[data-testid="start-rush-survivor-btn"]');
+    this.puzzleRushArena = page.locator('[data-testid="puzzle-rush-arena"]');
+    this.rushHudBar = page.locator('[data-testid="rush-hud-bar"]');
+    this.rushTimer = page.locator('[data-testid="rush-timer"]');
+    this.rushScore = page.locator('[data-testid="rush-score"]');
+    this.rushStrikes = page.locator('[data-testid="rush-strikes"]');
+    this.rushGameOver = page.locator('[data-testid="rush-game-over"]');
+    this.rushExitBtn = page.locator('[data-testid="rush-exit-btn"]');
   }
 
   /**
@@ -158,5 +188,25 @@ export class PuzzlesPage {
     await expect(this.expandModalBtn).toBeVisible({ timeout: 10_000 });
     await this.expandModalBtn.click();
     await expect(this.completionModal).toBeVisible({ timeout: 10_000 });
+  }
+
+  /**
+   * Launches Adaptive Rating Ladder mode directly from the ladder card.
+   */
+  async startLadder(): Promise<void> {
+    await expect(this.ladderPlayBtn).toBeVisible({ timeout: 10_000 });
+    await this.ladderPlayBtn.click();
+    await this.waitForArena();
+  }
+
+  /**
+   * Launches Puzzle Rush mode (blitz or survivor) from the rush card.
+   */
+  async startRush(subMode: 'blitz' | 'survivor' = 'blitz'): Promise<void> {
+    const btn = subMode === 'blitz' ? this.startRushBlitzBtn : this.startRushSurvivorBtn;
+    await expect(btn).toBeVisible({ timeout: 10_000 });
+    await btn.click();
+    await expect(this.puzzleRushArena).toBeVisible({ timeout: 15_000 });
+    await expect(this.page.locator('.chess-board-container, [role="grid"]')).toBeVisible({ timeout: 15_000 });
   }
 }

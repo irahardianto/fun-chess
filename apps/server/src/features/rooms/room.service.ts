@@ -22,7 +22,8 @@ import {
 } from "./clock.js";
 import {
   type IDisconnectTimerRegistry,
-  defaultDisconnectTimerRegistry,
+  DisconnectTimerRegistry,
+  DISCONNECT_GRACE_PERIOD_MS,
 } from "./disconnect_timer_registry.js";
 import {
   RoomNotFoundError,
@@ -30,6 +31,9 @@ import {
   UnauthorizedError,
   PlayerNotInRoomError,
   InvalidPayloadError,
+  RoomAlreadyExistsError,
+  OptimisticLockConflictError,
+  GameNotActiveError,
 } from "./room.errors.js";
 import {
   createInitialRoomState,
@@ -58,7 +62,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     private readonly sessionRegistry: SessionRegistry = new InMemorySessionRegistry(),
     private readonly clock: IClock = new SystemClock(),
     private readonly idGenerator: IIdGenerator = new UuidGenerator(),
-    private readonly timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
+    private readonly timerRegistry: IDisconnectTimerRegistry = new DisconnectTimerRegistry(),
   ) {}
 
   /**
@@ -82,12 +86,14 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       );
     }
 
-    const roomCode = await this.generateUniqueRoomCode();
     const playerId = this.idGenerator.generateId();
 
-    const randomIntVal = this.idGenerator.generateRandomInt
-      ? this.idGenerator.generateRandomInt(0, 2)
-      : randomInt(0, 2);
+    const randomIntVal =
+      !req.preferredColor || req.preferredColor === "random"
+        ? this.idGenerator.generateRandomInt
+          ? this.idGenerator.generateRandomInt(0, 2)
+          : randomInt(0, 2)
+        : 0;
 
     const { hostColor } = assignPlayerColors(req.preferredColor, randomIntVal);
 
@@ -103,23 +109,50 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       connectedAt: now,
     };
 
-    const newRoom = createInitialRoomState({
-      roomCode,
-      hostPlayer,
-      createdAt: now,
-    });
+    let createdRoom!: RoomState;
+    const MAX_CODE_ATTEMPTS = 100;
+    let created = false;
 
-    await this.store.save(newRoom);
+    for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
+      const roomCode = this.generateRoomCodeCandidate();
+      const candidateRoom = createInitialRoomState({
+        roomCode,
+        hostPlayer,
+        createdAt: now,
+      });
+
+      try {
+        await this.store.createIfAbsent(candidateRoom);
+        createdRoom = candidateRoom;
+        created = true;
+        break;
+      } catch (err) {
+        if (err instanceof RoomAlreadyExistsError) {
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!created) {
+      const fallbackCode = `R${now.toString(36).toUpperCase().slice(-3)}`;
+      createdRoom = createInitialRoomState({
+        roomCode: fallbackCode,
+        hostPlayer,
+        createdAt: now,
+      });
+      await this.store.createIfAbsent(createdRoom);
+    }
 
     const sessionRecord = await this.sessionRegistry.createSession({
       playerId,
-      roomCode,
+      roomCode: createdRoom.roomCode,
       color: hostColor,
       isHost: true,
       socketId,
     });
 
-    return { room: newRoom, sessionToken: sessionRecord.sessionToken };
+    return { room: createdRoom, sessionToken: sessionRecord.sessionToken };
   }
 
   /**
@@ -205,7 +238,23 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     req: ReconnectRequest,
     socketId: string,
   ): Promise<{ room: RoomState; player: Player }> {
-    const normalizedCode = (req.roomCode || "").trim().toUpperCase();
+    if (!req.roomCode || req.roomCode.trim().length === 0) {
+      throw new InvalidPayloadError("roomCode", "Room code cannot be empty");
+    }
+    if (!req.playerId || req.playerId.trim().length === 0) {
+      throw new InvalidPayloadError("playerId", "Player ID cannot be empty");
+    }
+    if (!req.sessionToken || req.sessionToken.trim().length === 0) {
+      throw new InvalidPayloadError(
+        "sessionToken",
+        "Session token cannot be empty",
+      );
+    }
+
+    const normalizedCode = req.roomCode.trim().toUpperCase();
+    if (normalizedCode.length !== ROOM_CODE_LENGTH) {
+      throw new InvalidRoomCodeError(req.roomCode);
+    }
     const existing = await this.store.findByCode(normalizedCode);
     if (!existing) {
       throw new RoomNotFoundError(normalizedCode);
@@ -221,6 +270,9 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     }
 
     const result = await this.store.mutate(normalizedCode, async (room) => {
+      // Cancel disconnect timer under room lock (MAJ-028)
+      this.timerRegistry.cancel(normalizedCode, req.playerId);
+
       const { nextRoom, player } = reconnectPlayerTransition(
         room,
         req.playerId,
@@ -272,9 +324,16 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         throw new PlayerNotInRoomError(socketId);
       }
 
+      // Cancel disconnect timer for leaving player under room lock (MAJ-028)
+      this.timerRegistry.cancel(normalizedCode, leavingPlayer.id);
+
       const now = this.clock.now();
       const { nextRoom, shouldDelete, gameOverPayload } =
         leaveRoomTransition(room, leavingPlayer.id, now);
+
+      if (shouldDelete || gameOverPayload) {
+        this.timerRegistry.cancelAllForRoom(normalizedCode);
+      }
 
       if (shouldDelete) {
         await this.store.delete(normalizedCode);
@@ -294,8 +353,14 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
 
   /**
    * Handles unexpected socket drop. Marks player disconnected and pauses active match.
+   * Manages disconnect grace timer under the room lock to eliminate race with immediate reconnect (MAJ-028).
    */
-  public async handleDisconnect(socketId: string): Promise<{
+  public async handleDisconnect(
+    socketId: string,
+    onForfeit?: (room: RoomState, gameOverPayload: GameOverPayload) => void | Promise<void>,
+    gracePeriodMs = DISCONNECT_GRACE_PERIOD_MS,
+    timerRegistry?: IDisconnectTimerRegistry,
+  ): Promise<{
     room: RoomState;
     player: Player;
     wasActiveGame: boolean;
@@ -304,6 +369,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     if (!match) return null;
 
     const { room: matchedRoom, playerId } = match;
+    const targetTimerRegistry = timerRegistry ?? this.timerRegistry;
 
     return this.store.withLock(matchedRoom.roomCode, async () => {
       const room = await this.store.findByCode(matchedRoom.roomCode);
@@ -319,6 +385,35 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       if (!droppedPlayer) return null;
 
       await this.store.save(nextRoom);
+
+      if (paused) {
+        // Clear any previous timer under lock and install new timer under lock (MAJ-028)
+        targetTimerRegistry.cancel(matchedRoom.roomCode, playerId);
+        if (targetTimerRegistry !== this.timerRegistry) {
+          this.timerRegistry.cancel(matchedRoom.roomCode, playerId);
+        }
+
+        const timer = setTimeout(async () => {
+          targetTimerRegistry.cancel(matchedRoom.roomCode, playerId);
+          if (targetTimerRegistry !== this.timerRegistry) {
+            this.timerRegistry.cancel(matchedRoom.roomCode, playerId);
+          }
+          const forfeitResult = await this.handleAbandonmentForfeit(
+            matchedRoom.roomCode,
+            playerId,
+          );
+          if (forfeitResult && onForfeit) {
+            await onForfeit(forfeitResult.room, forfeitResult.gameOverPayload);
+          }
+        }, gracePeriodMs);
+
+        timer.unref?.();
+        targetTimerRegistry.set(matchedRoom.roomCode, playerId, timer);
+        if (targetTimerRegistry !== this.timerRegistry) {
+          this.timerRegistry.set(matchedRoom.roomCode, playerId, timer);
+        }
+      }
+
       return { room: nextRoom, player: droppedPlayer, wasActiveGame: paused };
     });
   }
@@ -441,6 +536,16 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   ): Promise<RoomState> {
     const code = roomCode.trim().toUpperCase();
     return this.store.mutate(code, async (room) => {
+      if (room.status !== "playing") {
+        throw new GameNotActiveError(room.status);
+      }
+      if (nextGameState.moveCount <= room.game.moveCount) {
+        throw new OptimisticLockConflictError(
+          room.roomCode,
+          nextGameState.moveCount - 1,
+          room.game.moveCount,
+        );
+      }
       const now = this.clock.now();
       const updated = applyGameMoveTransition(
         room,
@@ -461,6 +566,12 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   ): Promise<RoomState> {
     const code = roomCode.trim().toUpperCase();
     return this.store.mutate(code, async (room) => {
+      if (room.status !== "playing") {
+        throw new GameNotActiveError(room.status);
+      }
+      if (gameOverPayload.reason === "draw_agreement" && !room.drawOffer) {
+        throw new GameNotActiveError("No draw offer is currently pending");
+      }
       const now = this.clock.now();
       const updated = finalizeGameTransition(room, gameOverPayload, now);
       return { updatedRoom: updated, result: updated };
@@ -492,7 +603,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     players?: { whitePlayer: Player | null; blackPlayer: Player | null },
   ): Promise<RoomState> {
     const code = roomCode.trim().toUpperCase();
-    return this.store.mutate(code, async (room) => {
+    const result = await this.store.mutate(code, async (room) => {
       const now = this.clock.now();
       const updated = updateRematchTransition(
         room,
@@ -503,6 +614,39 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       );
       return { updatedRoom: updated, result: updated };
     });
+
+    if (rematch?.status === "accepted") {
+      if (result.whitePlayer) {
+        await this.sessionRegistry.updateSessionColor(
+          code,
+          result.whitePlayer.id,
+          "w",
+        );
+      }
+      if (result.blackPlayer) {
+        await this.sessionRegistry.updateSessionColor(
+          code,
+          result.blackPlayer.id,
+          "b",
+        );
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Generates a 4-letter uppercase room code candidate.
+   */
+  private generateRoomCodeCandidate(): string {
+    let code = "";
+    for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
+      const idx = this.idGenerator.generateRandomInt
+        ? this.idGenerator.generateRandomInt(0, ROOM_CODE_CHARSET.length)
+        : randomInt(0, ROOM_CODE_CHARSET.length);
+      code += ROOM_CODE_CHARSET.charAt(idx);
+    }
+    return code;
   }
 
   /**
@@ -511,14 +655,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   private async generateUniqueRoomCode(): Promise<string> {
     let attempts = 0;
     while (attempts < 100) {
-      let code = "";
-      for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
-        const idx = this.idGenerator.generateRandomInt
-          ? this.idGenerator.generateRandomInt(0, ROOM_CODE_CHARSET.length)
-          : randomInt(0, ROOM_CODE_CHARSET.length);
-        code += ROOM_CODE_CHARSET.charAt(idx);
-      }
-
+      const code = this.generateRoomCodeCandidate();
       const existing = await this.store.findByCode(code);
       if (!existing) {
         return code;

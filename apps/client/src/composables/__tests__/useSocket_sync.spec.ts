@@ -4,7 +4,7 @@ import type { GameState, MoveResult, RoomState } from '@fun-chess/shared';
 
 describe('useSocket reactive ref synchronization across multiple instances (MAJ-013)', () => {
   let mockSocket: any;
-  let eventHandlers: Record<string, Function>;
+  let eventHandlers: Record<string, any>;
 
   beforeEach(() => {
     resetSocketState();

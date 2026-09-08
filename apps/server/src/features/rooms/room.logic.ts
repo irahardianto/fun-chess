@@ -271,8 +271,8 @@ export function leaveRoomTransition(
         nextRoom: {
           ...room,
           status: "game_over",
-          whitePlayer: null,
-          blackPlayer: null,
+          whitePlayer: isWhite ? null : room.whitePlayer,
+          blackPlayer: isBlack ? null : room.blackPlayer,
           lastActivityAt: now,
         },
         shouldDelete: false,
@@ -306,8 +306,8 @@ export function leaveRoomTransition(
 export function applyGameMoveTransition(
   room: RoomState,
   nextGameState: GameState,
-  gameOverPayload?: GameOverPayload,
-  now: number = Date.now(),
+  gameOverPayload: GameOverPayload | undefined,
+  now: number,
 ): RoomState {
   const nextStatus = gameOverPayload ? "game_over" : room.status;
   return {
@@ -324,8 +324,8 @@ export function applyGameMoveTransition(
  */
 export function finalizeGameTransition(
   room: RoomState,
-  _gameOverPayload: GameOverPayload,
-  now: number = Date.now(),
+  _gameOverPayload: GameOverPayload | undefined,
+  now: number,
 ): RoomState {
   return {
     ...room,
@@ -341,7 +341,7 @@ export function finalizeGameTransition(
 export function updateDrawOfferTransition(
   room: RoomState,
   drawOffer: RoomState["drawOffer"],
-  now: number = Date.now(),
+  now: number,
 ): RoomState {
   return {
     ...room,
@@ -356,8 +356,8 @@ export function updateDrawOfferTransition(
 export function updateRematchTransition(
   room: RoomState,
   rematch: RoomState["rematch"],
-  newGameState?: GameState,
-  now: number = Date.now(),
+  newGameState: GameState | undefined,
+  now: number,
   players?: { whitePlayer: Player | null; blackPlayer: Player | null },
 ): RoomState {
   let nextStatus = room.status;

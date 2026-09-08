@@ -14,99 +14,18 @@ import {
   RespondRematchRequestSchema,
   MoveResult,
 } from "@fun-chess/shared";
-import { Logger } from "../../platform/logger/logger.interface.js";
-import { wrapSocketHandler } from "../../platform/socket/socket_logging_middleware.js";
+import type { Logger } from "../../platform/logger/index.js";
 import {
   SocketRateLimiter,
   createSocketRateLimiter,
-} from "../../platform/socket/socket_rate_limiter.js";
+  TypedSocketServer,
+} from "../../platform/socket/index.js";
+import { createFeatureSocketHandler } from "../common/socket_handler.utils.js";
 import type { IGameService } from "./game.interface.js";
-import { TypedSocketServer } from "../../platform/socket/socket_server.js";
 import {
   type IDisconnectTimerRegistry,
   defaultDisconnectTimerRegistry,
-  cancelAllDisconnectTimersForRoom,
 } from "../rooms/index.js";
-
-function createGameHandler<TReq, TRes>(
-  logger: Logger,
-  operationName: string,
-  socket: Socket,
-  options: { schema: any; rateLimiter: SocketRateLimiter },
-  handler: (req: TReq, context: any) => Promise<TRes>,
-) {
-  const rateLimitLogger: Logger = new Proxy(logger, {
-    get(target, prop, receiver) {
-      if (prop === "warn") {
-        return (msg: string, meta?: Record<string, unknown>) => {
-          target.warn(msg, meta);
-          if (msg === "Operation rate limit exceeded" && meta?.operation) {
-            target.warn(`Rate limit exceeded for ${meta.operation}`, meta);
-          }
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-
-  const getMessage = (op: string) => {
-    const limitDesc =
-      (options.rateLimiter as any)?.getLimitDescription?.() ||
-      "Maximum 60 requests per 10 seconds allowed.";
-    switch (op) {
-      case "game:move":
-        return `Rate limit exceeded for game moves. ${limitDesc}`;
-      case "game:resign":
-        return `Rate limit exceeded for game resignation. ${limitDesc}`;
-      case "game:offer_draw":
-        return `Rate limit exceeded for draw offers. ${limitDesc}`;
-      case "game:respond_draw":
-        return `Rate limit exceeded for draw responses. ${limitDesc}`;
-      case "game:request_rematch":
-        return `Rate limit exceeded for rematch requests. ${limitDesc}`;
-      case "game:respond_rematch":
-        return `Rate limit exceeded for rematch responses. ${limitDesc}`;
-      default:
-        return `Rate limit exceeded for ${op}. ${limitDesc}`;
-    }
-  };
-
-  const proxiedSocket = new Proxy(socket, {
-    get(target, prop, receiver) {
-      if (prop === "emit") {
-        return (event: string, ...args: any[]) => {
-          if (event === "error" && args[0]?.code === "ERR_RATE_LIMITED") {
-            args[0].message = getMessage(operationName);
-          }
-          return (target as any).emit(event, ...args);
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-
-  const wrapped = wrapSocketHandler<TReq, TRes>(
-    rateLimitLogger,
-    operationName,
-    proxiedSocket,
-    options,
-    handler,
-  );
-
-  return (rawReq: unknown, callback?: (res: any) => void) => {
-    return wrapped(
-      rawReq,
-      callback
-        ? (res: any) => {
-            if (res?.error?.code === "ERR_RATE_LIMITED") {
-              res.error.message = getMessage(operationName);
-            }
-            callback(res);
-          }
-        : undefined,
-    );
-  };
-}
 
 /**
  * Registers gameplay Socket.io event listeners.
@@ -120,7 +39,7 @@ export function registerGameSocketHandlers(
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
 ): void {
   // 1. game:move
-  const handleMove = createGameHandler<
+  const handleMove = createFeatureSocketHandler<
     MakeMoveRequest,
     { success: true; moveResult: MoveResult }
   >(
@@ -156,7 +75,7 @@ export function registerGameSocketHandlers(
   socket.on("game:move", handleMove);
 
   // 2. game:resign
-  const handleResign = createGameHandler<
+  const handleResign = createFeatureSocketHandler<
     ResignRequest,
     { success: true }
   >(
@@ -176,7 +95,7 @@ export function registerGameSocketHandlers(
   socket.on("game:resign", handleResign);
 
   // 3. game:offer_draw
-  const handleOfferDraw = createGameHandler<
+  const handleOfferDraw = createFeatureSocketHandler<
     OfferDrawRequest,
     { success: true }
   >(
@@ -200,7 +119,7 @@ export function registerGameSocketHandlers(
   socket.on("game:offer_draw", handleOfferDraw);
 
   // 4. game:respond_draw
-  const handleRespondDraw = createGameHandler<
+  const handleRespondDraw = createFeatureSocketHandler<
     RespondDrawRequest,
     { success: true }
   >(
@@ -232,7 +151,7 @@ export function registerGameSocketHandlers(
   socket.on("game:respond_draw", handleRespondDraw);
 
   // 5. game:request_rematch
-  const handleRequestRematch = createGameHandler<
+  const handleRequestRematch = createFeatureSocketHandler<
     RequestRematchRequest,
     { success: true }
   >(
@@ -256,7 +175,7 @@ export function registerGameSocketHandlers(
   socket.on("game:request_rematch", handleRequestRematch);
 
   // 6. game:respond_rematch
-  const handleRespondRematch = createGameHandler<
+  const handleRespondRematch = createFeatureSocketHandler<
     RespondRematchRequest,
     { success: true }
   >(

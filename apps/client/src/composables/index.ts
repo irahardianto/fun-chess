@@ -25,8 +25,7 @@ export * from './useConfetti';
 
 // Platform & Hardware Integrations
 export * from './useQrScanner';
-export * from './usePwaInstall';
-export * from './useNetworkStatus';
+export { usePwaInstall, useNetworkStatus } from '../features/pwa';
 
 // Theme & UI Preferences
 export * from './useTheme';

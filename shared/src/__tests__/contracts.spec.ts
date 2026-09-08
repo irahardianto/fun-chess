@@ -76,11 +76,15 @@ import {
   PLAYER_AVATARS,
   DEFAULT_PLAYER_AVATAR,
   DEFAULT_OPPONENT_AVATAR,
-  // Error classes
   AppError,
   RoomNotFoundError,
   RoomFullError,
+  InvalidRoomCodeError,
   InvalidMoveError,
+  NotYourTurnError,
+  GameNotActiveError,
+  PlayerNotInRoomError,
+  InvalidPayloadError,
   RateLimitExceededError,
   UnauthorizedError,
   OptimisticLockConflictError,
@@ -92,9 +96,26 @@ import {
   JoinRoomRequestSchema,
   ReconnectRequestSchema,
   MovePayloadSchema,
+  MakeMoveRequestSchema,
   ServerEnvSchema,
   LivenessHealthResponseSchema,
   DetailedHealthResponseSchema,
+  HealthCheckResponseSchema,
+  HttpErrorBodySchema,
+  HttpErrorEnvelopeSchema,
+  UrlSchema,
+  safeParseUrl,
+  normalizeUrlString,
+  PieceTypeSchema,
+  PlayerSchema,
+  MoveResultSchema,
+  GameStateSchema,
+  RematchStateSchema,
+  DrawOfferSchema,
+  RoomStatusSchema,
+  RoomStateSchema,
+  GameOverReasonSchema,
+  GameOverPayloadSchema,
 } from "../index.js";
 
 describe("Shared Contracts & Data Model Specification", () => {
@@ -267,6 +288,44 @@ describe("Shared Contracts & Data Model Specification", () => {
         actualVersion: 2,
       });
       expect(conflict).toBeInstanceOf(AppError);
+
+      const invalidRoomCode = new InvalidRoomCodeError("ABC");
+      expect(invalidRoomCode.isAppError).toBe(true);
+      expect(invalidRoomCode.code).toBe("ERR_INVALID_ROOM_CODE");
+      expect(invalidRoomCode.statusCode).toBe(400);
+      expect(invalidRoomCode.message).toContain("Invalid room code 'ABC'");
+      expect(invalidRoomCode).toBeInstanceOf(AppError);
+
+      const notYourTurn = new NotYourTurnError();
+      expect(notYourTurn.isAppError).toBe(true);
+      expect(notYourTurn.code).toBe("ERR_NOT_YOUR_TURN");
+      expect(notYourTurn.statusCode).toBe(403);
+      expect(notYourTurn.message).toContain("not your turn");
+      expect(notYourTurn).toBeInstanceOf(AppError);
+
+      const gameNotActive = new GameNotActiveError("lobby");
+      expect(gameNotActive.isAppError).toBe(true);
+      expect(gameNotActive.code).toBe("ERR_GAME_NOT_ACTIVE");
+      expect(gameNotActive.statusCode).toBe(400);
+      expect(gameNotActive.message).toContain("Game is not currently active");
+      expect(gameNotActive.details).toEqual({ status: "lobby" });
+      expect(gameNotActive).toBeInstanceOf(AppError);
+
+      const playerNotInRoom = new PlayerNotInRoomError("socket-123");
+      expect(playerNotInRoom.isAppError).toBe(true);
+      expect(playerNotInRoom.code).toBe("ERR_PLAYER_NOT_IN_ROOM");
+      expect(playerNotInRoom.statusCode).toBe(403);
+      expect(playerNotInRoom.message).toContain("Socket does not belong");
+      expect(playerNotInRoom.details).toEqual({ socketId: "socket-123" });
+      expect(playerNotInRoom).toBeInstanceOf(AppError);
+
+      const invalidPayload = new InvalidPayloadError("roomCode", "too short");
+      expect(invalidPayload.isAppError).toBe(true);
+      expect(invalidPayload.code).toBe("ERR_INVALID_PAYLOAD");
+      expect(invalidPayload.statusCode).toBe(400);
+      expect(invalidPayload.message).toContain("Invalid payload: roomCode - too short");
+      expect(invalidPayload.details).toEqual({ field: "roomCode", reason: "too short" });
+      expect(invalidPayload).toBeInstanceOf(AppError);
     });
   });
 
@@ -530,9 +589,21 @@ describe("Shared Contracts & Data Model Specification", () => {
         expect(() => ServerEnvSchema.parse({ PORT: "not-a-port" })).toThrow();
         expect(() => ServerEnvSchema.parse({ NODE_ENV: "staging" })).toThrow();
         expect(() => ServerEnvSchema.parse({ LOG_LEVEL: "verbose" })).toThrow();
-        expect(() => ServerEnvSchema.parse({ PUBLIC_URL: "not-a-valid-url" })).toThrow();
+        expect(() => ServerEnvSchema.parse({ PUBLIC_URL: "http://:invalid" })).toThrow();
+        expect(() => ServerEnvSchema.parse({ PUBLIC_URL: "://invalid" })).toThrow();
         expect(() => ServerEnvSchema.parse({ LAN_IP: "999.999.999.999" })).toThrow();
         expect(() => ServerEnvSchema.parse({ HOST_IP: "invalid-ip" })).toThrow();
+      });
+
+      it("normalizes PUBLIC_URL without protocol by prepending https:// (MIN-001)", () => {
+        const parsedDomain = ServerEnvSchema.parse({ PUBLIC_URL: "chess.example.com" });
+        expect(parsedDomain.PUBLIC_URL).toBe("https://chess.example.com");
+
+        const parsedLocalhost = ServerEnvSchema.parse({ PUBLIC_URL: "localhost:3000" });
+        expect(parsedLocalhost.PUBLIC_URL).toBe("http://localhost:3000");
+
+        const parsedProtoRel = ServerEnvSchema.parse({ PUBLIC_URL: "//fun-chess.a.run.app" });
+        expect(parsedProtoRel.PUBLIC_URL).toBe("https://fun-chess.a.run.app");
       });
     });
   });
@@ -938,6 +1009,17 @@ describe("Shared Contracts & Data Model Specification", () => {
       ).toThrow();
     });
 
+    it("validates HealthCheckResponseSchema is aliased to LivenessHealthResponseSchema (CRIT-001)", () => {
+      expect(HealthCheckResponseSchema).toBe(LivenessHealthResponseSchema);
+      const liveness = HealthCheckResponseSchema.parse({
+        status: "ok",
+        uptimeSeconds: 15.2,
+        timestamp: "2026-09-08T07:45:00.000Z",
+      });
+      expect(liveness.status).toBe("ok");
+      expect("activeRooms" in liveness).toBe(false);
+    });
+
     it("validates detailed operational health schema (DetailedHealthResponseSchema)", () => {
       const valid = {
         status: "ok",
@@ -971,7 +1053,258 @@ describe("Shared Contracts & Data Model Specification", () => {
     });
   });
 
-  describe("Socket Event Contracts (MAJ-026, MAJ-027)", () => {
+  describe("HTTP Error Schemas (MAJ-033)", () => {
+    it("validates HttpErrorBodySchema and HttpErrorEnvelopeSchema", () => {
+      const envelope = {
+        status: "error" as const,
+        code: 404,
+        error: {
+          code: "ERR_ROOM_NOT_FOUND",
+          message: "Room ABCD not found",
+          details: { roomCode: "ABCD" },
+          correlationId: "corr-12345",
+        },
+      };
+
+      const parsed = HttpErrorEnvelopeSchema.parse(envelope);
+      expect(parsed.status).toBe("error");
+      expect(parsed.code).toBe(404);
+      expect(parsed.error.code).toBe("ERR_ROOM_NOT_FOUND");
+      expect(parsed.error.message).toBe("Room ABCD not found");
+      expect(parsed.error.correlationId).toBe("corr-12345");
+
+      // Rejects status !== 'error'
+      expect(() =>
+        HttpErrorEnvelopeSchema.parse({
+          ...envelope,
+          status: "fail",
+        }),
+      ).toThrow();
+
+      // Rejects HTTP status code < 400
+      expect(() =>
+        HttpErrorEnvelopeSchema.parse({
+          ...envelope,
+          code: 200,
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("URL Normalization & Schemas (MIN-001)", () => {
+    it("normalizes URLs missing protocol with normalizeUrlString and safeParseUrl", () => {
+      expect(normalizeUrlString("chess.example.com")).toBe("https://chess.example.com");
+      expect(normalizeUrlString("localhost:5173")).toBe("http://localhost:5173");
+      expect(normalizeUrlString("127.0.0.1:8080/room/1234")).toBe("http://127.0.0.1:8080/room/1234");
+      expect(normalizeUrlString("//fun-chess.a.run.app")).toBe("https://fun-chess.a.run.app");
+      expect(normalizeUrlString("https://fun-chess.com/play")).toBe("https://fun-chess.com/play");
+      expect(normalizeUrlString("")).toBeUndefined();
+      expect(normalizeUrlString("   ")).toBeUndefined();
+
+      const parsed = safeParseUrl("chess.example.com/play");
+      expect(parsed).toBeInstanceOf(URL);
+      expect(parsed?.protocol).toBe("https:");
+      expect(parsed?.hostname).toBe("chess.example.com");
+      expect(parsed?.pathname).toBe("/play");
+
+      const parsedLocal = safeParseUrl("localhost:3000");
+      expect(parsedLocal?.protocol).toBe("http:");
+      expect(parsedLocal?.port).toBe("3000");
+
+      expect(safeParseUrl("http://:invalid")).toBeUndefined();
+      expect(safeParseUrl("")).toBeUndefined();
+
+      expect(UrlSchema.parse("chess.example.com")).toBe("https://chess.example.com");
+      expect(() => UrlSchema.parse("http://:invalid")).toThrow();
+    });
+  });
+
+  describe("Core WebSocket Event Runtime Schemas (MAJ-029, MAJ-031)", () => {
+    const validPlayer = {
+      id: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      socketId: "sock-123",
+      name: "PlayerOne",
+      avatar: "🦁",
+      color: "w" as const,
+      isHost: true,
+      isConnected: true,
+      connectedAt: 1700000000000,
+    };
+
+    const validMoveResult = {
+      from: "e2",
+      to: "e4",
+      san: "e4",
+      piece: "p" as const,
+      color: "w" as const,
+      flags: "b",
+      fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+      moveNumber: 1,
+      timestamp: 1700000001000,
+    };
+
+    const validGameState = {
+      fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+      turn: "b" as const,
+      isCheck: false,
+      isCheckmate: false,
+      isDraw: false,
+      isStalemate: false,
+      isThreefoldRepetition: false,
+      isInsufficientMaterial: false,
+      isFiftyMoveRule: false,
+      moveHistory: [validMoveResult],
+      capturedWhite: [],
+      capturedBlack: [],
+      materialAdvantage: { white: 0, black: 0 },
+      lastMove: { from: "e2", to: "e4" },
+      moveCount: 1,
+    };
+
+    it("validates PieceTypeSchema and RoomStatusSchema enums", () => {
+      expect(PieceTypeSchema.parse("k")).toBe("k");
+      expect(PieceTypeSchema.parse("q")).toBe("q");
+      expect(() => PieceTypeSchema.parse("z")).toThrow();
+
+      expect(RoomStatusSchema.parse("playing")).toBe("playing");
+      expect(RoomStatusSchema.parse("paused_disconnect")).toBe("paused_disconnect");
+      expect(() => RoomStatusSchema.parse("invalid_status")).toThrow();
+
+      expect(GameOverReasonSchema.parse("checkmate")).toBe("checkmate");
+      expect(GameOverReasonSchema.parse("resignation")).toBe("resignation");
+      expect(() => GameOverReasonSchema.parse("unknown")).toThrow();
+    });
+
+    it("validates PlayerSchema structure and rejects non-UUID id", () => {
+      const parsed = PlayerSchema.parse(validPlayer);
+      expect(parsed.name).toBe("PlayerOne");
+      expect(parsed.color).toBe("w");
+
+      expect(() =>
+        PlayerSchema.parse({
+          ...validPlayer,
+          id: "not-a-uuid",
+        }),
+      ).toThrow();
+    });
+
+    it("validates MoveResultSchema structure", () => {
+      const parsed = MoveResultSchema.parse(validMoveResult);
+      expect(parsed.from).toBe("e2");
+      expect(parsed.to).toBe("e4");
+      expect(parsed.san).toBe("e4");
+
+      expect(() =>
+        MoveResultSchema.parse({
+          ...validMoveResult,
+          from: "invalid-square",
+        }),
+      ).toThrow();
+    });
+
+    it("validates GameStateSchema structure", () => {
+      const parsed = GameStateSchema.parse(validGameState);
+      expect(parsed.turn).toBe("b");
+      expect(parsed.moveCount).toBe(1);
+      expect(parsed.moveHistory).toHaveLength(1);
+    });
+
+    it("validates RematchStateSchema and DrawOfferSchema", () => {
+      const rematch = {
+        requestedBy: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+        requestedAt: 1700000005000,
+        status: "pending" as const,
+      };
+      const parsedRematch = RematchStateSchema.parse(rematch);
+      expect(parsedRematch.status).toBe("pending");
+
+      const drawOffer = {
+        offeredBy: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+        offeredAt: 1700000006000,
+      };
+      const parsedDraw = DrawOfferSchema.parse(drawOffer);
+      expect(parsedDraw.offeredBy).toBe(drawOffer.offeredBy);
+    });
+
+    it("validates RoomStateSchema structure", () => {
+      const room = {
+        roomCode: "ABCD",
+        version: 1,
+        status: "playing" as const,
+        hostId: validPlayer.id,
+        whitePlayer: validPlayer,
+        blackPlayer: null,
+        spectators: [],
+        game: validGameState,
+        rematch: null,
+        drawOffer: null,
+        createdAt: 1700000000000,
+        lastActivityAt: 1700000002000,
+      };
+
+      const parsed = RoomStateSchema.parse(room);
+      expect(parsed.roomCode).toBe("ABCD");
+      expect(parsed.status).toBe("playing");
+      expect(parsed.whitePlayer?.name).toBe("PlayerOne");
+    });
+
+    it("validates GameOverPayloadSchema", () => {
+      const gameOver = {
+        winner: "w" as const,
+        winnerName: "PlayerOne",
+        reason: "checkmate" as const,
+        message: "Checkmate! PlayerOne wins.",
+        finalFen: "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3",
+        totalMoves: 4,
+        durationSeconds: 125.5,
+      };
+
+      const parsed = GameOverPayloadSchema.parse(gameOver);
+      expect(parsed.winner).toBe("w");
+      expect(parsed.reason).toBe("checkmate");
+      expect(parsed.totalMoves).toBe(4);
+    });
+
+    it("validates MakeMoveRequestSchema with expectedMoveNumber and idempotencyKey (MAJ-031)", () => {
+      const req = {
+        roomCode: "ABCD",
+        move: { from: "e2", to: "e4" },
+        expectedMoveNumber: 0,
+        idempotencyKey: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      };
+
+      const parsed = MakeMoveRequestSchema.parse(req);
+      expect(parsed.roomCode).toBe("ABCD");
+      expect(parsed.expectedMoveNumber).toBe(0);
+      expect(parsed.idempotencyKey).toBe("9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d");
+
+      // Optional fields omitted
+      const parsedMinimal = MakeMoveRequestSchema.parse({
+        roomCode: "WXYZ",
+        move: { from: "d2", to: "d4" },
+      });
+      expect(parsedMinimal.expectedMoveNumber).toBeUndefined();
+      expect(parsedMinimal.idempotencyKey).toBeUndefined();
+
+      // Rejects negative expectedMoveNumber or invalid idempotencyKey UUID
+      expect(() =>
+        MakeMoveRequestSchema.parse({
+          roomCode: "ABCD",
+          move: { from: "e2", to: "e4" },
+          expectedMoveNumber: -1,
+        }),
+      ).toThrow();
+      expect(() =>
+        MakeMoveRequestSchema.parse({
+          roomCode: "ABCD",
+          move: { from: "e2", to: "e4" },
+          idempotencyKey: "not-a-uuid",
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("Socket Event Contracts (MAJ-026, MAJ-027, ENH-013)", () => {
     it("verifies room:leave acknowledgement callback signature", () => {
       const mockLeaveHandler: ClientToServerEvents["room:leave"] = (
         req,
@@ -979,7 +1312,13 @@ describe("Shared Contracts & Data Model Specification", () => {
       ) => {
         expect(req.roomCode).toBe("ABCD");
         callback?.({ success: true });
-        callback?.({ success: false, error: "Player not found" });
+        callback?.({
+          success: false,
+          error: {
+            code: "ERR_PLAYER_NOT_IN_ROOM",
+            message: "Player not found",
+          },
+        });
       };
 
       let callbackCount = 0;

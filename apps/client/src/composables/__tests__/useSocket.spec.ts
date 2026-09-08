@@ -8,7 +8,7 @@ const UUID_P2 = '22222222-2222-4222-8222-222222222222';
 
 describe('useSocket composable', () => {
   let mockSocket: any;
-  let eventHandlers: Record<string, Function>;
+  let eventHandlers: Record<string, any>;
 
   beforeEach(() => {
     resetSocketState();
@@ -1541,8 +1541,8 @@ describe('useSocket composable', () => {
       eventHandlers['room:player_disconnected']({ playerId: 'spec_1', gracePeriodMs: 60000 });
 
       expect(currentRoom.value.status).toBe('playing');
-      expect(currentRoom.value.spectators[0].isConnected).toBe(false);
-      expect(currentRoom.value.spectators[1].isConnected).toBe(true);
+      expect(currentRoom.value.spectators[0]!.isConnected).toBe(false);
+      expect(currentRoom.value.spectators[1]!.isConnected).toBe(true);
       expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
       expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
 
@@ -1550,7 +1550,7 @@ describe('useSocket composable', () => {
       eventHandlers['room:player_disconnected']({ player: spectator2, gracePeriodMs: 60000 });
 
       expect(currentRoom.value.status).toBe('playing');
-      expect(currentRoom.value.spectators[1].isConnected).toBe(false);
+      expect(currentRoom.value.spectators[1]!.isConnected).toBe(false);
       expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
       expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
     });
@@ -1667,7 +1667,7 @@ describe('useSocket composable', () => {
 
       // 3. Spectator reconnects while room is playing -> status stays 'playing', spectator.isConnected becomes true
       eventHandlers['room:player_reconnected']({ playerId: 'spec_1', playerName: 'Watcher' });
-      expect(currentRoom.value.spectators[0].isConnected).toBe(true);
+      expect(currentRoom.value.spectators[0]!.isConnected).toBe(true);
       expect(currentRoom.value.status).toBe('playing');
 
       // 4. Reconnection with authoritative roomStatus provided in payload
@@ -1700,7 +1700,7 @@ describe('useSocket composable', () => {
       currentRoom.value.status = 'playing';
       eventHandlers['room:player_disconnected']({ playerId: 'spec_1', roomStatus: 'paused_disconnect' });
       expect(currentRoom.value.status).toBe('playing');
-      expect(currentRoom.value.spectators[0].isConnected).toBe(false);
+      expect(currentRoom.value.spectators[0]!.isConnected).toBe(false);
     });
 
     it('should safely no-op disconnect and reconnect handlers when currentRoom is null or ID is missing', () => {

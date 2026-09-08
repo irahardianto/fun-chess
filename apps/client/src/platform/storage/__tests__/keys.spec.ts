@@ -100,7 +100,7 @@ describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
     expect(storage.getItem(STORAGE_KEYS.MIGRATION_V1_V2_TIMESTAMP)).toBeNull();
   });
 
-  it('logs warning via logger when legacy JSON is corrupted without silent swallow [MIN-006]', () => {
+  it('logs warning via logger when legacy JSON is corrupted without silent swallow [MIN-006, MIN-015]', () => {
     const storage = new InMemoryStorageAdapter();
     storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1, '{invalid-json-corrupted');
 
@@ -120,12 +120,40 @@ describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
       expect.stringContaining('Corrupted'),
       expect.objectContaining({
         operation: 'storage_migration_v1_v2',
+        correlationId: expect.any(String),
+        durationMs: expect.any(Number),
       })
     );
     expect(storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_V2)).toBeNull();
   });
 
-  it('logs error via logger when storage throws exception without silent swallow [MIN-006]', () => {
+  it('logs info with correlation ID and duration tracking on successful migration [MIN-015]', () => {
+    const storage = new InMemoryStorageAdapter();
+    storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1, '{"solved":[1,2,3]}');
+
+    const mockLogger = {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    migrateStorageV1ToV2(storage, mockLogger as any);
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.stringContaining('Migrated storage v1 to v2 successfully'),
+      expect.objectContaining({
+        operation: 'storage_migration_v1_v2',
+        correlationId: expect.any(String),
+        durationMs: expect.any(Number),
+      })
+    );
+  });
+
+  it('logs error via logger when storage throws exception without silent swallow [MIN-006, MIN-015]', () => {
     const throwingStorage: KeyValueStorage = {
       isAvailable: () => true,
       getItem: () => {
@@ -155,6 +183,8 @@ describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
       expect.stringContaining('Storage migration failed'),
       expect.objectContaining({
         operation: 'storage_migration_v1_v2',
+        correlationId: expect.any(String),
+        durationMs: expect.any(Number),
         error: expect.any(String),
       })
     );

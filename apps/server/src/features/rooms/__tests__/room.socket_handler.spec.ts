@@ -523,7 +523,7 @@ describe("Room Socket Handlers", () => {
       expect(rateLimitAck.error.message).toContain("Rate limit exceeded for room reconnection");
     });
 
-    it("keys rate limits by (ip, socket.id) so co-located sockets on same IP are isolated (MAJ-003)", async () => {
+    it("keys rate limits strictly by client IP so reconnecting or co-located sockets share quota preventing disconnect evasion (MAJ-001)", async () => {
       const sharedLimiter = new SocketRateLimiter({ maxRequests: 5, windowMs: 10_000 });
       const ip = "10.200.1.42";
 
@@ -573,7 +573,7 @@ describe("Room Socket Handlers", () => {
         sharedLimiter,
       );
 
-      // Socket2 connects with NEW socket ID but SAME client IP (e.g. co-located LAN player)
+      // Socket2 connects with NEW socket ID but SAME client IP (reconnection or evasion attempt)
       const socket2 = new TestSocket("sock_ephemeral_2");
       socket2.handshake.address = ip;
 
@@ -585,7 +585,7 @@ describe("Room Socket Handlers", () => {
         sharedLimiter,
       );
 
-      // Attempt on socket2 must SUCCEED because rate limit is keyed by (ip, socket.id) (MAJ-003)
+      // Attempt on socket2 must be RATE LIMITED because rate limit is keyed strictly by IP (MAJ-001)
       let socket2Ack: any;
       await socket2.trigger(
         "room:create",
@@ -595,7 +595,8 @@ describe("Room Socket Handlers", () => {
         },
       );
 
-      expect(socket2Ack.success).toBe(true);
+      expect(socket2Ack.success).toBe(false);
+      expect(socket2Ack.error.code).toBe("ERR_RATE_LIMITED");
     });
   });
 

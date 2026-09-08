@@ -42,6 +42,11 @@ export const AvatarEmojiSchema = z
 export const PieceColorSchema = z.enum(["w", "b"]);
 
 /**
+ * Chess piece type notation schema ('p', 'n', 'b', 'r', 'q', 'k').
+ */
+export const PieceTypeSchema = z.enum(["p", "n", "b", "r", "q", "k"]);
+
+/**
  * Preferred piece color selection schema for matchmaking ('w', 'b', or 'random').
  */
 export const PreferredColorSchema = z
@@ -60,6 +65,141 @@ export const ChessSquareSchema = z
  * Pawn promotion piece target schema ('q', 'r', 'b', 'n').
  */
 export const PromotionPieceSchema = z.enum(["q", "r", "b", "n"]);
+
+/**
+ * Public player representation schema.
+ * All Player objects are strictly free of private credentials (CRIT-001).
+ */
+export const PlayerSchema = z.object({
+  id: z.string().uuid("Player ID must be a valid UUID"),
+  socketId: z.string().min(1, "Socket ID must not be empty"),
+  name: PlayerNameSchema,
+  avatar: AvatarEmojiSchema,
+  color: PieceColorSchema,
+  isHost: z.boolean(),
+  isConnected: z.boolean(),
+  connectedAt: z.number().nonnegative(),
+});
+
+/**
+ * Executed move result schema.
+ */
+export const MoveResultSchema = z.object({
+  from: ChessSquareSchema,
+  to: ChessSquareSchema,
+  san: z.string().min(1),
+  piece: PieceTypeSchema,
+  color: PieceColorSchema,
+  captured: PieceTypeSchema.optional(),
+  promotion: PromotionPieceSchema.optional(),
+  flags: z.string(),
+  fen: z.string().min(1),
+  moveNumber: z.number().int().nonnegative(),
+  timestamp: z.number().nonnegative(),
+});
+
+/**
+ * Authoritative game state schema.
+ */
+export const GameStateSchema = z.object({
+  fen: z.string().min(1),
+  turn: PieceColorSchema,
+  isCheck: z.boolean(),
+  isCheckmate: z.boolean(),
+  isDraw: z.boolean(),
+  isStalemate: z.boolean(),
+  isThreefoldRepetition: z.boolean(),
+  isInsufficientMaterial: z.boolean(),
+  isFiftyMoveRule: z.boolean(),
+  moveHistory: z.array(MoveResultSchema),
+  capturedWhite: z.array(PieceTypeSchema),
+  capturedBlack: z.array(PieceTypeSchema),
+  materialAdvantage: z.object({
+    white: z.number(),
+    black: z.number(),
+  }),
+  lastMove: z
+    .object({
+      from: z.string(),
+      to: z.string(),
+    })
+    .nullable(),
+  moveCount: z.number().int().nonnegative(),
+});
+
+/**
+ * Rematch proposal state schema.
+ */
+export const RematchStateSchema = z.object({
+  requestedBy: z.string().uuid(),
+  requestedAt: z.number().nonnegative(),
+  status: z.enum(["pending", "accepted", "declined"]),
+});
+
+/**
+ * Draw offer state schema.
+ */
+export const DrawOfferSchema = z.object({
+  offeredBy: z.string().uuid(),
+  offeredAt: z.number().nonnegative(),
+});
+
+/**
+ * Room lifecycle status schema.
+ */
+export const RoomStatusSchema = z.enum([
+  "lobby",
+  "playing",
+  "paused_disconnect",
+  "game_over",
+  "rematch_pending",
+  "abandoned",
+]);
+
+/**
+ * Authoritative room state schema.
+ */
+export const RoomStateSchema = z.object({
+  roomCode: RoomCodeSchema,
+  version: z.number().int().positive().optional(),
+  status: RoomStatusSchema,
+  hostId: z.string().uuid(),
+  whitePlayer: PlayerSchema.nullable(),
+  blackPlayer: PlayerSchema.nullable(),
+  spectators: z.array(PlayerSchema),
+  game: GameStateSchema,
+  rematch: RematchStateSchema.nullable(),
+  drawOffer: DrawOfferSchema.nullable().optional(),
+  createdAt: z.number().nonnegative(),
+  lastActivityAt: z.number().nonnegative(),
+});
+
+/**
+ * Game termination reason schema.
+ */
+export const GameOverReasonSchema = z.enum([
+  "checkmate",
+  "stalemate",
+  "threefold_repetition",
+  "insufficient_material",
+  "fifty_move_rule",
+  "resignation",
+  "draw_agreement",
+  "abandonment",
+]);
+
+/**
+ * Match conclusion broadcast payload schema.
+ */
+export const GameOverPayloadSchema = z.object({
+  winner: z.union([PieceColorSchema, z.literal("draw")]),
+  winnerName: z.string().optional(),
+  reason: GameOverReasonSchema,
+  message: z.string().min(1),
+  finalFen: z.string().min(1),
+  totalMoves: z.number().int().nonnegative(),
+  durationSeconds: z.number().nonnegative(),
+});
 
 /**
  * Socket request schema for creating a new multiplayer room.
@@ -118,6 +258,17 @@ export type MovePayload = z.infer<typeof MovePayloadSchema>;
 export const MakeMoveRequestSchema = z.object({
   roomCode: RoomCodeSchema,
   move: MovePayloadSchema,
+  /**
+   * Expected move counter (half-moves / plies count before applying this move).
+   * Used by server for linearizability validation and idempotency deduplication.
+   */
+  expectedMoveNumber: z.number().int().nonnegative().optional(),
+  /**
+   * Client-generated UUID idempotency token.
+   * If a move with this idempotency key was already applied, the server returns
+   * the existing move result without throwing NotYourTurnError.
+   */
+  idempotencyKey: z.string().uuid().optional(),
 });
 export type MakeMoveRequest = z.infer<typeof MakeMoveRequestSchema>;
 
@@ -213,13 +364,88 @@ export type DetailedHealthResponse = z.infer<typeof DetailedHealthResponseSchema
 
 /**
  * HTTP response schema for health check endpoints (`/health`, `/api/health`).
- * Kept for backwards compatibility.
+ * Canonical alias for standard health checks (/health, /api/health).
+ * Aligned strictly with LivenessHealthResponse to resolve CRIT-001.
  */
-export const HealthCheckResponseSchema = DetailedHealthResponseSchema;
-export type HealthCheckResponse = DetailedHealthResponse;
+export const HealthCheckResponseSchema = LivenessHealthResponseSchema;
+export type HealthCheckResponse = LivenessHealthResponse;
+
+/**
+ * Standard HTTP error body schema (MAJ-033).
+ */
+export const HttpErrorBodySchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  details: z.record(z.unknown()).optional(),
+  correlationId: z.string().optional(),
+});
+export type HttpErrorBody = z.infer<typeof HttpErrorBodySchema>;
+
+/**
+ * Standard HTTP error envelope schema (MAJ-033).
+ */
+export const HttpErrorEnvelopeSchema = z.object({
+  status: z.literal("error"),
+  code: z.number().int().min(400).max(599),
+  error: HttpErrorBodySchema,
+});
+export type HttpErrorEnvelope = z.infer<typeof HttpErrorEnvelopeSchema>;
 
 const emptyStringToUndefined = (val: unknown): unknown =>
   typeof val === "string" && val.trim() === "" ? undefined : val;
+
+/**
+ * Normalizes a URL string by prepending a protocol if omitted (MIN-001).
+ * - Trims leading/trailing whitespace
+ * - Turns empty string into undefined
+ * - Protocol-relative URL (`//example.com`) -> `https://example.com`
+ * - Missing protocol: `localhost` or `127.0.0.1` -> `http://...`, other hostnames -> `https://...`
+ *
+ * @param val - Input value to normalize
+ * @returns Normalized URL string or undefined
+ */
+export function normalizeUrlString(val: unknown): unknown {
+  if (typeof val !== "string") return val;
+  let trimmed = val.trim();
+  if (trimmed === "") return undefined;
+  if (trimmed.startsWith("//")) {
+    return `https:${trimmed}`;
+  }
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) {
+    const isLocal = /^(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(trimmed);
+    return `${isLocal ? "http://" : "https://"}${trimmed}`;
+  }
+  return trimmed;
+}
+
+/**
+ * Safely parses and normalizes a URL string (MIN-001).
+ * If protocol is missing, prepends https:// (or http:// for localhost/127.0.0.1).
+ * Returns URL object if valid, or undefined if invalid.
+ *
+ * @param input - URL string to parse
+ * @returns Parsed URL instance or undefined
+ */
+export function safeParseUrl(input: string | undefined): URL | undefined {
+  if (!input || typeof input !== "string") return undefined;
+  const normalized = normalizeUrlString(input);
+  if (!normalized || typeof normalized !== "string") return undefined;
+  try {
+    const parsed = new URL(normalized);
+    if (!parsed.hostname) return undefined;
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Validates and normalizes URLs, prepending https:// (or http://) if protocol is omitted (MIN-001).
+ */
+export const UrlSchema = z.preprocess(
+  normalizeUrlString,
+  z.string().url("Must be a valid URL"),
+);
 
 /**
  * Server environment configuration validation schema.
@@ -238,7 +464,7 @@ export const ServerEnvSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   CORS_ORIGIN: z.preprocess(emptyStringToUndefined, z.string().optional()),
   PUBLIC_URL: z.preprocess(
-    emptyStringToUndefined,
+    normalizeUrlString,
     z.string().url("PUBLIC_URL must be a valid URL").optional(),
   ),
   LAN_IP: z.preprocess(

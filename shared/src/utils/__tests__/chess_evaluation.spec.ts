@@ -1,7 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Chess } from "chess.js";
 import {
   calculateMaterialAndCaptures,
+  calculateBoardMaterial,
+  calculateMaterialDifference,
+  calculateCaptures,
+  getKingSquare,
   isPawnPromotion,
   createInitialGameState,
   STANDARD_PIECE_POINTS,
@@ -19,6 +23,95 @@ describe("chess_evaluation utils", () => {
         q: 9,
         k: 0,
       });
+    });
+  });
+
+  describe("calculateBoardMaterial (MIN-018)", () => {
+    it("returns correct piece counts and material values for standard starting position", () => {
+      const chess = new Chess();
+      const summary = calculateBoardMaterial(chess);
+
+      expect(summary.whiteCounts).toEqual({
+        p: 8,
+        n: 2,
+        b: 2,
+        r: 2,
+        q: 1,
+        k: 1,
+      });
+      expect(summary.blackCounts).toEqual({
+        p: 8,
+        n: 2,
+        b: 2,
+        r: 2,
+        q: 1,
+        k: 1,
+      });
+      expect(summary.whiteMaterial).toBe(39);
+      expect(summary.blackMaterial).toBe(39);
+    });
+
+    it("correctly counts pieces and material for custom position with missing pieces", () => {
+      // Black missing queen (9) and knight (3)
+      const fen = "r1b1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+      const chess = new Chess(fen);
+      const summary = calculateBoardMaterial(chess);
+
+      expect(summary.blackCounts.q).toBe(0);
+      expect(summary.blackCounts.n).toBe(1);
+      expect(summary.blackMaterial).toBe(27);
+      expect(summary.whiteMaterial).toBe(39);
+    });
+  });
+
+  describe("calculateMaterialDifference (MIN-016)", () => {
+    it("returns zero advantage for equal starting position", () => {
+      const chess = new Chess();
+      const diff = calculateMaterialDifference(chess);
+      expect(diff).toEqual({ white: 0, black: 0 });
+    });
+
+    it("calculates white advantage when black is down material", () => {
+      const fen = "r1b1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+      const chess = new Chess(fen);
+      const diff = calculateMaterialDifference(chess);
+      expect(diff).toEqual({ white: 12, black: 0 });
+    });
+
+    it("accepts a precomputed BoardMaterialSummary", () => {
+      const chess = new Chess("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1");
+      const summary = calculateBoardMaterial(chess);
+      const diff = calculateMaterialDifference(summary);
+      expect(diff).toEqual({ white: 0, black: 9 });
+    });
+  });
+
+  describe("calculateCaptures (MIN-016)", () => {
+    it("returns empty lists for starting position", () => {
+      const chess = new Chess();
+      const captures = calculateCaptures(chess);
+      expect(captures.capturedWhite).toEqual([]);
+      expect(captures.capturedBlack).toEqual([]);
+    });
+
+    it("returns ordered captured pieces for positions with missing pieces", () => {
+      // Black missing 1 rook, White missing 1 rook
+      const fen = "1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBNR w Kkq - 0 1";
+      const chess = new Chess(fen);
+      const captures = calculateCaptures(chess);
+
+      expect(captures.capturedWhite).toEqual(["r"]);
+      expect(captures.capturedBlack).toEqual(["r"]);
+    });
+
+    it("accepts a precomputed BoardMaterialSummary", () => {
+      const fen = "r1b1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+      const chess = new Chess(fen);
+      const summary = calculateBoardMaterial(chess);
+      const captures = calculateCaptures(summary);
+
+      expect(captures.capturedBlack).toEqual(["q", "n"]);
+      expect(captures.capturedWhite).toEqual([]);
     });
   });
 
@@ -189,6 +282,30 @@ describe("chess_evaluation utils", () => {
       expect(state.materialAdvantage).toEqual({ white: 0, black: 9 });
       expect(state.isCheckmate).toBe(false);
       expect(state.isCheck).toBe(false);
+    });
+  });
+
+  describe("getKingSquare (MIN-019)", () => {
+    it("finds white and black king squares in standard starting position", () => {
+      const chess = new Chess();
+      expect(getKingSquare(chess, "w")).toBe("e1");
+      expect(getKingSquare(chess, "b")).toBe("e8");
+    });
+
+    it("finds king coordinates in custom board positions", () => {
+      const chess = new Chess("8/8/8/4K3/8/8/4k3/8 w - - 0 1");
+      expect(getKingSquare(chess, "w")).toBe("e5");
+      expect(getKingSquare(chess, "b")).toBe("e2");
+    });
+
+    it("returns null if king of specified color is not on the board", () => {
+      const chess = new Chess();
+      const customBoard = chess.board().map((row) =>
+        row.map((piece) => (piece?.type === "k" && piece.color === "b" ? null : piece)),
+      );
+      vi.spyOn(chess, "board").mockReturnValue(customBoard);
+      expect(getKingSquare(chess, "w")).toBe("e1");
+      expect(getKingSquare(chess, "b")).toBeNull();
     });
   });
 });

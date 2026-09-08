@@ -34,13 +34,13 @@ describe('ChessBoard.vue', () => {
     const wrapperWhite = mount(ChessBoard, {
       props: { fen: DEFAULT_FEN, orientation: 'w' },
     });
-    const firstSquareWhite = wrapperWhite.findAllComponents({ name: 'ChessSquare' })[0];
+    const firstSquareWhite = wrapperWhite.findAllComponents({ name: 'ChessSquare' })[0]!;
     expect(firstSquareWhite.props('square')).toBe('a8');
 
     const wrapperBlack = mount(ChessBoard, {
       props: { fen: DEFAULT_FEN, orientation: 'b' },
     });
-    const firstSquareBlack = wrapperBlack.findAllComponents({ name: 'ChessSquare' })[0];
+    const firstSquareBlack = wrapperBlack.findAllComponents({ name: 'ChessSquare' })[0]!;
     expect(firstSquareBlack.props('square')).toBe('h1');
   });
 
@@ -116,7 +116,7 @@ describe('ChessBoard.vue', () => {
     const inactiveSquares = squares.filter((s) => s.props('isSquareActive') === false);
 
     expect(activeSquares).toHaveLength(1);
-    expect(activeSquares[0].props('square')).toBe('e4');
+    expect(activeSquares[0]!.props('square')).toBe('e4');
     expect(inactiveSquares).toHaveLength(63);
   });
 

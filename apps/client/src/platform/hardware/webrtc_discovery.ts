@@ -3,6 +3,8 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Finding MAJ-012.
  */
 
+import { logger as defaultLogger, type ILogger } from '../telemetry';
+
 export interface IWebRtcDiscovery {
   /**
    * Attempts to discover the host's private IPv4 address via WebRTC ICE candidate inspection.
@@ -17,6 +19,8 @@ export interface IWebRtcDiscovery {
  * Production implementation using ephemeral RTCPeerConnection candidate inspection.
  */
 export class BrowserWebRtcDiscovery implements IWebRtcDiscovery {
+  constructor(private readonly logger: ILogger = defaultLogger) {}
+
   public async discoverLocalIp(timeoutMs: number = 800): Promise<string | null> {
     if (
       typeof window === 'undefined' ||
@@ -33,8 +37,11 @@ export class BrowserWebRtcDiscovery implements IWebRtcDiscovery {
         if (pc) {
           try {
             pc.close();
-          } catch {
-            // Suppress close error on abort/timeout
+          } catch (err) {
+            this.logger.debug('Failed to close RTCPeerConnection cleanly', {
+              operation: 'webrtc_discover_ip',
+              error: err instanceof Error ? err.message : String(err),
+            });
           }
           pc = null;
         }
@@ -56,8 +63,13 @@ export class BrowserWebRtcDiscovery implements IWebRtcDiscovery {
             if (!resolved && pc) {
               return pc.setLocalDescription(offer);
             }
+            return undefined;
           })
-          .catch(() => {
+          .catch((err) => {
+            this.logger.debug('WebRTC offer creation or local description failed', {
+              operation: 'webrtc_discover_ip',
+              error: err instanceof Error ? err.message : String(err),
+            });
             if (!resolved) {
               resolved = true;
               clearTimeout(timer);
@@ -85,7 +97,11 @@ export class BrowserWebRtcDiscovery implements IWebRtcDiscovery {
             }
           }
         };
-      } catch {
+      } catch (err) {
+        this.logger.debug('WebRTC initialization failed', {
+          operation: 'webrtc_discover_ip',
+          error: err instanceof Error ? err.message : String(err),
+        });
         if (!resolved) {
           resolved = true;
           clearTimeout(timer);

@@ -116,8 +116,14 @@ export class LobbyPage {
   /**
    * Switches to Solo AI mode and starts a match against the selected mascot.
    */
-  async startSoloAi(mascotId: MascotId = 'peanut'): Promise<void> {
+  async startSoloAi(mascotId: MascotId = 'peanut', color: 'w' | 'b' | 'random' = 'w'): Promise<void> {
     await this.selectMode('solo_ai');
+
+    if (color !== 'w') {
+      const colorBtn = this.page.locator(`[data-testid="color-option-${color}"]`);
+      await expect(colorBtn).toBeVisible({ timeout: 10_000 });
+      await colorBtn.click();
+    }
 
     const mascotCard = this.page.locator(`[data-testid="mascot-card-${mascotId}"]`);
     await expect(mascotCard).toBeVisible({ timeout: 10_000 });

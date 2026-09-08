@@ -1,8 +1,11 @@
-import { ref, onUnmounted, getCurrentInstance, type Ref } from 'vue';
-import { logger } from '@/platform/telemetry';
+import { ref, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope, type Ref } from 'vue';
+import { logger, generateCorrelationId } from '@/platform/telemetry';
+import { useCameraService } from '@/platform/di/helpers';
+import { defaultCameraService, type ICameraService } from '@/platform/hardware/camera.interface';
 
 export interface UseCameraStreamOptions {
   facingMode?: 'environment' | 'user';
+  cameraService?: ICameraService;
 }
 
 export interface UseCameraStreamReturn {
@@ -29,14 +32,14 @@ export function stopMediaStreamTracks(stream: MediaStream | null): void {
     for (const track of tracks) {
       try {
         track.stop();
-      } catch (err) {
+      } catch (err: unknown) {
         logger.warn('Failed to stop media track', {
           operation: 'camera_stop_track',
           error: err instanceof Error ? err.message : String(err),
         });
       }
     }
-  } catch (err) {
+  } catch (err: unknown) {
     logger.warn('Failed to get tracks from stream', {
       operation: 'camera_get_tracks',
       error: err instanceof Error ? err.message : String(err),
@@ -47,8 +50,22 @@ export function stopMediaStreamTracks(stream: MediaStream | null): void {
 /**
  * Composable dedicated to camera stream acquisition, permission handling, and track cleanup.
  * Part of MIN-027 decomposition from useQrScanner.
+ * Injects ICameraService (MAJ-015) and implements structured start/success logging (MIN-014).
  */
 export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): UseCameraStreamReturn {
+  function resolveCameraService(custom?: ICameraService): ICameraService {
+    if (custom) return custom;
+    if (getCurrentInstance()) {
+      try {
+        return useCameraService();
+      } catch {
+        return defaultCameraService;
+      }
+    }
+    return defaultCameraService;
+  }
+
+  const cameraService = resolveCameraService(defaultOptions.cameraService);
   const mediaStream = ref<MediaStream | null>(null);
   const hasCamera = ref(true);
   const cameraError = ref<string | null>(null);
@@ -65,7 +82,7 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
     if (activeVideoElement) {
       try {
         activeVideoElement.srcObject = null;
-      } catch (err) {
+      } catch (err: unknown) {
         logger.warn('Failed to clear videoElement.srcObject', {
           operation: 'camera_clear_src_object',
           error: err instanceof Error ? err.message : String(err),
@@ -88,21 +105,28 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
     stopStream();
     resetCameraError();
 
-    if (
-      typeof navigator === 'undefined' ||
-      !navigator.mediaDevices ||
-      typeof navigator.mediaDevices.getUserMedia !== 'function'
-    ) {
+    const activeService = options.cameraService ? resolveCameraService(options.cameraService) : cameraService;
+
+    if (!activeService.isSupported()) {
       hasCamera.value = false;
       cameraError.value = 'Camera access is not supported on this device/browser.';
       return null;
     }
 
+    const correlationId = generateCorrelationId();
+    const startTime = performance.now();
+    const facingMode = options.facingMode || defaultOptions.facingMode || 'environment';
+
+    logger.info('Starting camera stream acquisition', {
+      operation: 'camera_start_stream',
+      correlationId,
+      facingMode,
+    });
+
     let acquiredStream: MediaStream | null = null;
     activeVideoElement = videoElement;
 
     try {
-      const facingMode = options.facingMode || defaultOptions.facingMode || 'environment';
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: { ideal: facingMode },
@@ -113,7 +137,7 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
       };
 
       try {
-        acquiredStream = await navigator.mediaDevices.getUserMedia(constraints);
+        acquiredStream = await activeService.getUserMedia(constraints);
       } catch (firstErr: any) {
         if (
           firstErr?.name === 'NotAllowedError' ||
@@ -124,9 +148,10 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
         }
         logger.warn('Exact camera constraint failed, trying basic video fallback', {
           operation: 'camera_constraints_fallback',
+          correlationId,
           error: firstErr instanceof Error ? firstErr.message : String(firstErr),
         });
-        acquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        acquiredStream = await activeService.getUserMedia({ video: true, audio: false });
       }
 
       mediaStream.value = acquiredStream;
@@ -137,6 +162,13 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
       isStreaming.value = true;
       hasCamera.value = true;
       cameraError.value = null;
+
+      const durationMs = Math.round(performance.now() - startTime);
+      logger.info('Camera stream acquired successfully', {
+        operation: 'camera_start_stream',
+        correlationId,
+        durationMs,
+      });
 
       return acquiredStream;
     } catch (err: any) {
@@ -151,7 +183,7 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
       if (videoElement) {
         try {
           videoElement.srcObject = null;
-        } catch (clearErr) {
+        } catch (clearErr: unknown) {
           logger.warn('Failed to clear videoElement.srcObject in catch', {
             operation: 'camera_catch_clear_src_object',
             error: clearErr instanceof Error ? clearErr.message : String(clearErr),
@@ -173,8 +205,11 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
         cameraError.value = err?.message || 'Unable to access camera.';
       }
 
+      const durationMs = Math.round(performance.now() - startTime);
       logger.error('Failed to start camera stream', {
         operation: 'camera_start_stream',
+        correlationId,
+        durationMs,
         error: err instanceof Error ? err.message : String(err),
       });
 
@@ -182,7 +217,11 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
     }
   }
 
-  if (getCurrentInstance()) {
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      stopStream();
+    });
+  } else if (getCurrentInstance()) {
     onUnmounted(() => {
       stopStream();
     });
