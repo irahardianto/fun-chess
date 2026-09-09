@@ -13,7 +13,7 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "start": "pnpm --filter @fun-chess/server start",
     "build": "pnpm -r --if-present run build",
-    "lint": "eslint .",
+    "lint": "eslint . --no-inline-config --max-warnings 0",
     "typecheck": "pnpm --filter @fun-chess/shared exec tsc --noEmit && pnpm --filter @fun-chess/server exec tsc --noEmit && pnpm --filter @fun-chess/client exec vue-tsc --noEmit && pnpm --filter @fun-chess/e2e run typecheck",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:run": "pnpm test",

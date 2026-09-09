@@ -49,10 +49,11 @@ if [[ -n "$SKIP_RAW" && "$RUN_ALL" != "1" ]]; then
 fi
 
 should_run() {
-  # $1 = gate id. Returns 0 (run) / 1 (skip). `secrets`, `gitleaks`, `empty-catch`, and `pinned-deps` ignore skip flags.
+  # $1 = gate id. Returns 0 (run) / 1 (skip). `secrets`, `gitleaks`, `empty-catch`, `linter-override`, and `pinned-deps` ignore skip flags.
   [[ "$1" == "secrets" ]] && return 0
   [[ "$1" == "gitleaks" ]] && return 0
   [[ "$1" == "empty-catch" ]] && return 0
+  [[ "$1" == "linter-override" ]] && return 0
   [[ "$1" == "pinned-deps" ]] && return 0
   [[ "$RUN_ALL" == "1" ]] && return 0
   [[ -n "${SKIP_SET[$1]:-}" ]] && return 1
@@ -429,14 +430,79 @@ EOF
 
 # --- Gate: linter overrides --------------------------------------------------
 # code-idioms-and-conventions.md: "Never disable a lint rule or suppress a warning".
+# NON-SKIPPABLE.
 gate_linter_override() {
   local blocked=0
 
   if staged_any 'eslint.config.*'; then
     local bad_cfg
-    bad_cfg="$(git diff --cached -U0 -- 'eslint.config.*' 2>/dev/null | grep -E '^\+[[:space:]]*['\''"]?(@typescript-eslint/no-explicit-any|no-restricted-syntax|no-console)['\''"]?[[:space:]]*:[[:space:]]*(['\''"]off['\''"]|0)' || true)"
+    bad_cfg="$(node - 2>&1 <<'EOF'
+const ts = require('typescript');
+const { execSync } = require('child_process');
+let content = '';
+try {
+  content = execSync('git show :eslint.config.js', { encoding: 'utf8' });
+} catch {
+  process.exit(0);
+}
+
+const sf = ts.createSourceFile('eslint.config.js', content, ts.ScriptTarget.Latest, true);
+let violations = [];
+
+function checkNode(node) {
+  if (ts.isObjectLiteralExpression(node)) {
+    let filesProp = null;
+    let rulesProp = null;
+    for (const prop of node.properties) {
+      if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+        if (prop.name.text === 'files') filesProp = prop.initializer;
+        if (prop.name.text === 'rules') rulesProp = prop.initializer;
+      }
+    }
+    if (rulesProp && ts.isObjectLiteralExpression(rulesProp)) {
+      if (filesProp && ts.isArrayLiteralExpression(filesProp)) {
+        const filePatterns = filesProp.elements
+          .filter(ts.isStringLiteral)
+          .map(e => e.text);
+        const isTestOnly = filePatterns.every(p =>
+          p.includes('spec') || p.includes('test') || p.includes('__tests__') || p.includes('mock')
+        );
+        if (!isTestOnly) {
+          for (const ruleProp of rulesProp.properties) {
+            if (ts.isPropertyAssignment(ruleProp)) {
+              const val = ruleProp.initializer.getText(sf).replace(/['"]/g, '');
+              if (val === 'off' || val === '0') {
+                const ruleName = ruleProp.name.getText(sf).replace(/['"]/g, '');
+                violations.push(`Non-test file pattern [${filePatterns.join(', ')}] disables rule '${ruleName}' in eslint.config.js (prohibited by code-idioms-and-conventions.md)`);
+              }
+            }
+          }
+        }
+      } else if (!filesProp) {
+        const protectedRules = ['@typescript-eslint/no-explicit-any', 'no-debugger', 'no-eval'];
+        for (const ruleProp of rulesProp.properties) {
+          if (ts.isPropertyAssignment(ruleProp)) {
+            const ruleName = ruleProp.name.getText(sf).replace(/['"]/g, '');
+            const val = ruleProp.initializer.getText(sf).replace(/['"]/g, '');
+            if (protectedRules.includes(ruleName) && (val === 'off' || val === '0')) {
+              violations.push(`Global rule '${ruleName}' cannot be disabled in eslint.config.js`);
+            }
+          }
+        }
+      }
+    }
+  }
+  ts.forEachChild(node, checkNode);
+}
+checkNode(sf);
+if (violations.length > 0) {
+  console.log(violations.join('\n'));
+  process.exit(1);
+}
+EOF
+)" || true
     if [[ -n "$bad_cfg" ]]; then
-      while IFS= read -r l; do emit fail linter-override "disabling core linter rule prohibited in eslint.config: $l"; done <<<"$bad_cfg"
+      while IFS= read -r l; do emit fail linter-override "$l"; done <<<"$bad_cfg"
       blocked=1
     fi
   fi
@@ -456,7 +522,7 @@ gate_linter_override() {
 
   if [[ ${#prod_scan[@]} -gt 0 ]]; then
     local inline_hits
-    inline_hits="$(git grep -nE --cached -- '(eslint-disable|@ts-ignore)' -- "${prod_scan[@]}" 2>/dev/null || true)"
+    inline_hits="$(git grep -nE --cached -- '(eslint-disable|@ts-ignore|@ts-nocheck|@ts-expect-error)' -- "${prod_scan[@]}" 2>/dev/null || true)"
     if [[ -n "$inline_hits" ]]; then
       while IFS= read -r l; do emit fail linter-override "linter or compiler override in production code prohibited: $l"; done <<<"$inline_hits"
       blocked=1
@@ -666,8 +732,8 @@ gate_lint() {
 
   if staged_any '*.ts' '*.tsx' '*.vue' '*.js' 'eslint.config.*'; then
     local out
-    if out="$(pnpm run lint 2>&1)"; then
-      pass lint "ESLint passed (eslint .)"
+    if out="$(pnpm exec eslint . --no-inline-config --max-warnings 0 2>&1)"; then
+      pass lint "ESLint passed (eslint . --no-inline-config --max-warnings 0)"
     else
       printf '%s\n' "$out" | grep -E '(error|warning|Error:)' | head -n 10 | while IFS= read -r l; do emit fail lint "$l"; done
       emit fail lint "ESLint failed — fix lint errors before committing (code-idioms-and-conventions.md)"
