@@ -369,6 +369,35 @@ describe("Progress Codec (Deflate + CRC-32 + Base64URL QR & JSON Envelope)", () 
       expect(() => codec.decodeFromEnvelopeJson("not a json")).toThrow();
       expect(() => codec.decodeFromEnvelopeJson("")).toThrow();
     });
+
+    it("rejects JSON backup envelope with missing payload object (MAJ-023)", () => {
+      const badEnvelope = {
+        magic: "FC_PROGRESS_V1",
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        checksum: "ABCD1234",
+      };
+      expect(() => codec.decodeFromEnvelopeJson(JSON.stringify(badEnvelope))).toThrowError(
+        /missing payload object/,
+      );
+    });
+
+    it("rejects JSON backup envelope with invalid schemaVersion or exportedAt failing fast with schema validation error (MAJ-023)", () => {
+      const payload = createRealisticPayload(2, 2);
+      const envelopeJson = codec.encodeToEnvelopeJson(payload);
+      const envelopeObj = JSON.parse(envelopeJson);
+
+      envelopeObj.schemaVersion = -1; // invalid schemaVersion (must be positive int)
+      expect(() => codec.decodeFromEnvelopeJson(JSON.stringify(envelopeObj))).toThrowError(
+        /Invalid envelope JSON schema/,
+      );
+
+      const envelopeObj2 = JSON.parse(envelopeJson);
+      envelopeObj2.exportedAt = ""; // empty string invalid
+      expect(() => codec.decodeFromEnvelopeJson(JSON.stringify(envelopeObj2))).toThrowError(
+        /Invalid envelope JSON schema/,
+      );
+    });
   });
 
   describe("Standalone Helper Functions (decodeProgressFromQr, decodeProgressFromEnvelope, encodeProgressToQr, encodeProgressToEnvelope)", () => {

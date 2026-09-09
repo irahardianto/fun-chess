@@ -9,6 +9,7 @@ import {
 import { ALL_PUZZLES } from '../data/puzzle_catalog';
 import { usePuzzleProgress } from './usePuzzleProgress';
 import { usePuzzleRunner } from './usePuzzleRunner';
+import { logger } from '@/platform/telemetry';
 
 export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
   const progressModule = usePuzzleProgress(customStore);
@@ -38,7 +39,13 @@ export function useAdaptiveLadder(customStore?: PuzzleProgressStore) {
 
   const runner = usePuzzleRunner({
     onSolve: (puzzle, stars, hintsUsed, _mistakes) => {
-      handleSolve(puzzle, stars, hintsUsed);
+      handleSolve(puzzle, stars, hintsUsed).catch((err: unknown) => {
+        logger.warn('Failed to handle ladder solve', {
+          operation: 'adaptive_ladder_solve',
+          puzzleId: puzzle.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     },
   });
 

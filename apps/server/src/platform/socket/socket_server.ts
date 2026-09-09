@@ -58,6 +58,12 @@ export function createSocketServer(
         if (isOriginAllowed(origin, allowedOrigins)) {
           callback(null, true);
         } else {
+          logger?.warn("Socket connection rejected: origin not allowed", {
+            operation: "socket_cors_rejected",
+            correlationId: randomUUID(),
+            origin,
+            url: req.url?.split("?")[0],
+          });
           callback(3 as unknown as string, false);
         }
       },

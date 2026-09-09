@@ -51,11 +51,20 @@ export class ChessEngine {
     currentFen: string,
     move: MovePayload,
     expectedTurn: PieceColor,
+    logger: Logger = defaultLogger,
   ): MoveValidationResult {
     let chess: Chess;
     try {
       chess = new Chess(currentFen);
-    } catch {
+    } catch (err) {
+      logger.debug("FEN parsing failed during move validation", {
+        operation: "chess_engine_validate_move_fen",
+        currentFen,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message }
+            : { raw: err },
+      });
       return { success: false, error: "Invalid board FEN string" };
     }
 
@@ -76,6 +85,14 @@ export class ChessEngine {
 
       return { success: true, chess, moveResultObj: result };
     } catch (err: unknown) {
+      logger.debug("Move application threw exception in chess.js", {
+        operation: "chess_engine_move_exception",
+        move,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message }
+            : { raw: err },
+      });
       return {
         success: false,
         error: (err as Error).message || "Invalid move coordinates",
@@ -279,7 +296,9 @@ export class ChessEngine {
     counts.set(startPos, 1);
 
     for (let i = 0; i < moveHistory.length; i++) {
-      const pos = this.normalizeFen(moveHistory[i]!.fen);
+      const historyItem = moveHistory[i];
+      if (!historyItem?.fen) continue;
+      const pos = this.normalizeFen(historyItem.fen);
       const count = (counts.get(pos) || 0) + 1;
       if (count >= 3) {
         return true;
@@ -300,24 +319,20 @@ export class ChessEngine {
 
   /**
    * Locates the square of the king from a FEN string.
+   * Catches FEN parsing errors and logs debug details before returning null (MIN-001).
    */
   public static findKingSquare(
     fen: string,
     color: PieceColor,
-    logger: Logger = defaultLogger,
   ): Square | null {
     try {
       const chess = new Chess(fen);
       return this.getKingSquare(chess, color);
     } catch (err) {
-      logger.debug("FEN parsing failed during king square lookup", {
-        operation: "chess_engine_find_king_square",
-        fen,
+      defaultLogger.debug("FEN parse failure in findKingSquare", {
+        operation: "chess_find_king_square",
         color,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message }
-            : { raw: err },
+        error: err instanceof Error ? err.message : String(err),
       });
       return null;
     }

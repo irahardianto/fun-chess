@@ -1021,7 +1021,7 @@ describe('SC-4 Integration & Core Services Test Suite', () => {
         lastActivityAt: 2,
       };
 
-      eventHandlers['room:joined']?.(mockRoom);
+      eventHandlers['room:player_joined']?.({ player: mockRoom.whitePlayer, room: mockRoom });
 
       expect(instanceA.currentRoom.value).toEqual(mockRoom);
       expect(instanceB.currentRoom.value).toEqual(mockRoom);

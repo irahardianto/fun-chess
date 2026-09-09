@@ -16,8 +16,10 @@ import { Chess } from "chess.js";
 import {
   clearAllDisconnectTimers,
   type IDisconnectTimerRegistry,
+  MockSessionRegistry,
 } from "../../rooms/index.js";
 import { SocketRateLimiter } from "../../../platform/socket/socket_rate_limiter.js";
+import { SystemClock, UuidGenerator } from "../../../platform/time/index.js";
 
 interface SocketAckResponse {
   success: boolean;
@@ -128,6 +130,7 @@ describe("Game Socket Handlers", () => {
   let io: TestIo;
   let whiteSocket: TestSocket;
   let blackSocket: TestSocket;
+  let rateLimiter: SocketRateLimiter;
 
   const setupActiveRoom = async (
     code = "CHSS",
@@ -169,11 +172,18 @@ describe("Game Socket Handlers", () => {
 
   beforeEach(() => {
     store = new MockRoomGameAdapter();
-    service = new GameService(store);
     logger = new NullLogger();
+    const clock = new SystemClock();
+    const idGenerator = new UuidGenerator();
+    service = new GameService(store, clock, idGenerator, logger);
     io = new TestIo();
     whiteSocket = new TestSocket("sock_white");
     blackSocket = new TestSocket("sock_black");
+    rateLimiter = new SocketRateLimiter({
+      maxRequests: 60,
+      windowMs: 10_000,
+      pruneIntervalMs: 0,
+    });
     clearAllDisconnectTimers();
 
     registerGameSocketHandlers(
@@ -181,17 +191,20 @@ describe("Game Socket Handlers", () => {
       whiteSocket as unknown as Socket,
       service,
       logger,
+      rateLimiter,
     );
     registerGameSocketHandlers(
       io as unknown as TypedSocketServer,
       blackSocket as unknown as Socket,
       service,
       logger,
+      rateLimiter,
     );
   });
 
   afterEach(() => {
     clearAllDisconnectTimers();
+    rateLimiter.destroy();
     vi.restoreAllMocks();
   });
 
@@ -485,6 +498,8 @@ describe("Game Socket Handlers", () => {
       expect(rematchStartedPayload?.gameState.turn).toBe("w");
       expect(rematchStartedPayload?.room.whitePlayer?.id).toBe("p_black_id");
       expect(rematchStartedPayload?.room.blackPlayer?.id).toBe("p_white_id");
+      expect(rematchStartedPayload?.room.whitePlayer?.socketId).toBeUndefined();
+      expect(rematchStartedPayload?.room.blackPlayer?.socketId).toBeUndefined();
 
       const savedRoom = await store.findByCode("MTCH");
       expect(savedRoom?.status).toBe("playing");
@@ -546,7 +561,7 @@ describe("Game Socket Handlers", () => {
         customWhiteSocket as unknown as Socket,
         service,
         logger,
-        undefined,
+        rateLimiter,
         mockTimers,
       );
       registerGameSocketHandlers(
@@ -554,7 +569,7 @@ describe("Game Socket Handlers", () => {
         customBlackSocket as unknown as Socket,
         service,
         logger,
-        undefined,
+        rateLimiter,
         mockTimers,
       );
 
@@ -907,8 +922,8 @@ describe("Game Socket Handlers", () => {
     });
   });
 
-  describe("Session Sliding TTL on Valid Move (CRIT-002)", () => {
-    it("touches session via sessionRegistry when game:move succeeds", async () => {
+  describe("Session Sliding TTL on Valid Move (CRIT-002, F-04)", () => {
+    it("does not directly invoke sessionRegistry.touchSession in the socket handler on game:move (F-04)", async () => {
       await setupActiveRoom("SESS");
       const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
       const mockSessionRegistry = {
@@ -927,7 +942,7 @@ describe("Game Socket Handlers", () => {
         customSocket as unknown as Socket,
         service,
         logger,
-        undefined,
+        rateLimiter,
         undefined,
         mockSessionRegistry,
       );
@@ -942,15 +957,16 @@ describe("Game Socket Handlers", () => {
       );
 
       expect(ack?.success).toBe(true);
-      expect(touchSessionSpy).toHaveBeenCalledWith("token-socket-123", "sock_white");
+      expect(touchSessionSpy).not.toHaveBeenCalled();
     });
 
-    it("touches session via getSessionTokenForPlayer when sessionToken is not on socket.data", async () => {
+    it("does not call getSessionTokenForPlayer or touchSession from socket handler when sessionToken is absent", async () => {
       await setupActiveRoom("SES2");
       const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
+      const getSessionTokenSpy = vi.fn().mockReturnValue("token-lookup-456");
       const mockSessionRegistry = {
         touchSession: touchSessionSpy,
-        getSessionTokenForPlayer: vi.fn().mockReturnValue("token-lookup-456"),
+        getSessionTokenForPlayer: getSessionTokenSpy,
       } as unknown as import("../../rooms/index.js").SessionRegistry;
 
       const customSocket = new TestSocket("sock_white");
@@ -964,7 +980,7 @@ describe("Game Socket Handlers", () => {
         customSocket as unknown as Socket,
         service,
         logger,
-        undefined,
+        rateLimiter,
         undefined,
         mockSessionRegistry,
       );
@@ -979,19 +995,19 @@ describe("Game Socket Handlers", () => {
       );
 
       expect(ack?.success).toBe(true);
-      expect(touchSessionSpy).toHaveBeenCalledWith("token-lookup-456", "sock_white");
+      expect(touchSessionSpy).not.toHaveBeenCalled();
+      expect(getSessionTokenSpy).not.toHaveBeenCalled();
     });
 
-    it("touches session via playerIndex fallback map", async () => {
+    it("does not call touchSession on MockSessionRegistry directly from socket handler", async () => {
       await setupActiveRoom("SES3");
-      const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
-      const playerIndexMap = new Map<string, string>();
-      playerIndexMap.set("SES3:p_white_id", "token-index-789");
-
-      const mockSessionRegistry = {
-        touchSession: touchSessionSpy,
-        playerIndex: playerIndexMap,
-      } as unknown as import("../../rooms/index.js").SessionRegistry;
+      const mockSessionRegistry = new MockSessionRegistry();
+      await mockSessionRegistry.createSession({
+        roomCode: "SES3",
+        playerId: "p_white_id",
+        socketId: "sock_white",
+      });
+      const touchSpy = vi.spyOn(mockSessionRegistry, "touchSession");
 
       const customSocket = new TestSocket("sock_white");
       customSocket.data = {
@@ -1004,7 +1020,7 @@ describe("Game Socket Handlers", () => {
         customSocket as unknown as Socket,
         service,
         logger,
-        undefined,
+        rateLimiter,
         undefined,
         mockSessionRegistry,
       );
@@ -1019,7 +1035,7 @@ describe("Game Socket Handlers", () => {
       );
 
       expect(ack?.success).toBe(true);
-      expect(touchSessionSpy).toHaveBeenCalledWith("token-index-789", "sock_white");
+      expect(touchSpy).not.toHaveBeenCalled();
     });
 
     it("does not call touchSession when no sessionToken or userId is present", async () => {
@@ -1037,7 +1053,7 @@ describe("Game Socket Handlers", () => {
         customSocket as unknown as Socket,
         service,
         logger,
-        undefined,
+        rateLimiter,
         undefined,
         mockSessionRegistry,
       );

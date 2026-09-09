@@ -8,7 +8,8 @@ import type {
   Puzzle,
 } from '@fun-chess/shared';
 import BaseButton from '../../components/base/BaseButton.vue';
-import { PromotionModal } from '@/features/modals/index.js';
+import { PromotionModal } from '@/features/modals';
+import { logger } from '@/platform/telemetry';
 import PuzzleBoardWrapper from './components/PuzzleBoardWrapper.vue';
 import RatingClimbHud from './components/RatingClimbHud.vue';
 import StreakHud from './components/StreakHud.vue';
@@ -17,6 +18,7 @@ import { useThemedDrills } from './composables/useThemedDrills';
 import { useAdaptiveLadder } from './composables/useAdaptiveLadder';
 import { usePuzzleRunner } from './composables/usePuzzleRunner';
 import { getThemeDescriptor, getThemeVisualClues } from './data/puzzle_themes';
+import { useInjectClock } from '@/platform/di';
 
 interface Props {
   mode?: 'themed_drills' | 'adaptive_ladder';
@@ -41,7 +43,13 @@ const themedDrills = useThemedDrills(props.initialTheme, props.customStore);
 const drillsRunner = usePuzzleRunner({
   puzzle: themedDrills.currentPuzzle.value,
   onSolve: (puzzle, stars) => {
-    themedDrills.handleSolve(puzzle, stars);
+    themedDrills.handleSolve(puzzle, stars).catch((err: unknown) => {
+      logger.warn('Failed to handle drill solve', {
+        operation: 'themed_drill_solve',
+        puzzleId: puzzle.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   },
 });
 
@@ -112,12 +120,13 @@ function handlePromotionCancel() {
 }
 
 // --- 4. Timer & Completion State ---
-const solveStartTime = ref<number>(Date.now());
+const clock = useInjectClock();
+const solveStartTime = ref<number>(clock.now());
 const elapsedSeconds = ref<number>(0);
 const isCompletionDismissed = ref<boolean>(false);
 
 onMounted(() => {
-  solveStartTime.value = Date.now();
+  solveStartTime.value = clock.now();
 });
 
 // Watch for active puzzle completion
@@ -126,7 +135,7 @@ watch(
   (completed) => {
     if (completed && activeRunner.value.isSolvedSuccessfully.value) {
       isCompletionDismissed.value = false;
-      elapsedSeconds.value = Math.max(1, Math.round((Date.now() - solveStartTime.value) / 1000));
+      elapsedSeconds.value = Math.max(1, Math.round((clock.now() - solveStartTime.value) / 1000));
       const stars = activeRunner.value.calculatedStars.value;
       emit('completed', stars);
     }
@@ -151,7 +160,7 @@ watch(
       if (themedDrills.currentPuzzle.value) {
         drillsRunner.loadPuzzle(themedDrills.currentPuzzle.value);
       }
-      solveStartTime.value = Date.now();
+      solveStartTime.value = clock.now();
       elapsedSeconds.value = 0;
     }
   }
@@ -164,7 +173,7 @@ watch(
     if (newPuzzle && props.mode === 'themed_drills') {
       isCompletionDismissed.value = false;
       drillsRunner.loadPuzzle(newPuzzle);
-      solveStartTime.value = Date.now();
+      solveStartTime.value = clock.now();
       elapsedSeconds.value = 0;
     }
   }
@@ -182,13 +191,13 @@ function handleRequestHint() {
 function handleRetry() {
   isCompletionDismissed.value = false;
   activeRunner.value.resetCurrentPuzzle();
-  solveStartTime.value = Date.now();
+  solveStartTime.value = clock.now();
   elapsedSeconds.value = 0;
 }
 
 function handleNextPuzzle() {
   isCompletionDismissed.value = false;
-  solveStartTime.value = Date.now();
+  solveStartTime.value = clock.now();
   elapsedSeconds.value = 0;
   if (isLadderMode.value) {
     adaptiveLadder.pickNextLadderPuzzle();
@@ -213,7 +222,7 @@ function handleSkip() {
       drillsRunner.loadPuzzle(themedDrills.currentPuzzle.value);
     }
   }
-  solveStartTime.value = Date.now();
+  solveStartTime.value = clock.now();
   elapsedSeconds.value = 0;
 }
 

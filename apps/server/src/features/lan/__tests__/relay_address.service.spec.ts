@@ -5,11 +5,6 @@ import {
   normalizePublicUrl,
   extractHostnameFromUrl,
   MockRelayAddressService,
-  getRelayAddressingInfo,
-  generateRelayJoinUrl,
-  isCloudRelay,
-  getRelayLocalLanIp,
-  getAllRelayLanInterfaces,
 } from "../relay_address.service.js";
 
 describe("RelayAddressService", () => {
@@ -513,21 +508,6 @@ describe("RelayAddressService", () => {
       expect(mockService.generateJoinUrl(443, "room1")).toBe(
         "https://cloud-relay.example.com?room=ROOM1",
       );
-    });
-  });
-
-  describe("Singleton Helper Functions", () => {
-    it("exports functional helpers matching default service behavior", () => {
-      expect(typeof isCloudRelay()).toBe("boolean");
-      expect(typeof getRelayLocalLanIp()).toBe("string");
-      expect(Array.isArray(getAllRelayLanInterfaces())).toBe(true);
-
-      const info = getRelayAddressingInfo(3000);
-      expect(info.port).toBe(3000);
-      expect(typeof info.joinUrl).toBe("string");
-
-      const joinUrl = generateRelayJoinUrl(3000, "abc");
-      expect(joinUrl).toContain("?room=ABC");
     });
   });
 });

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { io } from 'socket.io-client';
-import { createSocketClient } from '../socket_client';
+import {
+  createSocketClient,
+  DEFAULT_MAX_RECONNECT_ATTEMPTS,
+  DEFAULT_RECONNECTION_ATTEMPTS,
+} from '../socket_client';
 
 vi.mock('socket.io-client', () => ({
   io: vi.fn().mockReturnValue({
@@ -18,31 +22,36 @@ describe('socket_client factory', () => {
     vi.clearAllMocks();
   });
 
-  it('creates socket with specified custom URL and robust reconnection parameters', () => {
+  it('creates socket with specified custom URL and circuit breaker reconnection parameters', () => {
     const customUrl = 'http://192.168.1.100:3000';
     createSocketClient(customUrl);
 
     expect(io).toHaveBeenCalledWith(customUrl, {
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: DEFAULT_MAX_RECONNECT_ATTEMPTS,
       reconnectionDelay: 1000,
       timeout: 20000,
       transports: ['websocket', 'polling'],
     });
   });
 
-  it('defaults to window.location.origin when no URL is provided', () => {
+  it('defaults to window.location.origin and DEFAULT_MAX_RECONNECT_ATTEMPTS when no URL is provided', () => {
     createSocketClient();
 
     expect(io).toHaveBeenCalledWith(window.location.origin, expect.objectContaining({
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: DEFAULT_MAX_RECONNECT_ATTEMPTS,
       reconnectionDelay: 1000,
       timeout: 20000,
       transports: ['websocket', 'polling'],
     }));
+  });
+
+  it('exports equivalent DEFAULT_MAX_RECONNECT_ATTEMPTS and DEFAULT_RECONNECTION_ATTEMPTS constants (ENH-006)', () => {
+    expect(DEFAULT_MAX_RECONNECT_ATTEMPTS).toBe(10);
+    expect(DEFAULT_RECONNECTION_ATTEMPTS).toBe(10);
   });
 
   it('attaches correlationId to auth and query when provided in options', () => {
@@ -77,6 +86,18 @@ describe('socket_client factory', () => {
     createSocketClient({});
     expect(io).toHaveBeenCalledWith(window.location.origin, expect.objectContaining({
       reconnectionDelayMax: 10000,
+    }));
+  });
+
+  it('allows configuring custom reconnectionAttempts circuit breaker limit (ENH-006)', () => {
+    createSocketClient({ reconnectionAttempts: 5 });
+    expect(io).toHaveBeenCalledWith(window.location.origin, expect.objectContaining({
+      reconnectionAttempts: 5,
+    }));
+
+    createSocketClient({ reconnectionAttempts: 0 });
+    expect(io).toHaveBeenCalledWith(window.location.origin, expect.objectContaining({
+      reconnectionAttempts: 0,
     }));
   });
 });

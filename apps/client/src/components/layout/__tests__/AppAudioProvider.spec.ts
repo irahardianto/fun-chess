@@ -268,4 +268,29 @@ describe('AppAudioProvider.vue', () => {
     await nextTick();
     expect(wrapper.text()).toContain('State: true');
   });
+
+  it('persists game event listeners across match resets and allows explicit reconnection (CRIT-002)', async () => {
+    let opponentMoveHandler: ((data: any) => void) | null = null;
+    const mockUnsubscribe = vi.fn();
+    const mockSocketApi: GameDomainEventSource = {
+      onOpponentMove: vi.fn((handler) => {
+        opponentMoveHandler = handler;
+        return mockUnsubscribe;
+      }),
+      onGameCheck: vi.fn().mockReturnValue(mockUnsubscribe),
+      onGameOver: vi.fn().mockReturnValue(mockUnsubscribe),
+    };
+
+    const wrapper = createComponent({ socketApi: mockSocketApi });
+    expect(mockSocketApi.onOpponentMove).toHaveBeenCalledTimes(1);
+
+    // Verify opponent move handler triggers sound
+    opponentMoveHandler!({ move: { captured: false, san: 'e4' } });
+    expect(mockSynth.playMove).toHaveBeenCalledTimes(1);
+
+    // Trigger explicit reconnectAudioListeners
+    wrapper.vm.reconnectAudioListeners();
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(3);
+    expect(mockSocketApi.onOpponentMove).toHaveBeenCalledTimes(2);
+  });
 });

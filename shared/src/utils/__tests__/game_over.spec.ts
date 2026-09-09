@@ -8,27 +8,72 @@ import { Chess } from "chess.js";
 
 describe("GameOver Utilities (MAJ-039)", () => {
   describe("formatGameOverMessage", () => {
-    it("formats checkmate messages for White and Black", () => {
+    it("formats checkmate messages for White and Black with and without winnerName", () => {
       expect(formatGameOverMessage("w", "checkmate", "Alice")).toBe(
         "Checkmate! Alice won the match.",
+      );
+      expect(formatGameOverMessage("w", "checkmate")).toBe(
+        "Checkmate! White won the match.",
+      );
+      expect(formatGameOverMessage("b", "checkmate", "Bob")).toBe(
+        "Checkmate! Bob won the match.",
       );
       expect(formatGameOverMessage("b", "checkmate")).toBe(
         "Checkmate! Black won the match.",
       );
     });
 
-    it("formats resignation messages", () => {
+    it("formats resignation messages with and without player names", () => {
       expect(formatGameOverMessage("w", "resignation", "Alice", "Bob")).toBe(
         "Bob resigned. Alice won the match!",
       );
+      expect(formatGameOverMessage("w", "resignation")).toBe(
+        "Black resigned. White won the match!",
+      );
+      expect(formatGameOverMessage("w", "resignation", "Alice")).toBe(
+        "Black resigned. Alice won the match!",
+      );
+      expect(formatGameOverMessage("b", "resignation")).toBe(
+        "White resigned. Black won the match!",
+      );
+      expect(formatGameOverMessage("b", "resignation", "Bob")).toBe(
+        "White resigned. Bob won the match!",
+      );
+      expect(formatGameOverMessage("b", "resignation", undefined, "Alice")).toBe(
+        "Alice resigned. Black won the match!",
+      );
     });
 
-    it("formats abandonment messages", () => {
+    it("formats abandonment messages with and without player names", () => {
       expect(formatGameOverMessage("b", "abandonment", "Bob", "Alice")).toBe(
         "Alice disconnected. Bob won by abandonment!",
       );
+      expect(formatGameOverMessage("b", "abandonment")).toBe(
+        "White disconnected. Black won by abandonment!",
+      );
+      expect(formatGameOverMessage("b", "abandonment", "Bob")).toBe(
+        "White disconnected. Bob won by abandonment!",
+      );
+      expect(formatGameOverMessage("w", "abandonment")).toBe(
+        "Black disconnected. White won by abandonment!",
+      );
+      expect(formatGameOverMessage("w", "abandonment", "Alice")).toBe(
+        "Black disconnected. Alice won by abandonment!",
+      );
+      expect(formatGameOverMessage("w", "abandonment", "Alice", "Bob")).toBe(
+        "Bob disconnected. Alice won by abandonment!",
+      );
       expect(formatGameOverMessage("draw", "abandonment")).toBe(
         "Both players disconnected. Game ended by abandonment.",
+      );
+    });
+
+    it("formats other win reasons such as timeout", () => {
+      expect(formatGameOverMessage("w", "timeout")).toBe(
+        "White won the match (timeout)!",
+      );
+      expect(formatGameOverMessage("b", "timeout", "Bob")).toBe(
+        "Bob won the match (timeout)!",
       );
     });
 
@@ -79,6 +124,31 @@ describe("GameOver Utilities (MAJ-039)", () => {
 
       expect(payload.durationSeconds).toBe(45);
       expect(payload.message).toBe("Draw by stalemate!");
+    });
+
+    it("calculates duration with Date.now() when nowMs is omitted (Line 92)", () => {
+      const fiveSecondsAgo = Date.now() - 5000;
+      const payload = createGameOverPayload({
+        winner: "w",
+        reason: "checkmate",
+        finalFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        totalMoves: 15,
+        startTimeMs: fiveSecondsAgo,
+      });
+
+      expect(payload.durationSeconds).toBeGreaterThanOrEqual(4);
+      expect(payload.durationSeconds).toBeLessThanOrEqual(6);
+    });
+
+    it("defaults durationSeconds to 1 when both durationSeconds and startTimeMs are omitted", () => {
+      const payload = createGameOverPayload({
+        winner: "b",
+        reason: "resignation",
+        finalFen: "8/8/8/8/8/8/8/8 w - - 0 1",
+        totalMoves: 10,
+      });
+
+      expect(payload.durationSeconds).toBe(1);
     });
 
     it("preserves custom message when supplied", () => {

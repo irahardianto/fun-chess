@@ -1,12 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import http, { Server } from "node:http";
 import net from "node:net";
-import { createHttpServer, resolveDistPath } from "../http_server.js";
-import { MockRoomStore } from "../../../features/rooms/mock_room.store.js";
+import {
+  createHttpServer,
+  resolveDistPath,
+  configureServerTimeouts,
+  sanitizeCorrelationId,
+  extractHttpUserId,
+  handleRateLimitCheck,
+} from "../http_server.js";
+import { MockRoomStore } from "../../../features/rooms/index.js";
 import {
   RelayAddressService,
   MockRelayAddressService,
-} from "../../../features/lan/relay_address.service.js";
+} from "../../../features/lan/index.js";
 import { NullLogger } from "../../logger/null_logger.js";
 import {
   LanInfoResponse,
@@ -299,7 +306,7 @@ describe("createHttpServer", () => {
       l.message.includes("HTTP Static served"),
     );
     expect(staticLog).toBeDefined();
-    expect(staticLog?.context?.["operation"]).toBe("http_static");
+    expect(staticLog?.context?.["operation"]).toBe("http_request");
     expect(staticLog?.context?.["duration"]).toBeTypeOf("number");
   });
 
@@ -521,7 +528,7 @@ describe("createHttpServer", () => {
         const res = await fetch(`http://127.0.0.1:${localAddr.port}/`);
         expect(res.status).toBe(200);
 
-        const staticLog = staticLogger.infoLogs.find((l) => l.operation === "http_static" || l.message === "HTTP Static served");
+        const staticLog = staticLogger.infoLogs.find((l) => l.operation === "http_request" || l.message === "HTTP Static served");
         expect(staticLog).toBeDefined();
         expect(staticLog?.context?.["statusCode"]).toBe(200);
       } finally {
@@ -529,6 +536,413 @@ describe("createHttpServer", () => {
           localServer.close(() => resolve());
         });
       }
+    });
+  });
+
+  describe("server timeouts and error logging (ENH-003, MAJ-013)", () => {
+    it("configures requestTimeout and headersTimeout on the HTTP server (ENH-003)", () => {
+      const mockServer = { requestTimeout: 0, headersTimeout: 0 };
+      configureServerTimeouts(mockServer);
+      expect(mockServer.requestTimeout).toBe(30_000);
+      expect(mockServer.headersTimeout).toBe(35_000);
+    });
+
+    it("configures timeouts automatically via createHttpServer config.server", () => {
+      const dummyServer = { requestTimeout: 0, headersTimeout: 0 };
+      createHttpServer({
+        roomStore: store,
+        relayAddressService: new RelayAddressService({ lanIp: "127.0.0.1", port: 3000 }),
+        logger,
+        port: 3000,
+        server: dummyServer as any,
+      });
+      expect(dummyServer.requestTimeout).toBe(30_000);
+      expect(dummyServer.headersTimeout).toBe(35_000);
+    });
+
+    it("eliminates duplicate error logging on unhandled request errors (MAJ-013)", async () => {
+      const errLogger = new NullLogger();
+      // create a mock route controller that throws
+      const throwingRoomStore = {
+        ...store,
+        count: () => {
+          throw new Error("Simulated unhandled exception");
+        },
+      };
+
+      const handler = createHttpServer({
+        roomStore: throwingRoomStore as any,
+        relayAddressService: new RelayAddressService({ lanIp: "127.0.0.1", port: 3000 }),
+        logger: errLogger,
+        port: 3000,
+      });
+
+      const localServer = http.createServer(handler);
+      await new Promise<void>((resolve) => {
+        localServer.listen(0, "127.0.0.1", resolve);
+      });
+      const localAddr = localServer.address() as { port: number };
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${localAddr.port}/health/detail`);
+        expect(res.status).toBe(500);
+
+        // Check error logs
+        const errorLogs = errLogger.errorLogs.filter((l) => l.context?.["operation"] === "http_request");
+        expect(errorLogs.length).toBe(1);
+        expect(errorLogs[0].context?.["statusCode"]).toBe(500);
+        expect(errorLogs[0].context?.["error"]).toBeDefined();
+
+        // Ensure there is no second log emitted for the error response
+        const totalReqLogs = errLogger.logs.filter(
+          (l) => l.context?.["operation"] === "http_request" && l.message !== "HTTP request received",
+        );
+        expect(totalReqLogs.length).toBe(1);
+      } finally {
+        await new Promise<void>((resolve) => {
+          localServer.close(() => resolve());
+        });
+      }
+    });
+  });
+
+  describe("sanitizeCorrelationId (MAJ-001)", () => {
+    it("preserves valid correlation ID matching allowlist pattern", () => {
+      const valid = "valid-correlation-id-12345";
+      expect(sanitizeCorrelationId(valid)).toBe(valid);
+    });
+
+    it("falls back to generated UUID when ID contains invalid characters", () => {
+      const invalid = "bad id with spaces!";
+      const result = sanitizeCorrelationId(invalid);
+      expect(result).not.toBe(invalid);
+      expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+
+    it("falls back to generated UUID when ID is too short or too long", () => {
+      expect(sanitizeCorrelationId("short")).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(sanitizeCorrelationId("a".repeat(65))).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+
+    it("falls back to generated UUID when header is undefined or empty", () => {
+      expect(sanitizeCorrelationId(undefined)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(sanitizeCorrelationId("")).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+
+    it("handles array header by checking first element", () => {
+      expect(sanitizeCorrelationId(["valid-correlation-id-99999"])).toBe("valid-correlation-id-99999");
+      expect(sanitizeCorrelationId(["invalid id with space"])).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+
+    it("sanitizes incoming x-correlation-id header on HTTP requests", async () => {
+      const validRes = await fetch(`http://127.0.0.1:${port}/healthz`, {
+        headers: { "x-correlation-id": "client-corr-id-12345" },
+      });
+      expect(validRes.headers.get("x-correlation-id")).toBe("client-corr-id-12345");
+
+      const invalidRes = await fetch(`http://127.0.0.1:${port}/healthz`, {
+        headers: { "x-correlation-id": "bad value with spaces!" },
+      });
+      const invalidHeader = invalidRes.headers.get("x-correlation-id");
+      expect(invalidHeader).not.toBe("bad value with spaces!");
+      expect(invalidHeader).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+  });
+
+  describe("Telemetry Authorization Guard (MAJ-002)", () => {
+    it("restricts /metrics and /health/detail for remote IPs in production mode", async () => {
+      const testAuthToken = ["test", "metrics", "token", "1234"].join("-");
+      const authLogger = new NullLogger();
+      const handler = createHttpServer({
+        roomStore: store,
+        relayAddressService: new RelayAddressService({ lanIp: "127.0.0.1", port: 3000 }),
+        logger: authLogger,
+        port: 3000,
+        env: {
+          NODE_ENV: "production",
+          TRUST_PROXY: true,
+          METRICS_SECRET: testAuthToken,
+          CORS_ORIGIN: "https://fun-chess.com",
+        },
+        allowedOrigins: ["https://fun-chess.com"],
+      });
+
+      const authServer = http.createServer(handler);
+      let authPort = 0;
+      await new Promise<void>((resolve) => {
+        authServer.listen(0, "127.0.0.1", () => {
+          authPort = (authServer.address() as net.AddressInfo).port;
+          resolve();
+        });
+      });
+
+      try {
+        // Remote client without secret -> 403 Forbidden
+        const resForbidden = await fetch(`http://127.0.0.1:${authPort}/metrics`, {
+          headers: { "x-forwarded-for": "198.51.100.25" },
+        });
+        expect(resForbidden.status).toBe(403);
+        const forbiddenData = (await resForbidden.json()) as HttpErrorEnvelope;
+        expect(forbiddenData.status).toBe("error");
+        expect(forbiddenData.error.code).toBe("ERR_UNAUTHORIZED");
+
+        // Remote client with x-metrics-secret -> 200 OK
+        const resAuthorizedHeader = await fetch(`http://127.0.0.1:${authPort}/metrics`, {
+          headers: {
+            "x-forwarded-for": "198.51.100.25",
+            "x-metrics-secret": testAuthToken,
+          },
+        });
+        expect(resAuthorizedHeader.status).toBe(200);
+
+        // Remote client with Authorization: Bearer <secret> -> 200 OK
+        const resAuthorizedBearer = await fetch(`http://127.0.0.1:${authPort}/health/detail`, {
+          headers: {
+            "x-forwarded-for": "198.51.100.25",
+            authorization: `Bearer ${testAuthToken}`,
+          },
+        });
+        expect(resAuthorizedBearer.status).toBe(200);
+
+        // Loopback client without secret -> 200 OK
+        const resLoopback = await fetch(`http://127.0.0.1:${authPort}/metrics`, {
+          headers: { "x-forwarded-for": "127.0.0.1" },
+        });
+        expect(resLoopback.status).toBe(200);
+      } finally {
+        await new Promise<void>((resolve) => authServer.close(() => resolve()));
+      }
+    });
+  });
+
+  describe("Health Route Operation Logging (MIN-007)", () => {
+    it("logs specific operations for healthz, health, and telemetry endpoints", async () => {
+      const opLogger = new NullLogger();
+      const handler = createHttpServer({
+        roomStore: store,
+        relayAddressService: new RelayAddressService({ lanIp: "127.0.0.1", port: 3000 }),
+        logger: opLogger,
+        port: 3000,
+      });
+
+      const opServer = http.createServer(handler);
+      let opPort = 0;
+      await new Promise<void>((resolve) => {
+        opServer.listen(0, "127.0.0.1", () => {
+          opPort = (opServer.address() as net.AddressInfo).port;
+          resolve();
+        });
+      });
+
+      try {
+        await fetch(`http://127.0.0.1:${opPort}/healthz`);
+        const healthzLog = opLogger.infoLogs.find(
+          (l) => l.context?.["operation"] === "health_readiness",
+        );
+        expect(healthzLog).toBeDefined();
+
+        await fetch(`http://127.0.0.1:${opPort}/health`);
+        const healthLog = opLogger.infoLogs.find(
+          (l) => l.context?.["operation"] === "health_liveness",
+        );
+        expect(healthLog).toBeDefined();
+
+        await fetch(`http://127.0.0.1:${opPort}/metrics`);
+        const telemetryLog = opLogger.infoLogs.find(
+          (l) => l.context?.["operation"] === "health_telemetry",
+        );
+        expect(telemetryLog).toBeDefined();
+      } finally {
+        await new Promise<void>((resolve) => opServer.close(() => resolve()));
+      }
+    });
+  });
+
+  describe("Rate Limiting Duration Logging (MIN-008)", () => {
+    it("records duration and durationMs when rate limit is exceeded", async () => {
+      const { HttpRateLimiter } = await import("../http_rate_limiter.js");
+      const rlLogger = new NullLogger();
+      const handler = createHttpServer({
+        roomStore: store,
+        relayAddressService: new RelayAddressService({ lanIp: "127.0.0.1", port: 3000 }),
+        logger: rlLogger,
+        rateLimiter: new HttpRateLimiter({
+          maxRequests: 1,
+          windowMs: 10_000,
+        }),
+      });
+
+      const rlServer = http.createServer(handler);
+      let rlPort = 0;
+      await new Promise<void>((resolve) => {
+        rlServer.listen(0, "127.0.0.1", () => {
+          rlPort = (rlServer.address() as net.AddressInfo).port;
+          resolve();
+        });
+      });
+
+      try {
+        await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
+        const res2 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
+        expect(res2.status).toBe(429);
+
+        const rateLimitLog = rlLogger.warnLogs.find(
+          (l) => l.context?.["operation"] === "http_rate_limited",
+        );
+        expect(rateLimitLog).toBeDefined();
+        expect(typeof rateLimitLog?.context?.["duration"]).toBe("number");
+        expect(typeof rateLimitLog?.context?.["durationMs"]).toBe("number");
+      } finally {
+        await new Promise<void>((resolve) => rlServer.close(() => resolve()));
+      }
+    });
+
+    it("extracts userId from request headers or query parameters (ENH-008)", () => {
+      const dummyReq1 = {
+        headers: { "x-user-id": "user-from-header" },
+      } as unknown as http.IncomingMessage;
+      expect(extractHttpUserId(dummyReq1)).toBe("user-from-header");
+
+      const dummyReq2 = {
+        headers: { "x-player-id": "player-from-header" },
+      } as unknown as http.IncomingMessage;
+      expect(extractHttpUserId(dummyReq2)).toBe("player-from-header");
+
+      const dummyReq3 = {
+        headers: { "x-session-token": "session-token-val" },
+      } as unknown as http.IncomingMessage;
+      expect(extractHttpUserId(dummyReq3)).toBe("session-token-val");
+
+      const dummyReq4 = {
+        headers: {},
+        url: "/api/lan-info?userId=query-user-123",
+      } as unknown as http.IncomingMessage;
+      expect(extractHttpUserId(dummyReq4)).toBe("query-user-123");
+
+      const dummyReq5 = {
+        headers: {},
+        url: "/api/lan-info?playerId=query-player-456",
+      } as unknown as http.IncomingMessage;
+      expect(extractHttpUserId(dummyReq5)).toBe("query-player-456");
+
+      const dummyReq6 = {
+        headers: {},
+        url: "/api/lan-info?sessionToken=query-session-789",
+      } as unknown as http.IncomingMessage;
+      expect(extractHttpUserId(dummyReq6)).toBe("query-session-789");
+
+      const dummyReq7 = {
+        headers: {},
+        url: "/api/lan-info",
+      } as unknown as http.IncomingMessage;
+      expect(extractHttpUserId(dummyReq7)).toBeUndefined();
+    });
+
+    it("includes optional userId in http_rate_limited log record when request includes user identification (ENH-008)", async () => {
+      const { HttpRateLimiter } = await import("../http_rate_limiter.js");
+      const rlLogger = new NullLogger();
+      const handler = createHttpServer({
+        roomStore: store,
+        relayAddressService: new RelayAddressService({ lanIp: "127.0.0.1", port: 3000 }),
+        logger: rlLogger,
+        rateLimiter: new HttpRateLimiter({
+          maxRequests: 1,
+          windowMs: 10_000,
+        }),
+      });
+
+      const rlServer = http.createServer(handler);
+      let rlPort = 0;
+      await new Promise<void>((resolve) => {
+        rlServer.listen(0, "127.0.0.1", () => {
+          rlPort = (rlServer.address() as net.AddressInfo).port;
+          resolve();
+        });
+      });
+
+      try {
+        await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`, {
+          headers: { "x-user-id": "user-ratelimited-123" },
+        });
+        const res2 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`, {
+          headers: { "x-user-id": "user-ratelimited-123" },
+        });
+        expect(res2.status).toBe(429);
+
+        const rateLimitLog = rlLogger.warnLogs.find(
+          (l) => l.context?.["operation"] === "http_rate_limited",
+        );
+        expect(rateLimitLog).toBeDefined();
+        expect(rateLimitLog?.context?.["userId"]).toBe("user-ratelimited-123");
+      } finally {
+        await new Promise<void>((resolve) => rlServer.close(() => resolve()));
+      }
+    });
+
+    it("omits userId from http_rate_limited log record when request does not provide user identification (ENH-008)", () => {
+      const rlLogger = new NullLogger();
+      let capturedStatus = 0;
+      let capturedData: unknown;
+      const sendJsonResponse = (status: number, data: unknown) => {
+        capturedStatus = status;
+        capturedData = data;
+      };
+
+      const rateLimiter = {
+        consume: () => false,
+        getLimitDescription: () => "Limit reached",
+      } as unknown as import("../http_rate_limiter.js").HttpRateLimiter;
+
+      const blocked = handleRateLimitCheck(
+        "127.0.0.1",
+        "/api/lan-info",
+        "GET",
+        "corr-123",
+        rateLimiter,
+        { roomStore: store, logger: rlLogger },
+        rlLogger,
+        sendJsonResponse,
+        100,
+        undefined,
+      );
+
+      expect(blocked).toBe(true);
+      expect(capturedStatus).toBe(429);
+      expect(capturedData).toBeDefined();
+
+      const rateLimitLog = rlLogger.warnLogs.find(
+        (l) => l.context?.["operation"] === "http_rate_limited",
+      );
+      expect(rateLimitLog).toBeDefined();
+      expect(rateLimitLog?.context).not.toHaveProperty("userId");
+    });
+  });
+
+  describe("Deprecated lanService logging (MIN-022)", () => {
+    it("logs a deprecation warning if lanService is supplied without relayAddressService", () => {
+      const depLogger = new NullLogger();
+      const mockLanService = {
+        getAddressingInfo: () => ({
+          lanIp: "127.0.0.1",
+          port: 3000,
+          localUrl: "http://localhost:3000",
+          joinUrl: "http://127.0.0.1:3000",
+          interfaces: ["127.0.0.1"],
+          relayMode: "lan" as const,
+          isCloudRelay: false,
+        }),
+      };
+
+      createHttpServer({
+        roomStore: store,
+        lanService: mockLanService,
+        logger: depLogger,
+      });
+
+      const warnLog = depLogger.warnLogs.find(
+        (l) => l.context?.["operation"] === "http_server_init" && l.message.includes("lanService is deprecated"),
+      );
+      expect(warnLog).toBeDefined();
     });
   });
 });

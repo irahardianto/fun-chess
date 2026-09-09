@@ -57,12 +57,15 @@ import {
   useSocketTransport,
   registerSocketEventListener,
 } from './useSocketTransport';
+import { useNotification } from '@/components/layout';
 import {
-  useRoomSession,
+  currentRoom,
+  currentPlayer,
+  sessionToken,
   createValidationError,
   getSavedSession,
   saveSession,
-} from './useRoomSession';
+} from './room_session_state';
 
 export type OpponentMoveCallback = (data: { move: MoveResult; gameState: GameState }) => void;
 
@@ -75,11 +78,6 @@ const lastGameOver = ref<GameOverPayload | null>(null);
 const kingInCheck = ref<{ inCheck: PieceColor; kingSquare: string } | null>(null);
 const lastMoveEvent = shallowRef<{ move: MoveResult; gameState: GameState } | null>(null);
 const opponentMoveListeners = new Set<OpponentMoveCallback>();
-
-/**
- * Derived reactive in-game states from RoomSession
- */
-const { currentRoom, currentPlayer, sessionToken } = useRoomSession();
 
 const gameState: ComputedRef<GameState | null> = computed(() => {
   return currentRoom.value?.game ?? null;
@@ -159,6 +157,7 @@ function handleGameDrawOffered(data: { fromPlayerId: string; fromPlayerName: str
 
 function handleGameDrawDeclined() {
   drawOfferedBy.value = null;
+  useNotification().showNotification('Opponent declined your draw offer', 'info');
 }
 
 function handleGameRematchRequested(data: { requestedBy: string; requesterName: string }) {
@@ -324,7 +323,7 @@ export async function executeSocketAction<
     onSettled,
   } = options;
 
-  logger.debug(startLogMessage, {
+  logger.info(startLogMessage, {
     operation,
     correlationId,
     ...(startLogContext ?? (typeof rawPayload === 'object' && rawPayload !== null ? (rawPayload as Record<string, unknown>) : {})),
@@ -589,6 +588,12 @@ export function declineRematch(
   respondRematch(roomCode, false, callback);
 }
 
+let leaveRoomResolver: ((roomCode: string, callback?: (res: { success: boolean }) => void) => Promise<boolean>) | null = null;
+
+export function setLeaveRoomResolver(resolver: typeof leaveRoomResolver): void {
+  leaveRoomResolver = resolver;
+}
+
 /**
  * Leaves the active multiplayer room, delegating to useRoomSession.
  */
@@ -596,20 +601,27 @@ export async function leaveRoom(
   roomCode: string,
   callback?: (res: { success: boolean }) => void
 ): Promise<boolean> {
-  const { leaveRoom: sessionLeaveRoom } = useRoomSession();
+  if (leaveRoomResolver) {
+    return leaveRoomResolver(roomCode, callback);
+  }
+  const { leaveRoom: sessionLeaveRoom } = await import('./useRoomSession');
   return sessionLeaveRoom(roomCode, callback);
 }
 
 /**
  * Resets in-game reactive states and subscribers.
+ * Defaults to preserving external subscribers (like audio listeners) across match resets,
+ * while allowing complete teardown for test isolation.
  */
-export function resetGameActionsState(): void {
+export function resetGameActionsState(preserveSubscribers = true): void {
   drawOfferedBy.value = null;
   rematchRequestedBy.value = null;
   lastGameOver.value = null;
   kingInCheck.value = null;
   lastMoveEvent.value = null;
-  opponentMoveListeners.clear();
+  if (!preserveSubscribers) {
+    opponentMoveListeners.clear();
+  }
   customLogger = null;
   initGameActionsListeners();
 }
@@ -644,6 +656,7 @@ export function useGameActions(options?: { logger?: ILogger }) {
     acceptRematch,
     declineRematch,
     leaveRoom,
+    setLeaveRoomResolver,
     resetGameActionsState,
     initGameActionsListeners,
   };

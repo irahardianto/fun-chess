@@ -11,8 +11,9 @@ import {
   PinoLogger,
   type Logger,
   runLoggedJob,
+  defaultLogger,
 } from "./platform/logger/index.js";
-import { createHttpServer } from "./platform/http/index.js";
+import { createHttpServer, type HttpRateLimiter } from "./platform/http/index.js";
 import {
   createSocketServer,
   createSocketRateLimiter,
@@ -31,9 +32,11 @@ import type { IClock, IIdGenerator } from "@fun-chess/shared";
 import {
   InMemoryRoomStore,
   type RoomStore,
+  MAX_ROOMS,
   RoomService,
+  type IRoomService,
   clearAllDisconnectTimers,
-  defaultDisconnectTimerRegistry,
+  DisconnectTimerRegistry,
   type IDisconnectTimerRegistry,
   registerRoomSocketHandlers,
   handleSocketDisconnect,
@@ -42,9 +45,13 @@ import {
 } from "./features/rooms/index.js";
 import {
   GameService,
+  type IGameService,
   registerGameSocketHandlers,
 } from "./features/game/index.js";
-import { RelayAddressService } from "./features/lan/index.js";
+import {
+  RelayAddressService,
+  type IRelayAddressService,
+} from "./features/lan/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,6 +69,11 @@ export interface StartServerOptions {
   autoListen?: boolean;
   timerRegistry?: IDisconnectTimerRegistry;
   onExit?: (code: number) => void;
+  relayAddressService?: IRelayAddressService;
+  allowedOrigins?: string[];
+  httpRateLimiter?: HttpRateLimiter;
+  socketRateLimiter?: SocketRateLimiter;
+  roomCreateRateLimiter?: SocketRateLimiter;
 }
 
 export interface ServerInstance {
@@ -69,9 +81,12 @@ export interface ServerInstance {
   io: TypedSocketServer;
   shutdownCoordinator: ShutdownCoordinator;
   roomStore: RoomStore;
-  roomService: RoomService;
-  gameService: GameService;
+  roomService: IRoomService;
+  gameService: IGameService;
   sessionRegistry: SessionRegistry;
+  relayAddressService: IRelayAddressService;
+  timerRegistry: IDisconnectTimerRegistry;
+  logger: Logger;
   rateLimiter: SocketRateLimiter;
   roomCreateRateLimiter: SocketRateLimiter;
   config: ServerEnv;
@@ -86,9 +101,9 @@ export interface DomainServices {
   clock: IClock;
   idGenerator: IIdGenerator;
   sessionRegistry: SessionRegistry;
-  roomService: RoomService;
-  gameService: GameService;
-  relayAddressService: RelayAddressService;
+  roomService: IRoomService;
+  gameService: IGameService;
+  relayAddressService: IRelayAddressService;
 }
 
 /**
@@ -100,28 +115,44 @@ export function setupDomainServices(
   port: number,
   logger?: Logger,
 ): DomainServices {
-  const timerRegistry = options.timerRegistry ?? defaultDisconnectTimerRegistry;
+  const resolvedLogger = logger ?? options.logger ?? defaultLogger;
+  const timerRegistry = options.timerRegistry ?? new DisconnectTimerRegistry();
   const clock = options.clock ?? new SystemClock();
   const idGenerator = options.idGenerator ?? new UuidGenerator();
   const sessionRegistry =
     options.sessionRegistry ?? new InMemorySessionRegistry(clock, idGenerator);
-  const roomStore = options.roomStore ?? new InMemoryRoomStore(clock, idGenerator, logger);
+  const roomStore =
+    options.roomStore ??
+    new InMemoryRoomStore({
+      clock,
+      logger: resolvedLogger,
+      maxRooms: MAX_ROOMS,
+      maxCancelledTickets: 5_000,
+    });
   const roomService = new RoomService(
     roomStore,
     sessionRegistry,
     clock,
     idGenerator,
     timerRegistry,
-    logger,
+    resolvedLogger,
   );
-  const gameService = new GameService(roomService, clock, idGenerator, sessionRegistry);
-  const relayAddressService = new RelayAddressService({
-    publicUrl: env.PUBLIC_URL,
-    host: env.HOST,
-    port,
-    lanIp: env.LAN_IP,
-    hostIp: env.HOST_IP,
-  });
+  const gameService = new GameService(
+    roomService,
+    clock,
+    idGenerator,
+    resolvedLogger,
+    sessionRegistry,
+  );
+  const relayAddressService =
+    options.relayAddressService ??
+    new RelayAddressService({
+      publicUrl: env.PUBLIC_URL,
+      host: env.HOST,
+      port,
+      lanIp: env.LAN_IP,
+      hostIp: env.HOST_IP,
+    });
 
   return {
     timerRegistry,
@@ -146,7 +177,7 @@ export function setupSocketGateway(
   logger: Logger,
   roomCreateRateLimiter?: SocketRateLimiter,
 ): void {
-  const { roomService, gameService, timerRegistry, sessionRegistry } = domainServices;
+  const { roomService, gameService, timerRegistry } = domainServices;
 
   io.on("connection", (socket) => {
     socket.data = socket.data || {};
@@ -192,13 +223,13 @@ export function setupSocketGateway(
       logger,
       rateLimiter,
       timerRegistry,
-      sessionRegistry,
       env.TRUST_PROXY,
     );
 
     // Wrap async disconnect listener in try/catch with structured error log
     socket.on("disconnect", async (reason) => {
       const disconnectCorrelationId = randomUUID();
+      const startTime = performance.now();
       logger.info("Client socket disconnected", {
         operation: "socket_disconnected",
         correlationId: disconnectCorrelationId,
@@ -217,12 +248,26 @@ export function setupSocketGateway(
           timerRegistry,
           disconnectCorrelationId,
         );
-      } catch (err: unknown) {
-        logger.error("Client socket disconnect handler failed", {
-          operation: "socket_disconnect_error",
+        const duration = Math.round(performance.now() - startTime);
+        logger.info("Client socket disconnect handler completed", {
+          operation: "socket_disconnected",
           correlationId: disconnectCorrelationId,
           socketId: socket.id,
           reason,
+          duration,
+          durationMs: duration,
+          status: "success",
+        });
+      } catch (err: unknown) {
+        const duration = Math.round(performance.now() - startTime);
+        logger.error("Client socket disconnect handler failed", {
+          operation: "socket_disconnected",
+          status: "failed",
+          correlationId: disconnectCorrelationId,
+          socketId: socket.id,
+          reason,
+          duration,
+          durationMs: duration,
           error:
             err instanceof Error
               ? { name: err.name, message: err.message, stack: err.stack }
@@ -237,7 +282,7 @@ export function setupSocketGateway(
  * Sets up periodic room and session cleanup tasks with structured logging (MAJ-031).
  */
 export function setupBackgroundJobs(
-  roomService: RoomService,
+  roomService: IRoomService,
   logger: Logger,
 ): NodeJS.Timeout {
   const cleanupInterval = setInterval(
@@ -284,7 +329,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
   }
 
   const env: ServerEnv = validateServerConfig(rawMerged);
-  const allowedOrigins = resolveAllowedOrigins(env);
+  const allowedOrigins = options.allowedOrigins ?? resolveAllowedOrigins(env);
 
   const logger =
     options.logger ??
@@ -325,6 +370,8 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     distPath,
     allowedOrigins,
     env,
+    metricsSecret: env.METRICS_SECRET,
+    rateLimiter: options.httpRateLimiter,
     getActiveSocketCount: () => (ioRef.current ? ioRef.current.sockets.sockets.size : 0),
   });
 
@@ -344,18 +391,22 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
   ioRef.current = io;
 
   // Shared Socket Rate Limiter singleton (SEC-HIGH-001, MAJ-001, MAJ-003, MAJ-015)
-  const rateLimiter = createSocketRateLimiter({
-    maxKeys: env.RATE_LIMIT_MAX_KEYS ?? 10_000,
-    windowMs: env.RATE_LIMIT_WINDOW_MS ?? 10_000,
-    maxRequests: env.RATE_LIMIT_MAX_REQUESTS ?? (env.NODE_ENV === "production" ? 60 : 1000),
-    logger,
-  });
+  const rateLimiter =
+    options.socketRateLimiter ??
+    createSocketRateLimiter({
+      maxKeys: env.RATE_LIMIT_MAX_KEYS ?? 10_000,
+      windowMs: env.RATE_LIMIT_WINDOW_MS ?? 10_000,
+      maxRequests: env.RATE_LIMIT_MAX_REQUESTS ?? (env.NODE_ENV === "production" ? 60 : 1000),
+      logger,
+    });
 
-  const roomCreateRateLimiter = createSocketRateLimiter({
-    maxRequests: env.RATE_LIMIT_ROOM_CREATE_MAX,
-    windowMs: 60_000,
-    logger,
-  });
+  const roomCreateRateLimiter =
+    options.roomCreateRateLimiter ??
+    createSocketRateLimiter({
+      maxRequests: env.RATE_LIMIT_ROOM_CREATE_MAX,
+      windowMs: 60_000,
+      logger,
+    });
 
   // 5. Register Feature Socket Ingress Handlers & Transport Error Logging (MAJ-031)
   setupSocketGateway(io, domainServices, rateLimiter, env, logger, roomCreateRateLimiter);
@@ -381,6 +432,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
         clearAllDisconnectTimers();
       },
       () => {
+        options.httpRateLimiter?.destroy();
         rateLimiter.destroy();
         roomCreateRateLimiter.destroy();
       },
@@ -481,6 +533,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
         clearInterval(cleanupInterval);
         timerRegistry.clear();
         clearAllDisconnectTimers();
+        options.httpRateLimiter?.destroy();
         rateLimiter.destroy();
         roomCreateRateLimiter.destroy();
         shutdownCoordinator.dispose();
@@ -559,6 +612,9 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     roomService,
     gameService,
     sessionRegistry: domainServices.sessionRegistry,
+    relayAddressService: domainServices.relayAddressService,
+    timerRegistry,
+    logger,
     rateLimiter,
     roomCreateRateLimiter,
     config: env,
@@ -566,6 +622,31 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     url: boundUrl,
     close,
   };
+}
+
+export const FALLBACK_LOG_LEVELS = [
+  "fatal",
+  "error",
+  "warn",
+  "info",
+  "debug",
+  "trace",
+] as const;
+
+export type FallbackLogLevel = (typeof FALLBACK_LOG_LEVELS)[number];
+
+/**
+ * Safely parses and validates an unknown log level string against the allowed log levels.
+ * Returns the matching FallbackLogLevel or defaults to "info" on invalid or missing values (ENH-001).
+ */
+export function parseFallbackLogLevel(rawLevel: unknown): FallbackLogLevel {
+  if (typeof rawLevel !== "string") {
+    return "info";
+  }
+  const normalized = rawLevel.trim().toLowerCase();
+  return (FALLBACK_LOG_LEVELS as readonly string[]).includes(normalized)
+    ? (normalized as FallbackLogLevel)
+    : "info";
 }
 
 // Auto-start if executed directly via node or CLI
@@ -576,13 +657,7 @@ const isMain =
 if (isMain) {
   startServer().catch((err) => {
     const bootstrapCorrelationId = randomUUID();
-    const rawLogLevel = process.env.LOG_LEVEL;
-    const validLogLevels = ["trace", "debug", "info", "warn", "error", "fatal"] as const;
-    type LogLevelType = (typeof validLogLevels)[number];
-    const safeLogLevel: LogLevelType =
-      typeof rawLogLevel === "string" && (validLogLevels as readonly string[]).includes(rawLogLevel.toLowerCase())
-        ? (rawLogLevel.toLowerCase() as LogLevelType)
-        : "info";
+    const safeLogLevel = parseFallbackLogLevel(process.env.LOG_LEVEL);
     const fallbackLogger = new PinoLogger({
       level: safeLogLevel,
     });

@@ -53,7 +53,7 @@ describe('useSocket reactive ref synchronization across multiple instances (MAJ-
     expect(instanceA.kingInCheck).toBe(instanceB.kingInCheck);
   });
 
-  it('synchronizes room:joined event across all instances', () => {
+  it('synchronizes room:player_joined event across all instances', () => {
     const instanceA = useSocket(mockSocket);
     const instanceB = useSocket();
 
@@ -79,7 +79,7 @@ describe('useSocket reactive ref synchronization across multiple instances (MAJ-
     };
 
     // Simulate incoming socket event
-    eventHandlers['room:joined'](mockRoom);
+    eventHandlers['room:player_joined']({ player: mockRoom.whitePlayer!, room: mockRoom });
 
     expect(instanceA.currentRoom.value?.roomCode).toBe('SYNC');
     expect(instanceB.currentRoom.value?.roomCode).toBe('SYNC');

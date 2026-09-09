@@ -268,5 +268,6 @@ function handlePlay() {
 
 .scenario-play-btn {
   min-width: 80px;
+  min-height: 44px;
 }
 </style>

@@ -79,112 +79,132 @@ export class ShutdownCoordinator {
     this.isShuttingDown = true;
     const corrId = correlationId ?? randomUUID();
     const startTime = performance.now();
+    let exitCode = 0;
+    let exitTriggered = false;
+
+    const triggerExit = (code: number) => {
+      if (!exitTriggered) {
+        exitTriggered = true;
+        this.onExit(code);
+      }
+    };
 
     this.logger.info("Shutdown signal received, initiating graceful shutdown", {
       operation: "server_shutdown",
       correlationId: corrId,
       signal,
+      status: "started",
     });
-
-    // 1. Clear background interval
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = undefined;
-    }
-
-    // 2. Run additional cleanup tasks (e.g. clear disconnect timers)
-    for (const cleanup of this.additionalCleanups) {
-      try {
-        await cleanup();
-      } catch (err) {
-        this.logger.error("Error during shutdown cleanup task", {
-          operation: "shutdown_cleanup_error",
-          correlationId: corrId,
-          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
-        });
-      }
-    }
-
-    // 3. Set force exit timer in case sockets or server hang
-    const timeoutPromise = new Promise<"timeout">((resolve) => {
-      this.forceExitTimer = setTimeout(() => {
-        const duration = Math.round(performance.now() - startTime);
-        this.logFatal("Forced shutdown due to timeout waiting for connections to close.", {
-          operation: "server_shutdown_timeout",
-          correlationId: corrId,
-          timeoutMs: this.timeoutMs,
-          duration,
-          durationMs: duration,
-        });
-        this.onExit(1);
-        resolve("timeout");
-      }, this.timeoutMs);
-
-      if (typeof this.forceExitTimer.unref === "function") {
-        this.forceExitTimer.unref();
-      }
-    });
-
-    // 4. Disconnect all sockets and close idle/all connections before closing (MAJ-010)
-    if (typeof this.io.disconnectSockets === "function") {
-      this.io.disconnectSockets(true);
-    }
-    const serverWithControl = this.server as unknown as HttpServerWithConnectionControl;
-    if (typeof serverWithControl.closeIdleConnections === "function") {
-      serverWithControl.closeIdleConnections();
-    }
-    if (typeof serverWithControl.closeAllConnections === "function") {
-      serverWithControl.closeAllConnections();
-    }
-
-    // 5. Close Socket.io server and HTTP server concurrently
-    const closeServers = Promise.all([
-      new Promise<void>((resolve, reject) => {
-        this.io.close((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      }),
-      new Promise<void>((resolve, reject) => {
-        this.server.close((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      }),
-    ]);
 
     try {
-      const outcome = await Promise.race([closeServers.then(() => "ok" as const), timeoutPromise]);
-
-      if (this.forceExitTimer) {
-        clearTimeout(this.forceExitTimer);
+      // 1. Clear background interval
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+        this.cleanupInterval = undefined;
       }
+
+      // 2. Run additional cleanup tasks in isolated try/catch blocks (MAJ-002)
+      for (const cleanup of this.additionalCleanups) {
+        try {
+          await cleanup();
+        } catch (err) {
+          this.logger.error("Error during shutdown cleanup task", {
+            operation: "server_shutdown",
+            status: "cleanup_error",
+            correlationId: corrId,
+            error:
+              err instanceof Error
+                ? { name: err.name, message: err.message, stack: err.stack }
+                : { raw: err },
+          });
+        }
+      }
+
+      // 3. Set force exit timer in case sockets or server hang
+      const timeoutPromise = new Promise<"timeout">((resolve) => {
+        this.forceExitTimer = setTimeout(() => {
+          const duration = Math.round(performance.now() - startTime);
+          this.logFatal("Forced shutdown due to timeout waiting for connections to close.", {
+            operation: "server_shutdown",
+            status: "timeout",
+            correlationId: corrId,
+            timeoutMs: this.timeoutMs,
+            duration,
+            durationMs: duration,
+          });
+          exitCode = 1;
+          triggerExit(1);
+          resolve("timeout");
+        }, this.timeoutMs);
+
+        if (typeof this.forceExitTimer.unref === "function") {
+          this.forceExitTimer.unref();
+        }
+      });
+
+      // 4. Disconnect all sockets and close idle/all connections before closing (MAJ-010)
+      if (typeof this.io.disconnectSockets === "function") {
+        this.io.disconnectSockets(true);
+      }
+      const serverWithControl = this.server as unknown as HttpServerWithConnectionControl;
+      if (typeof serverWithControl.closeIdleConnections === "function") {
+        serverWithControl.closeIdleConnections();
+      }
+      if (typeof serverWithControl.closeAllConnections === "function") {
+        serverWithControl.closeAllConnections();
+      }
+
+      // 5. Close Socket.io server and HTTP server concurrently
+      const closeServers = Promise.all([
+        new Promise<void>((resolve, reject) => {
+          this.io.close((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        }),
+        new Promise<void>((resolve, reject) => {
+          this.server.close((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        }),
+      ]);
+
+      const outcome = await Promise.race([closeServers.then(() => "ok" as const), timeoutPromise]);
 
       if (outcome === "ok") {
         const duration = Math.round(performance.now() - startTime);
         this.logger.info("Fun Chess server closed successfully.", {
-          operation: "server_shutdown_complete",
+          operation: "server_shutdown",
+          status: "completed",
           correlationId: corrId,
           duration,
           durationMs: duration,
         });
-        this.onExit(0);
+        exitCode = 0;
+      } else {
+        exitCode = 1;
       }
     } catch (err) {
-      if (this.forceExitTimer) {
-        clearTimeout(this.forceExitTimer);
-      }
-
+      exitCode = 1;
       const duration = Math.round(performance.now() - startTime);
       this.logFatal("Error closing server during shutdown", {
-        operation: "server_shutdown_error",
+        operation: "server_shutdown",
+        status: "error",
         correlationId: corrId,
         duration,
         durationMs: duration,
-        error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message, stack: err.stack }
+            : { raw: err },
       });
-
-      this.onExit(1);
+    } finally {
+      if (this.forceExitTimer) {
+        clearTimeout(this.forceExitTimer);
+        this.forceExitTimer = undefined;
+      }
+      triggerExit(exitCode);
     }
   }
 
@@ -204,14 +224,16 @@ export class ShutdownCoordinator {
     };
 
     this.unhandledRejectionHandler = (reason: unknown) => {
+      const correlationId = randomUUID();
       this.logger.error("Unhandled promise rejection", {
         operation: "unhandled_rejection",
-        correlationId: randomUUID(),
+        correlationId,
         error:
           reason instanceof Error
             ? { name: reason.name, message: reason.message, stack: reason.stack }
             : { raw: reason },
       });
+      void this.shutdown("unhandledRejection", correlationId);
     };
 
     this.uncaughtExceptionHandler = (err: Error) => {

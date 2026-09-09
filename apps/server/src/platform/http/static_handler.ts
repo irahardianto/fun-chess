@@ -1,7 +1,6 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
-import { defaultLogger } from "../logger/index.js";
 import { IFileStorage, NodeFileStorage } from "./file_storage.js";
 import { extractClientIp } from "./ip_utils.js";
 
@@ -43,7 +42,12 @@ export { extractClientIp };
  * Checks for path traversal sequences, URL encoding bypasses (%2e%2e),
  * null byte injections (%00, \0), and directory escape boundaries (CRIT-008, MAJ-034).
  */
-export function checkPathTraversal(rootDir: string, urlPath: string): boolean {
+export function checkPathTraversal(
+  rootDir: string,
+  urlPath: string,
+  logger?: Logger,
+  clientIp?: string,
+): boolean {
   if (urlPath.includes("\0") || urlPath.toLowerCase().includes("%00")) {
     return true;
   }
@@ -54,18 +58,20 @@ export function checkPathTraversal(rootDir: string, urlPath: string): boolean {
     let decoded = decodeURIComponent(urlPath);
     try {
       decoded = decodeURIComponent(decoded);
-    } catch (err) {
-      defaultLogger.debug("Secondary URI decoding failed during traversal check", {
-        operation: "check_path_traversal",
-        urlPath,
-        error: err instanceof Error ? err.message : String(err),
+    } catch (secErr) {
+      logger?.warn("Malformed URI component in secondary decode", {
+        operation: "static_serve_decode_error",
+        path: urlPath,
+        clientIp,
+        error: secErr instanceof Error ? secErr.message : String(secErr),
       });
     }
     decodedPath = decoded;
   } catch (err) {
-    defaultLogger.debug("Initial URI decoding failed during traversal check", {
-      operation: "check_path_traversal",
-      urlPath,
+    logger?.warn("Malformed URI component in static path request", {
+      operation: "static_serve_decode_error",
+      path: urlPath,
+      clientIp,
       error: err instanceof Error ? err.message : String(err),
     });
     decodedPath = urlPath;
@@ -95,8 +101,10 @@ export function checkPathTraversal(rootDir: string, urlPath: string): boolean {
 export function resolveCandidatePath(
   rootDir: string,
   urlPath: string,
+  logger?: Logger,
+  clientIp?: string,
 ): { sanitizedPath: string; targetFilePath: string; isTraversal: boolean } {
-  const isTraversal = checkPathTraversal(rootDir, urlPath);
+  const isTraversal = checkPathTraversal(rootDir, urlPath, logger, clientIp);
   const sanitizedPath = path.normalize(urlPath);
   const targetFilePath = path.join(
     rootDir,
@@ -173,12 +181,26 @@ function handleNotFound(
   res: ServerResponse,
   isHead: boolean,
   message = "Not Found",
+  correlationId?: string,
 ): boolean {
-  res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+  const errorEnvelope = {
+    status: "error",
+    code: 404,
+    error: {
+      code: "ERR_NOT_FOUND",
+      message,
+      ...(correlationId ? { correlationId } : {}),
+    },
+  };
+  const body = JSON.stringify(errorEnvelope);
+  res.writeHead(404, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(body),
+  });
   if (isHead) {
     res.end();
   } else {
-    res.end(message);
+    res.end(body);
   }
   return true;
 }
@@ -215,8 +237,15 @@ async function resolveTargetFile(
       return { status: "not_found" };
     }
 
-    if (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader) {
-      return { status: "ready", targetFilePath: path.join(rootDir, "index.html") };
+    if (
+      acceptHeader.includes("text/html") ||
+      acceptHeader.includes("*/*") ||
+      !acceptHeader
+    ) {
+      return {
+        status: "ready",
+        targetFilePath: path.join(rootDir, "index.html"),
+      };
     }
 
     return { status: "not_found" };
@@ -243,7 +272,9 @@ async function verifyCanonicalPath(
     const isInsideRoot =
       canonicalTarget === canonicalRoot ||
       canonicalTarget.startsWith(
-        canonicalRoot.endsWith(path.sep) ? canonicalRoot : canonicalRoot + path.sep,
+        canonicalRoot.endsWith(path.sep)
+          ? canonicalRoot
+          : canonicalRoot + path.sep,
       );
 
     if (!isInsideRoot) {
@@ -262,7 +293,12 @@ async function verifyCanonicalPath(
 function sendFallbackOrMiss(
   res: ServerResponse,
   options: StaticFileHandlerOptions,
-  context: { urlPath: string; isHead: boolean; correlationId?: string; acceptHeader: string },
+  context: {
+    urlPath: string;
+    isHead: boolean;
+    correlationId?: string;
+    acceptHeader: string;
+  },
   targetFilePath: string,
   readError: unknown,
   logger?: Logger,
@@ -273,10 +309,18 @@ function sendFallbackOrMiss(
   if (
     options.fallbackHtml &&
     !ext &&
-    (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader)
+    (acceptHeader.includes("text/html") ||
+      acceptHeader.includes("*/*") ||
+      !acceptHeader)
   ) {
     try {
-      sendAssetResponse(res, options.fallbackHtml, "text/html; charset=utf-8", true, isHead);
+      sendAssetResponse(
+        res,
+        options.fallbackHtml,
+        "text/html; charset=utf-8",
+        true,
+        isHead,
+      );
       return true;
     } catch (fallbackErr: unknown) {
       logger?.error("Failed to send fallback HTML response", {
@@ -307,7 +351,12 @@ async function readAndSendStaticFile(
   fileStorage: IFileStorage,
   targetFilePath: string,
   options: StaticFileHandlerOptions,
-  context: { urlPath: string; isHead: boolean; correlationId?: string; acceptHeader: string },
+  context: {
+    urlPath: string;
+    isHead: boolean;
+    correlationId?: string;
+    acceptHeader: string;
+  },
   logger?: Logger,
 ): Promise<boolean> {
   const { urlPath, isHead, correlationId } = context;
@@ -328,7 +377,11 @@ async function readAndSendStaticFile(
         path: urlPath,
         error:
           sendErr instanceof Error
-            ? { name: sendErr.name, message: sendErr.message, stack: sendErr.stack }
+            ? {
+                name: sendErr.name,
+                message: sendErr.message,
+                stack: sendErr.stack,
+              }
             : { raw: sendErr },
       });
       return handleServerError(res, isHead);
@@ -349,7 +402,14 @@ async function readAndSendStaticFile(
       return handleServerError(res, isHead);
     }
 
-    return sendFallbackOrMiss(res, options, context, targetFilePath, err, logger);
+    return sendFallbackOrMiss(
+      res,
+      options,
+      context,
+      targetFilePath,
+      err,
+      logger,
+    );
   }
 }
 
@@ -373,13 +433,17 @@ export async function serveStaticFile(
   const rootDir = path.resolve(options.distPath);
   const clientIp = extractClientIp(
     req,
-    options.trustProxy ?? (!req.socket && Boolean(req.headers?.["x-forwarded-for"])),
+    options.trustProxy ??
+      (!req.socket && Boolean(req.headers?.["x-forwarded-for"])),
   );
   const correlationId = options.correlationId;
 
   // 1. Path Traversal Guard (SEC-HIGH-002, CRIT-008, MAJ-034)
-  const { sanitizedPath, targetFilePath: initialTarget, isTraversal } =
-    resolveCandidatePath(rootDir, urlPath);
+  const {
+    sanitizedPath,
+    targetFilePath: initialTarget,
+    isTraversal,
+  } = resolveCandidatePath(rootDir, urlPath, logger, clientIp);
 
   if (isTraversal) {
     const duration = Math.round(performance.now() - startTime);
@@ -413,20 +477,28 @@ export async function serveStaticFile(
       targetFilePath: initialTarget,
       error:
         statResult.error instanceof Error
-          ? { name: statResult.error.name, message: statResult.error.message, stack: statResult.error.stack }
+          ? {
+              name: statResult.error.name,
+              message: statResult.error.message,
+              stack: statResult.error.stack,
+            }
           : { raw: statResult.error },
     });
     return handleServerError(res, isHead);
   }
 
   if (statResult.status === "not_found") {
-    return handleNotFound(res, isHead);
+    return handleNotFound(res, isHead, "Not Found", correlationId);
   }
 
   const targetFilePath = statResult.targetFilePath;
 
   // 3. Symlink Canonicalization Guard (MAJ-001, CWE-59)
-  const canonicalResult = await verifyCanonicalPath(fileStorage, rootDir, targetFilePath);
+  const canonicalResult = await verifyCanonicalPath(
+    fileStorage,
+    rootDir,
+    targetFilePath,
+  );
 
   if (canonicalResult.status === "traversal") {
     const duration = Math.round(performance.now() - startTime);
@@ -451,7 +523,11 @@ export async function serveStaticFile(
       targetFilePath,
       error:
         canonicalResult.error instanceof Error
-          ? { name: canonicalResult.error.name, message: canonicalResult.error.message, stack: canonicalResult.error.stack }
+          ? {
+              name: canonicalResult.error.name,
+              message: canonicalResult.error.message,
+              stack: canonicalResult.error.stack,
+            }
           : { raw: canonicalResult.error },
     });
     return handleServerError(res, isHead);

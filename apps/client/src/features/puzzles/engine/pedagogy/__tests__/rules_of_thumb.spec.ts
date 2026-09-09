@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Chess } from 'chess.js';
 import type { Puzzle, PuzzleAnalysisResult } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 import {
   THEME_RULES_OF_THUMB,
   PIECE_DISPLAY_NAMES,
@@ -88,6 +89,22 @@ describe('Pedagogical Rules of Thumb & Mistake Refutations', () => {
       expect(generateMistakeRefutation('4k3/8/8/8/8/8/8/4K3 w - - 0 1', { from: 'a1', to: 'a8' })).toBeNull();
     });
 
+    it('handles corrupt move coordinates and engine exceptions gracefully without throwing', () => {
+      const debugSpy = vi.spyOn(logger, 'debug');
+      const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      // Completely corrupt square coordinates that bypass TypeScript at runtime
+      expect(generateMistakeRefutation(fen, { from: 'z9' as any, to: 'z10' as any })).toBeNull();
+      expect(debugSpy).toHaveBeenCalledWith(
+        'Illegal player move in generateMistakeRefutation',
+        expect.objectContaining({
+          operation: 'refutation_player_move',
+        })
+      );
+      // Illegal move in position
+      expect(generateMistakeRefutation(fen, { from: 'e1', to: 'e8' })).toBeNull();
+      debugSpy.mockRestore();
+    });
+
     it('returns checkmate refutation for blunders allowing checkmate', () => {
       // White plays 2.g4 allowing Qh4#
       const fen = 'rnbqkbnr/pppp1ppp/8/4p3/8/5P2/PPPPP1PP/RNBQKBNR w KQkq - 0 2';
@@ -136,6 +153,27 @@ describe('Pedagogical Rules of Thumb & Mistake Refutations', () => {
       expect(generateStepBreakdowns(null as any)).toEqual([]);
       expect(generateStepBreakdowns({ ...samplePuzzle, moves: [] })).toEqual([]);
       expect(generateStepBreakdowns({ ...samplePuzzle, fen: 'bad-fen' })).toEqual([]);
+    });
+
+    it('handles corrupt or illegal moves in puzzle solution gracefully', () => {
+      const debugSpy = vi.spyOn(logger, 'debug');
+      const corruptMovesPuzzle: Puzzle = {
+        ...samplePuzzle,
+        moves: ['z9z8', 'e1e8'],
+      };
+      const steps = generateStepBreakdowns(corruptMovesPuzzle);
+      expect(steps.length).toBe(2);
+      expect(steps[0]?.moveSan).toBe('z9z8');
+      expect(steps[0]?.moveUci).toBe('z9z8');
+      expect(steps[0]?.explanation).toBeDefined();
+      expect(debugSpy).toHaveBeenCalledWith(
+        'Illegal solution move in generateStepBreakdowns',
+        expect.objectContaining({
+          operation: 'step_breakdowns_move',
+          moveUci: 'z9z8',
+        })
+      );
+      debugSpy.mockRestore();
     });
 
     it('synthesizes step explanations for player checkmate', () => {

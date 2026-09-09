@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GameService } from "../game.service.js";
 import type { MoveApplicationResult } from "../game.interface.js";
 import { MockRoomGameAdapter } from "./mock_room_adapter.js";
+import { MockSessionRegistry } from "../../rooms/index.js";
 import {
   RoomState,
   RoomNotFoundError,
@@ -12,12 +13,18 @@ import {
   InvalidPayloadError,
   OptimisticLockConflictError,
   type IClock,
+  type IIdGenerator,
 } from "@fun-chess/shared";
 import { ChessEngine } from "../chess_engine.js";
 import { Chess } from "chess.js";
+import { NullLogger } from "../../../platform/logger/null_logger.js";
+import { SystemClock, UuidGenerator } from "../../../platform/time/index.js";
 
 describe("GameService", () => {
   let store: MockRoomGameAdapter;
+  let clock: IClock;
+  let idGenerator: IIdGenerator;
+  let logger: NullLogger;
   let service: GameService;
 
   const createActiveGameRoom = (
@@ -58,7 +65,10 @@ describe("GameService", () => {
 
   beforeEach(() => {
     store = new MockRoomGameAdapter();
-    service = new GameService(store);
+    clock = new SystemClock();
+    idGenerator = new UuidGenerator();
+    logger = new NullLogger();
+    service = new GameService(store, clock, idGenerator, logger);
   });
 
   describe("makeMove", () => {
@@ -707,7 +717,12 @@ describe("GameService", () => {
       const fakeClock: IClock = {
         now: () => fixedTime,
       };
-      const customService = new GameService(store, fakeClock);
+      const customService = new GameService(
+        store,
+        fakeClock,
+        idGenerator,
+        logger,
+      );
 
       const room = createActiveGameRoom("TIME");
       await store.save(room);
@@ -727,16 +742,19 @@ describe("GameService", () => {
 
   describe("Session Sliding TTL (CRIT-002)", () => {
     it("calls touchSession on sessionRegistry when a valid move is applied", async () => {
-      const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
-      const mockSessionRegistry = {
-        touchSession: touchSessionSpy,
-        playerIndex: new Map([["SESS:p_white_id", "token-p1-123"]]),
-      } as unknown as import("../../rooms/index.js").SessionRegistry;
+      const mockSessionRegistry = new MockSessionRegistry();
+      const sessionRecord = await mockSessionRegistry.createSession({
+        roomCode: "SESS",
+        playerId: "p_white_id",
+        socketId: "sock_white",
+      });
+      const touchSessionSpy = vi.spyOn(mockSessionRegistry, "touchSession");
 
       const customService = new GameService(
         store,
-        undefined,
-        undefined,
+        clock,
+        idGenerator,
+        logger,
         mockSessionRegistry,
       );
 
@@ -750,7 +768,185 @@ describe("GameService", () => {
 
       expect(result.moveResult.from).toBe("e2");
       expect(result.moveResult.to).toBe("e4");
-      expect(touchSessionSpy).toHaveBeenCalledWith("token-p1-123", "sock_white");
+      expect(touchSessionSpy).toHaveBeenCalledWith(
+        sessionRecord.sessionToken,
+        "sock_white",
+      );
+    });
+  });
+
+  describe("Service-Level Operational Logging (MAJ-003)", () => {
+    it("emits debug start and info success logs for makeMove with operation, roomCode, playerId, duration, and durationMs", async () => {
+      const debugSpy = vi.spyOn(logger, "debug");
+      const infoSpy = vi.spyOn(logger, "info");
+      const room = createActiveGameRoom("LOG1");
+      await store.save(room);
+
+      await service.makeMove(
+        { roomCode: "LOG1", move: { from: "e2", to: "e4" } },
+        "sock_white",
+      );
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        "Applying chess move",
+        expect.objectContaining({
+          operation: "game_move",
+          roomCode: "LOG1",
+          playerId: "p_white_id",
+          move: { from: "e2", to: "e4" },
+        }),
+      );
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Chess move applied",
+        expect.objectContaining({
+          operation: "game_move",
+          roomCode: "LOG1",
+          playerId: "p_white_id",
+          san: "e4",
+          duration: expect.any(Number),
+          durationMs: expect.any(Number),
+          isGameOver: false,
+        }),
+      );
+    });
+
+    it("emits warn log on invalid move rejection with operation, roomCode, playerId, duration, and durationMs", async () => {
+      const warnSpy = vi.spyOn(logger, "warn");
+      const room = createActiveGameRoom("LOG2");
+      await store.save(room);
+
+      await expect(
+        service.makeMove(
+          { roomCode: "LOG2", move: { from: "e2", to: "e5" } },
+          "sock_white",
+        ),
+      ).rejects.toBeInstanceOf(InvalidMoveError);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Invalid move rejected",
+        expect.objectContaining({
+          operation: "game_move_rejected",
+          roomCode: "LOG2",
+          playerId: "p_white_id",
+          reason: expect.any(String),
+          duration: expect.any(Number),
+          durationMs: expect.any(Number),
+        }),
+      );
+    });
+
+    it("emits info log on resign with operation, roomCode, playerId, winnerColor, duration, and durationMs", async () => {
+      const infoSpy = vi.spyOn(logger, "info");
+      const room = createActiveGameRoom("LOG3");
+      await store.save(room);
+
+      await service.resign("LOG3", "sock_white");
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Player resigned",
+        expect.objectContaining({
+          operation: "game_resign",
+          roomCode: "LOG3",
+          playerId: "p_white_id",
+          winnerColor: "b",
+          duration: expect.any(Number),
+          durationMs: expect.any(Number),
+        }),
+      );
+    });
+
+    it("emits info log on offerDraw with operation, roomCode, playerId, action: offer, duration, and durationMs", async () => {
+      const infoSpy = vi.spyOn(logger, "info");
+      const room = createActiveGameRoom("LOG4");
+      await store.save(room);
+
+      await service.offerDraw("LOG4", "sock_white");
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Draw offer processed",
+        expect.objectContaining({
+          operation: "game_draw_action",
+          roomCode: "LOG4",
+          playerId: "p_white_id",
+          action: "offer",
+          duration: expect.any(Number),
+          durationMs: expect.any(Number),
+        }),
+      );
+    });
+
+    it("emits info log on respondDraw (accept and decline) with operation, roomCode, playerId, action, duration, and durationMs", async () => {
+      const room = createActiveGameRoom("LOG5");
+      await store.save(room);
+      await service.offerDraw("LOG5", "sock_white");
+
+      const infoSpy = vi.spyOn(logger, "info");
+
+      // Decline
+      await service.respondDraw("LOG5", "sock_black", false);
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Draw offer processed",
+        expect.objectContaining({
+          operation: "game_draw_action",
+          roomCode: "LOG5",
+          playerId: "p_black_id",
+          action: "decline",
+          duration: expect.any(Number),
+          durationMs: expect.any(Number),
+        }),
+      );
+
+      // Offer again and accept
+      await service.offerDraw("LOG5", "sock_white");
+      await service.respondDraw("LOG5", "sock_black", true);
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Draw offer processed",
+        expect.objectContaining({
+          operation: "game_draw_action",
+          roomCode: "LOG5",
+          playerId: "p_black_id",
+          action: "accept",
+          duration: expect.any(Number),
+          durationMs: expect.any(Number),
+        }),
+      );
+    });
+
+    it("emits info log on requestRematch and respondRematch with operation, roomCode, playerId, status, duration, and durationMs", async () => {
+      const room = createActiveGameRoom("LOG6");
+      await store.save(room);
+      await service.resign("LOG6", "sock_white");
+
+      const infoSpy = vi.spyOn(logger, "info");
+
+      // Request rematch
+      await service.requestRematch("LOG6", "sock_white");
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Rematch action processed",
+        expect.objectContaining({
+          operation: "game_rematch_action",
+          roomCode: "LOG6",
+          playerId: "p_white_id",
+          status: "pending",
+          duration: expect.any(Number),
+          durationMs: expect.any(Number),
+        }),
+      );
+
+      // Respond rematch (accepted)
+      await service.respondRematch("LOG6", "sock_black", true);
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Rematch action processed",
+        expect.objectContaining({
+          operation: "game_rematch_action",
+          roomCode: "LOG6",
+          playerId: "p_black_id",
+          status: "accepted",
+          duration: expect.any(Number),
+          durationMs: expect.any(Number),
+        }),
+      );
     });
   });
 });

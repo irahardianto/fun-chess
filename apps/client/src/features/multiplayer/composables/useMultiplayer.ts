@@ -29,7 +29,7 @@ import {
 export function resetSocketState(): void {
   resetTransportState();
   resetRoomSessionState();
-  resetGameActionsState();
+  resetGameActionsState(false);
 }
 
 /**
@@ -44,7 +44,7 @@ export function useMultiplayer(injectedSocket?: TypedSocket) {
     detachSocketListeners(existingSocket);
     resetTransportState();
     resetRoomSessionState(false);
-    resetGameActionsState();
+    resetGameActionsState(false);
   }
   const transport = useSocketTransport(injectedSocket);
   const session = useRoomSession();

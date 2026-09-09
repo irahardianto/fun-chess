@@ -19,6 +19,7 @@ import { crc32Checksum } from "./checksum_crc32.js";
 import { canonicalJsonStringify } from "./canonical_json.js";
 import { defaultDictionaryMapper } from "./dictionary_mapper.js";
 import { defaultSchemaValidator } from "./schema_validator.js";
+import { UnifiedProgressEnvelopeSchema } from "../contracts/schemas.js";
 
 const B64_CHARS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -313,42 +314,56 @@ export class DefaultProgressCodec implements ProgressCodec {
       );
     }
 
-    let parsed: Partial<UnifiedProgressEnvelope>;
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(jsonString) as Partial<UnifiedProgressEnvelope>;
+      parsed = JSON.parse(jsonString);
     } catch {
       throw new Error("Invalid envelope JSON: malformed JSON syntax");
     }
 
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      parsed.magic !== "FC_PROGRESS_V1"
-    ) {
+    // MAJ-023: Validate parsed JSON using UnifiedProgressEnvelopeSchema.safeParse(parsed)
+    const envelopeValidation = UnifiedProgressEnvelopeSchema.safeParse(parsed);
+    if (!envelopeValidation.success) {
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        (parsed as Record<string, unknown>).magic !== "FC_PROGRESS_V1"
+      ) {
+        throw new Error(
+          'Invalid envelope JSON: missing or incorrect "FC_PROGRESS_V1" magic identifier',
+        );
+      }
+      if (
+        !("payload" in (parsed as Record<string, unknown>)) ||
+        typeof (parsed as Record<string, unknown>).payload !== "object" ||
+        !(parsed as Record<string, unknown>).payload
+      ) {
+        throw new Error("Invalid envelope JSON: missing payload object");
+      }
+      const issueSummary = envelopeValidation.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ");
       throw new Error(
-        'Invalid envelope JSON: missing or incorrect "FC_PROGRESS_V1" magic identifier',
+        `Invalid envelope JSON schema: ${issueSummary}`,
       );
     }
 
-    if (!parsed.payload || typeof parsed.payload !== "object") {
-      throw new Error("Invalid envelope JSON: missing payload object");
-    }
+    const envelope = envelopeValidation.data;
 
     // Verify CRC-32 checksum against canonical representation
-    const canonicalPayload = canonicalJsonStringify(parsed.payload);
+    const canonicalPayload = canonicalJsonStringify(envelope.payload);
     const calculatedChecksum = crc32Checksum.toHex(
       crc32Checksum.calculate(canonicalPayload),
     );
     if (
-      !parsed.checksum ||
-      calculatedChecksum.toUpperCase() !== parsed.checksum.trim().toUpperCase()
+      calculatedChecksum.toUpperCase() !== envelope.checksum.trim().toUpperCase()
     ) {
       throw new Error(
-        `CRC-32 checksum mismatch: calculated ${calculatedChecksum} does not match expected ${parsed.checksum}`,
+        `CRC-32 checksum mismatch: calculated ${calculatedChecksum} does not match expected ${envelope.checksum}`,
       );
     }
 
-    return defaultSchemaValidator.assertValid(parsed.payload);
+    return defaultSchemaValidator.assertValid(envelope.payload);
   }
 }
 

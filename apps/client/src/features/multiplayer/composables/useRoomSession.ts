@@ -6,7 +6,6 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Findings CRIT-005, MIN-030.
  */
 
-import { ref, computed, getCurrentInstance, type ComputedRef } from 'vue';
 import type {
   CreateRoomRequest,
   GameState,
@@ -15,7 +14,6 @@ import type {
   ReconnectRequest,
   RoomState,
   RoomStatus,
-  SavedSession,
   SocketErrorPayload,
 } from '@fun-chess/shared';
 import {
@@ -25,154 +23,35 @@ import {
   LeaveRoomRequestSchema,
   ReconnectRequestSchema,
 } from '@fun-chess/shared';
-import { useInjectSessionStorage, resolveLogger } from '@/platform/di';
-import { safeSessionStorage, type KeyValueStorage, STORAGE_KEYS } from '@/platform/storage';
-import { generateCorrelationId, type ILogger } from '@/platform/telemetry';
+import { generateCorrelationId } from '@/platform/telemetry';
 import {
   useSocketTransport,
   registerSocketEventListener,
 } from './useSocketTransport';
+import { resetGameActionsState } from './useGameActions';
+import {
+  type UseRoomSessionOptions,
+  setRoomSessionStorage,
+  setRoomSessionLogger,
+  setRoomSessionNavigation,
+  logger,
+  createValidationError,
+  getSavedSession,
+  saveSession,
+  clearSession,
+  currentRoom,
+  currentPlayer,
+  sessionToken,
+  isHost,
+  isSpectator,
+} from './room_session_state';
 
-/** Session storage key for persisting fun-chess multiplayer sessions */
-export const SESSION_STORAGE_KEY = STORAGE_KEYS.SESSION_TOKEN;
+export * from './room_session_state';
 
-export type { SavedSession };
-
-let customSessionStorage: KeyValueStorage | null = null;
-let customLogger: ILogger | null = null;
-
-export function setRoomSessionStorage(storage: KeyValueStorage | null): void {
-  customSessionStorage = storage;
-}
-
-export function setRoomSessionLogger(logger: ILogger | null): void {
-  customLogger = logger;
-}
-
-/**
- * Dynamically resolves session storage adapter (safe in browser & test environments).
- */
-function getSessionStorage(custom?: KeyValueStorage): KeyValueStorage {
-  if (custom) return custom;
-  if (customSessionStorage) return customSessionStorage;
-  if (getCurrentInstance()) {
-    return useInjectSessionStorage();
-  }
-  return safeSessionStorage;
-}
-
-function getActiveLogger(): ILogger {
-  return resolveLogger(customLogger);
-}
-
-const logger: ILogger = {
-  debug: (msg, meta) => getActiveLogger().debug(msg, meta),
-  info: (msg, meta) => getActiveLogger().info(msg, meta),
-  warn: (msg, meta) => getActiveLogger().warn(msg, meta),
-  error: (msg, meta) => getActiveLogger().error(msg, meta),
-  fatal: (msg, meta) => getActiveLogger().fatal(msg, meta),
-  child: (context) => getActiveLogger().child(context),
-};
-
-interface ZodValidationErrorLike {
-  errors?: Array<{ path: Array<string | number>; message: string }>;
-}
-
-/**
- * Formats a Zod validation error into a readable message.
- */
-function formatZodError(error: ZodValidationErrorLike): string {
-  if (Array.isArray(error.errors)) {
-    return error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
-  }
-  return 'Validation error';
-}
-
-/**
- * Creates a standard SocketErrorPayload for client validation rejections.
- */
-export function createValidationError(error: unknown): SocketErrorPayload {
-  return {
-    code: 'ERR_INVALID_PAYLOAD',
-    message: formatZodError(error as ZodValidationErrorLike),
-    correlationId: generateCorrelationId(),
-  };
-}
-
-/**
- * Retrieves the saved session from sessionStorage if available.
- */
-export function getSavedSession(): SavedSession | null {
-  const storage = getSessionStorage();
-  try {
-    const raw = storage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed === 'object' &&
-      typeof parsed.roomCode === 'string' &&
-      typeof parsed.playerId === 'string' &&
-      typeof parsed.sessionToken === 'string'
-    ) {
-      return parsed as SavedSession;
-    }
-    return null;
-  } catch (err) {
-    logger.warn('Failed to parse saved session from storage', {
-      operation: 'socket_get_saved_session',
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
-}
-
-/**
- * Persists active session credentials into sessionStorage.
- */
-export function saveSession(session: SavedSession): void {
-  const storage = getSessionStorage();
-  try {
-    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-  } catch (err) {
-    logger.warn('Failed to save session to storage', {
-      operation: 'socket_save_session',
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-}
-
-/**
- * Removes the active session credentials from sessionStorage.
- */
-export function clearSession(): void {
-  const storage = getSessionStorage();
-  try {
-    storage.removeItem(SESSION_STORAGE_KEY);
-  } catch (err) {
-    logger.warn('Failed to clear session from storage', {
-      operation: 'socket_clear_session',
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-}
-
-// ----------------------------------------------------------------------------
-// Module-Singleton Reactive Room Session State (MAJ-013)
-// ----------------------------------------------------------------------------
-const currentRoom = ref<RoomState | null>(null);
-const currentPlayer = ref<Player | null>(null);
-const sessionToken = ref<string | null>(null);
-
-const isHost: ComputedRef<boolean> = computed(() => {
-  if (!currentRoom.value || !currentPlayer.value) return false;
-  return currentRoom.value.hostId === currentPlayer.value.id;
-});
-
-const isSpectator: ComputedRef<boolean> = computed(() => {
-  if (!currentRoom.value || !currentPlayer.value) return false;
-  return currentRoom.value.spectators?.some((s) => s.id === currentPlayer.value?.id) ?? false;
-});
+let customNavigation: {
+  onRoomClosed?: () => void;
+  navigate?: (path: string) => void;
+} | null = null;
 
 // ----------------------------------------------------------------------------
 // Internal Event Listeners Registration
@@ -181,13 +60,9 @@ function handleConnect() {
   checkAndAutoReconnect();
 }
 
-function handleRoomCreated(room: RoomState) {
-  currentRoom.value = room;
-}
-
-function handleRoomJoined(room: RoomState) {
-  currentRoom.value = room;
-}
+// Note (MAJ-008): Room state for creator and joiner is received directly through
+// acknowledgment callbacks in createRoom / joinRoom; fragile dependencies on
+// deprecated room:created and room:joined socket events have been removed.
 
 function handleRoomPlayerJoined(data: { player: Player; room: RoomState }) {
   currentRoom.value = data.room;
@@ -199,12 +74,30 @@ function handleRoomPlayerLeft(data?: { playerId?: string; playerName?: string; r
     currentPlayer.value = null;
     sessionToken.value = null;
     clearSession();
-    if (typeof window !== 'undefined') {
-      if (typeof window.location?.assign === 'function') {
-        window.location.assign('/multiplayer');
-      } else if (window.location) {
-        window.location.href = '/multiplayer';
+    resetGameActionsState(true);
+    if (customNavigation?.onRoomClosed) {
+      try {
+        customNavigation.onRoomClosed();
+      } catch (err) {
+        logger.warn('Error executing onRoomClosed callback', {
+          operation: 'socket_room_player_left',
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
+    } else if (customNavigation?.navigate) {
+      try {
+        customNavigation.navigate('/multiplayer');
+      } catch (err) {
+        logger.warn('Error executing navigate callback', {
+          operation: 'socket_room_player_left',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    } else {
+      logger.info('Room closed with no navigation callback provided; falling back safely', {
+        operation: 'socket_room_player_left',
+        reason: data.reason,
+      });
     }
     return;
   }
@@ -228,26 +121,28 @@ function handleRoomPlayerLeft(data?: { playerId?: string; playerName?: string; r
 }
 
 function handleRoomPlayerDisconnected(data: {
-  playerId?: string;
-  player?: Player;
+  playerId: string;
   gracePeriodMs?: number;
-  roomStatus?: string;
-  disconnectedAt?: number;
+  roomStatus?: RoomStatus;
 }) {
   if (!currentRoom.value) return;
 
-  const disconnectedId = data?.playerId ?? data?.player?.id;
+  const disconnectedId = data?.playerId;
   if (!disconnectedId) return;
 
   const isWhite = currentRoom.value.whitePlayer?.id === disconnectedId;
   const isBlack = currentRoom.value.blackPlayer?.id === disconnectedId;
   const isActivePlayer = isWhite || isBlack;
 
-  if (data?.roomStatus && (data.roomStatus as RoomStatus) !== 'paused_disconnect') {
-    currentRoom.value = {
-      ...currentRoom.value,
-      status: data.roomStatus as RoomStatus,
-    };
+  // Authoritatively update room status per API contracts §2.1 (MAJ-008)
+  if (data?.roomStatus) {
+    // Spectator disconnect should not pause the active match
+    if (data.roomStatus !== 'paused_disconnect' || isActivePlayer) {
+      currentRoom.value = {
+        ...currentRoom.value,
+        status: data.roomStatus,
+      };
+    }
   } else if (isActivePlayer && currentRoom.value.status === 'playing') {
     currentRoom.value = {
       ...currentRoom.value,
@@ -348,8 +243,6 @@ function handleGameOver() {
 
 export function initRoomSessionListeners(): void {
   registerSocketEventListener('connect', handleConnect);
-  registerSocketEventListener('room:created', handleRoomCreated);
-  registerSocketEventListener('room:joined', handleRoomJoined);
   registerSocketEventListener('room:player_joined', handleRoomPlayerJoined);
   registerSocketEventListener('room:player_left', handleRoomPlayerLeft);
   registerSocketEventListener('room:player_disconnected', handleRoomPlayerDisconnected);
@@ -639,6 +532,7 @@ export async function leaveRoom(
     currentPlayer.value = null;
     sessionToken.value = null;
     clearSession();
+    resetGameActionsState(true);
     logger.info('Leave room succeeded (socket disconnected)', {
       operation: 'socket_room_leave',
       correlationId,
@@ -659,6 +553,7 @@ export async function leaveRoom(
       currentPlayer.value = null;
       sessionToken.value = null;
       clearSession();
+      resetGameActionsState(true);
       if (success) {
         logger.info('Leave room succeeded', {
           operation: 'socket_room_leave',
@@ -697,21 +592,29 @@ export function resetRoomSessionState(clearStorage = true): void {
   if (clearStorage) {
     clearSession();
   }
-  customSessionStorage = null;
-  customLogger = null;
+  setRoomSessionStorage(null);
+  setRoomSessionLogger(null);
+  setRoomSessionNavigation(null);
+  customNavigation = null;
   initRoomSessionListeners();
 }
 
 /**
  * Primary composable exposing room session state and lifecycle controls.
  */
-export function useRoomSession(options?: { storage?: KeyValueStorage; logger?: ILogger }) {
+export function useRoomSession(options?: UseRoomSessionOptions) {
   initRoomSessionListeners();
   if (options?.storage) {
-    customSessionStorage = options.storage;
+    setRoomSessionStorage(options.storage);
   }
   if (options?.logger) {
-    customLogger = options.logger;
+    setRoomSessionLogger(options.logger);
+  }
+  if (options?.onRoomClosed || options?.navigate) {
+    customNavigation = {
+      onRoomClosed: options.onRoomClosed,
+      navigate: options.navigate,
+    };
   }
   return {
     currentRoom,
@@ -729,5 +632,6 @@ export function useRoomSession(options?: { storage?: KeyValueStorage; logger?: I
     clearSession,
     resetRoomSessionState,
     initRoomSessionListeners,
+    setRoomSessionNavigation,
   };
 }

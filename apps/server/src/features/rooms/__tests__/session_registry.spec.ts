@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { InMemorySessionRegistry } from "../in_memory_session_registry.js";
+import { NullLogger } from "../../../platform/logger/null_logger.js";
 
 describe("InMemorySessionRegistry", () => {
   let registry: InMemorySessionRegistry;
@@ -222,6 +223,36 @@ describe("InMemorySessionRegistry", () => {
       expect(touched).not.toBeNull();
       expect(touched!.expiresAt).toBeGreaterThan(created.createdAt + 20_000);
     });
+
+    it("advances lastSeenAt monotonically and updates socketId across multiple touches (MIN-026)", async () => {
+      const created = await registry.createSession({
+        playerId: "p-multi-touch",
+        roomCode: "MTCH",
+        color: "w",
+        isHost: true,
+        socketId: "sock-initial",
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await registry.touchSession(created.sessionToken, "sock-second");
+      const firstTouch = await registry.validateSession(
+        created.sessionToken,
+        "MTCH",
+        "p-multi-touch",
+      );
+      expect(firstTouch?.socketId).toBe("sock-second");
+      expect(firstTouch?.lastSeenAt).toBeGreaterThan(created.lastSeenAt);
+
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await registry.touchSession(created.sessionToken, "sock-third");
+      const secondTouch = await registry.validateSession(
+        created.sessionToken,
+        "MTCH",
+        "p-multi-touch",
+      );
+      expect(secondTouch?.socketId).toBe("sock-third");
+      expect(secondTouch?.lastSeenAt).toBeGreaterThan(firstTouch!.lastSeenAt);
+    });
   });
 
   describe("deleteSession", () => {
@@ -412,6 +443,38 @@ describe("InMemorySessionRegistry", () => {
         ),
       ).toBeNull();
     });
+
+    it("returns 0 when no sessions are expired (MIN-026)", async () => {
+      await registry.createSession({
+        playerId: "active-p1",
+        roomCode: "ACT1",
+        color: "w",
+        isHost: true,
+        socketId: "sock-1",
+        ttlMs: 60_000,
+      });
+
+      const cleaned = await registry.cleanupExpiredSessions();
+      expect(cleaned).toBe(0);
+    });
+
+    it("cleans up secondary indices when sessions expire (MIN-026)", async () => {
+      await registry.createSession({
+        playerId: "exp-sec-p",
+        roomCode: "SEC1",
+        color: "w",
+        isHost: true,
+        socketId: "sock-sec",
+        ttlMs: -100,
+      });
+
+      const cleaned = await registry.cleanupExpiredSessions();
+      expect(cleaned).toBe(1);
+
+      // Verify secondary lookup returns null
+      const token = await registry.getSessionTokenForPlayer("SEC1", "exp-sec-p");
+      expect(token).toBeNull();
+    });
   });
 
   describe("clear", () => {
@@ -460,6 +523,37 @@ describe("InMemorySessionRegistry", () => {
         registry.updateSessionColor("NONE", "p-unknown", "b"),
       ).resolves.not.toThrow();
     });
+
+    it("inverts color and preserves all other session fields (MIN-026)", async () => {
+      const created = await registry.createSession({
+        playerId: "p-invert",
+        roomCode: "INVT",
+        color: "w",
+        isHost: true,
+        socketId: "sock-invt",
+      });
+
+      await registry.updateSessionColor("INVT", "p-invert", "b");
+      const updatedBlack = await registry.validateSession(
+        created.sessionToken,
+        "INVT",
+        "p-invert",
+      );
+      expect(updatedBlack?.color).toBe("b");
+      expect(updatedBlack?.playerId).toBe("p-invert");
+      expect(updatedBlack?.roomCode).toBe("INVT");
+      expect(updatedBlack?.isHost).toBe(true);
+      expect(updatedBlack?.socketId).toBe("sock-invt");
+
+      // Invert back to white
+      await registry.updateSessionColor("INVT", "p-invert", "w");
+      const updatedWhite = await registry.validateSession(
+        created.sessionToken,
+        "INVT",
+        "p-invert",
+      );
+      expect(updatedWhite?.color).toBe("w");
+    });
   });
 
   describe("Clock and IdGenerator injection (MAJ-012)", () => {
@@ -483,7 +577,7 @@ describe("InMemorySessionRegistry", () => {
     });
   });
 
-  describe("getSessionByToken and findSessionByToken (SEC-002)", () => {
+  describe("getSessionByToken (SEC-002)", () => {
     it("retrieves session record by sessionToken", async () => {
       const created = await registry.createSession({
         playerId: "p-lookup",
@@ -498,18 +592,11 @@ describe("InMemorySessionRegistry", () => {
       expect(session?.sessionToken).toBe(created.sessionToken);
       expect(session?.playerId).toBe("p-lookup");
       expect(session?.roomCode).toBe("LOOK");
-
-      const aliasSession = await registry.findSessionByToken(created.sessionToken);
-      expect(aliasSession).not.toBeNull();
-      expect(aliasSession?.sessionToken).toBe(created.sessionToken);
     });
 
     it("returns null for non-existent token", async () => {
       const session = await registry.getSessionByToken("non-existent-token");
       expect(session).toBeNull();
-
-      const aliasSession = await registry.findSessionByToken("non-existent-token");
-      expect(aliasSession).toBeNull();
     });
 
     it("returns null and deletes expired session", async () => {
@@ -526,7 +613,7 @@ describe("InMemorySessionRegistry", () => {
       expect(session).toBeNull();
 
       // Ensure session is purged
-      const secondAttempt = await registry.findSessionByToken(created.sessionToken);
+      const secondAttempt = await registry.getSessionByToken(created.sessionToken);
       expect(secondAttempt).toBeNull();
     });
   });
@@ -562,6 +649,62 @@ describe("InMemorySessionRegistry", () => {
 
       const token = await registry.getSessionTokenForPlayer("EXPP", "p-exp-player");
       expect(token).toBeNull();
+    });
+  });
+
+  describe("DEBUG-level mutation logging (ENH-010)", () => {
+    it("logs debug records on createSession, touchSession, updateSessionColor, and cleanupExpiredSessions", async () => {
+      const logger = new NullLogger();
+      const loggedRegistry = new InMemorySessionRegistry(undefined, undefined, logger);
+
+      // 1. createSession
+      const created = await loggedRegistry.createSession({
+        playerId: "p-dbg-1",
+        roomCode: "DBGS",
+        color: "w",
+        isHost: true,
+        socketId: "sock-dbg-1",
+      });
+      const createLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "session_storage_create",
+      );
+      expect(createLogs.length).toBe(1);
+      expect(createLogs[0]?.context).toMatchObject({
+        roomCode: "DBGS",
+        playerId: "p-dbg-1",
+        sessionToken: created.sessionToken,
+      });
+
+      // 2. touchSession
+      await loggedRegistry.touchSession(created.sessionToken, "sock-dbg-2");
+      const touchLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "session_storage_touch",
+      );
+      expect(touchLogs.length).toBe(1);
+      expect(touchLogs[0]?.context).toMatchObject({
+        sessionToken: created.sessionToken,
+        newSocketId: "sock-dbg-2",
+      });
+
+      // 3. updateSessionColor
+      await loggedRegistry.updateSessionColor("DBGS", "p-dbg-1", "b");
+      const updateColorLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "session_storage_update_color",
+      );
+      expect(updateColorLogs.length).toBe(1);
+      expect(updateColorLogs[0]?.context).toMatchObject({
+        roomCode: "DBGS",
+        playerId: "p-dbg-1",
+        newColor: "b",
+      });
+
+      // 4. cleanupExpiredSessions
+      await loggedRegistry.cleanupExpiredSessions();
+      const cleanupLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "session_storage_cleanup_expired",
+      );
+      expect(cleanupLogs.length).toBe(1);
+      expect(cleanupLogs[0]?.context?.cleanedCount).toBeDefined();
     });
   });
 });

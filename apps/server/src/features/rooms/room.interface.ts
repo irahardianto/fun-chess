@@ -27,7 +27,7 @@ export interface IRoomService {
   reconnect(
     req: ReconnectRequest,
     socketId: string,
-  ): Promise<{ room: RoomState; player: Player }>;
+  ): Promise<{ room: RoomState; player: Player; sessionToken: string }>;
 
   leaveRoom(
     roomCode: string,
@@ -41,7 +41,11 @@ export interface IRoomService {
 
   handleDisconnect(
     socketId: string,
-    onForfeit?: (room: RoomState, gameOverPayload: GameOverPayload) => void | Promise<void>,
+    onForfeit?: (
+      room: RoomState,
+      gameOverPayload: GameOverPayload,
+      correlationId?: string,
+    ) => void | Promise<void>,
     gracePeriodMs?: number,
     timerRegistry?: IDisconnectTimerRegistry,
   ): Promise<{

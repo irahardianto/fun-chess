@@ -176,10 +176,10 @@ describe('AppViewRouter.vue', () => {
 
     const soloArena = wrapper.findComponent({ name: 'SoloAiArena' });
     await soloArena.vm.$emit('exit');
-    expect(wrapper.emitted('solo-ai-exit') || wrapper.emitted('exit-solo-ai') || wrapper.emitted('exit')).toBeTruthy();
+    expect(wrapper.emitted('solo-ai-exit')).toBeTruthy();
 
     await soloArena.vm.$emit('change-opponent');
-    expect(wrapper.emitted('solo-ai-change-opponent') || wrapper.emitted('change-opponent')).toBeTruthy();
+    expect(wrapper.emitted('solo-ai-change-opponent')).toBeTruthy();
   });
 
   it('switches to ScenarioArena when mode is "academy" and activeScenario is provided', async () => {
@@ -197,13 +197,13 @@ describe('AppViewRouter.vue', () => {
 
     const academy = wrapper.findComponent({ name: 'ScenarioArena' });
     await academy.vm.$emit('back');
-    expect(wrapper.emitted('academy-back') || wrapper.emitted('back')).toBeTruthy();
+    expect(wrapper.emitted('academy-back')).toBeTruthy();
 
     await academy.vm.$emit('next-lesson', mockScenario);
-    expect(wrapper.emitted('academy-next-lesson') || wrapper.emitted('next-lesson')).toBeTruthy();
+    expect(wrapper.emitted('next-lesson')).toBeTruthy();
 
     await academy.vm.$emit('completed', 3);
-    expect(wrapper.emitted('academy-completed') || wrapper.emitted('completed')).toBeTruthy();
+    expect(wrapper.emitted('scenario-completed')).toBeTruthy();
   });
 
   it('switches to PuzzleArena when mode is "puzzle_hub" and sub-mode is "themed_drills" or "adaptive_ladder"', async () => {
@@ -223,7 +223,7 @@ describe('AppViewRouter.vue', () => {
 
     const puzzleArena = wrapperDrills.findComponent({ name: 'PuzzleArena' });
     await puzzleArena.vm.$emit('back');
-    expect(wrapperDrills.emitted('puzzle-back') || wrapperDrills.emitted('back')).toBeTruthy();
+    expect(wrapperDrills.emitted('puzzle-exit')).toBeTruthy();
 
     // Adaptive ladder
     const wrapperLadder = mount(AppViewRouter, {
@@ -254,7 +254,7 @@ describe('AppViewRouter.vue', () => {
 
     const rushArena = wrapperRush.findComponent({ name: 'PuzzleRushArena' });
     await rushArena.vm.$emit('exit');
-    expect(wrapperRush.emitted('puzzle-rush-exit') || wrapperRush.emitted('exit')).toBeTruthy();
+    expect(wrapperRush.emitted('puzzle-exit')).toBeTruthy();
 
     // Streak survivor
     const wrapperStreak = mount(AppViewRouter, {
@@ -287,7 +287,7 @@ describe('AppViewRouter.vue', () => {
     expect(puzzleArena.props('initialTheme')).toBe('pin');
 
     await puzzleArena.vm.$emit('back');
-    expect(wrapper.emitted('puzzle-back') || wrapper.emitted('back')).toBeTruthy();
+    expect(wrapper.emitted('puzzle-exit')).toBeTruthy();
 
     await puzzleArena.vm.$emit('completed', 3);
     expect(wrapper.emitted('puzzle-completed') || wrapper.emitted('completed')).toBeTruthy();
@@ -297,7 +297,7 @@ describe('AppViewRouter.vue', () => {
     const wrapper = mount(AppViewRouter, {
       props: {
         ...defaultProps,
-        currentMode: 'puzzle_ladder',
+        currentAppMode: 'puzzle_ladder',
       },
       global: globalConfig,
     });
@@ -309,7 +309,7 @@ describe('AppViewRouter.vue', () => {
     expect(puzzleArena.props('mode')).toBe('adaptive_ladder');
 
     await puzzleArena.vm.$emit('exit');
-    expect(wrapper.emitted('puzzle-back') || wrapper.emitted('back')).toBeTruthy();
+    expect(wrapper.emitted('puzzle-exit')).toBeTruthy();
   });
 
   it('switches to PuzzleRushArena when mode is "puzzle_rush" without falling through to LobbyView', async () => {
@@ -326,7 +326,7 @@ describe('AppViewRouter.vue', () => {
 
     const rushArena = wrapper.findComponent({ name: 'PuzzleRushArena' });
     await rushArena.vm.$emit('exit');
-    expect(wrapper.emitted('puzzle-rush-exit') || wrapper.emitted('exit')).toBeTruthy();
+    expect(wrapper.emitted('puzzle-exit')).toBeTruthy();
   });
 
   it('switches to MultiplayerArena when currentRoom is present and status is "playing" or "paused_disconnect"', async () => {

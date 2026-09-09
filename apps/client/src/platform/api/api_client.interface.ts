@@ -13,6 +13,8 @@ export interface ApiRequestOptions {
   headers?: Record<string, string>;
   /** Optional correlation ID for tracing across client and server */
   correlationId?: string;
+  /** Optional bearer authentication token for protected endpoints (ENH-007) */
+  authToken?: string;
 }
 
 export interface ApiResponse<T> {
@@ -21,6 +23,14 @@ export interface ApiResponse<T> {
   ok: boolean;
 }
 
+/**
+ * Contract for the centralized HTTP API client used across client composables and features.
+ * Provides typed REST ingress methods, networking discovery, and server health probes.
+ *
+ * Note on health endpoints (ENH-016):
+ * The server exposes `/api/health` and `/health` as equivalent endpoints serving
+ * identical LivenessHealthResponse payloads.
+ */
 export interface IApiClient {
   /** Performs GET request with timeout and error handling */
   get<T>(url: string, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
@@ -40,7 +50,16 @@ export interface IApiClient {
   /** Discovers LAN networking information from server */
   getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse>;
 
-  /** Lightweight health probe targeting /health (CRIT-001) */
+  /**
+   * Lightweight health probe targeting server liveness (CRIT-001, ENH-016).
+   *
+   * Note: The server exposes `/api/health` and `/health` as equivalent endpoints
+   * returning identical {@link LivenessHealthResponse} payloads. Either path can be used
+   * interchangeably for liveness probing and monitoring.
+   *
+   * @param options - Optional HTTP request options including timeoutMs, signal, headers, and correlationId.
+   * @returns Promise resolving to the validated LivenessHealthResponse object.
+   */
   checkHealth(options?: ApiRequestOptions): Promise<LivenessHealthResponse>;
 
   /** Deep telemetry probe targeting /health/detail (CRIT-001) */

@@ -56,7 +56,12 @@ export function getLegalTargetSquares(chess: Chess, square: Square): Square[] {
       verbose: true,
     });
     return moves.map((m) => m.to as Square);
-  } catch {
+  } catch (err) {
+    defaultLogger.debug('Failed to get legal target squares', {
+      operation: 'get_legal_target_squares',
+      square,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return [];
   }
 }

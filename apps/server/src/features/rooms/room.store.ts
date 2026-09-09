@@ -40,7 +40,11 @@ export interface RoomStore {
   /**
    * Executes an arbitrary asynchronous callback within the room's exclusive lock.
    */
-  withLock<T>(roomCode: string, action: () => Promise<T>): Promise<T>;
+  withLock<T>(
+    roomCode: string,
+    action: () => Promise<T>,
+    correlationId?: string,
+  ): Promise<T>;
 
   /**
    * Saves a room state with CAS version validation.
@@ -80,3 +84,8 @@ export interface RoomStore {
 }
 
 export type IRoomStore = RoomStore;
+
+/**
+ * Maximum capacity of active rooms permitted in memory.
+ */
+export const MAX_ROOMS = 10_000;

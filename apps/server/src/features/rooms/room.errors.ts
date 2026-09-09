@@ -83,11 +83,29 @@ export class LockExecutionTimeoutError extends AppError {
 export class RoomCapacityExceededError extends AppError {
   constructor(maxRooms: number) {
     super(
-      "ERR_INTERNAL_SERVER",
+      "ERR_ROOM_CAPACITY_EXCEEDED" as unknown as ErrorCode,
       `Maximum room capacity reached (${maxRooms})`,
-      507,
+      429,
       { maxRooms },
     );
     this.name = "RoomCapacityExceededError";
+    Object.setPrototypeOf(this, RoomCapacityExceededError.prototype);
+  }
+}
+
+/**
+ * Thrown when the queue of pending lock waiters for a room exceeds the circuit breaker limit.
+ * Addresses ENH-004: Circuit breaker for room mutex lock queue depth.
+ */
+export class RoomBusyError extends AppError {
+  constructor(roomCode: string, maxQueueDepth: number) {
+    super(
+      "ERR_RATE_LIMITED",
+      `Room '${roomCode}' is busy: lock queue depth exceeded limit (${maxQueueDepth})`,
+      429,
+      { roomCode, maxQueueDepth },
+    );
+    this.name = "RoomBusyError";
+    Object.setPrototypeOf(this, RoomBusyError.prototype);
   }
 }

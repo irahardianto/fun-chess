@@ -1,744 +1,427 @@
----
-spec_id: sdd-fun-chess-project-conventions
-doc_type: sdd
-version: 1.0.0
-status: frozen
-title: "Fun-Chess Monorepo Architectural Patterns & Engineering Conventions"
-created_at: "2026-09-09T07:00:00Z"
-updated_at: "2026-09-09T07:00:00Z"
-authors:
-  - "@architect"
-reviewers:
-  - "@conductor"
-  - "@tech-lead[server-platform]"
-  - "@tech-lead[server-gameplay]"
-  - "@tech-lead[client-platform]"
-  - "@tech-lead[client-features]"
-dependencies:
-  specs:
-    - ".agentwork/brief.md"
-    - ".agentwork/api_contracts.md"
-  rules:
-    - ".agents/rules/architectural-pattern.md"
-    - ".agents/rules/project-structure.md"
-    - ".agents/rules/code-organization-principles.md"
-    - ".agents/rules/logging-and-observability-mandate.md"
-    - ".agents/rules/error-handling-principles.md"
-    - ".agents/rules/resources-and-memory-management-principles.md"
----
+# Project Conventions & Architectural Mandates
 
-# Fun-Chess Monorepo Architectural Patterns & Engineering Conventions
-
-## 1. Overview and Design Principles
-
-<!-- architecture: ARCH-CONVENTIONS-001 -->
-This document establishes the **authoritative architectural conventions, code idioms, and quality standards** for the Fun-Chess monorepo. It binds all Tech-Leads, Builders, and specialized subagents during the audit remediation lifecycle.
-
-### Core Universal Invariants
-1. **I/O Isolation (Rule 1)**: All network, storage, timer, randomness, and DOM interactions MUST be abstracted behind interfaces. Every I/O boundary must have a production implementation and a test double.
-2. **Pure Business Logic (Rule 2)**: Core domain rules, calculations, chess rules, and state transformations MUST be pure functions (no side effects, deterministic inputs to outputs). The sequence is always: **Fetch dependencies -> Pure logic -> Persist result**.
-3. **Dependency Direction (Rule 3)**: Dependencies point strictly inward toward pure business logic:
-   $$\text{Infrastructure / Platform} \longrightarrow \text{Contracts / Interfaces} \longleftarrow \text{Domain / Business Logic}$$
-4. **Structured Observability**: Every operation entry point MUST be instrumented with 3-point structured logging using static message strings, correlation IDs, and explicit durations. Raw `console.*` is strictly forbidden.
-<!-- end architecture -->
+> **Status: FROZEN ARCHITECTURAL CONTRACT**
+> **Phase: DESIGN**
+> **Author: System Architect (@architect)**
+> **Audience: Builders (@backend-engineer, @frontend-engineer, @tech-lead, @test-automation-engineer)**
+> **Context: Codebase Audit Remediation (CRIT-001, MAJ-001 to MAJ-013, MIN-001 to MIN-027)**
 
 ---
 
-## 2. Monorepo Directory Structure & Vertical Slice Architecture
+## 1. Directory Structure & Module Boundary Mandates
 
-### 2.1 Workspace Structure Overview
+### 1.1 Vertical Slices (Context → Feature → Layer)
+The codebase strictly follows the **vertical slice architecture** defined in `project-structure.md` and `code-organization-principles.md`. Code is organized by business feature, NOT technical layers.
 
-The repository is organized as a pnpm monorepo following the **Context $\to$ Feature $\to$ Layer** principle:
-
-```text
-fun-chess/
-├── shared/                       # @fun-chess/shared (Contracts, models, pure utilities)
-│   └── src/
-│       ├── contracts/            # Schemas, interfaces, events, errors, system tokens
-│       │   ├── events.ts         # ClientToServer & ServerToClient WebSocket event contracts
-│       │   ├── schemas.ts        # Zod validation schemas for all I/O boundaries
-│       │   ├── models.ts         # Authoritative domain models & TypeScript types
-│       │   ├── errors.ts         # Canonical AppError & domain error hierarchy
-│       │   └── system.ts         # IClock & IIdGenerator contracts
-│       └── utils/                # Pure mathematical, evaluation, and codec algorithms
-├── apps/
-│   ├── server/                   # @fun-chess/server (Node.js/Socket.io backend)
-│   │   └── src/
-│   │       ├── platform/         # Generic technical infrastructure & adapters
-│   │       │   ├── http/         # Native HTTP server, static file handler, IP utils
-│   │       │   ├── socket/       # Socket.IO wrapper, logging middleware, rate limiter
-│   │       │   ├── lifecycle/    # ShutdownCoordinator & graceful exit handlers
-│   │       │   ├── logger/       # Structured Pino telemetry logger & job runner
-│   │       │   ├── storage/      # NodeFileStorage adapter
-│   │       │   └── network/      # RelayAddressService & LAN discovery
-│   │       ├── features/         # Vertical business feature slices
-│   │       │   ├── rooms/        # Room lifecycle, lobby matchmaking, sessions
-│   │       │   └── game/         # Chess engine, gameplay state machine, move execution
-│   │       └── index.ts          # Composition root & server bootstrap entry point
-│   ├── client/                   # @fun-chess/client (Vue 3/Vite frontend SPA)
-│   │   └── src/
-│   │       ├── platform/         # Technical platform adapters & Vue DI
-│   │       │   ├── di/           # Vue InjectionKey tokens & useInject* composables
-│   │       │   ├── api/          # HTTP API client
-│   │       │   ├── storage/      # LocalStorage/SessionStorage adapters & migrations
-│   │       │   ├── telemetry/    # Structured browser logger & correlation IDs
-│   │       │   ├── audio/        # Web Audio API synthesizer
-│   │       │   └── hardware/     # Clipboard, camera, PWA, haptics
-│   │       ├── features/         # Vertical frontend feature slices
-│   │       │   ├── board/        # Chessboard canvas/DOM, piece rendering, drag-and-drop
-│   │       │   ├── lobby/        # Room creation, joining, LAN discovery, QR codes
-│   │       │   ├── multiplayer/  # Socket.IO transport, room session, game actions
-│   │       │   ├── ai/           # Stockfish worker, bot difficulty, offline play
-│   │       │   ├── puzzles/      # Daily puzzles, puzzle rush, local progress store
-│   │       │   ├── scenarios/    # Interactive training scenarios & bot runner
-│   │       │   ├── portability/  # Save export/import, QR sync, backup validation
-│   │       │   └── pwa/          # Service worker registration & offline install prompt
-│   │       ├── components/       # Shared UI primitives (modals, buttons, toast)
-│   │       ├── main.ts           # Client composition root & app mount
-│   │       └── App.vue           # Root view shell & providers
-│   └── e2e/                      # @fun-chess/e2e (Playwright test suites)
-│       ├── ui/                   # Browser user journey & PWA specs
-│       └── src/pages/            # Page Object Model abstractions
-├── tools/                        # Offline tooling (puzzle compiler, generators)
-└── infra/                        # Docker, docker-compose, and deployment configs
+```
+apps/server/src/
+├── features/                  # Vertical business domains
+│   ├── rooms/                 # Room lifecycle, matchmaking, presence
+│   ├── game/                  # Chess moves, engine validation, timers, game over
+│   └── lan/                   # Local network discovery, relay addressing
+├── platform/                  # Reusable cross-cutting infrastructure
+│   ├── http/                  # Native HTTP server, controllers, security headers
+│   ├── socket/                # Socket.io server bootstrap & logging middleware
+│   ├── logger/                # Structured Pino logger wrapper
+│   ├── config/                # Environment variable schema & parsing
+│   ├── id/                    # UUID generators
+│   └── time/                  # System clock abstractions
+└── index.ts                   # Composition root (wires DI, boots HTTP/Socket)
 ```
 
-### 2.2 Vertical Slice Architecture Rules
-
-<!-- architecture: ARCH-VERTICAL-SLICES -->
-1. **Self-Contained Slices**: Each feature directory represents an independent vertical business slice containing its public interface, domain logic, data stores, socket/UI handlers, and co-located unit tests.
-2. **Public Barrel Export (`index.ts`)**: Every feature slice MUST expose a single public barrel `index.ts`. Cross-feature imports MUST target only this barrel (e.g. `import { RoomService } from '../rooms'`).
-3. **Internal Isolation**: Direct deep imports into another feature's internal files (e.g. `import { InMemoryRoomStore } from '../rooms/in_memory_room.store.js'`) are **STRICTLY FORBIDDEN**.
-4. **Platform Infrastructure Relocation (MAJ-021)**: Technical utilities that do not encapsulate business logic MUST reside under `platform/`. For example, `features/common/socket_handler.utils.ts` is relocated to `platform/socket/socket_handler.utils.ts` and re-exported via `platform/socket/index.ts`.
-<!-- end architecture -->
+### 1.2 Module Boundary & Public API Encapsulation (MAJ-006)
+1. **The Public API Rule**:
+   - Each feature directory MUST expose a top-level `index.ts`.
+   - **Cross-module calls go through the public API only — never import internal files directly.**
+   - If feature B needs a function, type, or class from feature A, feature A's `index.ts` MUST explicitly re-export it.
+2. **Forbidden Anti-Pattern**:
+   ```typescript
+   // ❌ STRICTLY FORBIDDEN (Breaks encapsulation, MAJ-006)
+   import { sanitizePublicRoom } from "../rooms/room.logic.js";
+   import { RoomNotFoundError } from "../rooms/room.errors.js";
+   ```
+3. **Mandatory Pattern**:
+   ```typescript
+   // ✅ MANDATORY (Imports exclusively through public interface)
+   import { sanitizePublicRoom, RoomNotFoundError } from "../rooms/index.js";
+   ```
+4. **Authoritative Public API for `features/rooms/index.ts`**:
+   The rooms public entry point MUST re-export all domain interfaces, errors, and public sanitizers:
+   ```typescript
+   // apps/server/src/features/rooms/index.ts
+   export type { IRoomService, IRoomGameAdapter } from "./room.interface.js";
+   export type { RoomStore, IRoomStore, RoomMutator } from "./room.store.js";
+   export { MAX_ROOMS } from "./room.store.js";
+   export type { SessionRecord, SessionRegistry, ISessionRegistry } from "./session_registry.js";
+   export { InMemorySessionRegistry } from "./in_memory_session_registry.js";
+   export { MockSessionRegistry } from "./mock_session_registry.js";
+   export { InMemoryRoomStore, type InMemoryRoomStoreOptions, type LockContext } from "./in_memory_room.store.js";
+   export { MockRoomStore } from "./mock_room.store.js";
+   export { RoomService } from "./room.service.js";
+   export { registerRoomSocketHandlers, handleSocketDisconnect } from "./room.socket_handler.js";
+   export {
+     DisconnectTimerRegistry,
+     defaultDisconnectTimerRegistry,
+     createDisconnectTimerRegistry,
+     resetDefaultDisconnectTimerRegistry,
+     cancelDisconnectTimer,
+     cancelAllDisconnectTimersForRoom,
+     clearAllDisconnectTimers,
+     DISCONNECT_GRACE_PERIOD_MS,
+     type IDisconnectTimerRegistry,
+   } from "./disconnect_timer_registry.js";
+   export {
+     sanitizePublicRoom,
+     sanitizePublicPlayer,
+     createInitialRoomState,
+     abandonmentForfeitTransition,
+   } from "./room.logic.js";
+   export * from "./room.errors.js";
+   ```
 
 ---
 
-## 3. Canonical Error Handling Conventions
+## 2. Pure State Transition Pattern vs. I/O Mutations (CRIT-001)
 
-<!-- architecture: ARCH-ERROR-HANDLING -->
-### 3.1 Error Class Hierarchy & Prototype Identity (MAJ-005)
-
-All domain, validation, and infrastructure errors in the Fun-Chess monorepo MUST inherit from `AppError` in `@fun-chess/shared`.
-
-```text
-                      ┌──────────────────────┐
-                      │     Error (ES6)      │
-                      └──────────┬───────────┘
-                                 │
-                      ┌──────────▼───────────┐
-                      │       AppError       │
-                      │  (@fun-chess/shared) │
-                      └──────────┬───────────┘
-         ┌───────────────────────┼───────────────────────┐
-         │                       │                       │
-┌────────▼────────┐    ┌─────────▼─────────┐   ┌─────────▼─────────┐
-│  Domain Errors  │    │ Validation Errors │   │  Platform Errors  │
-├─────────────────┤    ├───────────────────┤   ├───────────────────┤
-│RoomNotFoundError│    │InvalidPayloadError│   │ LockTimeoutError  │
-│NotYourTurnError │    │InvalidMoveError   │   │ StorageQuotaError │
-│OptimisticLock...│    └───────────────────┘   │ SocketTimeoutError│
-└─────────────────┘                            └───────────────────┘
+### 2.1 The Three-Step Architectural Pattern
+All state transitions follow the pure business logic rule (`architectural-pattern.md` Rule 2):
+```
+[Step 1: Fetch state snapshot under lock]
+                  ↓
+[Step 2: Pure State Transition Function (Input -> Output, no side effects, no I/O)]
+                  ↓
+[Step 3: Atomic Mutation & Versioned Persistence (ticket validation + CAS version increment)]
 ```
 
-#### Base `AppError` Contract (`shared/src/contracts/errors.ts`)
+### 2.2 Specification of CRIT-001 Remediation
 
+#### The Defect
+Previously, `handleAbandonmentForfeit` in `room.service.ts` fetched a room snapshot via `findByCode()`, directly modified properties on the object (`room.status = "game_over"; room.lastActivityAt = this.clock.now()`), and called `this.store.save(room)`.
+This bypassed:
+1. Pure state transition extraction (`room.logic.ts`)
+2. Monotonic ticket validation (`assertTicketValid`)
+3. Optimistic version conflict detection (`OptimisticLockConflictError`)
+4. Service-layer structured observability
+
+#### Authoritative Remediation
+
+##### 1. Pure Function: `abandonmentForfeitTransition` (`apps/server/src/features/rooms/room.logic.ts`)
 ```typescript
-export class AppError extends Error {
-  public readonly code: string;
-  public readonly statusCode: number;
-  public readonly details?: Record<string, unknown>;
-
-  constructor(
-    code: string,
-    message: string,
-    statusCode = 500,
-    details?: Record<string, unknown>,
-  ) {
-    super(message);
-    this.name = this.constructor.name;
-    this.code = code;
-    this.statusCode = statusCode;
-    this.details = details;
-
-    // Explicitly restore prototype chain for transpiled ESM/CJS interop
-    Object.setPrototypeOf(this, new.target.prototype);
+/**
+ * Pure transition applying forfeiture by abandonment when a player's disconnect grace period expires.
+ * Returns the next RoomState and GameOverPayload, or null if the player reconnected or room is not paused.
+ */
+export function abandonmentForfeitTransition(
+  room: RoomState,
+  disconnectedPlayerId: string,
+  now: number,
+): { nextRoom: RoomState; gameOverPayload: GameOverPayload } | null {
+  // Only forfeit if room is actively waiting for reconnect
+  if (room.status !== "paused_disconnect") {
+    return null;
   }
 
-  public toJSON(): SocketErrorPayload {
-    return {
-      code: this.code,
-      message: this.message,
-      statusCode: this.statusCode,
-      details: this.details,
-    };
+  // Identify disconnected player
+  let disconnectedPlayer: Player | null = null;
+  if (room.whitePlayer?.id === disconnectedPlayerId) {
+    disconnectedPlayer = room.whitePlayer;
+  } else if (room.blackPlayer?.id === disconnectedPlayerId) {
+    disconnectedPlayer = room.blackPlayer;
   }
+
+  // If player is not found or has reconnected in the interim, abort forfeit
+  if (!disconnectedPlayer || disconnectedPlayer.isConnected) {
+    return null;
+  }
+
+  const winnerColor: PieceColor = disconnectedPlayer.color === "w" ? "b" : "w";
+  const winnerPlayer = winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
+
+  let gameOverPayload: GameOverPayload;
+  if (winnerPlayer && winnerPlayer.isConnected) {
+    gameOverPayload = createGameOverPayload({
+      winner: winnerColor,
+      winnerName: winnerPlayer.name,
+      loserName: disconnectedPlayer.name,
+      reason: "abandonment",
+      finalFen: room.game.fen,
+      totalMoves: room.game.moveCount,
+      startTimeMs: room.createdAt,
+    });
+  } else {
+    // Both players disconnected when timer expired -> draw by abandonment
+    gameOverPayload = createGameOverPayload({
+      winner: "draw",
+      reason: "abandonment",
+      finalFen: room.game.fen,
+      totalMoves: room.game.moveCount,
+      startTimeMs: room.createdAt,
+    });
+  }
+
+  const nextRoom: RoomState = {
+    ...room,
+    status: "game_over",
+    drawOffer: null,
+    lastActivityAt: now,
+  };
+
+  return { nextRoom, gameOverPayload };
 }
 ```
 
-### 3.2 Error Invariants & Anti-Patterns
-
-1. **Single Source of Truth**: NEVER declare duplicate error classes with identical names in separate packages. Always export from `@fun-chess/shared` and import in server and client (resolves MAJ-005).
-2. **Never Fail Silently (Rule 1 of Error Handling)**:
-   - Empty catch blocks (`catch (e) {}`) are **REJECTED IN CODE REVIEW**.
-   - If an error is caught and absorbed intentionally, it MUST be logged with a clear rationale or captured in an explicit fallback:
-     ```typescript
-     // FORBIDDEN:
-     try { doSomething(); } catch (err) {}
-
-     // REQUIRED:
-     try {
-       doSomething();
-     } catch (err) {
-       logger.warn("Non-critical operation failed, proceeding with fallback", {
-         operation: "safe_operation_fallback",
-         correlationId,
-         error: err instanceof Error ? err.message : String(err),
-       });
-     }
-     ```
-3. **Sentinel Errors vs Exception Hierarchy**:
-   - Use typed `AppError` subclasses for business logic failures that carry structured context (e.g. `OptimisticLockConflictError` carrying `expectedVersion` and `actualVersion`).
-   - Use standard boolean/null return guards only for non-exceptional query misses (e.g. `findByCode(code): Promise<RoomState | null>`).
-<!-- end architecture -->
-
----
-
-## 4. Structured Logging Conventions
-
-<!-- architecture: ARCH-STRUCTURED-LOGGING -->
-### 4.1 Mandatory 3-Point Operation Logging
-
-Per `.agents/rules/logging-and-observability-mandate.md`, every operation entry point (socket handler, HTTP endpoint, background cron/interval, or asynchronous worker) MUST log at three distinct lifecycle points:
-
-1. **Operation Start**: Log immediately on entry with correlation ID, user ID (if available), and operation name.
-2. **Operation Success**: Log completion with duration in milliseconds (`durationMs`), status `"success"`, and relevant result identifiers.
-3. **Operation Failure**: Log error with duration in milliseconds, status `"failed"`, and full error context (message, stack trace).
+##### 2. Service Execution via `this.store.mutate()` (`apps/server/src/features/rooms/room.service.ts`)
+`handleAbandonmentForfeit` MUST call `this.store.mutate()` to guarantee atomic execution inside the lock queue, ticket verification, and version monotonicity:
 
 ```typescript
-export async function handleOperation(
-  logger: Logger,
-  userId: string,
-  params: OperationParams,
-): Promise<OperationResult> {
-  const correlationId = randomUUID();
-  const startTime = performance.now();
+public async handleAbandonmentForfeit(
+  roomCode: string,
+  disconnectedPlayerId: string,
+): Promise<{ room: RoomState; gameOverPayload: GameOverPayload } | null> {
+  const normalizedCode = normalizeRoomCode(roomCode);
+  const startTime = this.clock.now();
 
-  // 1. Operation Start
-  logger.info("Executing operation", {
-    operation: "user_operation",
-    correlationId,
-    userId,
-    paramKey: params.key,
+  this.logger.info("Processing abandonment forfeit", {
+    operation: "room_abandonment_forfeit",
+    roomCode: normalizedCode,
+    disconnectedPlayerId,
   });
 
   try {
-    const result = await executeBusinessLogic(params);
-    const durationMs = Math.round(performance.now() - startTime);
+    const outcome = await this.store.mutate(
+      normalizedCode,
+      (current) => {
+        const transition = abandonmentForfeitTransition(
+          current,
+          disconnectedPlayerId,
+          this.clock.now(),
+        );
+        if (!transition) {
+          return { updatedRoom: current, result: null };
+        }
+        return {
+          updatedRoom: transition.nextRoom,
+          result: {
+            room: transition.nextRoom,
+            gameOverPayload: transition.gameOverPayload,
+          },
+        };
+      },
+    );
 
-    // 2. Operation Success
-    logger.info("Operation completed successfully", {
-      operation: "user_operation",
-      correlationId,
-      userId,
-      status: "success",
-      duration: durationMs,
-      durationMs,
-      resultId: result.id,
+    const duration = this.clock.now() - startTime;
+    if (outcome) {
+      this.logger.info("Abandonment forfeit completed successfully", {
+        operation: "room_abandonment_forfeit",
+        roomCode: normalizedCode,
+        disconnectedPlayerId,
+        winner: outcome.gameOverPayload.winner,
+        duration,
+        durationMs: duration,
+      });
+    } else {
+      this.logger.info("Abandonment forfeit skipped: player reconnected or room state changed", {
+        operation: "room_abandonment_forfeit",
+        roomCode: normalizedCode,
+        disconnectedPlayerId,
+        duration,
+        durationMs: duration,
+      });
+    }
+
+    return outcome;
+  } catch (error) {
+    const duration = this.clock.now() - startTime;
+    this.logger.error("Abandonment forfeit processing failed", {
+      operation: "room_abandonment_forfeit",
+      roomCode: normalizedCode,
+      disconnectedPlayerId,
+      duration,
+      durationMs: duration,
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { raw: error },
     });
-
-    return result;
-  } catch (err) {
-    const durationMs = Math.round(performance.now() - startTime);
-
-    // 3. Operation Failure
-    logger.error("Operation failed", {
-      operation: "user_operation",
-      correlationId,
-      userId,
-      status: "failed",
-      duration: durationMs,
-      durationMs,
-      error:
-        err instanceof Error
-          ? { name: err.name, message: err.message, stack: err.stack }
-          : { raw: err },
-    });
-
-    throw err;
+    throw error;
   }
 }
 ```
 
-### 4.2 Static Message Templates (MAJ-024)
-
-Log messages in the first argument MUST be **static string literals**. Dynamic variables MUST NEVER be interpolated into the message string:
-
-```typescript
-// FORBIDDEN (Violates MAJ-024, breaks aggregation and log indexing):
-logger.info(`Room ${roomCode} created by player ${playerId}`);
-logger.warn(`Lock timeout on room ${roomCode} after ${timeoutMs}ms`);
-
-// REQUIRED (Static templates with structured context):
-logger.info("Room created successfully", {
-  operation: "room_create",
-  roomCode,
-  playerId,
-});
-logger.warn("Lock acquisition timed out", {
-  operation: "room_lock_acquire",
-  roomCode,
-  timeoutMs,
-});
-```
-
-### 4.3 Zero Raw `console.*` Mandate (MAJ-025)
-
-1. Calls to `console.log`, `console.info`, `console.warn`, `console.error`, `console.debug`, or `console.trace` are **COMPLETELY FORBIDDEN** in production code across all workspaces.
-2. In client components/composables, inject `ILogger` via `useInjectLogger()`.
-3. In server components/services, receive `Logger` via constructor/parameter injection.
-<!-- end architecture -->
-
 ---
 
-## 5. Dependency Injection Patterns
+## 3. Error Handling Conventions
 
-### 5.1 Server Dependency Injection & Architecture
+### 3.1 Non-Negotiable Principle: Never Fail Silently (`error-handling-principles.md`)
+Empty catch blocks (`catch {}` or `catch (e) {}` with no logging or bubbling) are strictly prohibited across all packages (`shared`, `apps/server`, `apps/client`, `apps/e2e`).
 
-<!-- architecture: ARCH-SERVER-DI -->
-#### 5.1.1 `GameService` Decoupling & `RoomService` Injection (MAJ-015)
-- **Problem**: `InMemoryRoomStore` previously implemented `IRoomGameAdapter`, embedding domain gameplay logic (`applyGameMove`, `finalizeGame`) directly inside the storage adapter. In `index.ts`, `GameService` was injected with `roomStore` directly.
-- **Remediation & Pattern**:
-  1. `RoomStore` is confined strictly to data persistence operations (`findByCode`, `save`, `delete`, `mutate`, `withLock`). It DOES NOT implement `IRoomGameAdapter`.
-  2. `RoomService` implements `IRoomService` (for socket/HTTP ingress) AND `IRoomGameAdapter` (for game domain coordination).
-  3. `GameService` receives `IRoomGameAdapter` (implemented by `roomService`), NOT `roomStore`.
+### 3.2 Asynchronous Timers and Background Jobs
+Errors thrown inside `setTimeout`, `setInterval`, queue workers, or background promises CANNOT bubble to a request context. They MUST be caught, bound, and logged with complete context.
 
-```mermaid
-graph TD
-    subgraph Composition Root [apps/server/src/index.ts]
-        RS[RoomStore: InMemoryRoomStore]
-        SVC[RoomService: IRoomService & IRoomGameAdapter]
-        GS[GameService: IGameService]
-    end
-
-    RS -->|Storage Adapter| SVC
-    SVC -->|Domain Game Adapter| GS
-```
-
-Wiring in `apps/server/src/index.ts`:
-
+#### MAJ-004 Remediation (Disconnect Grace-Period Timer Callback)
 ```typescript
-const roomStore: RoomStore = options.roomStore ?? new InMemoryRoomStore(logger);
-const roomService = new RoomService(
-  roomStore,
-  undefined,
-  clock,
-  idGenerator,
-  timerRegistry,
-);
-// GameService is injected with roomService (implementing IRoomGameAdapter), NEVER roomStore!
-const gameService = new GameService(roomService, clock, idGenerator);
-```
-
-#### 5.1.2 Time and Randomness Abstraction (MAJ-019, MAJ-020)
-
-1. **System Clock (`IClock`)**:
-   - Contract in `shared/src/contracts/system.ts`: `export interface IClock { now(): number; }`
-   - Pure domain calculations MUST receive explicit timestamp parameters:
-     ```typescript
-     // dictionary_mapper.ts (MAJ-019)
-     public toCompact(payload: UnifiedProgressPayload, now: number): CompactProgressDto
-     ```
-   - Stateful services receive `IClock` via constructor:
-     ```typescript
-     export class ChessEngine {
-       public static applyMove(
-         chess: Chess,
-         moveResultObj: Move,
-         currentHistory: MoveResult[],
-         timestamp: number, // Explicit parameter, no Date.now() default
-         initialFen?: string,
-       ): MoveApplicationOutcome
-     }
-     ```
-2. **ID & Randomness Generator (`IIdGenerator`)**:
-   - `generateRandomInt` MUST be a required method on `IIdGenerator` (resolves MAJ-020):
-     ```typescript
-     export interface IIdGenerator {
-       generateId(): string;
-       generateRandomInt(min: number, max: number): number;
-     }
-     ```
-   - `RoomService` MUST NOT fall back to `node:crypto.randomInt`. It calls `this.idGenerator.generateRandomInt(min, max)` exclusively.
-<!-- end architecture -->
-
----
-
-### 5.2 Client Dependency Injection (Vue 3)
-
-<!-- architecture: ARCH-CLIENT-DI -->
-#### 5.2.1 Unified `useInject*` Composables (MAJ-016, ENH-003)
-
-In `apps/client/src/platform/di/index.ts`:
-- Define all DI tokens using Vue's `InjectionKey<T>` in `tokens.ts`.
-- Expose unified `useInject*` composables that provide graceful fallback to default instances.
-- **ELIMINATE** the competing `use*` helpers that threw errors (ENH-003).
-
-```typescript
-import { inject } from 'vue';
-import {
-  API_CLIENT_KEY,
-  STORAGE_KEY,
-  SESSION_STORAGE_KEY,
-  AUDIO_SERVICE_KEY,
-  LOGGER_KEY,
-  CLIPBOARD_SERVICE_KEY,
-  CAMERA_SERVICE_KEY,
-} from './tokens';
-import type { IApiClient } from '../api/api_client.interface';
-import type { KeyValueStorage } from '../storage/key_value_storage';
-import type { IAudioService } from '../audio/audio.interface';
-import type { ILogger } from '../telemetry';
-import type { IClipboardService, ICameraService } from '../hardware';
-import { apiClient as defaultApiClient } from '../api';
-import { safeLocalStorage, safeSessionStorage } from '../storage';
-import { audioSynthesizer as defaultAudioSynthesizer } from '../audio/audio_synthesizer';
-import { logger as defaultLogger } from '../telemetry';
-import { defaultClipboardService, defaultCameraService } from '../hardware';
-
-export * from './tokens';
-
-/**
- * Injects the application logger. Falls back to default platform logger if called outside provider.
- */
-export function useInjectLogger(fallback?: ILogger): ILogger {
-  return inject(LOGGER_KEY, fallback ?? defaultLogger);
-}
-
-/**
- * Injects persistent key-value storage.
- */
-export function useInjectStorage(fallback?: KeyValueStorage): KeyValueStorage {
-  return inject(STORAGE_KEY, fallback ?? safeLocalStorage);
-}
-
-/**
- * Injects session-scoped key-value storage.
- */
-export function useInjectSessionStorage(fallback?: KeyValueStorage): KeyValueStorage {
-  return inject(SESSION_STORAGE_KEY, fallback ?? safeSessionStorage);
-}
-
-/**
- * Injects clipboard service (MAJ-017).
- */
-export function useInjectClipboardService(fallback?: IClipboardService): IClipboardService {
-  return inject(CLIPBOARD_SERVICE_KEY, fallback ?? defaultClipboardService);
-}
-
-/**
- * Injects HTTP API client.
- */
-export function useInjectApiClient(fallback?: IApiClient): IApiClient {
-  return inject(API_CLIENT_KEY, fallback ?? defaultApiClient);
-}
-
-/**
- * Injects audio synthesizer service.
- */
-export function useInjectAudioService(fallback?: IAudioService): IAudioService {
-  return inject(AUDIO_SERVICE_KEY, fallback ?? defaultAudioSynthesizer);
-}
-```
-
-#### 5.2.2 Feature Consumption Guidelines
-
-In all client feature components and composables:
-1. **NEVER** import singletons directly from `@/platform/telemetry`, `@/platform/storage`, or `@/platform/hardware`.
-2. **ALWAYS** call the injection composables at the top of the `setup()` or composable function:
-
-```typescript
-// apps/client/src/features/lobby/QrCodeModal.vue (MAJ-017)
-<script setup lang="ts">
-import { useInjectLogger, useInjectClipboardService } from '@/platform/di';
-
-const logger = useInjectLogger();
-const clipboard = useInjectClipboardService();
-
-async function handleCopy() {
+// apps/server/src/features/rooms/room.service.ts
+const timer = setTimeout(async () => {
   try {
-    await clipboard.writeText(shareUrl.value);
-    copied.value = true;
+    await runLoggedJob(
+      this.logger,
+      "disconnect_grace_period_abandonment",
+      async (jobCorrelationId) => {
+        const forfeitResult = await this.handleAbandonmentForfeit(
+          matchedRoom.roomCode,
+          playerId,
+        );
+        if (forfeitResult && onForfeit) {
+          await onForfeit(
+            forfeitResult.room,
+            forfeitResult.gameOverPayload,
+            jobCorrelationId,
+          );
+        }
+        return {
+          roomCode: matchedRoom.roomCode,
+          playerId,
+          forfeited: Boolean(forfeitResult),
+        };
+      },
+    );
   } catch (err) {
-    logger.error("Failed to copy URL to clipboard", {
-      operation: "clipboard_copy",
+    // MAJ-004: Catch and log error explicitly with full room and player context
+    this.logger.error("Disconnect grace-period forfeiture job failed", {
+      operation: "disconnect_grace_period_abandonment",
+      roomCode: matchedRoom.roomCode,
+      playerId,
+      error: err instanceof Error
+        ? { name: err.name, message: err.message, stack: err.stack }
+        : { raw: err },
+    });
+  }
+}, gracePeriodMs);
+```
+
+#### MIN-001 Remediation (`ChessEngine.findKingSquare`)
+```typescript
+// apps/server/src/features/game/chess_engine.ts
+public static findKingSquare(fen: string, color: PieceColor): string | null {
+  try {
+    const chess = new Chess(fen);
+    // ... search for king square ...
+  } catch (err) {
+    defaultLogger.debug("FEN parse failure in findKingSquare", {
+      operation: "chess_find_king_square",
+      color,
       error: err instanceof Error ? err.message : String(err),
     });
-  }
-}
-</script>
-```
-<!-- end architecture -->
-
----
-
-## 6. Server Lifecycle & Teardown Patterns
-
-### 6.1 `ShutdownCoordinator` Listener Retention & `dispose()` (MAJ-010)
-
-<!-- architecture: ARCH-LIFECYCLE -->
-To prevent process listener leaks and `MaxListenersExceededWarning` across server restarts and test runs, `ShutdownCoordinator` MUST retain references to registered listeners and provide a `dispose()` method:
-
-```typescript
-// apps/server/src/platform/lifecycle/shutdown_coordinator.ts
-export class ShutdownCoordinator {
-  private sigintHandler?: () => void;
-  private sigtermHandler?: () => void;
-  private unhandledRejectionHandler?: (reason: unknown) => void;
-  private uncaughtExceptionHandler?: (err: Error) => void;
-  private serverErrorHandler?: (err: Error) => void;
-  private isDisposed = false;
-
-  public installProcessHandlers(): void {
-    if (this.isDisposed) return;
-
-    this.sigintHandler = () => { void this.shutdown("SIGINT"); };
-    this.sigtermHandler = () => { void this.shutdown("SIGTERM"); };
-    this.unhandledRejectionHandler = (reason: unknown) => {
-      this.logger.error("Unhandled promise rejection", {
-        operation: "unhandled_rejection",
-        correlationId: randomUUID(),
-        error: reason instanceof Error ? { name: reason.name, message: reason.message, stack: reason.stack } : { raw: reason },
-      });
-    };
-    this.uncaughtExceptionHandler = (err: Error) => {
-      this.logger.fatal("Uncaught exception, initiating emergency shutdown", {
-        operation: "uncaught_exception",
-        correlationId: randomUUID(),
-        error: { name: err.name, message: err.message, stack: err.stack },
-      });
-      void this.shutdown("uncaughtException");
-    };
-    this.serverErrorHandler = (err: Error) => {
-      this.logger.fatal("HTTP server fatal socket error", {
-        operation: "server_error",
-        correlationId: randomUUID(),
-        error: { name: err.name, message: err.message, stack: err.stack },
-      });
-      void this.shutdown("serverError");
-    };
-
-    process.on("SIGINT", this.sigintHandler);
-    process.on("SIGTERM", this.sigtermHandler);
-    process.on("unhandledRejection", this.unhandledRejectionHandler);
-    process.on("uncaughtException", this.uncaughtExceptionHandler);
-    this.server.on("error", this.serverErrorHandler);
-  }
-
-  /**
-   * Uninstalls all process and server event listeners and cancels pending timers (MAJ-010).
-   */
-  public dispose(): void {
-    if (this.isDisposed) return;
-    this.isDisposed = true;
-
-    if (this.sigintHandler) process.removeListener("SIGINT", this.sigintHandler);
-    if (this.sigtermHandler) process.removeListener("SIGTERM", this.sigtermHandler);
-    if (this.unhandledRejectionHandler) process.removeListener("unhandledRejection", this.unhandledRejectionHandler);
-    if (this.uncaughtExceptionHandler) process.removeListener("uncaughtException", this.uncaughtExceptionHandler);
-    if (this.serverErrorHandler) this.server.removeListener("error", this.serverErrorHandler);
-
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-    }
+    return null;
   }
 }
 ```
 
-### 6.2 Programmatic `server.close()` Timeout Race & Teardown (MAJ-007, MAJ-008)
-
-In `apps/server/src/index.ts`:
-1. Race the shutdown against a **5000ms timeout rejection** to prevent hanging in test runners.
-2. Disconnect socket clients: `io.disconnectSockets(true)`.
-3. Call `closeIdleConnections()` AND `closeAllConnections()` on the HTTP server.
-4. DO NOT ignore callback errors (`MAJ-008`). Reject the promise if `err` is returned:
-
+#### MIN-002 Remediation (`static_handler.ts`)
 ```typescript
-const close = async (): Promise<void> => {
-  const closeCorrelationId = randomUUID();
-  const closeStartTime = performance.now();
-
-  logger.info("Fun Chess server closing...", {
-    operation: "server_close",
-    correlationId: closeCorrelationId,
-  });
-
-  const teardownPromise = (async () => {
-    // 1. Clear background timers
-    clearInterval(cleanupInterval);
-    timerRegistry.clear();
-    clearAllDisconnectTimers();
-    rateLimiter.destroy();
-
-    // 2. Disconnect and close WebSocket transport
-    if (typeof io.disconnectSockets === "function") {
-      io.disconnectSockets(true);
-    }
-    await new Promise<void>((resolve, reject) => {
-      io.close((err) => (err ? reject(err) : resolve()));
-    });
-
-    // 3. Terminate active HTTP connections and close server
-    if (server.listening) {
-      const sWithConn = server as http.Server & {
-        closeIdleConnections?: () => void;
-        closeAllConnections?: () => void;
-      };
-      if (typeof sWithConn.closeIdleConnections === "function") {
-        sWithConn.closeIdleConnections();
-      }
-      if (typeof sWithConn.closeAllConnections === "function") {
-        sWithConn.closeAllConnections();
-      }
-      await new Promise<void>((resolve, reject) => {
-        server.close((err) => (err ? reject(err) : resolve()));
-      });
-    }
-
-    // 4. Clean up shutdown coordinator listeners
-    shutdownCoordinator.dispose();
-  })();
-
-  const timeoutPromise = new Promise<void>((_, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error("Server teardown timed out after 5000ms"));
-    }, 5000);
-    timer.unref?.();
-  });
-
-  try {
-    await Promise.race([teardownPromise, timeoutPromise]);
-    const closeDuration = Math.round(performance.now() - closeStartTime);
-    logger.info("Fun Chess server closed successfully", {
-      operation: "server_close",
-      correlationId: closeCorrelationId,
-      status: "success",
-      durationMs: closeDuration,
-    });
-  } catch (err) {
-    const closeDuration = Math.round(performance.now() - closeStartTime);
-    logger.error("Fun Chess server close encountered error or timed out", {
-      operation: "server_close",
-      correlationId: closeCorrelationId,
-      status: "failed",
-      durationMs: closeDuration,
-      error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
-    });
-    throw err;
-  }
-};
-```
-
-### 6.3 Server Bootstrap Failure Cleanup (MAJ-009)
-
-If `server.listen()` encounters a binding failure (e.g. `EADDRINUSE`) or any synchronous setup throws:
-- Wrap startup in `try / catch`.
-- Clean up `cleanupInterval`, `rateLimiter.destroy()`, and `shutdownCoordinator.dispose()` before rethrowing:
-
-```typescript
+// apps/server/src/platform/http/static_handler.ts
 try {
-  if (autoListen) {
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(port, host, () => {
-        server.removeListener("error", reject);
-        resolve();
-      });
-    });
-  }
-} catch (bootstrapErr) {
-  // MAJ-009: Clean up lingering resources immediately on bootstrap failure
-  clearInterval(cleanupInterval);
-  rateLimiter.destroy();
-  shutdownCoordinator.dispose();
-  timerRegistry.clear();
-  clearAllDisconnectTimers();
-  throw bootstrapErr;
+  decodedPath = decodeURIComponent(pathname);
+} catch (err) {
+  logger.warn("Malformed URI component in static path request", {
+    operation: "static_serve_decode_error",
+    path: pathname,
+    clientIp,
+    error: err instanceof Error ? err.message : String(err),
+  });
+  return false;
 }
 ```
-<!-- end architecture -->
+
+#### MIN-003 Remediation (Client `emitWithTimeout` Rejection Support)
+```typescript
+// apps/client/src/features/multiplayer/composables/useSocketTransport.ts
+export interface EmitWithTimeoutOptions<TRes> {
+  timeoutMs?: number;
+  timeoutMessage?: string;
+  operation?: string;
+  correlationId?: string;
+  rejectOnError?: boolean; // MIN-003: Optional flag allowing caller to reject promise
+  onSuccess?: (res: TRes) => void;
+  onError?: (err: SocketErrorPayload) => void;
+}
+```
 
 ---
 
-## 7. Reference Vertical Slice Skeleton
+## 4. Structured Logging Mandate
 
-Below is the canonical template for a vertical feature slice (`features/example/`):
+### 4.1 Mandatory Context Fields (`logging-and-observability-mandate.md`)
+Every operational log entry MUST contain:
+1. `operation`: Canonical snake_case string (e.g. `room_create`, `game_move`, `health_liveness`, `http_rate_limited`).
+2. `correlationId`: UUID tracing the request or transaction.
+3. `duration` / `durationMs`: Elapsed time in integer milliseconds for all completion/rejection logs.
+4. `userId` / `playerId`: Identity of the actor when available.
+5. `error`: Structured object containing `{ name, message, stack }` or `{ code, message }` on failure.
 
-```text
-apps/server/src/features/example/
-├── index.ts                     # Public API barrel (Exports interface, service, types ONLY)
-├── example.interface.ts         # Pure domain contracts & service interfaces
-├── example.service.ts           # Domain orchestrator with constructor DI
-├── example.logic.ts             # Pure business calculation functions (zero I/O)
-├── example.store.ts             # I/O boundary interface for persistence
-├── in_memory_example.store.ts   # In-memory production/test adapter
-├── example.socket_handler.ts    # Socket.IO ingress controller (3-point logging)
-└── __tests__/
-    ├── example.service.spec.ts  # Unit tests with mocked dependencies
-    ├── example.logic.spec.ts    # Pure unit tests for calculations
-    └── example.store.spec.ts    # Storage adapter boundary tests
+### 4.2 Standard Log Levels
+- **`error`**: Unhandled exceptions, failed storage mutations, crashed background jobs, fatal configuration errors.
+- **`warn`**: Rate limit triggers, unauthorized telemetry access attempts, recoverable invalid user input, socket disconnects.
+- **`info`**: Operational entry points and successes (room creation, room join, match start, game completion, server startup).
+- **`debug`**: Mutex acquisition details, chess engine FEN validation details, internal ticket sequence logs.
+
+---
+
+## 5. Testing Strategy & I/O Isolation Mandates
+
+### 5.1 Unit Tests vs. Integration Tests (MAJ-010)
+1. **Unit Tests (`*.spec.ts` or `*.test.ts`)**:
+   - **ZERO REAL I/O**: No filesystem writes, no network calls, no child processes.
+   - Must use in-memory adapters (`MemoryFileStorage`, `MockRoomStore`, `MockSessionRegistry`).
+   - Run in milliseconds.
+2. **Integration Tests (`*.integration.spec.ts`)**:
+   - Exercise real filesystem interactions or multi-component wiring.
+   - Must clean up temporary files in `finally` or `afterEach` blocks (`fs.rm(tempDir, { recursive: true })`).
+3. **Partitioning `file_storage.spec.ts` (MAJ-010)**:
+   - `apps/server/src/platform/http/__tests__/file_storage.spec.ts`: Unit test suite testing `MemoryFileStorage`.
+   - `apps/server/src/platform/http/__tests__/file_storage.integration.spec.ts`: Integration test suite testing `NodeFileStorage` with temporary directories and symlinks.
+
+### 5.2 Deterministic Time in Test Doubles (MAJ-013)
+`MockRoomStore` MUST NOT call wall-clock `Date.now()`. It accepts an injectable `IClock` defaulting to `SystemClock`. In tests, a simulated or stepped clock can be provided to test time-based transitions deterministically.
+
+---
+
+## 6. Canonical Feature Directory Skeleton
+
+Below is the standard vertical slice skeleton for a server feature (`features/rooms`):
+
+```
+apps/server/src/features/rooms/
+├── index.ts                         # Public API: ONLY exported symbols for other features
+├── room.interface.ts                # Service contracts (IRoomService, IRoomGameAdapter)
+├── room.store.ts                    # Storage contract (RoomStore, IRoomStore, MAX_ROOMS)
+├── in_memory_room.store.ts          # Production store implementation (FIFO lock, ticket model)
+├── mock_room.store.ts               # Unit test store double (injectable IClock)
+├── room.logic.ts                    # Pure state transitions (addPlayer, abandonmentForfeit, sanitize)
+├── room.service.ts                  # Service orchestration & transaction boundaries (DI injected)
+├── room.socket_handler.ts           # Socket.io event controllers (rate limiting, auth, acks)
+├── session_registry.ts              # Session store contract (SessionRegistry, SessionRecord)
+├── in_memory_session_registry.ts    # Production session registry
+├── mock_session_registry.ts         # Test double session registry
+├── disconnect_timer_registry.ts     # Disconnect timer registry & lifecycle helpers
+├── room.errors.ts                   # Domain-specific typed error classes
+└── __tests__/                       # Co-located unit tests (100% in-memory)
+    ├── room.service.spec.ts
+    ├── room.logic.spec.ts
+    ├── in_memory_room.store.spec.ts
+    ├── room.socket_handler.spec.ts
+    └── session_registry.spec.ts
 ```
 
-### Reference Implementation Snippets
+---
 
-#### 1. Public API (`index.ts`)
-```typescript
-export type { IExampleService, ExampleItem } from "./example.interface.js";
-export { ExampleService } from "./example.service.js";
-export { registerExampleSocketHandlers } from "./example.socket_handler.js";
-export { InMemoryExampleStore } from "./in_memory_example.store.js";
-```
+## 7. Builder Responsibility Checklist
 
-#### 2. Pure Business Logic (`example.logic.ts`)
-```typescript
-/**
- * Pure calculation: No I/O, no network, no side effects, deterministic output.
- */
-export function calculateItemScore(baseScore: number, multiplier: number): number {
-  if (multiplier < 0) {
-    throw new InvalidPayloadError("Score multiplier cannot be negative");
-  }
-  return baseScore * multiplier;
-}
-```
-
-#### 3. Domain Service with Constructor DI (`example.service.ts`)
-```typescript
-export class ExampleService implements IExampleService {
-  constructor(
-    private readonly store: ExampleStore,
-    private readonly clock: IClock,
-    private readonly logger: Logger,
-  ) {}
-
-  public async processItem(id: string, multiplier: number): Promise<ExampleItem> {
-    // 1. Fetch dependencies via I/O abstraction
-    const item = await this.store.findById(id);
-    if (!item) {
-      throw new ItemNotFoundError(id);
-    }
-
-    // 2. Pure business logic
-    const newScore = calculateItemScore(item.baseScore, multiplier);
-    const updatedItem: ExampleItem = {
-      ...item,
-      score: newScore,
-      updatedAt: this.clock.now(),
-    };
-
-    // 3. Persist result
-    await this.store.save(updatedItem);
-    return updatedItem;
-  }
-}
-```
+| Scope Card | Builder Agent | Key Conventions to Apply |
+|------------|---------------|--------------------------|
+| **SC-1** | `@backend-engineer` | Shared contracts: `events.ts`, `normalization.ts`, exact engines pin in root `package.json` |
+| **SC-2** | `@backend-engineer` | HTTP pipeline reordering (rate limit first), `sanitizeCorrelationId`, telemetry auth guard, isolated `file_storage.integration.spec.ts`, pinned `workspace:^1.0.0` |
+| **SC-3** | `@backend-engineer` | Pure `abandonmentForfeitTransition`, `this.store.mutate()` in forfeit, non-empty catch in timer, explicit DI in `RoomService`, `while` eviction in `InMemoryRoomStore`, `MockRoomStore` clock |
+| **SC-4** | `@backend-engineer` | Explicit DI in `GameService` with `Logger`, cross-module import via `rooms/index.ts`, shared `normalizeRoomCode` |
+| **SC-5** | `@tech-lead` | Clean composition root in `index.ts` wiring all concrete dependencies, run integration test suite |
+| **SC-6** | `@frontend-engineer` | Consume ack-only room state in `useRoomSession`, update `room:player_disconnected` handler, expose `resetTransportState()`, pin `workspace:^1.0.0` |
+| **SC-7** | `@test-automation-engineer` | Playwright E2E scenario for "Draw Offer Declined", verify 0 regressions across entire test suite |

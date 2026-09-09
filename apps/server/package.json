@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
@@ -13,7 +17,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@fun-chess/shared": "workspace:*",
+    "@fun-chess/shared": "workspace:^1.0.0",
     "chess.js": "1.4.0",
     "pino": "9.6.0",
     "socket.io": "4.8.1",

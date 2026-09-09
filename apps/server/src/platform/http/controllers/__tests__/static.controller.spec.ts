@@ -87,7 +87,7 @@ describe("StaticController", () => {
     expect(writtenBody).toBe("<!DOCTYPE html><html><body>SPA Root</body></html>");
   });
 
-  it("returns 404 for unknown asset path with file extension (MIN-031)", async () => {
+  it("returns 404 for unknown asset path with file extension (MIN-031, F-06)", async () => {
     const fileStorage = new MemoryFileStorage({});
 
     const controller = new StaticController({
@@ -97,6 +97,7 @@ describe("StaticController", () => {
     });
 
     let writtenStatus = 0;
+    let writtenHeaders: Record<string, string> = {};
     let writtenBody = "";
 
     const req = {
@@ -108,11 +109,14 @@ describe("StaticController", () => {
     } as unknown as IncomingMessage;
 
     const res = {
-      writeHead: (status: number) => {
+      writeHead: (status: number, headers?: Record<string, string>) => {
         writtenStatus = status;
+        if (headers) writtenHeaders = headers;
+        return res;
       },
       end: (data?: unknown) => {
         if (data) writtenBody = String(data);
+        return res;
       },
       headersSent: false,
     } as unknown as ServerResponse;
@@ -120,10 +124,20 @@ describe("StaticController", () => {
     const served = await controller.serve(req, res);
     expect(served).toBe(true);
     expect(writtenStatus).toBe(404);
-    expect(writtenBody).toContain("Not Found");
+    expect(writtenHeaders["Content-Type"]).toContain("application/json");
+
+    const parsed = JSON.parse(writtenBody);
+    expect(parsed).toEqual({
+      status: "error",
+      code: 404,
+      error: {
+        code: "ERR_NOT_FOUND",
+        message: "Not Found",
+      },
+    });
   });
 
-  it("returns 404 when request path lacks extension and accept header does not accept HTML (ENH-014)", async () => {
+  it("returns 404 when request path lacks extension and accept header does not accept HTML (ENH-014, F-06)", async () => {
     const fileStorage = new MemoryFileStorage({});
 
     const controller = new StaticController({
@@ -133,6 +147,7 @@ describe("StaticController", () => {
     });
 
     let writtenStatus = 0;
+    let writtenHeaders: Record<string, string> = {};
     let writtenBody = "";
 
     const req = {
@@ -144,11 +159,14 @@ describe("StaticController", () => {
     } as unknown as IncomingMessage;
 
     const res = {
-      writeHead: (status: number) => {
+      writeHead: (status: number, headers?: Record<string, string>) => {
         writtenStatus = status;
+        if (headers) writtenHeaders = headers;
+        return res;
       },
       end: (data?: unknown) => {
         if (data) writtenBody = String(data);
+        return res;
       },
       headersSent: false,
     } as unknown as ServerResponse;
@@ -156,7 +174,17 @@ describe("StaticController", () => {
     const served = await controller.serve(req, res);
     expect(served).toBe(true);
     expect(writtenStatus).toBe(404);
-    expect(writtenBody).toContain("Not Found");
+    expect(writtenHeaders["Content-Type"]).toContain("application/json");
+
+    const parsed = JSON.parse(writtenBody);
+    expect(parsed).toEqual({
+      status: "error",
+      code: 404,
+      error: {
+        code: "ERR_NOT_FOUND",
+        message: "Not Found",
+      },
+    });
   });
 
   it("returns 500 when fileStorage throws unexpected system error (ENH-014)", async () => {

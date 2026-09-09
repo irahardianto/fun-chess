@@ -13,6 +13,48 @@ export interface HealthControllerOptions {
   startTime?: number;
 }
 
+export interface TelemetryAuthParams {
+  clientIp: string;
+  headers: Record<string, string | string[] | undefined>;
+  metricsSecret?: string;
+  isProduction: boolean;
+}
+
+/**
+ * Validates whether an incoming HTTP request is authorized to access operational telemetry (/metrics, /health/detail).
+ * Access requires loopback IP, valid METRICS_SECRET via header, or non-production environment (MAJ-002).
+ */
+export function isTelemetryAuthorized(params: TelemetryAuthParams): boolean {
+  const { clientIp, headers, metricsSecret, isProduction } = params;
+
+  // 1. Loopback check
+  const isLoopback =
+    clientIp === "127.0.0.1" ||
+    clientIp === "::1" ||
+    clientIp === "::ffff:127.0.0.1";
+  if (isLoopback) return true;
+
+  // 2. Secret token match
+  if (metricsSecret) {
+    const rawSecretHeader = headers["x-metrics-secret"];
+    const secretHeader = Array.isArray(rawSecretHeader)
+      ? rawSecretHeader[0]
+      : rawSecretHeader;
+    if (secretHeader && secretHeader === metricsSecret) return true;
+
+    const rawAuth = headers["authorization"];
+    const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7).trim();
+      if (token === metricsSecret) return true;
+    }
+    return false;
+  }
+
+  // 3. Permitted in non-production if no secret configured
+  return !isProduction;
+}
+
 /**
  * Controller for container health checks and operational telemetry (MIN-029).
  * Redacts process memory metrics in production to prevent information disclosure (MIN-001).

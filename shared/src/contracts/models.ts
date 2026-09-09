@@ -53,8 +53,8 @@ export type GameOverReason =
 export interface Player {
   /** Unique UUID v4 identifier for the player */
   id: string;
-  /** Ephemeral Socket.io connection identifier */
-  socketId: string;
+  /** Ephemeral Socket.io connection identifier (omitted from public client broadcasts per ENH-001) */
+  socketId?: string;
   /** Player display name (1-20 characters, sanitized) */
   name: string;
   /** Selected emoji avatar (e.g. 🦁, 🚀, 🦄, ⚡, 👑, 🐼) */
@@ -68,11 +68,6 @@ export interface Player {
   /** Epoch timestamp (milliseconds) when the player joined */
   connectedAt: number;
 }
-
-/**
- * Semantic alias for Player explicitly denoting public view visibility.
- */
-export type PublicPlayer = Player;
 
 /**
  * Private authentication credential stored server-side and client-side (sessionStorage).

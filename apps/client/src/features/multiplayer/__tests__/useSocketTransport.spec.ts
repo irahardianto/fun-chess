@@ -181,6 +181,17 @@ describe('useSocketTransport composable', () => {
     it('aliases resetSocketTransportState to resetTransportState', () => {
       expect(resetSocketTransportState).toBe(resetTransportState);
     });
+
+    it('disconnects and resets transport state when disconnect(true) is invoked (MIN-015)', () => {
+      const transport = useSocketTransport(mockSocket);
+      expect(transport.socket.value).toBe(mockSocket);
+
+      disconnect(true);
+
+      expect(mockSocket.disconnect).toHaveBeenCalled();
+      expect(transport.socket.value).toBeNull();
+      expect(transport.isConnected.value).toBe(false);
+    });
   });
 
   // ==========================================================================
@@ -638,6 +649,65 @@ describe('useSocketTransport composable', () => {
 
       expect(result.success).toBe(false);
       expect(transport.lastError.value?.code).toBe('ERR_INTERNAL_SERVER');
+    });
+
+    it('rejects promise when rejectOnError is true on timeout (MIN-003)', async () => {
+      vi.useFakeTimers();
+      mockSocket.emit.mockImplementation(() => {});
+
+      const promise = emitWithTimeout(mockSocket, 'slow:request', {}, {
+        operation: 'test_reject_timeout',
+        timeoutMs: 1000,
+        timeoutMessage: 'Timed out!',
+        rejectOnError: true,
+      });
+
+      vi.advanceTimersByTime(1000);
+
+      await expect(promise).rejects.toEqual(expect.objectContaining({
+        code: 'ERR_SOCKET_TIMEOUT',
+        message: 'Timed out!',
+      }));
+
+      vi.useRealTimers();
+    });
+
+    it('rejects promise when rejectOnError is true on server error response (MIN-003)', async () => {
+      mockSocket.emit.mockImplementation((_event: string, _payload: any, ack: Function) => {
+        ack({
+          success: false,
+          error: { code: 'ERR_ROOM_NOT_FOUND', message: 'Room does not exist' },
+        });
+      });
+
+      const promise = emitWithTimeout(mockSocket, 'room:join', {}, {
+        operation: 'test_reject_error_payload',
+        timeoutMessage: 'Timed out!',
+        rejectOnError: true,
+      });
+
+      await expect(promise).rejects.toEqual(expect.objectContaining({
+        code: 'ERR_ROOM_NOT_FOUND',
+        message: 'Room does not exist',
+      }));
+    });
+
+    it('resolves with success: false when rejectOnError is false or omitted (MIN-003)', async () => {
+      mockSocket.emit.mockImplementation((_event: string, _payload: any, ack: Function) => {
+        ack({
+          success: false,
+          error: { code: 'ERR_ROOM_NOT_FOUND', message: 'Room does not exist' },
+        });
+      });
+
+      const result = await emitWithTimeout(mockSocket, 'room:join', {}, {
+        operation: 'test_resolve_on_error',
+        timeoutMessage: 'Timed out!',
+        rejectOnError: false,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('ERR_ROOM_NOT_FOUND');
     });
 
     it('logs operation start at INFO level with static template (MIN-014, MAJ-024)', async () => {

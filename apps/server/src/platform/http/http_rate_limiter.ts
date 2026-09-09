@@ -1,6 +1,9 @@
-import { SocketRateLimiter, SocketRateLimiterOptions } from "../socket/socket_rate_limiter.js";
+import {
+  SlidingWindowRateLimiter,
+  RateLimiterOptions,
+} from "../rate_limiter/index.js";
 
-export interface HttpRateLimiterOptions extends SocketRateLimiterOptions {
+export interface HttpRateLimiterOptions extends RateLimiterOptions {
   /**
    * Maximum allowed requests within windowMs.
    * Default: 100 requests per 10 seconds.
@@ -18,10 +21,10 @@ export interface HttpRateLimiterOptions extends SocketRateLimiterOptions {
  * Keyed by client IP address to prevent brute-force and resource exhaustion attacks.
  */
 export class HttpRateLimiter {
-  private readonly limiter: SocketRateLimiter;
+  private readonly limiter: SlidingWindowRateLimiter;
 
   constructor(options?: HttpRateLimiterOptions) {
-    this.limiter = new SocketRateLimiter({
+    this.limiter = new SlidingWindowRateLimiter({
       maxRequests: options?.maxRequests ?? 100,
       windowMs: options?.windowMs ?? 10_000,
       maxKeys: options?.maxKeys ?? 10_000,

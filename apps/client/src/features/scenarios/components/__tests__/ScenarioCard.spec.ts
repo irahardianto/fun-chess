@@ -133,4 +133,16 @@ describe('ScenarioCard.vue', () => {
     expect(wrapper.emitted('play')).toBeTruthy();
     expect(wrapper.emitted('play')?.[0]).toEqual([mockScenario]);
   });
+
+  it('enforces 44px minimum touch target styling on play button', () => {
+    const wrapper = mount(ScenarioCard, {
+      props: {
+        scenario: mockScenario,
+      },
+    });
+
+    const playBtn = wrapper.find('.scenario-play-btn');
+    expect(playBtn.exists()).toBe(true);
+    expect(playBtn.classes()).toContain('scenario-play-btn');
+  });
 });

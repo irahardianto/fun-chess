@@ -7,10 +7,16 @@ import type {
   MascotPersona,
   GameOverPayload,
   MoveResult,
+  IClock,
 } from '@fun-chess/shared';
 import type { Move } from 'chess.js';
-import { useInjectLogger } from '@/platform/di';
-import { logger as defaultLogger, type ILogger } from '@/platform/telemetry/index.js';
+import { useInjectLogger, useInjectClock } from '@/platform/di';
+import { SystemClock } from '@/platform/time';
+import {
+  logger as defaultLogger,
+  generateCorrelationId,
+  type ILogger,
+} from '@/platform/telemetry';
 import type { UseAiBoardStateReturn } from './useAiBoardState.js';
 import type { useAiWorker } from './useAiWorker.js';
 import type { useTakebackHistory } from './useTakebackHistory.js';
@@ -44,6 +50,7 @@ export interface UseAiMoveExecutionOptions {
   onClearSelection?: () => void;
   onClearHint?: () => void;
   logger?: ILogger;
+  clock?: IClock;
 }
 
 /**
@@ -53,6 +60,7 @@ export interface UseAiMoveExecutionOptions {
  */
 export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
   const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+  const clock = options.clock ?? (getCurrentInstance() ? useInjectClock() : new SystemClock());
   const {
     boardState,
     aiWorker,
@@ -66,23 +74,22 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
   } = options;
 
   const { chess, turn, playerColor, aiColor, isGameOver, lastGameOver } = boardState;
-  const { requestAiMove, cancelCalculation } = aiWorker;
 
   const lastMoveOutcome = ref<MoveOutcomeEvent | null>(null);
   const lastGameCompletion = ref<GameCompletionOutcomeEvent | null>(null);
-  let matchStartTime = Date.now();
+  let matchStartTime = clock.now();
 
   function resetExecution(): void {
     lastMoveOutcome.value = null;
     lastGameCompletion.value = null;
-    matchStartTime = Date.now();
+    matchStartTime = clock.now();
   }
 
   function checkAndHandleGameOver(): boolean {
     if (!chess.isGameOver()) return false;
 
     isGameOver.value = true;
-    const durationSeconds = Math.max(1, Math.round((Date.now() - matchStartTime) / 1000));
+    const durationSeconds = Math.max(1, Math.round((clock.now() - matchStartTime) / 1000));
     const totalMoves = history.moveHistory.value.length;
 
     let payload: GameOverPayload;
@@ -156,7 +163,7 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
       flags: result.flags,
       fen: chess.fen(),
       moveNumber: chess.history().length,
-      timestamp: Date.now(),
+      timestamp: clock.now(),
     };
 
     history.recordMove(moveRes);
@@ -194,7 +201,7 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
       return;
     }
 
-    await requestAiMove(
+    await aiWorker.requestAiMove(
       chess.fen(),
       mascot.value.id,
       () => (chess.isGameOver() ? [] : chess.moves({ verbose: true })),
@@ -262,7 +269,7 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
         flags: result.flags,
         fen: chess.fen(),
         moveNumber: chess.history().length,
-        timestamp: Date.now(),
+        timestamp: clock.now(),
       };
 
       history.recordMove(moveRes);
@@ -311,31 +318,70 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
   function resign(): void {
     if (isGameOver.value) return;
 
-    cancelCalculation();
-    isGameOver.value = true;
+    const correlationId = generateCorrelationId();
+    const startTime = clock.now();
 
-    const durationSeconds = Math.max(1, Math.round((Date.now() - matchStartTime) / 1000));
-    const payload: GameOverPayload = {
-      winner: aiColor.value,
-      winnerName: mascot.value.name,
-      reason: 'resignation',
-      message: `You resigned. ${mascot.value.name} won! 🏳️`,
-      finalFen: chess.fen(),
-      totalMoves: history.moveHistory.value.length,
-      durationSeconds,
-    };
+    // 1. Operation Start
+    logger.info('Resigning AI game', {
+      operation: 'ai_resign',
+      correlationId,
+      playerColor: playerColor.value,
+      aiColor: aiColor.value,
+    });
 
-    lastGameOver.value = payload;
-    banter.triggerBanter('ai_win');
+    try {
+      aiWorker.cancelCalculation();
+      isGameOver.value = true;
 
-    const completionOutcome: GameCompletionOutcomeEvent = {
-      type: 'game_over',
-      winner: aiColor.value,
-      reason: 'resignation',
-      isLocalPlayerWinner: false,
-    };
-    lastGameCompletion.value = completionOutcome;
-    onGameCompletion?.(completionOutcome);
+      const durationSeconds = Math.max(1, Math.round((clock.now() - matchStartTime) / 1000));
+      const payload: GameOverPayload = {
+        winner: aiColor.value,
+        winnerName: mascot.value.name,
+        reason: 'resignation',
+        message: `You resigned. ${mascot.value.name} won! 🏳️`,
+        finalFen: chess.fen(),
+        totalMoves: history.moveHistory.value.length,
+        durationSeconds,
+      };
+
+      lastGameOver.value = payload;
+      banter.triggerBanter('ai_win');
+
+      const completionOutcome: GameCompletionOutcomeEvent = {
+        type: 'game_over',
+        winner: aiColor.value,
+        reason: 'resignation',
+        isLocalPlayerWinner: false,
+      };
+      lastGameCompletion.value = completionOutcome;
+      onGameCompletion?.(completionOutcome);
+
+      const durationMs = Math.round(clock.now() - startTime);
+
+      // 2. Operation Success
+      logger.info('Resignation completed successfully', {
+        operation: 'ai_resign',
+        correlationId,
+        status: 'success',
+        duration: durationMs,
+        durationMs,
+        winner: aiColor.value,
+        totalMoves: payload.totalMoves,
+      });
+    } catch (err) {
+      const durationMs = Math.round(clock.now() - startTime);
+
+      // 3. Operation Failure
+      logger.error('Resignation failed', {
+        operation: 'ai_resign',
+        correlationId,
+        status: 'failed',
+        duration: durationMs,
+        durationMs,
+        error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
+      });
+      throw err;
+    }
   }
 
   return {

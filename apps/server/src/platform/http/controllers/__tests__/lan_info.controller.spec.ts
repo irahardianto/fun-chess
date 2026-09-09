@@ -28,4 +28,62 @@ describe("LanInfoController", () => {
     expect(result.relayMode).toBe("lan");
     expect(result.isCloudRelay).toBe(false);
   });
+
+  it("handles cloud relay mode addressing info correctly (MIN-027)", () => {
+    const mockCloudAddressService: IAddressingInfoProvider = {
+      getAddressingInfo: (port: number) => ({
+        lanIp: "cloud-relay.fun-chess.io",
+        port,
+        localUrl: `http://localhost:${port}`,
+        joinUrl: "https://cloud-relay.fun-chess.io",
+        publicUrl: "https://cloud-relay.fun-chess.io",
+        interfaces: ["cloud-relay.fun-chess.io"],
+        relayMode: "cloud",
+        isCloudRelay: true,
+      }),
+      isCloudRelay: () => true,
+    };
+
+    const controller = new LanInfoController({
+      addressService: mockCloudAddressService,
+    });
+
+    const result = controller.getLanInfo(8080);
+    expect(result.port).toBe(8080);
+    expect(result.lanIp).toBe("cloud-relay.fun-chess.io");
+    expect(result.joinUrl).toBe("https://cloud-relay.fun-chess.io");
+    expect(result.publicUrl).toBe("https://cloud-relay.fun-chess.io");
+    expect(result.relayMode).toBe("cloud");
+    expect(result.isCloudRelay).toBe(true);
+  });
+
+  it("falls back to default port 3000 when port is omitted or 0 (MIN-027)", () => {
+    const recordedPorts: number[] = [];
+    const mockAddressService: IAddressingInfoProvider = {
+      getAddressingInfo: (port: number) => {
+        recordedPorts.push(port);
+        return {
+          lanIp: "127.0.0.1",
+          port,
+          localUrl: `http://localhost:${port}`,
+          joinUrl: `http://127.0.0.1:${port}`,
+          interfaces: ["127.0.0.1"],
+          relayMode: "lan",
+          isCloudRelay: false,
+        };
+      },
+    };
+
+    const controller = new LanInfoController({
+      addressService: mockAddressService,
+    });
+
+    const resultDefault = controller.getLanInfo();
+    expect(resultDefault.port).toBe(3000);
+    expect(recordedPorts).toContain(3000);
+
+    const resultZero = controller.getLanInfo(0);
+    expect(resultZero.port).toBe(3000);
+    expect(recordedPorts).toEqual([3000, 3000]);
+  });
 });

@@ -1,3 +1,4 @@
+import type { Server as NodeHttpServer } from "node:http";
 import type { LanInfoResponse } from "@fun-chess/shared";
 import type { ServerEnv } from "../config/env.js";
 import type { Logger } from "../logger/logger.interface.js";
@@ -51,7 +52,9 @@ export type HttpErrorResponse = HttpErrorEnvelope;
 export interface HttpServerConfig {
   roomStore: IRoomCountProvider;
   relayAddressService?: IAddressingInfoProvider;
-  /** @deprecated Use relayAddressService */
+  /**
+   * @deprecated Use `relayAddressService` instead. Scheduled for removal in v2.0.0 (MIN-022).
+   */
   lanService?: IAddressingInfoProvider;
   logger: Logger;
   port?: number;
@@ -61,4 +64,6 @@ export interface HttpServerConfig {
   fileStorage?: IFileStorage;
   getActiveSocketCount?: () => number;
   rateLimiter?: HttpRateLimiter;
+  server?: NodeHttpServer;
+  metricsSecret?: string;
 }

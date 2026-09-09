@@ -7,7 +7,9 @@ import {
   LockTimeoutError,
   LockExecutionTimeoutError,
   RoomCapacityExceededError,
+  RoomBusyError,
 } from "../room.errors.js";
+import { NullLogger } from "../../../platform/logger/null_logger.js";
 import type { Logger } from "../../../platform/logger/index.js";
 
 interface TestableStore {
@@ -616,8 +618,8 @@ describe("InMemoryRoomStore", () => {
       expect(caughtError).toBeInstanceOf(RoomCapacityExceededError);
       const error = caughtError as RoomCapacityExceededError;
       expect(error.name).toBe("RoomCapacityExceededError");
-      expect(error.code).toBe("ERR_INTERNAL_SERVER");
-      expect(error.statusCode).toBe(507);
+      expect(error.code).toBe("ERR_ROOM_CAPACITY_EXCEEDED");
+      expect(error.statusCode).toBe(429);
       expect(error.details).toEqual({ maxRooms: 2 });
       expect(error.message).toContain("Maximum room capacity reached (2)");
     });
@@ -657,8 +659,141 @@ describe("InMemoryRoomStore", () => {
 
       expect(caughtError).toBeInstanceOf(RoomCapacityExceededError);
       const error = caughtError as RoomCapacityExceededError;
-      expect(error.statusCode).toBe(507);
+      expect(error.statusCode).toBe(429);
+      expect(error.code).toBe("ERR_ROOM_CAPACITY_EXCEEDED");
       expect(error.details).toEqual({ maxRooms: 1 });
+    });
+  });
+
+  describe("Queue-depth circuit breaker (ENH-004)", () => {
+    it("rejects incoming lock requests with RoomBusyError when queue depth exceeds maxQueueDepth", async () => {
+      const logger = new NullLogger();
+      const storeWithLimit = new InMemoryRoomStore({
+        maxQueueDepth: 2,
+        logger,
+      });
+
+      let releaseFirst: () => void;
+      const firstBlocker = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+
+      // 1st request acquires the lock (waitersCount = 1)
+      const p1 = storeWithLimit.withLock("BUSY", async () => {
+        await firstBlocker;
+        return "first_done";
+      });
+
+      // Give event loop tick to let p1 acquire lock
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // 2nd request enters the queue (waitersCount = 2)
+      const p2 = storeWithLimit.withLock("BUSY", async () => {
+        return "second_done";
+      });
+
+      // Give event loop tick for p2 to enqueue
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // 3rd request arrives when waitersCount is 2 (>= maxQueueDepth of 2) -> immediately rejected
+      await expect(
+        storeWithLimit.withLock("BUSY", async () => "third_done"),
+      ).rejects.toThrow(RoomBusyError);
+
+      const warningLogs = logger.warnLogs.filter(
+        (l) => l.context?.operation === "room_lock_queue_depth_exceeded",
+      );
+      expect(warningLogs.length).toBe(1);
+      expect(warningLogs[0]?.context).toMatchObject({
+        roomCode: "BUSY",
+        maxQueueDepth: 2,
+      });
+
+      // Clean up first blocker
+      releaseFirst!();
+      expect(await p1).toBe("first_done");
+      expect(await p2).toBe("second_done");
+    });
+  });
+
+  describe("DEBUG-level mutation logging (ENH-010)", () => {
+    it("logs debug records on save, createIfAbsent, mutate, and delete", async () => {
+      const logger = new NullLogger();
+      const loggedStore = new InMemoryRoomStore({ logger });
+
+      // 1. createIfAbsent
+      const room = createDummyRoom("DBGL");
+      await loggedStore.createIfAbsent(room);
+      const createLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "room_storage_create",
+      );
+      expect(createLogs.length).toBe(1);
+      expect(createLogs[0]?.context?.roomCode).toBe("DBGL");
+
+      // 2. save
+      await loggedStore.save({ ...room, status: "playing" });
+      const saveLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "room_storage_save",
+      );
+      expect(saveLogs.length).toBe(1);
+      expect(saveLogs[0]?.context?.roomCode).toBe("DBGL");
+
+      // 3. mutate
+      await loggedStore.mutate("DBGL", async (r) => ({
+        updatedRoom: { ...r, status: "game_over" },
+        result: "mutated",
+      }));
+      const mutateStarted = logger.debugLogs.filter(
+        (l) => l.context?.operation === "room_mutate_started",
+      );
+      const mutateCompleted = logger.debugLogs.filter(
+        (l) => l.context?.operation === "room_mutate_completed",
+      );
+      expect(mutateStarted.length).toBe(1);
+      expect(mutateCompleted.length).toBe(1);
+
+      // 4. delete
+      await loggedStore.delete("DBGL");
+      const deleteLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "room_storage_delete",
+      );
+      expect(deleteLogs.length).toBe(1);
+      expect(deleteLogs[0]?.context?.roomCode).toBe("DBGL");
+      expect(deleteLogs[0]?.context?.existed).toBe(true);
+    });
+  });
+
+  describe("Decomposed withLock execution (ENH-013)", () => {
+    it("executes actions sequentially under FIFO mutex with acquireLock, executeWithTimeout, releaseLock", async () => {
+      const executionOrder: number[] = [];
+
+      const p1 = store.withLock("FIFO", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        executionOrder.push(1);
+        return 1;
+      });
+
+      const p2 = store.withLock("FIFO", async () => {
+        executionOrder.push(2);
+        return 2;
+      });
+
+      const [r1, r2] = await Promise.all([p1, p2]);
+      expect(r1).toBe(1);
+      expect(r2).toBe(2);
+      expect(executionOrder).toEqual([1, 2]);
+    });
+
+    it("supports re-entrant withLock calls within the same async context", async () => {
+      const result = await store.withLock("REENTRANT", async (ctx) => {
+        expect(ctx?.roomCode).toBe("REENTRANT");
+        const nested = await store.withLock("REENTRANT", async (nestedCtx) => {
+          expect(nestedCtx?.ticket).toBe(ctx?.ticket);
+          return "nested_success";
+        });
+        return `outer_${nested}`;
+      });
+      expect(result).toBe("outer_nested_success");
     });
   });
 });

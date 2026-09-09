@@ -101,15 +101,19 @@ export function scoreMoveForOrdering(move: Move): number {
  */
 export function orderMoves(moves: Move[]): Move[] {
   if (moves.length <= 1) return moves;
-  const scored = new Array(moves.length);
+  const scored: Array<{ move: Move; score: number }> = [];
   for (let i = 0; i < moves.length; i++) {
-    const m = moves[i]!;
-    scored[i] = { move: m, score: scoreMoveForOrdering(m) };
+    const m = moves[i];
+    if (!m) continue;
+    scored.push({ move: m, score: scoreMoveForOrdering(m) });
   }
   scored.sort((a, b) => b.score - a.score);
-  const result = new Array(moves.length);
-  for (let i = 0; i < moves.length; i++) {
-    result[i] = scored[i]!.move;
+  const result: Move[] = [];
+  for (let i = 0; i < scored.length; i++) {
+    const item = scored[i];
+    if (item) {
+      result.push(item.move);
+    }
   }
   return result;
 }

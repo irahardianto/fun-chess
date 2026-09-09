@@ -1,16 +1,18 @@
 import { getCurrentInstance } from 'vue';
+import type { Chess, Square as ChessSquare } from 'chess.js';
 import type {
   Puzzle,
   HintLevel,
   ExtendedHintData,
   PieceType,
+  PieceColor,
+  Square,
 } from '@fun-chess/shared';
 import { createSafeChess } from '@fun-chess/shared';
 import { parseUciMove } from './puzzle_validator';
 import { PIECE_DISPLAY_NAMES } from './puzzle_analysis_engine';
 import { useInjectLogger } from '@/platform/di';
 import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
-
 
 export const THEME_ICONS: Record<string, string> = {
   fork: '🍴',
@@ -35,8 +37,125 @@ export const THEME_ICONS: Record<string, string> = {
   windmill: '🔄',
 };
 
-// Re-export type for compatibility
 export type { ExtendedHintData };
+
+export interface HintPieceDetails {
+  pieceType?: PieceType;
+  color?: PieceColor;
+  pieceName: string;
+}
+
+export interface HintContext {
+  from: Square;
+  to?: Square;
+  san: string;
+  expectedUci: string;
+  pieceName: string;
+  themeIcon: string;
+  tacticalObjective?: string;
+  stepExplanation?: string;
+  targetSquares?: readonly Square[];
+  threatSquares?: readonly Square[];
+}
+
+/**
+ * Pure helper resolving piece type, color, and display name from board position.
+ */
+export function resolveHintPieceDetails(from: Square, board: Chess): HintPieceDetails {
+  const piece = board.get(from as unknown as ChessSquare);
+  if (!piece) {
+    return { pieceName: 'Piece' };
+  }
+  return {
+    pieceType: piece.type as PieceType,
+    color: piece.color as PieceColor,
+    pieceName: PIECE_DISPLAY_NAMES[piece.type as PieceType] ?? 'Piece',
+  };
+}
+
+function formatLevel1Hint(context: HintContext): ExtendedHintData {
+  const { from, pieceName, themeIcon, tacticalObjective, stepExplanation } = context;
+  const message = stepExplanation
+    ? `Look at your ${pieceName} on ${from}! ${stepExplanation}`
+    : tacticalObjective
+      ? `Look at your ${pieceName} on ${from}! ${tacticalObjective}`
+      : `Look at your ${pieceName} on ${from}! Can it make a powerful move?`;
+
+  return {
+    level: 1,
+    tier: 'piece_nudge',
+    sourceSquare: from,
+    themeIcon,
+    tacticalObjective,
+    message,
+    mascotDialogue: `Which piece can leap or strike? Check out ${from}! 💡`,
+  };
+}
+
+function formatLevel2Hint(context: HintContext): ExtendedHintData {
+  const { from, to, pieceName, themeIcon, tacticalObjective, stepExplanation, targetSquares, threatSquares } = context;
+  const message = stepExplanation
+    ? `Move your ${pieceName} from ${from} to ${to}! ${stepExplanation}`
+    : tacticalObjective
+      ? `Move your ${pieceName} from ${from} to ${to}! Goal: ${tacticalObjective}`
+      : `Move your ${pieceName} from ${from} to ${to} to attack!`;
+
+  return {
+    level: 2,
+    tier: 'target_glow',
+    sourceSquare: from,
+    targetSquare: to,
+    themeIcon,
+    tacticalObjective,
+    targetSquares,
+    threatSquares,
+    message,
+    mascotDialogue: `I spot an amazing target square on ${to}! 🎯`,
+  };
+}
+
+function formatLevel3Hint(context: HintContext): ExtendedHintData {
+  const { from, to, san, expectedUci, themeIcon, tacticalObjective, stepExplanation, targetSquares, threatSquares } = context;
+  const message = stepExplanation
+    ? `Play ${san} (${from} to ${to})! ${stepExplanation}`
+    : `Play ${san} (${from} to ${to}) to execute the winning move!`;
+
+  return {
+    level: 3,
+    tier: 'full_solution',
+    sourceSquare: from,
+    targetSquare: to,
+    solutionSan: san,
+    solutionUci: expectedUci,
+    themeIcon,
+    tacticalObjective,
+    targetSquares,
+    threatSquares,
+    highlightArrow: to ? { from, to } : undefined,
+    message,
+    mascotDialogue: `Here is the winning move: ${san}! 👑`,
+  };
+}
+
+/**
+ * Pure formatting helper for hint text and highlighting by level.
+ */
+export function formatHintByLevel(level: HintLevel, context: HintContext): ExtendedHintData {
+  switch (level) {
+    case 1:
+      return formatLevel1Hint(context);
+    case 2:
+      return formatLevel2Hint(context);
+    case 3:
+      return formatLevel3Hint(context);
+    default:
+      return {
+        level: 0,
+        tier: 'none',
+        message: 'Take your time and scan the board for active pieces!',
+      };
+  }
+}
 
 /**
  * Pure 3-tier progressive hint generator returning structured ExtendedHintData.
@@ -60,7 +179,7 @@ export function generateProgressiveHint(
   customLogger?: ILogger
 ): ExtendedHintData {
   const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
-  if (requestedLevel === 0 || !puzzle || !puzzle.moves || currentMoveIndex >= puzzle.moves.length) {
+  if (requestedLevel === 0 || !puzzle?.moves || currentMoveIndex >= puzzle.moves.length) {
     return {
       level: 0,
       tier: 'none',
@@ -78,26 +197,19 @@ export function generateProgressiveHint(
   }
 
   const { from, to, promotion } = parseUciMove(expectedUci);
-  const themeIcon = (puzzle.primaryTheme && THEME_ICONS[puzzle.primaryTheme]) ?? '💡';
   const stepExp = puzzle.stepExplanations?.[currentMoveIndex];
-  const tacticalObjective = (currentMoveIndex > 0 && stepExp?.explanation)
-    ? stepExp.explanation
-    : (puzzle.tacticalGoal ?? stepExp?.explanation ?? undefined);
-  const targetSquares = puzzle.targetSquares ?? (to ? [to] : undefined);
-  const threatSquares = puzzle.targetSquares ?? puzzle.keySquares ?? (to ? [to] : undefined);
+  const stepExplanation = (currentMoveIndex > 0 && stepExp?.explanation) ? stepExp.explanation : undefined;
+  const tacticalObjective = stepExplanation ?? puzzle.tacticalGoal ?? stepExp?.explanation;
 
-  // Extract piece type from current position
   let pieceName = 'Piece';
   let san = stepExp?.moveSan ?? expectedUci;
+
   try {
     const chess = createSafeChess(currentFen);
-    const piece = chess.get(from as unknown as import('chess.js').Square);
-    if (piece) {
-      pieceName = PIECE_DISPLAY_NAMES[piece.type as PieceType] ?? 'Piece';
-    }
+    pieceName = resolveHintPieceDetails(from, chess).pieceName;
     const moveRes = chess.move({
-      from: from as unknown as import('chess.js').Square,
-      to: to as unknown as import('chess.js').Square,
+      from: from as unknown as ChessSquare,
+      to: to as unknown as ChessSquare,
       promotion,
     });
     if (moveRes) {
@@ -112,67 +224,20 @@ export function generateProgressiveHint(
     });
   }
 
-
-  if (requestedLevel === 1) {
-    const conceptualMsg = (currentMoveIndex > 0 && stepExp?.explanation)
-      ? `Look at your ${pieceName} on ${from}! ${stepExp.explanation}`
-      : tacticalObjective
-        ? `Look at your ${pieceName} on ${from}! ${tacticalObjective}`
-        : `Look at your ${pieceName} on ${from}! Can it make a powerful move?`;
-
-    return {
-      level: 1,
-      tier: 'piece_nudge',
-      sourceSquare: from,
-      themeIcon,
-      tacticalObjective,
-      message: conceptualMsg,
-      mascotDialogue: `Which piece can leap or strike? Check out ${from}! 💡`,
-    };
-  }
-
-  if (requestedLevel === 2) {
-    const targetMsg = (currentMoveIndex > 0 && stepExp?.explanation)
-      ? `Move your ${pieceName} from ${from} to ${to}! ${stepExp.explanation}`
-      : tacticalObjective
-        ? `Move your ${pieceName} from ${from} to ${to}! Goal: ${tacticalObjective}`
-        : `Move your ${pieceName} from ${from} to ${to} to attack!`;
-
-    return {
-      level: 2,
-      tier: 'target_glow',
-      sourceSquare: from,
-      targetSquare: to,
-      themeIcon,
-      tacticalObjective,
-      targetSquares,
-      threatSquares,
-      message: targetMsg,
-      mascotDialogue: `I spot an amazing target square on ${to}! 🎯`,
-    };
-  }
-
-  // Level 3: Full Solution
-  const fullSolutionMsg = stepExp?.explanation
-    ? `Play ${san} (${from} to ${to})! ${stepExp.explanation}`
-    : `Play ${san} (${from} to ${to}) to execute the winning move!`;
-
-  return {
-    level: 3,
-    tier: 'full_solution',
-    sourceSquare: from,
-    targetSquare: to,
-    solutionSan: san,
-    solutionUci: expectedUci,
-    themeIcon,
+  const context: HintContext = {
+    from,
+    to,
+    san,
+    expectedUci,
+    pieceName,
+    themeIcon: (puzzle.primaryTheme && THEME_ICONS[puzzle.primaryTheme]) ?? '💡',
     tacticalObjective,
-    targetSquares,
-    threatSquares,
-    highlightArrow: { from, to },
-    message: fullSolutionMsg,
-    mascotDialogue: `Here is the winning move: ${san}! 👑`,
+    stepExplanation,
+    targetSquares: puzzle.targetSquares ?? (to ? [to] : undefined),
+    threatSquares: puzzle.targetSquares ?? puzzle.keySquares ?? (to ? [to] : undefined),
   };
+
+  return formatHintByLevel(requestedLevel, context);
 }
 
 export const generatePuzzleHint = generateProgressiveHint;
-

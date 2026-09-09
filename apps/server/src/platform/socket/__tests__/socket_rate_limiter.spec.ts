@@ -338,7 +338,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       }
     });
 
-    it("re-throws errors during prune and records error log with correlationId (MAJ-015)", () => {
+    it("re-throws errors during prune without redundant local logging (MIN-007)", () => {
       const logger = new NullLogger();
       const limiter = new SocketRateLimiter({
         maxRequests: 5,
@@ -355,38 +355,49 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       };
       (limiter as unknown as { timestamps: unknown }).timestamps = errorMap;
 
-      const testCorrelationId = "test-corr-prune-123";
-      expect(() => limiter.prune(Date.now(), testCorrelationId)).toThrow("Simulated map iteration crash");
-
-      const errorLog = logger.errorLogs.find(
-        (l) => l.context?.["operation"] === "rate_limiter_prune_error",
-      );
-      expect(errorLog).toBeDefined();
-      expect(errorLog?.context?.["correlationId"]).toBe(testCorrelationId);
+      expect(() => limiter.prune(Date.now())).toThrow("Simulated map iteration crash");
+      // Verify prune() does not emit redundant local error logs
+      expect(logger.errorLogs).toHaveLength(0);
     });
 
-    it("logs non-Error exception during prune with raw property", () => {
-      const logger = new NullLogger();
-      const limiter = new SocketRateLimiter({
-        maxRequests: 5,
-        windowMs: 1000,
-        pruneIntervalMs: 0,
-        logger,
-      });
+    it("logs failure via runLoggedJob with correlationId when background prune interval fails (MIN-007)", async () => {
+      vi.useFakeTimers();
+      try {
+        const logger = new NullLogger();
+        const limiter = new SocketRateLimiter({
+          maxRequests: 5,
+          windowMs: 1000,
+          pruneIntervalMs: 500,
+          logger,
+        });
 
-      const errorMap = {
-        entries: () => {
-          throw "string error";
-        },
-      };
-      (limiter as unknown as { timestamps: unknown }).timestamps = errorMap;
+        // Force timestamps iteration to throw
+        const errorMap = {
+          entries: () => {
+            throw new Error("Simulated background prune failure");
+          },
+          clear: () => {},
+        };
+        (limiter as unknown as { timestamps: unknown }).timestamps = errorMap;
 
-      expect(() => limiter.prune(Date.now())).toThrow("string error");
-      const errorLog = logger.errorLogs.find(
-        (l) => l.context?.["operation"] === "rate_limiter_prune_error",
-      );
-      expect(errorLog).toBeDefined();
-      expect((errorLog?.context?.["error"] as { raw: unknown })?.raw).toBe("string error");
+        // Advance timers to trigger background prune interval
+        await vi.advanceTimersByTimeAsync(550);
+
+        // runLoggedJob emits 3-point logging: started and failed
+        const failedLog = logger.errorLogs.find(
+          (l) => l.context?.["operation"] === "rate_limiter_prune" && l.context?.["status"] === "failed",
+        );
+        expect(failedLog).toBeDefined();
+        expect(failedLog?.context?.["correlationId"]).toBeDefined();
+        expect(failedLog?.context?.["durationMs"]).toBeTypeOf("number");
+        expect((failedLog?.context?.["error"] as { message?: string })?.message).toBe(
+          "Simulated background prune failure",
+        );
+
+        limiter.destroy();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("prunes partially expired timestamps when valid.length < list.length", () => {

@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { watch, ref, computed } from 'vue';
 import type { ChessScenario, StarRating, Square } from '@fun-chess/shared';
-import { ChessBoard } from '@/features/board/index.js';
-import { PromotionModal } from '@/features/modals/index.js';
+import { ChessBoard } from '@/features/board';
+import { PromotionModal } from '@/features/modals';
 import BaseButton from '../../components/base/BaseButton.vue';
 import ScenarioGuideOverlay from './components/ScenarioGuideOverlay.vue';
 import ScenarioCompletionModal from './components/ScenarioCompletionModal.vue';
-import { ProgressiveHintLayer } from '@/features/puzzles/index.js';
+import { ProgressiveHintLayer } from '@/features/puzzles';
 import { useScenarioRunner, type ScenarioStepOutcomeEvent } from './composables/useScenarioRunner';
 import { useScenarioProgress } from './composables/useScenarioProgress';
 import { getNextScenario } from './data';
 import { useAudio } from '../../composables/useAudio';
+import { logger } from '@/platform/telemetry';
 
 interface Props {
   scenario: ChessScenario;
@@ -63,7 +64,13 @@ watch(
     if (completed && props.scenario) {
       const stars = runner.calculatedStars.value;
       const hints = runner.hintsUsedCurrentAttempt.value;
-      progress.saveProgress(props.scenario.id, stars, hints);
+      progress.saveProgress(props.scenario.id, stars, hints).catch((err: unknown) => {
+        logger.warn('Failed to auto-save scenario progress on completion', {
+          operation: 'scenario_auto_save_progress',
+          scenarioId: props.scenario?.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
       emit('completed', stars);
     }
   }

@@ -10,6 +10,7 @@ import type {
   PlayerMistakeRefutation,
   PuzzleAttemptResult,
   PuzzleAnalysisResult,
+  IClock,
 } from '@fun-chess/shared';
 import { createSafeChess } from '@fun-chess/shared';
 import { validatePuzzleMove } from '../engine/puzzle_validator';
@@ -19,6 +20,8 @@ import { usePuzzleHints } from './usePuzzleHints';
 import { usePuzzleReplay, type ReplayStep } from './usePuzzleReplay';
 import { useAudio } from '../../../composables/useAudio';
 import { logger } from '../../../platform/telemetry/index.js';
+import { useInjectClock } from '../../../platform/di';
+import { SystemClock } from '../../../platform/time';
 
 export type { ReplayStep };
 
@@ -26,6 +29,7 @@ export interface UsePuzzleRunnerOptions {
   puzzle?: Puzzle | null;
   initialPuzzle?: Puzzle | null;
   autoPlayAudio?: boolean;
+  clock?: IClock;
   onSolve?: (puzzle: Puzzle, stars: StarRating, hintsUsed: number, mistakes: number) => void;
   onSolved?: (puzzle: Puzzle, stars: StarRating, hintsUsed: number, mistakes: number) => void;
   onMistake?: (puzzle: Puzzle, mistakeCount: number) => void;
@@ -37,6 +41,7 @@ export interface UsePuzzleRunnerOptions {
  * Decomposed and composed using `usePuzzleHints` and `usePuzzleReplay`.
  */
 export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
+  const clock = options.clock ?? (getCurrentInstance() ? useInjectClock() : new SystemClock());
   const targetInitialPuzzle = options.puzzle || options.initialPuzzle || null;
   const autoAudio = options.autoPlayAudio ?? true;
   const audio = useAudio();
@@ -411,7 +416,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     setReplayStep: replay.goToReplayStep,
     toggleInspectBoard: replay.toggleInspectBoard,
     replay,
-
+    clock,
     clearTimers,
     loadPuzzle,
     selectSquare,

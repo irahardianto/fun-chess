@@ -6,6 +6,7 @@ import BaseButton from '@/components/base/BaseButton.vue';
 import { useClipboardService } from '@/platform/di/helpers';
 import { defaultClipboardService, type IClipboardService } from '@/platform/hardware/clipboard.interface';
 import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger } from '@/platform/telemetry';
 
 const props = defineProps<{
   payload: UnifiedProgressPayload | null;
@@ -21,7 +22,11 @@ function resolveClipboardService(): IClipboardService {
   if (getCurrentInstance()) {
     try {
       return useClipboardService();
-    } catch {
+    } catch (err: unknown) {
+      defaultLogger.debug('Failed to inject clipboard service, using default', {
+        operation: 'qr_export_resolve_clipboard',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return defaultClipboardService;
     }
   }
@@ -60,7 +65,11 @@ async function renderQrCode() {
     let ctx: CanvasRenderingContext2D | null = null;
     try {
       ctx = canvasRef.value.getContext ? canvasRef.value.getContext('2d') : null;
-    } catch {
+    } catch (err: unknown) {
+      logger.debug('Failed to acquire canvas context', {
+        operation: 'qr_export_get_context',
+        error: err instanceof Error ? err.message : String(err),
+      });
       ctx = null;
     }
     if (!ctx) {

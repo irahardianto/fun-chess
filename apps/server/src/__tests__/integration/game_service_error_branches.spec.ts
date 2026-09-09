@@ -11,6 +11,8 @@ import {
 } from "@fun-chess/shared";
 import { ChessEngine } from "../../features/game/chess_engine.js";
 import { Chess } from "chess.js";
+import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
+import { NullLogger } from "../../platform/logger/null_logger.js";
 
 describe("GameService Error Branches & State Machine Guards (MAJ-043)", () => {
   let adapter: MockRoomGameAdapter;
@@ -57,7 +59,12 @@ describe("GameService Error Branches & State Machine Guards (MAJ-043)", () => {
 
   beforeEach(() => {
     adapter = new MockRoomGameAdapter();
-    service = new GameService(adapter);
+    service = new GameService(
+      adapter,
+      new SystemClock(),
+      new UuidGenerator(),
+      new NullLogger(),
+    );
   });
 
   // =========================================================================

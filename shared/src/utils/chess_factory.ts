@@ -22,24 +22,49 @@ export interface ChessLoggerMetadata {
  * Supports structured metadata parameter on warn (ENH-008).
  */
 export interface ChessLogger {
-  warn(
-    message: string,
-    meta?: ChessLoggerMetadata,
-    ...args: unknown[]
-  ): void;
-  error?(
-    message: string,
-    meta?: ChessLoggerMetadata,
-    ...args: unknown[]
-  ): void;
+  warn(message: string, meta?: ChessLoggerMetadata, ...args: unknown[]): void;
+  error?(message: string, meta?: ChessLoggerMetadata, ...args: unknown[]): void;
 }
 
 /**
- * Default logger for Chess factory operations (MIN-004).
- * Emits structured warnings to console.warn when warnings occur.
+ * Pluggable log handler callback type for chess factory and FEN operations (F-07).
+ */
+export type ChessLogHandler = (
+  level: "warn" | "error",
+  message: string,
+  meta?: ChessLoggerMetadata,
+  ...args: unknown[]
+) => void;
+
+let customChessLogHandler: ChessLogHandler | null = null;
+
+/**
+ * Registers a custom log handler callback for default chess logging operations (F-07).
+ *
+ * @param handler - Custom log handler or null to reset to default console logging
+ */
+export function setChessLogHandler(handler: ChessLogHandler | null): void {
+  customChessLogHandler = handler;
+}
+
+/**
+ * No-op logger implementation that silently ignores all warnings and errors (F-07).
+ */
+export const NOOP_CHESS_LOGGER: ChessLogger = {
+  warn: () => {},
+  error: () => {},
+};
+
+/**
+ * Default logger for Chess factory operations (MIN-004, F-07).
+ * Routes to customChessLogHandler if configured, otherwise falls back to console.warn/error.
  */
 export const DEFAULT_CHESS_LOGGER: ChessLogger = {
   warn: (message: string, meta?: ChessLoggerMetadata, ...args: unknown[]) => {
+    if (customChessLogHandler) {
+      customChessLogHandler("warn", message, meta, ...args);
+      return;
+    }
     if (typeof console !== "undefined" && typeof console.warn === "function") {
       if (meta) {
         console.warn(message, meta, ...args);
@@ -49,6 +74,10 @@ export const DEFAULT_CHESS_LOGGER: ChessLogger = {
     }
   },
   error: (message: string, meta?: ChessLoggerMetadata, ...args: unknown[]) => {
+    if (customChessLogHandler) {
+      customChessLogHandler("error", message, meta, ...args);
+      return;
+    }
     if (typeof console !== "undefined" && typeof console.error === "function") {
       if (meta) {
         console.error(message, meta, ...args);
@@ -157,14 +186,11 @@ function restoreChessState(
   } catch (restoreErr) {
     const errorMsg =
       restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
-    logger?.warn(
-      "[safeLoadFen] Failed to restore previous FEN.",
-      {
-        operation: "safe_load_fen_restore_previous",
-        previousFen,
-        error: errorMsg,
-      },
-    );
+    logger?.warn("[safeLoadFen] Failed to restore previous FEN.", {
+      operation: "safe_load_fen_restore_previous",
+      previousFen,
+      error: errorMsg,
+    });
     try {
       chess.reset();
     } catch (resetErr) {

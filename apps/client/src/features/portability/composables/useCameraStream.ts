@@ -62,7 +62,11 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
     if (getCurrentInstance()) {
       try {
         return useCameraService();
-      } catch {
+      } catch (err: unknown) {
+        logger.debug('Failed to inject camera service, falling back to default', {
+          operation: 'camera_resolve_service',
+          error: err instanceof Error ? err.message : String(err),
+        });
         return defaultCameraService;
       }
     }

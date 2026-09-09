@@ -60,7 +60,7 @@ export default tseslint.config(
       'preserve-caught-error': 'off',
       'prefer-const': 'error',
       'vue/multi-word-component-names': 'off',
-      'vue/no-v-html': 'off',
+      'vue/no-v-html': 'error',
       'vue/max-attributes-per-line': 'off',
       'vue/singleline-html-element-content-newline': 'off',
       'vue/one-component-per-file': 'off',

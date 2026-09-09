@@ -3,35 +3,101 @@ import { Logger } from "./logger.interface.js";
 
 export interface PinoLoggerOptions extends LoggerOptions {
   isDev?: boolean;
+  stream?: pino.DestinationStream | NodeJS.WritableStream;
 }
 
-const DEFAULT_REDACT_PATHS = [
+/**
+ * Authoritative default redact paths for Pino structured logging (SEC-01, ENH-009).
+ *
+ * Security Rationale and Pattern Documentation:
+ * 1. Wildcard Redactions for Credentials, Secrets, and Tokens (`*.sessionToken`, `*.password`, `*.secret`, `*.token`, `*.authorization`):
+ *    In modern distributed and layered architectures, logging context objects can nest domain
+ *    entities, authentication payloads, error objects, and request/response representations
+ *    at arbitrary depths (e.g. `auth.sessionToken`, `user.credentials.password`, `api.secret`).
+ *    Single wildcards (`*.pattern`) and multi-level wildcards (`*.*.pattern`) instruct Pino's
+ *    fast-redact engine to scan beyond root keys and sanitize sensitive fields wherever they appear
+ *    in the object graph, satisfying the Rugged Software Mandate ("never log credentials or tokens").
+ *
+ * 2. The `key` and `apiKey` Redaction Pattern:
+ *    The identifier `key` is frequently used for cryptographic keys, HMAC signing keys, and API keys,
+ *    but can occasionally appear in generic mapping contexts. To prevent credentials from leaking
+ *    while maintaining predictability, exact matches (`"key"`, `"apiKey"`) and nested wildcards
+ *    (`"*.key"`, `"*.*.key"`, `"*.apiKey"`) are explicitly registered to redact secrets like private
+ *    keys or API tokens if logged in service configs or handshake objects.
+ *
+ * 3. Nested HTTP Headers & Telemetry Secrets (`headers.authorization`, `*.req.headers.authorization`, `*.req.headers['x-metrics-secret']`):
+ *    Incoming HTTP request representations or error contexts containing `req` or `headers` may
+ *    harbor sensitive authorization tokens or telemetry probe keys (`x-metrics-secret`).
+ *    Explicit bracketed and dot-notated paths ensure that both root-level `headers` and nested
+ *    `req.headers` (e.g. inside error objects or audit logs) have their authorization headers and
+ *    shared secret tokens redacted.
+ */
+export const DEFAULT_REDACT_PATHS: string[] = [
+  // Session tokens (camelCase & snake_case, root and nested)
   "sessionToken",
   "*.sessionToken",
   "*.*.sessionToken",
   "session_token",
   "*.session_token",
   "*.*.session_token",
+
+  // Passwords
   "password",
   "*.password",
+  "*.*.password",
+
+  // Tokens (JWTs, CSRF tokens, bearer tokens)
   "token",
   "*.token",
+  "*.*.token",
+
+  // Secrets and cryptographic credentials
   "secret",
   "*.secret",
+  "*.*.secret",
+
+  // Authorization headers and Bearer strings
   "authorization",
-  "headers.authorization",
-  "headers.cookie",
-  "cookie",
-  "key",
-  "*.key",
-  "apiKey",
-  "*.apiKey",
+  "*.authorization",
+  "*.*.authorization",
   "bearer",
   "*.bearer",
+  "*.*.bearer",
+
+  // Credentials
   "credential",
   "*.credential",
+  "*.*.credential",
   "credentials",
   "*.credentials",
+  "*.*.credentials",
+
+  // Keys (API keys, private keys, signing keys)
+  "key",
+  "*.key",
+  "*.*.key",
+  "apiKey",
+  "*.apiKey",
+  "*.*.apiKey",
+
+  // Cookies and session identifiers
+  "cookie",
+  "*.cookie",
+  "*.*.cookie",
+  "headers.cookie",
+  "*.headers.cookie",
+
+  // HTTP Request headers (authorization & telemetry secret guards)
+  "headers.authorization",
+  "*.headers.authorization",
+  "req.headers.authorization",
+  "*.req.headers.authorization",
+  "*.*.req.headers.authorization",
+  "headers['x-metrics-secret']",
+  "*.headers['x-metrics-secret']",
+  "req.headers['x-metrics-secret']",
+  "*.req.headers['x-metrics-secret']",
+  "*.*.req.headers['x-metrics-secret']",
 ];
 
 /**
@@ -47,20 +113,27 @@ export class PinoLogger implements Logger {
     } else {
       const opts = (options as PinoLoggerOptions) || {};
       const level = opts.level ?? "info";
-      type PinoFactory = (options?: LoggerOptions) => PinoInstance;
+      type PinoFactory = (
+        options?: LoggerOptions,
+        destination?: pino.DestinationStream | NodeJS.WritableStream,
+      ) => PinoInstance;
       const pinoFn = (
         typeof pino === "function"
           ? pino
           : (pino as unknown as { default: PinoFactory }).default
       ) as unknown as PinoFactory;
-      this.logger = pinoFn({
+      const stream = (opts as { stream?: pino.DestinationStream }).stream;
+      const pinoConfig = {
         level,
         redact: {
           paths: DEFAULT_REDACT_PATHS,
           censor: "[REDACTED]",
         },
         ...opts,
-      });
+      };
+      this.logger = stream
+        ? pinoFn(pinoConfig, stream)
+        : pinoFn(pinoConfig);
     }
   }
 

@@ -367,5 +367,16 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useCameraService()).toBe(defaultCameraService);
       });
     });
+
+    it('verifies clean decoupling between DI tokens and storage adapters (MAJ-002)', async () => {
+      const tokensModule = await import('../tokens');
+      expect(tokensModule.API_CLIENT_KEY).toBeDefined();
+      expect(tokensModule.STORAGE_KEY).toBeDefined();
+      expect(tokensModule.SESSION_STORAGE_KEY).toBeDefined();
+
+      const indexModule = await import('../index');
+      expect(indexModule.useInjectStorage).toBeDefined();
+      expect(indexModule.STORAGE_KEY).toBe(tokensModule.STORAGE_KEY);
+    });
   });
 });

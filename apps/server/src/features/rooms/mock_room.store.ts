@@ -3,7 +3,9 @@ import {
   GameOverPayload,
   Player,
   RoomState,
+  type IClock,
 } from "@fun-chess/shared";
+import { SystemClock } from "../../platform/time/index.js";
 import { RoomStore, RoomMutator } from "./room.store.js";
 import {
   RoomNotFoundError,
@@ -25,6 +27,12 @@ export class MockRoomStore implements RoomStore {
   public rooms: Map<string, RoomState> = new Map();
   public saveCalls: RoomState[] = [];
   public deleteCalls: string[] = [];
+  private readonly clock: IClock;
+
+  constructor(clock?: IClock) {
+    this.clock = clock ?? new SystemClock();
+  }
+
 
   public async save(room: RoomState, expectedVersion?: number): Promise<void> {
     const code = room.roomCode.toUpperCase();
@@ -45,7 +53,7 @@ export class MockRoomStore implements RoomStore {
     const roomToSave: RoomState = {
       ...structuredClone(room),
       version: nextVersion,
-      lastActivityAt: room.lastActivityAt ?? Date.now(),
+      lastActivityAt: room.lastActivityAt ?? this.clock.now(),
     };
 
     this.saveCalls.push(structuredClone(roomToSave));
@@ -61,7 +69,7 @@ export class MockRoomStore implements RoomStore {
       const roomToSave: RoomState = {
         ...structuredClone(room),
         version: room.version || 1,
-        lastActivityAt: room.lastActivityAt ?? Date.now(),
+        lastActivityAt: room.lastActivityAt ?? this.clock.now(),
       };
       this.saveCalls.push(structuredClone(roomToSave));
       this.rooms.set(code, roomToSave);
@@ -94,7 +102,7 @@ export class MockRoomStore implements RoomStore {
       const roomToSave: RoomState = {
         ...structuredClone(updatedRoom),
         version: nextVersion,
-        lastActivityAt: updatedRoom.lastActivityAt ?? Date.now(),
+        lastActivityAt: updatedRoom.lastActivityAt ?? this.clock.now(),
       };
 
       this.saveCalls.push(structuredClone(roomToSave));
@@ -106,6 +114,7 @@ export class MockRoomStore implements RoomStore {
   public async withLock<T>(
     _roomCode: string,
     action: () => Promise<T>,
+    _correlationId?: string,
   ): Promise<T> {
     return await action();
   }
@@ -166,7 +175,7 @@ export class MockRoomStore implements RoomStore {
     gameOverPayload?: GameOverPayload,
   ): Promise<RoomState> {
     return this.mutate(roomCode, (room) => {
-      const now = Date.now();
+      const now = this.clock.now();
       const updated = applyGameMoveTransition(
         room,
         nextGameState,
@@ -182,7 +191,7 @@ export class MockRoomStore implements RoomStore {
     gameOverPayload: GameOverPayload,
   ): Promise<RoomState> {
     return this.mutate(roomCode, (room) => {
-      const now = Date.now();
+      const now = this.clock.now();
       const updated = finalizeGameTransition(room, gameOverPayload, now);
       return { updatedRoom: updated, result: updated };
     });
@@ -193,7 +202,7 @@ export class MockRoomStore implements RoomStore {
     drawOffer: RoomState["drawOffer"],
   ): Promise<RoomState> {
     return this.mutate(roomCode, (room) => {
-      const now = Date.now();
+      const now = this.clock.now();
       const updated = updateDrawOfferTransition(room, drawOffer, now);
       return { updatedRoom: updated, result: updated };
     });
@@ -206,7 +215,7 @@ export class MockRoomStore implements RoomStore {
     players?: { whitePlayer: Player | null; blackPlayer: Player | null },
   ): Promise<RoomState> {
     return this.mutate(roomCode, (room) => {
-      const now = Date.now();
+      const now = this.clock.now();
       const updated = updateRematchTransition(
         room,
         rematch,

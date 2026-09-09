@@ -700,5 +700,135 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
       expect(compact.pz.sp.map(([id]) => id)).toEqual(["puz-a", "puz-z"]);
     });
   });
+
+  describe("Dictionary Mappings - Edge Cases and Full Branch Coverage (MAJ-025)", () => {
+    it("handles 1-star ratings and 0 attempts/hints in mapScenariosToCompact", () => {
+      const payload: UnifiedProgressPayload = {
+        version: 1,
+        exportedAt: 1700000000000,
+        scenarios: {
+          "lesson-1star": {
+            scenarioId: "lesson-1star",
+            starsEarned: 1,
+            attemptsCount: 0,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 0,
+            lastCompletedAt: 0,
+          },
+        },
+        puzzles: {
+          ratingProfile: {
+            rating: 800,
+            ratingDeviation: 350,
+            peakRating: 800,
+            totalAttempted: 0,
+            totalSolved: 0,
+            bestStreak: 0,
+            ratingHistory: [],
+          },
+          themeMastery: {
+            fork: {
+              theme: "fork",
+              attempted: 0,
+              solved: 0,
+              starsEarned: 0,
+              masteryLevel: "novice",
+              lastPracticedAt: 0,
+            },
+          },
+          arcadeStats: {
+            puzzleRushHighScore: 0,
+            puzzleRushBestStreak: 0,
+            streakSurvivorHighScore: 0,
+            totalRushRuns: 0,
+          },
+          solvedPuzzles: {
+            puz1: {
+              stars: 1,
+              solvedAt: 0,
+            },
+          },
+          createdAt: 0,
+          lastActiveAt: 0,
+        },
+      };
+
+      const compact = defaultDictionaryMapper.toCompact(payload);
+      expect(compact.sc[0]?.[1]).toBe(1); // 1 star
+      expect(compact.pz.tm[0]?.[1]).toBe(0); // 0 attempted
+      expect(compact.pz.sp[0]?.[1]).toBe(1); // 1 star
+
+      const restored = defaultDictionaryMapper.fromCompact(compact);
+      expect(restored.scenarios["lesson-1star"]?.starsEarned).toBe(1);
+      expect(restored.puzzles.solvedPuzzles["puz1"]?.stars).toBe(1);
+    });
+
+    it("handles partial rating profiles with fallback values in mapRatingToCompact", () => {
+      const payload: UnifiedProgressPayload = {
+        version: 1,
+        exportedAt: 1700000000000,
+        scenarios: {},
+        puzzles: {
+          ratingProfile: {
+            rating: 1200,
+            ratingDeviation: 100,
+            peakRating: undefined as any, // peakRating omitted
+            totalAttempted: 10,
+            totalSolved: 8,
+            bestStreak: 5,
+            ratingHistory: [],
+          },
+          themeMastery: {},
+          arcadeStats: {
+            puzzleRushHighScore: 10,
+            puzzleRushBestStreak: 5,
+            streakSurvivorHighScore: 8,
+            totalRushRuns: 4,
+          },
+          solvedPuzzles: {},
+          createdAt: 1700000000000,
+          lastActiveAt: 1700000000000,
+        },
+      };
+
+      const compact = toCompactProgress(payload);
+      expect(compact.pz.r[2]).toBe(1200); // peakRating falls back to rating
+
+      const restored = fromCompactProgress(compact);
+      expect(restored.puzzles.ratingProfile.peakRating).toBe(1200);
+    });
+
+    it("restores sparse arcadeStats and solvedPuzzles tuples containing undefined elements", () => {
+      const sparseDto: CompactProgressDto = {
+        v: 1,
+        t: 1700000000,
+        sc: [
+          ["sc1", 1, undefined as any, undefined as any, undefined as any, undefined as any],
+        ],
+        pz: {
+          r: [undefined as any, undefined as any, undefined as any, undefined as any, undefined as any, undefined as any],
+          tm: [
+            ["fork", undefined as any, undefined as any, undefined as any, undefined as any],
+          ],
+          ac: [undefined as any, undefined as any, undefined as any, undefined as any],
+          sp: [
+            ["puz-sparse", 1, undefined as any],
+          ],
+          ca: 1700000000,
+          la: 1700000000,
+        },
+      };
+
+      const restored = defaultDictionaryMapper.fromCompact(sparseDto);
+      expect(restored.puzzles.arcadeStats.puzzleRushHighScore).toBe(0);
+      expect(restored.puzzles.arcadeStats.puzzleRushBestStreak).toBe(0);
+      expect(restored.puzzles.arcadeStats.streakSurvivorHighScore).toBe(0);
+      expect(restored.puzzles.arcadeStats.totalRushRuns).toBe(0);
+      expect(restored.puzzles.solvedPuzzles["puz-sparse"]?.solvedAt).toBe(0);
+      expect(restored.puzzles.solvedPuzzles["puz-sparse"]?.stars).toBe(1);
+      expect(restored.scenarios["sc1"]?.attemptsCount).toBe(0);
+      expect(restored.scenarios["sc1"]?.hintsUsedTotal).toBe(0);
+    });
+  });
 });
 

@@ -230,4 +230,115 @@ describe("ShutdownCoordinator", () => {
     expect(removeListenerSpy).toHaveBeenCalledWith("SIGTERM", expect.any(Function));
     expect(mockServer.removeListener).toHaveBeenCalledWith("error", expect.any(Function));
   });
+
+  it("triggers controlled graceful shutdown on unhandledRejection (MIN-004)", () => {
+    const coordinator = new ShutdownCoordinator({
+      server: mockServer,
+      io: mockIo,
+      logger,
+      onExit: (code) => exitCalls.push(code),
+    });
+
+    const shutdownSpy = vi.spyOn(coordinator, "shutdown").mockResolvedValue();
+    coordinator.installProcessHandlers();
+
+    const unhandledHandler = (
+      coordinator as unknown as { unhandledRejectionHandler: (reason: unknown) => void }
+    ).unhandledRejectionHandler;
+
+    const rejectionReason = new Error("Unhandled promise rejection error");
+    unhandledHandler(rejectionReason);
+
+    expect(shutdownSpy).toHaveBeenCalledWith("unhandledRejection", expect.any(String));
+    const passedCorrId = shutdownSpy.mock.calls[0]?.[1];
+    const errorLog = logger.errorLogs.find((l) => l.context?.["operation"] === "unhandled_rejection");
+    expect(errorLog).toBeDefined();
+    expect(errorLog?.context?.["correlationId"]).toBe(passedCorrId);
+
+    coordinator.uninstallProcessHandlers();
+  });
+
+  it("isolates additionalCleanups callbacks so failure in one does not abort others (MAJ-002)", async () => {
+    let secondCleanupRan = false;
+    let thirdCleanupRan = false;
+
+    const failingCleanup = () => {
+      throw new Error("First cleanup crashed");
+    };
+    const secondCleanup = () => {
+      secondCleanupRan = true;
+    };
+    const thirdCleanup = async () => {
+      thirdCleanupRan = true;
+    };
+
+    const coordinator = new ShutdownCoordinator({
+      server: mockServer,
+      io: mockIo,
+      logger,
+      onExit: (code) => exitCalls.push(code),
+      additionalCleanups: [failingCleanup, secondCleanup, thirdCleanup],
+    });
+
+    await coordinator.shutdown("SIGTERM");
+
+    expect(secondCleanupRan).toBe(true);
+    expect(thirdCleanupRan).toBe(true);
+    expect(exitCalls).toEqual([0]);
+
+    const cleanupErrorLog = logger.errorLogs.find(
+      (l) => l.context?.["operation"] === "server_shutdown" && l.context?.["status"] === "cleanup_error",
+    );
+    expect(cleanupErrorLog).toBeDefined();
+  });
+
+  it("retains invariant operation: 'server_shutdown' with status payload across lifecycle (MIN-008)", async () => {
+    const coordinator = new ShutdownCoordinator({
+      server: mockServer,
+      io: mockIo,
+      logger,
+      onExit: (code) => exitCalls.push(code),
+    });
+
+    await coordinator.shutdown("SIGTERM");
+
+    const startLog = logger.infoLogs.find(
+      (l) => l.context?.["operation"] === "server_shutdown" && l.context?.["status"] === "started",
+    );
+    expect(startLog).toBeDefined();
+
+    const completeLog = logger.infoLogs.find(
+      (l) => l.context?.["operation"] === "server_shutdown" && l.context?.["status"] === "completed",
+    );
+    expect(completeLog).toBeDefined();
+    expect(completeLog?.context?.["operation"]).toBe("server_shutdown");
+    expect(completeLog?.context?.["status"]).toBe("completed");
+  });
+
+  it("reliably executes exit handler and forceExitTimer cleanup in finally when error is thrown (MAJ-002)", async () => {
+    mockServer.close = vi.fn(() => {
+      throw new Error("Synchronous error during server close");
+    });
+
+    const coordinator = new ShutdownCoordinator({
+      server: mockServer,
+      io: mockIo,
+      logger,
+      timeoutMs: 3000,
+      onExit: (code) => exitCalls.push(code),
+    });
+
+    await coordinator.shutdown("SIGINT");
+
+    expect(exitCalls).toEqual([1]);
+    const errorLog = logger.fatalLogs.find(
+      (l) => l.context?.["operation"] === "server_shutdown" && l.context?.["status"] === "error",
+    );
+    expect(errorLog).toBeDefined();
+    expect(errorLog?.context?.["status"]).toBe("error");
+
+    // Advance timer to verify forceExitTimer was cleaned up and does not cause a second exit
+    vi.advanceTimersByTime(5000);
+    expect(exitCalls).toEqual([1]);
+  });
 });

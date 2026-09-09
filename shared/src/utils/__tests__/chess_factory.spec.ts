@@ -16,15 +16,19 @@ import {
   safeLoadFen,
   DEFAULT_CHESS_LOGGER,
   SILENT_CHESS_LOGGER,
+  setChessLogHandler,
+  NOOP_CHESS_LOGGER,
   type ChessLogger,
 } from "../chess_factory.js";
 
 describe("Safe Chess Factory & FEN Validator", () => {
   beforeEach(() => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
+    setChessLogHandler(null);
     vi.restoreAllMocks();
   });
 
@@ -83,6 +87,13 @@ describe("Safe Chess Factory & FEN Validator", () => {
 
       // Random garbage text
       expect(isValidFen("not-a-valid-fen-at-all")).toBe(false);
+    });
+
+    it("returns false if validateFen throws in isValidFen", () => {
+      vi.mocked(validateFen).mockImplementationOnce(() => {
+        throw new Error("Validation crash");
+      });
+      expect(isValidFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")).toBe(false);
     });
   });
 
@@ -235,6 +246,28 @@ describe("Safe Chess Factory & FEN Validator", () => {
       expect(safeLoadFen(null as unknown as Chess, DEFAULT_CHESS_FEN)).toBe(false);
     });
 
+    it("uses default error message when validation.error is undefined", () => {
+      vi.mocked(validateFen).mockReturnValueOnce({ ok: false } as ReturnType<typeof validateFen>);
+      const mockLogger: ChessLogger = { warn: vi.fn() };
+      createSafeChess("bad-fen", mockLogger);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[createSafeChess] Invalid FEN"),
+        expect.objectContaining({ error: "Malformed position" }),
+      );
+    });
+
+    it("handles non-Error exception in createSafeChess", () => {
+      vi.mocked(validateFen).mockImplementationOnce(() => {
+        throw "String exception";
+      });
+      const mockLogger: ChessLogger = { warn: vi.fn() };
+      createSafeChess("bad-fen", mockLogger);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[createSafeChess] Failed to initialize position"),
+        expect.objectContaining({ error: "String exception" }),
+      );
+    });
+
     it("recovers safely when position initialization throws in createSafeChess (MIN-034)", () => {
       vi.mocked(validateFen).mockImplementationOnce(() => {
         throw new Error("Validation engine crashed");
@@ -333,6 +366,54 @@ describe("Safe Chess Factory & FEN Validator", () => {
         }),
       );
     });
+
+    it("handles non-Error exception when chess.load throws in safeLoadFen", () => {
+      const chess = new Chess();
+      vi.spyOn(chess, "load").mockImplementationOnce(() => {
+        throw "String load failure";
+      });
+      const mockLogger: ChessLogger = { warn: vi.fn() };
+      const validFen = "8/5k2/8/8/8/8/4K3/8 w - - 0 1";
+      expect(safeLoadFen(chess, validFen, mockLogger)).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[safeLoadFen] Failed to load FEN"),
+        expect.objectContaining({ error: "String load failure" }),
+      );
+    });
+
+    it("handles non-Error exception when restoring previous FEN throws in safeLoadFen", () => {
+      const chess = new Chess();
+      let callCount = 0;
+      vi.spyOn(chess, "load").mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) throw new Error("first fail");
+        throw "String restore fail";
+      });
+      const mockLogger: ChessLogger = { warn: vi.fn() };
+      const validFen = "8/5k2/8/8/8/8/4K3/8 w - - 0 1";
+      expect(safeLoadFen(chess, validFen, mockLogger)).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[safeLoadFen] Failed to restore previous FEN"),
+        expect.objectContaining({ error: "String restore fail" }),
+      );
+    });
+
+    it("handles non-Error exception when reset throws in safeLoadFen", () => {
+      const chess = new Chess();
+      vi.spyOn(chess, "load").mockImplementation(() => {
+        throw new Error("Load failed");
+      });
+      vi.spyOn(chess, "reset").mockImplementation(() => {
+        throw "String reset fail";
+      });
+      const mockLogger: ChessLogger = { warn: vi.fn(), error: vi.fn() };
+      const validFen = "8/5k2/8/8/8/8/4K3/8 w - - 0 1";
+      expect(safeLoadFen(chess, validFen, mockLogger)).toBe(false);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("[safeLoadFen] Failed to reset chess instance after load failure"),
+        expect.objectContaining({ error: "String reset fail" }),
+      );
+    });
   });
 
   describe("DEFAULT_CHESS_LOGGER & SILENT_CHESS_LOGGER (MIN-004)", () => {
@@ -344,8 +425,93 @@ describe("Safe Chess Factory & FEN Validator", () => {
       expect(console.warn).toHaveBeenCalledWith("Warning with meta", { operation: "test" });
     });
 
+    it("logs to console.error via DEFAULT_CHESS_LOGGER with and without metadata", () => {
+      DEFAULT_CHESS_LOGGER.error?.("Error without meta");
+      expect(console.error).toHaveBeenCalledWith("Error without meta");
+
+      DEFAULT_CHESS_LOGGER.error?.("Error with meta", { operation: "test" });
+      expect(console.error).toHaveBeenCalledWith("Error with meta", { operation: "test" });
+    });
+
     it("aliases SILENT_CHESS_LOGGER to DEFAULT_CHESS_LOGGER", () => {
       expect(SILENT_CHESS_LOGGER).toBe(DEFAULT_CHESS_LOGGER);
+    });
+  });
+
+  describe("setChessLogHandler & NOOP_CHESS_LOGGER (F-07)", () => {
+    it("routes warnings to custom handler when registered", () => {
+      const handler = vi.fn();
+      setChessLogHandler(handler);
+
+      DEFAULT_CHESS_LOGGER.warn("Custom warning message", { operation: "test_op" });
+
+      expect(handler).toHaveBeenCalledWith(
+        "warn",
+        "Custom warning message",
+        { operation: "test_op" },
+      );
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    it("routes errors to custom handler when registered", () => {
+      const handler = vi.fn();
+      setChessLogHandler(handler);
+
+      DEFAULT_CHESS_LOGGER.error?.("Custom error message", { operation: "test_error" });
+
+      expect(handler).toHaveBeenCalledWith(
+        "error",
+        "Custom error message",
+        { operation: "test_error" },
+      );
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it("resets to default console logging when setChessLogHandler(null) is called", () => {
+      const handler = vi.fn();
+      setChessLogHandler(handler);
+      setChessLogHandler(null);
+
+      DEFAULT_CHESS_LOGGER.warn("Warning after reset", { operation: "reset" });
+      DEFAULT_CHESS_LOGGER.error?.("Error after reset", { operation: "reset" });
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledWith("Warning after reset", { operation: "reset" });
+      expect(console.error).toHaveBeenCalledWith("Error after reset", { operation: "reset" });
+    });
+
+    it("invokes custom handler during createSafeChess failure when registered", () => {
+      const handler = vi.fn();
+      setChessLogHandler(handler);
+
+      createSafeChess("invalid-fen");
+
+      expect(handler).toHaveBeenCalledWith(
+        "warn",
+        "[createSafeChess] Invalid FEN. Falling back to standard starting position.",
+        expect.objectContaining({
+          operation: "create_safe_chess",
+          fen: "invalid-fen",
+        }),
+      );
+    });
+
+    it("provides NOOP_CHESS_LOGGER with no-op warn and error methods", () => {
+      expect(typeof NOOP_CHESS_LOGGER.warn).toBe("function");
+      expect(typeof NOOP_CHESS_LOGGER.error).toBe("function");
+
+      expect(() => {
+        NOOP_CHESS_LOGGER.warn("ignore this", { operation: "noop" });
+        NOOP_CHESS_LOGGER.error?.("ignore error", { operation: "noop" });
+      }).not.toThrow();
+
+      expect(console.warn).not.toHaveBeenCalled();
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it("suppresses warnings when NOOP_CHESS_LOGGER is provided to createSafeChess", () => {
+      createSafeChess("bad-fen", NOOP_CHESS_LOGGER);
+      expect(console.warn).not.toHaveBeenCalled();
     });
   });
 });

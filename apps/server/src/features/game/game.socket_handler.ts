@@ -13,23 +13,20 @@ import {
   RespondRematchRequest,
   RespondRematchRequestSchema,
   MoveResult,
+  normalizeRoomCode,
 } from "@fun-chess/shared";
-import { env } from "../../platform/config/index.js";
 import type { Logger } from "../../platform/logger/index.js";
 import {
   SocketRateLimiter,
-  createSocketRateLimiter,
   TypedSocketServer,
+  createFeatureSocketHandler,
 } from "../../platform/socket/index.js";
-import { createFeatureSocketHandler } from "../../platform/socket/socket_handler.utils.js";
 import type { IGameService } from "./game.interface.js";
 import {
   type IDisconnectTimerRegistry,
   defaultDisconnectTimerRegistry,
-  type SessionRegistry,
+  sanitizePublicRoom,
 } from "../rooms/index.js";
-
-export const defaultSocketRateLimiter = createSocketRateLimiter();
 
 /**
  * Registers gameplay Socket.io event listeners.
@@ -39,14 +36,38 @@ export function registerGameSocketHandlers(
   socket: Socket,
   gameService: IGameService,
   logger: Logger,
-  rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
+  rateLimiter: SocketRateLimiter,
+  timerRegistry?: IDisconnectTimerRegistry,
+  trustProxy?: boolean,
+): void;
+/**
+ * @deprecated Legacy signature for interim compatibility prior to SC-5 composition root wiring.
+ */
+export function registerGameSocketHandlers(
+  io: TypedSocketServer,
+  socket: Socket,
+  gameService: IGameService,
+  logger: Logger,
+  rateLimiter: SocketRateLimiter,
+  timerRegistry: IDisconnectTimerRegistry,
+  _sessionRegistry: unknown,
+  trustProxy?: boolean,
+): void;
+export function registerGameSocketHandlers(
+  io: TypedSocketServer,
+  socket: Socket,
+  gameService: IGameService,
+  logger: Logger,
+  rateLimiter: SocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
-  sessionRegistry?: SessionRegistry,
-  trustProxy: boolean = env.TRUST_PROXY,
+  trustProxyOrSessionRegistry?: boolean | unknown,
+  trustProxyLegacy?: boolean,
 ): void {
   const effectiveTrustProxy =
     (socket.data as { trustProxy?: boolean } | undefined)?.trustProxy ??
-    trustProxy;
+    (typeof trustProxyOrSessionRegistry === "boolean"
+      ? trustProxyOrSessionRegistry
+      : (trustProxyLegacy ?? false));
 
   // 1. game:move
   const handleMove = createFeatureSocketHandler<
@@ -56,31 +77,14 @@ export function registerGameSocketHandlers(
     logger,
     "game:move",
     socket,
-    { schema: MakeMoveRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
+    {
+      schema: MakeMoveRequestSchema,
+      rateLimiter,
+      trustProxy: effectiveTrustProxy,
+    },
     async (req) => {
-      const roomCode = req.roomCode.trim().toUpperCase();
+      const roomCode = normalizeRoomCode(req.roomCode);
       const result = await gameService.makeMove(req, socket.id);
-
-      if (sessionRegistry) {
-        const sessionToken = (socket.data as { sessionToken?: string } | undefined)?.sessionToken;
-        if (sessionToken) {
-          await sessionRegistry.touchSession(sessionToken, socket.id);
-        } else {
-          const playerId = (socket.data as { userId?: string } | undefined)?.userId;
-          let token: string | null | undefined;
-          if (playerId && typeof sessionRegistry.getSessionTokenForPlayer === "function") {
-            token = await sessionRegistry.getSessionTokenForPlayer(roomCode, playerId);
-          }
-          if (!token && playerId) {
-            token = (sessionRegistry as { playerIndex?: Map<string, string> }).playerIndex?.get(
-              `${roomCode}:${playerId}`,
-            );
-          }
-          if (token) {
-            await sessionRegistry.touchSession(token, socket.id);
-          }
-        }
-      }
 
       io.to(roomCode).emit("game:moved", {
         move: result.moveResult,
@@ -113,9 +117,13 @@ export function registerGameSocketHandlers(
     logger,
     "game:resign",
     socket,
-    { schema: ResignRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
+    {
+      schema: ResignRequestSchema,
+      rateLimiter,
+      trustProxy: effectiveTrustProxy,
+    },
     async (req) => {
-      const roomCode = req.roomCode.trim().toUpperCase();
+      const roomCode = normalizeRoomCode(req.roomCode);
       const result = await gameService.resign(roomCode, socket.id);
       timerRegistry.cancelAllForRoom(roomCode);
       io.to(roomCode).emit("game:over", result.gameOverPayload);
@@ -133,9 +141,13 @@ export function registerGameSocketHandlers(
     logger,
     "game:offer_draw",
     socket,
-    { schema: OfferDrawRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
+    {
+      schema: OfferDrawRequestSchema,
+      rateLimiter,
+      trustProxy: effectiveTrustProxy,
+    },
     async (req) => {
-      const roomCode = req.roomCode.trim().toUpperCase();
+      const roomCode = normalizeRoomCode(req.roomCode);
       const result = await gameService.offerDraw(roomCode, socket.id);
       if (result.opponentPlayer?.socketId) {
         io.to(result.opponentPlayer.socketId).emit("game:draw_offered", {
@@ -157,9 +169,13 @@ export function registerGameSocketHandlers(
     logger,
     "game:respond_draw",
     socket,
-    { schema: RespondDrawRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
+    {
+      schema: RespondDrawRequestSchema,
+      rateLimiter,
+      trustProxy: effectiveTrustProxy,
+    },
     async (req) => {
-      const roomCode = req.roomCode.trim().toUpperCase();
+      const roomCode = normalizeRoomCode(req.roomCode);
       const result = await gameService.respondDraw(
         roomCode,
         socket.id,
@@ -189,9 +205,13 @@ export function registerGameSocketHandlers(
     logger,
     "game:request_rematch",
     socket,
-    { schema: RequestRematchRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
+    {
+      schema: RequestRematchRequestSchema,
+      rateLimiter,
+      trustProxy: effectiveTrustProxy,
+    },
     async (req) => {
-      const roomCode = req.roomCode.trim().toUpperCase();
+      const roomCode = normalizeRoomCode(req.roomCode);
       const result = await gameService.requestRematch(roomCode, socket.id);
 
       io.to(roomCode).emit("game:rematch_requested", {
@@ -213,9 +233,13 @@ export function registerGameSocketHandlers(
     logger,
     "game:respond_rematch",
     socket,
-    { schema: RespondRematchRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
+    {
+      schema: RespondRematchRequestSchema,
+      rateLimiter,
+      trustProxy: effectiveTrustProxy,
+    },
     async (req) => {
-      const roomCode = req.roomCode.trim().toUpperCase();
+      const roomCode = normalizeRoomCode(req.roomCode);
       const result = await gameService.respondRematch(
         roomCode,
         socket.id,
@@ -226,7 +250,7 @@ export function registerGameSocketHandlers(
         timerRegistry.cancelAllForRoom(roomCode);
         io.to(roomCode).emit("game:rematch_started", {
           gameState: result.nextGameState,
-          room: result.room,
+          room: sanitizePublicRoom(result.room),
         });
       } else {
         io.to(roomCode).emit("game:rematch_declined", {

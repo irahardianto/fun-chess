@@ -401,3 +401,97 @@ export function updateRematchTransition(
     lastActivityAt: now,
   };
 }
+
+/**
+ * Sanitizes a Player object for public broadcast by removing ephemeral socketId (F-01).
+ *
+ * @param player - Player object containing potential internal socketId
+ * @returns Sanitized Player object without socketId
+ */
+export function sanitizePublicPlayer(player: Player): Player {
+  const { socketId: _, ...publicPlayer } = player;
+  return publicPlayer as Player;
+}
+
+/**
+ * Sanitizes a RoomState object for public broadcast by removing ephemeral socketIds (F-01).
+ *
+ * @param room - RoomState object to sanitize
+ * @returns Sanitized RoomState object with sanitized player objects
+ */
+export function sanitizePublicRoom(room: RoomState): RoomState {
+  return {
+    ...room,
+    whitePlayer: room.whitePlayer
+      ? sanitizePublicPlayer(room.whitePlayer)
+      : null,
+    blackPlayer: room.blackPlayer
+      ? sanitizePublicPlayer(room.blackPlayer)
+      : null,
+    spectators: Array.isArray(room.spectators)
+      ? room.spectators.map(sanitizePublicPlayer)
+      : [],
+  };
+}
+
+/**
+ * Pure transition applying forfeiture by abandonment when a player's disconnect grace period expires.
+ * Returns the next RoomState and GameOverPayload, or null if the player reconnected or room is not paused.
+ */
+export function abandonmentForfeitTransition(
+  room: RoomState,
+  disconnectedPlayerId: string,
+  now: number,
+): { nextRoom: RoomState; gameOverPayload: GameOverPayload } | null {
+  // Only forfeit if room is actively waiting for reconnect
+  if (room.status !== "paused_disconnect") {
+    return null;
+  }
+
+  // Identify disconnected player
+  let disconnectedPlayer: Player | null = null;
+  if (room.whitePlayer?.id === disconnectedPlayerId) {
+    disconnectedPlayer = room.whitePlayer;
+  } else if (room.blackPlayer?.id === disconnectedPlayerId) {
+    disconnectedPlayer = room.blackPlayer;
+  }
+
+  // If player is not found or has reconnected in the interim, abort forfeit
+  if (!disconnectedPlayer || disconnectedPlayer.isConnected) {
+    return null;
+  }
+
+  const winnerColor: PieceColor = disconnectedPlayer.color === "w" ? "b" : "w";
+  const winnerPlayer = winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
+
+  let gameOverPayload: GameOverPayload;
+  if (winnerPlayer && winnerPlayer.isConnected) {
+    gameOverPayload = createGameOverPayload({
+      winner: winnerColor,
+      winnerName: winnerPlayer.name,
+      loserName: disconnectedPlayer.name,
+      reason: "abandonment",
+      finalFen: room.game.fen,
+      totalMoves: room.game.moveCount,
+      startTimeMs: room.createdAt,
+    });
+  } else {
+    // Both players disconnected when timer expired -> draw by abandonment
+    gameOverPayload = createGameOverPayload({
+      winner: "draw",
+      reason: "abandonment",
+      finalFen: room.game.fen,
+      totalMoves: room.game.moveCount,
+      startTimeMs: room.createdAt,
+    });
+  }
+
+  const nextRoom: RoomState = {
+    ...room,
+    status: "game_over",
+    drawOffer: null,
+    lastActivityAt: now,
+  };
+
+  return { nextRoom, gameOverPayload };
+}

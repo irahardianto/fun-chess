@@ -1,3 +1,4 @@
+import { toRaw } from 'vue';
 import {
   sanitizeAndValidateProgress,
   type PuzzleProgress,
@@ -16,15 +17,14 @@ import {
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
 import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
 import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+import { SystemClock } from '@/platform/time';
 
 export { PUZZLE_PROGRESS_STORAGE_KEY };
 
 /**
- * Default system clock implementation using Date.now().
+ * Default system clock implementation using SystemClock.
  */
-export const systemClock: IClock = {
-  now: () => Date.now(),
-};
+export const systemClock: IClock = new SystemClock();
 
 /**
  * Robust LocalStorage implementation of PuzzleProgressStore.
@@ -107,23 +107,23 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
 
   public async getProgress(): Promise<PuzzleProgress> {
     if (!this.storage.isAvailable()) {
-      return JSON.parse(JSON.stringify(this.memoryCache));
+      return structuredClone(toRaw(this.memoryCache));
     }
 
     try {
       const raw = this.storage.getItem(this.storageKey);
       if (!raw) {
-        return JSON.parse(JSON.stringify(this.memoryCache));
+        return structuredClone(toRaw(this.memoryCache));
       }
       const parsed = JSON.parse(raw);
       this.memoryCache = this.sanitizeProgress(parsed);
-      return JSON.parse(JSON.stringify(this.memoryCache));
+      return structuredClone(toRaw(this.memoryCache));
     } catch (err) {
       this.logger.warn('Failed to parse or deserialize puzzle progress from storage, using fallback cache', {
         operation: 'get_puzzle_progress',
         error: err instanceof Error ? err.message : String(err),
       });
-      return JSON.parse(JSON.stringify(this.memoryCache));
+      return structuredClone(toRaw(this.memoryCache));
     }
   }
 
@@ -200,7 +200,7 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
     };
 
     await this.persist(updated);
-    return JSON.parse(JSON.stringify(updated));
+    return structuredClone(toRaw(updated));
   }
 
   public async saveArcadeResult(
@@ -227,7 +227,7 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
     };
 
     await this.persist(updated);
-    return JSON.parse(JSON.stringify(updated));
+    return structuredClone(toRaw(updated));
   }
 
   public async restoreProgress(progress: PuzzleProgress): Promise<void> {
@@ -260,7 +260,7 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
   }
 
   private async persist(data: PuzzleProgress, throwOnQuota: boolean = false): Promise<void> {
-    this.memoryCache = JSON.parse(JSON.stringify(data));
+    this.memoryCache = structuredClone(toRaw(data));
     if (this.storage.isAvailable()) {
       try {
         this.storage.setItem(this.storageKey, JSON.stringify(data));

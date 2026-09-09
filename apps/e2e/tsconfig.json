@@ -3,7 +3,9 @@
   "compilerOptions": {
     "moduleResolution": "NodeNext",
     "module": "NodeNext",
-    "types": ["node"]
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*", "ui/**/*", "api/**/*", "playwright.config.ts"]
 }

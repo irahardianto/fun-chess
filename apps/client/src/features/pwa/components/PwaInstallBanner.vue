@@ -48,7 +48,7 @@ function handleDismiss() {
 
         <!-- Text Content -->
         <div class="banner-text-content">
-          <h4 class="banner-title">Install Fun Chess on your Device!</h4>
+          <p class="banner-title pwa-title" role="heading" aria-level="2">Install Fun Chess on your Device!</p>
           <p class="banner-desc">Play anywhere, even without Wi-Fi or internet!</p>
         </div>
 
@@ -164,6 +164,12 @@ function handleDismiss() {
   align-items: center;
   gap: var(--space-2);
   flex-shrink: 0;
+}
+
+.banner-btn-secondary,
+.banner-btn-primary {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .banner-close-btn {

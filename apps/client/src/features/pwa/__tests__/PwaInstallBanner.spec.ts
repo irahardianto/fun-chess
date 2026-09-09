@@ -67,4 +67,16 @@ describe('PwaInstallBanner.vue', () => {
     const { isSnoozed } = usePwaInstall();
     expect(isSnoozed.value).toBe(true);
   });
+
+  it('uses accessible heading semantics without skipping hierarchy levels (no h4)', () => {
+    const wrapper = mount(PwaInstallBanner, {
+      props: { forceShow: true },
+    });
+
+    expect(wrapper.find('h4').exists()).toBe(false);
+    const heading = wrapper.find('[role="heading"]');
+    expect(heading.exists()).toBe(true);
+    expect(heading.attributes('aria-level')).toBe('2');
+    expect(heading.text()).toBe('Install Fun Chess on your Device!');
+  });
 });

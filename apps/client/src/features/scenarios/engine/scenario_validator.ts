@@ -1,6 +1,7 @@
 import type { Square, TutorialStep, StepMoveConstraint } from '@fun-chess/shared';
 import type { Square as ChessSquare } from 'chess.js';
 import { createSafeChess } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 
 export interface PlayerMoveInput {
   from: Square;
@@ -64,7 +65,12 @@ export function validateStepMove(
         return { valid: true, reason: 'Delivers sound checkmate' };
       }
     } catch (err) {
-      void err;
+      logger.debug('Scenario validator checkmate simulation failed', {
+        operation: 'scenario_validate_step_move_checkmate',
+        error: err instanceof Error ? err.message : String(err),
+        from: move.from,
+        to: move.to,
+      });
     }
   }
 
@@ -107,7 +113,11 @@ export function isSourceSquareAllowed(
         }
       }
     } catch (err) {
-      void err;
+      logger.debug('Scenario validator source square checkmate simulation failed', {
+        operation: 'scenario_is_source_square_allowed_checkmate',
+        error: err instanceof Error ? err.message : String(err),
+        from,
+      });
     }
   }
 
@@ -156,7 +166,11 @@ export function getAllowedTargetsForSource(
         }
       }
     } catch (err) {
-      void err;
+      logger.debug('Scenario validator target square checkmate simulation failed', {
+        operation: 'scenario_get_allowed_targets_checkmate',
+        error: err instanceof Error ? err.message : String(err),
+        from,
+      });
     }
   }
 

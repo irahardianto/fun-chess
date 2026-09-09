@@ -5,7 +5,6 @@ import {
   cancelDisconnectTimer,
   clearAllDisconnectTimers,
   DisconnectTimerRegistry,
-  roomCreateRateLimiter,
 } from "../room.socket_handler.js";
 import { SocketRateLimiter } from "../../../platform/socket/socket_rate_limiter.js";
 import { RoomService } from "../room.service.js";
@@ -122,6 +121,7 @@ describe("Room Socket Handlers", () => {
   let io: TestIo;
   let socket: TestSocket;
   let rateLimiter: SocketRateLimiter;
+  let createRateLimiter: SocketRateLimiter;
 
   beforeEach(() => {
     store = new MockRoomStore();
@@ -130,9 +130,17 @@ describe("Room Socket Handlers", () => {
     logger = new NullLogger();
     io = new TestIo();
     socket = new TestSocket("sock_host");
-    rateLimiter = new SocketRateLimiter({ maxRequests: 5, windowMs: 10_000 });
+    rateLimiter = new SocketRateLimiter({
+      maxRequests: 5,
+      windowMs: 10_000,
+      pruneIntervalMs: 0,
+    });
+    createRateLimiter = new SocketRateLimiter({
+      maxRequests: 3,
+      windowMs: 60_000,
+      pruneIntervalMs: 0,
+    });
     clearAllDisconnectTimers();
-    roomCreateRateLimiter.clear();
 
     registerRoomSocketHandlers(
       io as unknown as TypedSocketServer,
@@ -140,12 +148,15 @@ describe("Room Socket Handlers", () => {
       service,
       logger,
       rateLimiter,
+      undefined,
+      createRateLimiter,
     );
   });
 
   afterEach(() => {
     clearAllDisconnectTimers();
-    roomCreateRateLimiter.clear();
+    rateLimiter.destroy();
+    createRateLimiter.destroy();
     vi.restoreAllMocks();
   });
 
@@ -163,15 +174,16 @@ describe("Room Socket Handlers", () => {
       expect(ackResponse?.success).toBe(true);
       expect(ackResponse?.room?.roomCode).toBeDefined();
       expect(ackResponse?.sessionToken).toBeDefined();
+      expect(ackResponse?.player?.socketId).toBeUndefined();
+      expect(ackResponse?.room?.whitePlayer?.socketId).toBeUndefined();
+      expect(ackResponse?.room?.blackPlayer?.socketId).toBeUndefined();
       expect(socket.rooms.has(ackResponse?.room?.roomCode || "")).toBe(true);
 
+      // Dual delivery eliminated: room:created is not emitted to the creating socket (MAJ-008)
       const createdEvent = socket.emittedEvents.find(
         (e) => e.event === "room:created",
       );
-      expect(createdEvent).toBeDefined();
-      expect(asRecord(createdEvent?.payload).roomCode).toBe(
-        ackResponse?.room?.roomCode,
-      );
+      expect(createdEvent).toBeUndefined();
     });
 
     it("rejects room creation with ERR_RATE_LIMITED when rate limit is exceeded (SEC-01)", async () => {
@@ -228,17 +240,11 @@ describe("Room Socket Handlers", () => {
         (hostPlayer as unknown as Record<string, unknown>)?.sessionToken,
       ).toBeUndefined();
 
+      // Dual delivery eliminated: room:created is not emitted to the creating socket (MAJ-008)
       const createdEvent = socket.emittedEvents.find(
         (e) => e.event === "room:created",
       );
-      expect(createdEvent).toBeDefined();
-      expect(asRecord(createdEvent?.payload).sessionToken).toBeUndefined();
-      const eventPlayer =
-        asRecord(createdEvent?.payload).whitePlayer ??
-        asRecord(createdEvent?.payload).blackPlayer;
-      expect(
-        (eventPlayer as unknown as Record<string, unknown>)?.sessionToken,
-      ).toBeUndefined();
+      expect(createdEvent).toBeUndefined();
     });
 
     it("rejects malformed room:create payload with ERR_INVALID_PAYLOAD via ack", async () => {
@@ -295,13 +301,16 @@ describe("Room Socket Handlers", () => {
       expect(ackResponse?.success).toBe(true);
       expect(ackResponse?.player?.name).toBe("Bob");
       expect(ackResponse?.player?.color).toBe("b");
+      expect(ackResponse?.player?.socketId).toBeUndefined();
+      expect(ackResponse?.room?.whitePlayer?.socketId).toBeUndefined();
+      expect(ackResponse?.room?.blackPlayer?.socketId).toBeUndefined();
       expect(joinerSocket.rooms.has(created.roomCode)).toBe(true);
 
-      // Joined event emitted to joiner
+      // Dual delivery eliminated: room:joined is not emitted to joiner (MAJ-008)
       const joinedEvent = joinerSocket.emittedEvents.find(
         (e) => e.event === "room:joined",
       );
-      expect(joinedEvent).toBeDefined();
+      expect(joinedEvent).toBeUndefined();
 
       // Broadcast to room: player joined and game started
       const playerJoinedEmit = joinerSocket.toEmits.find(
@@ -309,6 +318,10 @@ describe("Room Socket Handlers", () => {
       );
       expect(playerJoinedEmit).toBeDefined();
       expect(playerJoinedEmit?.room).toBe(created.roomCode);
+      const playerJoinedData = asRecord(playerJoinedEmit?.payload);
+      expect((asRecord(playerJoinedData.player))?.socketId).toBeUndefined();
+      expect((asRecord(asRecord(playerJoinedData.room).whitePlayer))?.socketId).toBeUndefined();
+      expect((asRecord(asRecord(playerJoinedData.room).blackPlayer))?.socketId).toBeUndefined();
 
       const gameStartedEmit = io.toEmits.find(
         (e) => e.event === "game:started",
@@ -447,6 +460,7 @@ describe("Room Socket Handlers", () => {
         reconnSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       let ackResponse: TestAckResponse | undefined;
@@ -473,6 +487,7 @@ describe("Room Socket Handlers", () => {
         reconnSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       await reconnSocket.trigger("room:reconnect", { roomCode: "ABCD" });
@@ -506,6 +521,7 @@ describe("Room Socket Handlers", () => {
         reconnSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       let ackResponse: TestAckResponse | undefined;
@@ -522,7 +538,11 @@ describe("Room Socket Handlers", () => {
       );
 
       expect(ackResponse?.success).toBe(true);
+      expect(ackResponse?.sessionToken).toBe(sessionToken);
       expect(ackResponse?.room?.status).toBe("playing");
+      expect(ackResponse?.player?.socketId).toBeUndefined();
+      expect(ackResponse?.room?.whitePlayer?.socketId).toBeUndefined();
+      expect(ackResponse?.room?.blackPlayer?.socketId).toBeUndefined();
       expect(reconnSocket.rooms.has(created.roomCode)).toBe(true);
 
       const reconnectedEmit = reconnSocket.toEmits.find(
@@ -530,6 +550,15 @@ describe("Room Socket Handlers", () => {
       );
       expect(reconnectedEmit).toBeDefined();
       expect(asRecord(reconnectedEmit?.payload).playerId).toBe(created.hostId);
+
+      const reconnectedSelfEmit = reconnSocket.emittedEvents.find(
+        (e) => e.event === "room:reconnected",
+      );
+      expect(reconnectedSelfEmit).toBeDefined();
+      const selfPayload = asRecord(reconnectedSelfEmit?.payload);
+      expect((asRecord(selfPayload.player))?.socketId).toBeUndefined();
+      expect((asRecord(asRecord(selfPayload.room).whitePlayer))?.socketId).toBeUndefined();
+      expect((asRecord(asRecord(selfPayload.room).blackPlayer))?.socketId).toBeUndefined();
     });
 
     it("rejects room:reconnect with ERR_RATE_LIMITED when rate limit is exceeded (SEC-HIGH-001)", async () => {
@@ -696,6 +725,7 @@ describe("Room Socket Handlers", () => {
         bobSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       let ackResponse: TestAckResponse | undefined;
@@ -746,6 +776,7 @@ describe("Room Socket Handlers", () => {
         specSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       let ackResponse: TestAckResponse | undefined;
@@ -1356,6 +1387,11 @@ describe("Room Socket Handlers", () => {
     });
 
     it("enforces differential rate limit of 3 creations / min / IP (MAJ-006)", async () => {
+      const specificCreateLimiter = new SocketRateLimiter({
+        maxRequests: 3,
+        windowMs: 60_000,
+        pruneIntervalMs: 0,
+      });
       const createSocket = new TestSocket("sock_diff_create");
       createSocket.handshake.address = "172.16.0.5";
 
@@ -1364,6 +1400,9 @@ describe("Room Socket Handlers", () => {
         createSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
+        undefined,
+        specificCreateLimiter,
       );
 
       // 3 room:create requests succeed
@@ -1403,6 +1442,8 @@ describe("Room Socket Handlers", () => {
       );
       // Join should fail with RoomNotFoundError / ERR_ROOM_NOT_FOUND, NOT ERR_RATE_LIMITED!
       expect(joinAck?.error?.code).not.toBe("ERR_RATE_LIMITED");
+
+      specificCreateLimiter.destroy();
     });
 
     it("logs structured error when disconnect grace period forfeit fails (MIN-007)", async () => {
@@ -1411,12 +1452,17 @@ describe("Room Socket Handlers", () => {
           _sockId: string,
           onForfeit?: (room: RoomState, gameOverPayload: unknown) => Promise<void>,
         ) => {
-          // Simulate calling onForfeit where error happens
+          // Simulate calling onForfeit where error happens in background job
           if (onForfeit) {
-            await onForfeit(
-              { roomCode: "TEST" } as unknown as RoomState,
-              { winner: "w" },
-            );
+            try {
+              await onForfeit(
+                { roomCode: "TEST" } as unknown as RoomState,
+                { winner: "w" },
+              );
+            } catch (error) {
+              // Simulated background job runner absorbs error after logging (MAJ-012)
+              void error;
+            }
           }
           return null;
         },
@@ -1560,6 +1606,7 @@ describe("Room Socket Handlers", () => {
         creatorSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       let createAck: TestAckResponse | undefined;
@@ -1582,6 +1629,7 @@ describe("Room Socket Handlers", () => {
         joinerSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       let joinAck: TestAckResponse | undefined;
@@ -1612,6 +1660,7 @@ describe("Room Socket Handlers", () => {
         reconnSocket as unknown as Socket,
         service,
         logger,
+        rateLimiter,
       );
 
       let reconnAck: TestAckResponse | undefined;
@@ -1628,7 +1677,153 @@ describe("Room Socket Handlers", () => {
       );
 
       expect(reconnAck?.success).toBe(true);
+      expect(reconnAck?.sessionToken).toBe(joinAck?.sessionToken);
       expect(reconnSocket.data.sessionToken).toBe(joinAck?.sessionToken);
+    });
+  });
+
+  describe("Socket membership error isolation (ENH-005)", () => {
+    it("isolates socket.join() error on room:create without failing operation ack", async () => {
+      const socket = new TestSocket("sock_join_fail_create");
+      vi.spyOn(socket, "join").mockRejectedValueOnce(new Error("Socket transport join error"));
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        socket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let ack: TestAckResponse | undefined;
+      await socket.trigger(
+        "room:create",
+        { playerName: "Alice" },
+        (res) => {
+          ack = res;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(ack?.room).toBeDefined();
+
+      const warnLog = logger.warnLogs.find(
+        (l) =>
+          l.context?.operation === "socket_room_membership_error" &&
+          l.context?.action === "join",
+      );
+      expect(warnLog).toBeDefined();
+    });
+
+    it("isolates socket.join() error on room:join without failing operation ack", async () => {
+      const { room } = await service.createRoom(
+        { playerName: "Host", preferredColor: "w" },
+        "sock_host",
+      );
+
+      const socket = new TestSocket("sock_join_fail_join");
+      vi.spyOn(socket, "join").mockRejectedValueOnce(new Error("Socket transport join error"));
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        socket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let ack: TestAckResponse | undefined;
+      await socket.trigger(
+        "room:join",
+        { roomCode: room.roomCode, playerName: "Guest" },
+        (res) => {
+          ack = res;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(ack?.room).toBeDefined();
+
+      const warnLog = logger.warnLogs.find(
+        (l) =>
+          l.context?.operation === "socket_room_membership_error" &&
+          l.context?.action === "join",
+      );
+      expect(warnLog).toBeDefined();
+    });
+
+    it("isolates socket.join() error on room:reconnect without failing operation ack and returns sessionToken (ENH-005, ENH-015)", async () => {
+      const { room, player, sessionToken } = await service.createRoom(
+        { playerName: "Host", preferredColor: "w" },
+        "sock_host",
+      );
+
+      const socket = new TestSocket("sock_join_fail_recon");
+      vi.spyOn(socket, "join").mockRejectedValueOnce(new Error("Socket transport reconnect join error"));
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        socket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let ack: TestAckResponse | undefined;
+      await socket.trigger(
+        "room:reconnect",
+        { roomCode: room.roomCode, playerId: player.id, sessionToken },
+        (res) => {
+          ack = res;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(ack?.room).toBeDefined();
+      expect(ack?.sessionToken).toBe(sessionToken);
+
+      const warnLog = logger.warnLogs.find(
+        (l) =>
+          l.context?.operation === "socket_room_membership_error" &&
+          l.context?.action === "join",
+      );
+      expect(warnLog).toBeDefined();
+    });
+
+    it("isolates socket.leave() error on room:leave without failing operation ack", async () => {
+      const { room } = await service.createRoom(
+        { playerName: "Host", preferredColor: "w" },
+        "sock_leave_fail",
+      );
+
+      const socket = new TestSocket("sock_leave_fail");
+      vi.spyOn(socket, "leave").mockRejectedValueOnce(new Error("Socket transport leave error"));
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        socket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let ack: TestAckResponse | undefined;
+      await socket.trigger(
+        "room:leave",
+        { roomCode: room.roomCode },
+        (res) => {
+          ack = res;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+
+      const warnLog = logger.warnLogs.find(
+        (l) =>
+          l.context?.operation === "socket_room_membership_error" &&
+          l.context?.action === "leave",
+      );
+      expect(warnLog).toBeDefined();
     });
   });
 });

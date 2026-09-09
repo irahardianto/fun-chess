@@ -1,3 +1,4 @@
+import { toRaw } from 'vue';
 import type {
   ProgressStorage,
   UnifiedProgressPayload,
@@ -5,10 +6,12 @@ import type {
   PuzzleProgressStore,
   ScenarioProgressMap,
   PuzzleProgress,
+  IClock,
 } from '@fun-chess/shared';
 import { UNIFIED_PROGRESS_SCHEMA_VERSION, assertValidProgress } from '@fun-chess/shared';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
 import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
+import { SystemClock } from '@/platform/time';
 
 export class StorageCommitError extends Error {
   public readonly rolledBack: boolean;
@@ -29,11 +32,16 @@ interface StorageSnapshot {
  * Adheres to Rule 1 (I/O Isolation) and CRIT-003 Two-Phase Commit with rollback.
  */
 export class LocalStorageUnifiedStore implements ProgressStorage {
+  private readonly clock: IClock;
+
   constructor(
     private readonly scenarioStore: ScenarioProgressStore,
     private readonly puzzleStore: PuzzleProgressStore,
-    private readonly logger: ILogger = defaultLogger
-  ) {}
+    private readonly logger: ILogger = defaultLogger,
+    clock?: IClock
+  ) {
+    this.clock = clock ?? new SystemClock();
+  }
 
   public async getUnifiedProgress(): Promise<UnifiedProgressPayload> {
     const [scenarios, puzzles] = await Promise.all([
@@ -43,7 +51,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
 
     return {
       version: UNIFIED_PROGRESS_SCHEMA_VERSION,
-      exportedAt: Date.now(),
+      exportedAt: this.clock.now(),
       scenarios,
       puzzles,
     };
@@ -75,8 +83,8 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
 
       // Phase 1: Capture pre-write snapshot
       const snapshot: StorageSnapshot = {
-        scenarios: structuredClone(await this.scenarioStore.getProgressMap()),
-        puzzles: structuredClone(await this.puzzleStore.getProgress()),
+        scenarios: structuredClone(toRaw(await this.scenarioStore.getProgressMap())),
+        puzzles: structuredClone(toRaw(await this.puzzleStore.getProgress())),
       };
 
       // Phase 2: Staged write
@@ -133,7 +141,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
             type: 'STORAGE_QUOTA_EXCEEDED',
             store: 'unified',
             attemptedAction: 'overwrite',
-            timestamp: Date.now(),
+            timestamp: this.clock.now(),
             message: 'Storage quota exceeded while importing progress. Local state was preserved.',
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
           });

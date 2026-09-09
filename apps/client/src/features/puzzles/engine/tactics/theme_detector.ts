@@ -13,6 +13,7 @@ import {
 } from '@fun-chess/shared';
 import { getSquaresAttackedByPiece, findKingSquare } from '../geometry/attack_rays';
 import { PIECE_DISPLAY_NAMES } from '../pedagogy/rules_of_thumb';
+import { logger } from '@/platform/telemetry';
 
 /**
  * Detects checkmate motif (smothered mate, back-rank mate, or mate in 1).
@@ -262,7 +263,13 @@ export function classifyTacticalMotif(
   try {
     chessBefore = createSafeChess(fenBefore);
     chessAfter = createSafeChess(fenAfter);
-  } catch {
+  } catch (err: unknown) {
+    logger.debug('Invalid FEN in detectMoveTheme', {
+      operation: 'detect_move_theme_fen_parse',
+      fenBefore,
+      fenAfter,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return {
       theme: 'fork',
       confidence: 0.5,

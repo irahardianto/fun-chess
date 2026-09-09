@@ -15,7 +15,7 @@ export class LanInfoController {
     this.addressService = options.addressService;
   }
 
-  public getLanInfo(port: number): LanInfoResponse {
-    return this.addressService.getAddressingInfo(port);
+  public getLanInfo(port: number = 3000): LanInfoResponse {
+    return this.addressService.getAddressingInfo(port || 3000);
   }
 }

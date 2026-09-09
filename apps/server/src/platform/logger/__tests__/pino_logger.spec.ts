@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Writable } from "node:stream";
 import pino from "pino";
-import { PinoLogger } from "../pino_logger.js";
+import { PinoLogger, DEFAULT_REDACT_PATHS, type PinoLoggerOptions } from "../pino_logger.js";
 
 describe("PinoLogger", () => {
   let logs: Record<string, unknown>[];
@@ -240,6 +240,71 @@ describe("PinoLogger", () => {
     it("accepts explicit level in options", () => {
       const logger = new PinoLogger({ level: "debug" });
       expect(logger).toBeDefined();
+    });
+  });
+
+  describe("Redaction rules and depth (ENH-009)", () => {
+    it("exports DEFAULT_REDACT_PATHS containing required wildcard and nested paths", () => {
+      expect(DEFAULT_REDACT_PATHS).toContain("*.sessionToken");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.password");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.secret");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.token");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.authorization");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.req.headers.authorization");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.req.headers['x-metrics-secret']");
+      expect(DEFAULT_REDACT_PATHS).toContain("key");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.key");
+    });
+
+    it("redacts nested sensitive fields including passwords, tokens, secrets, and request headers", () => {
+      const logger = new PinoLogger({
+        level: "info",
+        stream: logStream,
+      } as PinoLoggerOptions);
+
+      logger.info("Security test log", {
+        auth: { sessionToken: "session-xyz" },
+        user: { password: ["secret", "password"].join("-") },
+        api: { secret: ["api", "secret", "val"].join("-"), token: ["jwt", "token", "val"].join("-") },
+        service: { authorization: "Bearer top-secret" },
+        key: "plain-key",
+        nestedKey: { key: "sub-key" },
+        req: {
+          headers: {
+            authorization: "Bearer header-token",
+            "x-metrics-secret": "telemetry-secret-123",
+          },
+        },
+        event: {
+          req: {
+            headers: {
+              authorization: "Bearer nested-header-token",
+              "x-metrics-secret": "nested-telemetry-secret",
+            },
+          },
+        },
+      });
+
+      expect(logs).toHaveLength(1);
+      const log = logs[0] as Record<string, unknown>;
+      expect(log["msg"]).toBe("Security test log");
+      expect((log["auth"] as Record<string, unknown>)["sessionToken"]).toBe("[REDACTED]");
+      expect((log["user"] as Record<string, unknown>)["password"]).toBe("[REDACTED]");
+      expect((log["api"] as Record<string, unknown>)["secret"]).toBe("[REDACTED]");
+      expect((log["api"] as Record<string, unknown>)["token"]).toBe("[REDACTED]");
+      expect((log["service"] as Record<string, unknown>)["authorization"]).toBe("[REDACTED]");
+      expect(log["key"]).toBe("[REDACTED]");
+      expect((log["nestedKey"] as Record<string, unknown>)["key"]).toBe("[REDACTED]");
+
+      const reqObj = log["req"] as { headers: Record<string, unknown> };
+      expect(reqObj.headers["authorization"]).toBe("[REDACTED]");
+      expect(reqObj.headers["x-metrics-secret"]).toBe("[REDACTED]");
+
+      const eventReqObj = (
+        log["event"] as { req: { headers: Record<string, unknown> } }
+      ).req;
+      expect(eventReqObj.headers["authorization"]).toBe("[REDACTED]");
+      expect(eventReqObj.headers["x-metrics-secret"]).toBe("[REDACTED]");
     });
   });
 });

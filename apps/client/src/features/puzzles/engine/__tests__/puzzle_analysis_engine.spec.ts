@@ -389,6 +389,49 @@ describe('PuzzleAnalysisEngine Unit Tests (MAJ-037)', () => {
       );
       debugSpy.mockRestore();
     });
+
+    it('logs structured debug message when calculateColorMaterial encounters an error', () => {
+      const validFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const debugSpy = vi.spyOn(logger, 'debug');
+      vi.spyOn(Chess.prototype, 'board').mockImplementationOnce(() => {
+        throw new Error('simulated board parsing failure');
+      });
+
+      const total = calculateColorMaterial(validFen, 'w');
+      expect(total).toBe(0);
+      expect(debugSpy).toHaveBeenCalledWith(
+        'Failed to calculate color material from FEN',
+        expect.objectContaining({
+          operation: 'calculate_color_material',
+          fen: validFen,
+          color: 'w',
+        })
+      );
+      debugSpy.mockRestore();
+    });
+
+    it('uses customLogger when provided for calculateColorMaterial and getPieceCounts', () => {
+      const validFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const customMockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+      };
+      vi.spyOn(Chess.prototype, 'board').mockImplementationOnce(() => {
+        throw new Error('custom logger test error');
+      });
+
+      const total = calculateColorMaterial(validFen, 'b', customMockLogger as any);
+      expect(total).toBe(0);
+      expect(customMockLogger.debug).toHaveBeenCalledWith(
+        'Failed to calculate color material from FEN',
+        expect.objectContaining({
+          operation: 'calculate_color_material',
+          color: 'b',
+        })
+      );
+    });
   });
 
 

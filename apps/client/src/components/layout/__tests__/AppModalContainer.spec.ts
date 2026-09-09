@@ -259,7 +259,7 @@ describe('AppModalContainer.vue', () => {
       props: {
         ...defaultProps,
         isConflictModalOpen: true,
-        diffPreview: { scenarios: {}, puzzles: {} },
+        diffPreview: { scenarios: {}, puzzles: {} } as any,
       },
       global: globalConfig,
     });

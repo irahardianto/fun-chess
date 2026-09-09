@@ -1,20 +1,19 @@
 # ============================================================
 # Stage 1: Build stage (compile TypeScript & bundle Vue PWA)
 # ============================================================
-FROM node:22-alpine AS builder
+FROM node:22.14.0-alpine AS builder
 
 WORKDIR /app
 
 # Enable Corepack and activate pnpm
 ENV CI=true
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 # Copy root and workspace package manifests for caching
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY shared/package.json ./shared/
 COPY apps/server/package.json ./apps/server/
 COPY apps/client/package.json ./apps/client/
-COPY apps/e2e/package.json ./apps/e2e/
 
 # Install full dependencies across all workspaces
 RUN pnpm install --frozen-lockfile
@@ -34,7 +33,7 @@ RUN pnpm --filter @fun-chess/server --prod deploy /app/pruned-server
 # ============================================================
 # Stage 2: Production runner stage (minimal, secure, non-root)
 # ============================================================
-FROM node:22-alpine AS runner
+FROM node:22.14.0-alpine AS runner
 
 WORKDIR /app
 

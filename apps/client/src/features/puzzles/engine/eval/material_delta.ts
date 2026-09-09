@@ -230,7 +230,13 @@ export function calculateMaterialDelta(
   try {
     chessInit = createSafeChess(initialFen);
     chessFinal = createSafeChess(finalFen);
-  } catch {
+  } catch (err: unknown) {
+    getEffectiveLogger().debug('Invalid FEN in evaluateMaterialAdvantageDelta', {
+      operation: 'eval_material_delta_fen_parse',
+      initialFen,
+      finalFen,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return {
       netCentipawns: 0,
       netPoints: 0,

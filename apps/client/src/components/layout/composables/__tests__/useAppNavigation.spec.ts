@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useAppNavigation } from '../useAppNavigation';
+import { useAppNavigation, parseRoomCodeFromUrl } from '../useAppNavigation';
 import { STORAGE_KEYS, type KeyValueStorage } from '@/platform/storage';
 import type { IApiClient } from '@/platform/api';
 import type { ILogger } from '@/platform/telemetry';
@@ -370,6 +370,92 @@ describe('useAppNavigation composable', () => {
       await nav.loadInitialNetworkAndProgress(mockProgressStore);
 
       expect(nav.lobbyActiveMode.value).toBe('multiplayer_lan');
+    });
+
+    it('hydrates initialRoomCode from window.location.search on loadInitialNetworkAndProgress', async () => {
+      const originalLocation = window.location;
+      Object.defineProperty(window, 'location', {
+        value: {
+          ...originalLocation,
+          search: '?join=wxyz',
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      try {
+        const nav = useAppNavigation({
+          storage: mockStorage,
+          apiClient: mockApiClient,
+          logger: mockLogger,
+        });
+
+        await nav.loadInitialNetworkAndProgress();
+        expect(nav.initialRoomCode.value).toBe('WXYZ');
+      } finally {
+        Object.defineProperty(window, 'location', {
+          value: originalLocation,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+  });
+
+  // ==========================================================================
+  // 7. URL Room Code Parsing Deduplication (ENH-014)
+  // ==========================================================================
+  describe('parseRoomCodeFromUrl (ENH-014)', () => {
+    it('extracts and uppercase-normalizes code from join query parameter', () => {
+      expect(parseRoomCodeFromUrl('?join=abcd')).toBe('ABCD');
+      expect(parseRoomCodeFromUrl('?join=  wxyz  ')).toBe('WXYZ');
+    });
+
+    it('extracts and uppercase-normalizes code from room query parameter', () => {
+      expect(parseRoomCodeFromUrl('?room=efgh')).toBe('EFGH');
+    });
+
+    it('prioritizes join over room when both are present', () => {
+      expect(parseRoomCodeFromUrl('?join=first&room=second')).toBe('FIRST');
+    });
+
+    it('returns empty string when query string contains no room parameters', () => {
+      expect(parseRoomCodeFromUrl('')).toBe('');
+      expect(parseRoomCodeFromUrl('?other=123')).toBe('');
+      expect(parseRoomCodeFromUrl('?join=')).toBe('');
+    });
+
+    it('reads from window.location.search when search parameter is not provided', () => {
+      const originalLocation = window.location;
+      Object.defineProperty(window, 'location', {
+        value: {
+          ...originalLocation,
+          search: '?room=mars',
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      try {
+        expect(parseRoomCodeFromUrl()).toBe('MARS');
+      } finally {
+        Object.defineProperty(window, 'location', {
+          value: originalLocation,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+
+    it('returns empty string safely when window is undefined in SSR contexts', () => {
+      const originalWindow = globalThis.window;
+      // @ts-expect-error test environment manipulation
+      delete globalThis.window;
+      try {
+        expect(parseRoomCodeFromUrl()).toBe('');
+      } finally {
+        globalThis.window = originalWindow;
+      }
     });
   });
 });

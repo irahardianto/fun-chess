@@ -27,3 +27,10 @@ playwright-report
 .env.local
 .env.*.local
 .DS_Store
+
+# Infrastructure, Terraform, and hooks
+infra/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.githooks/

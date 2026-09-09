@@ -59,12 +59,6 @@ export interface SessionRegistry {
   getSessionByToken(sessionToken: string): Promise<SessionRecord | null>;
 
   /**
-   * Finds an active session record by its token.
-   * Alias for getSessionByToken.
-   */
-  findSessionByToken(sessionToken: string): Promise<SessionRecord | null>;
-
-  /**
    * Retrieves the active session token for a player in a room.
    * Returns null if no active session exists or if it has expired.
    */
@@ -119,3 +113,5 @@ export interface SessionRegistry {
    */
   clear(): Promise<void>;
 }
+
+export type ISessionRegistry = SessionRegistry;

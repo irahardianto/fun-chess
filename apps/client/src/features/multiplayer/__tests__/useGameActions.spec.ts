@@ -13,6 +13,7 @@ import {
   resetTransportState,
 } from '../composables/useSocketTransport';
 import { logger } from '@/platform/telemetry';
+import { useNotification } from '@/components/layout';
 import type { GameState, MovePayload, MoveResult, Player, RoomState, GameOverPayload } from '@fun-chess/shared';
 
 describe('useGameActions composable', () => {
@@ -111,7 +112,8 @@ describe('useGameActions composable', () => {
   beforeEach(() => {
     resetTransportState();
     resetRoomSessionState();
-    resetGameActionsState();
+    resetGameActionsState(false);
+    useNotification().clearAll();
     sessionStorage.clear();
     vi.clearAllMocks();
 
@@ -122,7 +124,8 @@ describe('useGameActions composable', () => {
   afterEach(() => {
     resetTransportState();
     resetRoomSessionState();
-    resetGameActionsState();
+    resetGameActionsState(false);
+    useNotification().clearAll();
     sessionStorage.clear();
     vi.restoreAllMocks();
   });
@@ -425,13 +428,16 @@ describe('useGameActions composable', () => {
       });
     });
 
-    it('clears drawOfferedBy when game:draw_declined event arrives', () => {
+    it('clears drawOfferedBy and shows toast when game:draw_declined event arrives', () => {
       const game = useGameActions();
+      const notification = useNotification();
       game.drawOfferedBy.value = { fromPlayerId: UUID_P2, fromPlayerName: 'Bob' };
 
       eventHandlers['game:draw_declined']({ byPlayerId: UUID_P1 });
 
       expect(game.drawOfferedBy.value).toBeNull();
+      expect(notification.activeNotification.value?.message).toBe('Opponent declined your draw offer');
+      expect(notification.activeNotification.value?.type).toBe('info');
     });
   });
 
@@ -747,7 +753,7 @@ describe('useGameActions composable', () => {
   // 8. State Reset
   // ==========================================================================
   describe('State Reset (resetGameActionsState)', () => {
-    it('resets all in-game reactive states and subscribers', () => {
+    it('resets all in-game reactive states and subscribers when preserveSubscribers = false', () => {
       const game = useGameActions();
       const subscriber = vi.fn();
       onOpponentMove(subscriber);
@@ -758,7 +764,7 @@ describe('useGameActions composable', () => {
       game.kingInCheck.value = { inCheck: 'w', kingSquare: 'e1' };
       game.lastMoveEvent.value = { move: {} as MoveResult, gameState: {} as GameState };
 
-      resetGameActionsState();
+      resetGameActionsState(false);
 
       expect(game.drawOfferedBy.value).toBeNull();
       expect(game.rematchRequestedBy.value).toBeNull();
@@ -775,6 +781,48 @@ describe('useGameActions composable', () => {
       });
 
       expect(subscriber).not.toHaveBeenCalled();
+    });
+
+    it('persists opponent move audio listeners when preserveSubscribers = true (CRIT-002)', () => {
+      const game = useGameActions();
+      const audioListener = vi.fn();
+      onOpponentMove(audioListener);
+
+      game.drawOfferedBy.value = { fromPlayerId: UUID_P2, fromPlayerName: 'Bob' };
+      game.lastGameOver.value = { winner: 'w', reason: 'checkmate' } as GameOverPayload;
+
+      // Default or explicit preserveSubscribers = true
+      resetGameActionsState(true);
+
+      expect(game.drawOfferedBy.value).toBeNull();
+      expect(game.lastGameOver.value).toBeNull();
+
+      // Move listener MUST persist across match reset
+      const session = useRoomSession();
+      session.currentPlayer.value = createTestPlayer({ color: 'w' });
+      eventHandlers['game:moved']({
+        move: { color: 'b', moveNumber: 1 } as MoveResult,
+        gameState: {} as GameState,
+      });
+
+      expect(audioListener).toHaveBeenCalledTimes(1);
+    });
+
+    it('defaults preserveSubscribers to true across consecutive match cycles', () => {
+      const audioListener = vi.fn();
+      onOpponentMove(audioListener);
+
+      // Reset without parameters defaults to true
+      resetGameActionsState();
+
+      const session = useRoomSession();
+      session.currentPlayer.value = createTestPlayer({ color: 'w' });
+      eventHandlers['game:moved']({
+        move: { color: 'b', moveNumber: 1 } as MoveResult,
+        gameState: {} as GameState,
+      });
+
+      expect(audioListener).toHaveBeenCalledTimes(1);
     });
   });
 });

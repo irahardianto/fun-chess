@@ -74,10 +74,6 @@ export function useChessGame(initialFen?: string) {
     return isPawnPromotion(from, to, piece);
   }
 
-  function checkRequiresPromotion(from: Square, to: Square): boolean {
-    return isPromotionMove(from, to);
-  }
-
   function applyLocalMove(
     from: Square,
     to: Square,
@@ -223,7 +219,6 @@ export function useChessGame(initialFen?: string) {
     isMyTurn,
     selectedSquare: computed(() => boardSelection.selectedSquare.value),
     legalMoves: computed(() => boardSelection.legalMovesForSelected.value),
-    legalMovesForSelected: computed(() => boardSelection.legalMovesForSelected.value),
     pendingPromotion: boardSelection.pendingPromotion,
     capturedWhite,
     capturedBlack,
@@ -234,7 +229,6 @@ export function useChessGame(initialFen?: string) {
     isLegalTarget: (square: Square) => boardSelection.isLegalTarget(square),
     isCapturableTarget,
     isPromotionMove,
-    checkRequiresPromotion,
     selectSquare,
     completePromotion,
     cancelPromotion,

@@ -70,12 +70,28 @@ export interface CreateRoomErrorAck {
 export type CreateRoomAckResponse = CreateRoomSuccessAck | CreateRoomErrorAck;
 
 /**
+ * Authoritative broadcast payload when a player disconnects (MAJ-008).
+ * Specifies the disconnected player ID, optional reconnect grace period, and authoritative room status.
+ */
+export interface PlayerDisconnectedPayload {
+  playerId: string;
+  gracePeriodMs?: number;
+  roomStatus: RoomStatus;
+}
+
+/**
  * Contract defining all events pushed from Server to Client via Socket.io.
  */
 export interface ServerToClientEvents {
-  /** Emitted to the creator when a new room is successfully created */
+  /**
+   * Emitted to the creator when a new room is successfully created.
+   * @deprecated Retained for backwards compatibility. Creators receive room state via the ack callback.
+   */
   "room:created": (room: RoomState) => void;
-  /** Emitted to joining client when room join succeeds */
+  /**
+   * Emitted to joining client when room join succeeds.
+   * @deprecated Retained for backwards compatibility. Joiners receive room state via the ack callback.
+   */
   "room:joined": (room: RoomState) => void;
   /** Broadcast to room members when a player joins the room */
   "room:player_joined": (data: { player: Player; room: RoomState }) => void;
@@ -85,13 +101,11 @@ export interface ServerToClientEvents {
     playerName: string;
     reason?: "player_left" | "host_left" | "kicked" | "room_closed";
   }) => void;
-  /** Broadcast when a player disconnects, specifying the reconnection grace period and authoritative room status */
+  /** Broadcast when a player disconnects, specifying reconnection grace period and authoritative room status */
   "room:player_disconnected": (data: {
-    playerId?: string;
-    player?: Player;
+    playerId: string;
     gracePeriodMs?: number;
-    roomStatus?: RoomStatus;
-    disconnectedAt?: number;
+    roomStatus: RoomStatus;
   }) => void;
   /** Broadcast when a previously disconnected player successfully re-establishes connection */
   "room:player_reconnected": (data: {
@@ -183,7 +197,8 @@ export interface ClientToServerEvents {
             success: true;
             room: RoomState;
             player: Player;
-            roomStatus?: RoomStatus;
+            roomStatus: RoomStatus;
+            sessionToken?: string;
           }
         | { success: false; error: SocketErrorPayload },
     ) => void,

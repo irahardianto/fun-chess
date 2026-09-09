@@ -64,10 +64,11 @@ export function useTakebackHistory(options: UseTakebackHistoryOptions = {}) {
 
   function rewindTo(snapshot: TakebackSnapshot): void {
     moveHistory.value = moveHistory.value.slice(0, snapshot.moveCount);
-    lastMove.value = moveHistory.value.length > 0
+    const last = moveHistory.value.length > 0 ? moveHistory.value[moveHistory.value.length - 1] : undefined;
+    lastMove.value = last
       ? {
-          from: moveHistory.value[moveHistory.value.length - 1]!.from,
-          to: moveHistory.value[moveHistory.value.length - 1]!.to,
+          from: last.from,
+          to: last.to,
         }
       : null;
     incrementTakebackCount();

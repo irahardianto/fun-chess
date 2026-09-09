@@ -193,7 +193,8 @@ describe('Pack Pedagogy & Tactical Resolution Test Suite (SC-4)', () => {
               to: to as unknown as import('chess.js').Square,
               promotion,
             });
-          } catch {
+          } catch (err) {
+            void err;
             moveRes = null;
           }
 

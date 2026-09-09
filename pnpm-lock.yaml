@@ -19,6 +19,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 4.1.11
         version: 4.1.11(vitest@4.1.11)
+      chess.js:
+        specifier: 1.0.0-beta.9
+        version: 1.0.0-beta.9
       eslint:
         specifier: 10.10.0
         version: 10.10.0
@@ -44,7 +47,7 @@ importers:
   apps/client:
     dependencies:
       '@fun-chess/shared':
-        specifier: workspace:*
+        specifier: workspace:^1.0.0
         version: link:../../shared
       canvas-confetti:
         specifier: 1.9.4
@@ -123,7 +126,7 @@ importers:
   apps/server:
     dependencies:
       '@fun-chess/shared':
-        specifier: workspace:*
+        specifier: workspace:^1.0.0
         version: link:../../shared
       chess.js:
         specifier: 1.4.0
@@ -1697,6 +1700,9 @@ packages:
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
+
+  chess.js@1.0.0-beta.9:
+    resolution: {integrity: sha512-pzH0fcyA80xX23OTtwQMTsyjDE5zPxKrbXPzQeX6D+I/ekrUdyhDzhMpfTdyXn3ob3GzS9/0mAGqGbvMy7XeoQ==}
 
   chess.js@1.4.0:
     resolution: {integrity: sha512-BBJgrrtKQOzFLonR0l+k64A98NLemPwNsCskwb+29bRwobUa4iTm51E1kwGPbWXAcfdDa18nad6vpPPKPWarqw==}
@@ -4947,6 +4953,8 @@ snapshots:
   canvas-confetti@1.9.4: {}
 
   chai@6.2.2: {}
+
+  chess.js@1.0.0-beta.9: {}
 
   chess.js@1.4.0: {}
 

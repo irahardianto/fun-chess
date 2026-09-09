@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import QrExportView from '../QrExportView.vue';
+import { LOGGER_KEY } from '@/platform/di';
 import type { UnifiedProgressPayload } from '@fun-chess/shared';
 
 describe('QrExportView.vue', () => {
@@ -93,5 +94,40 @@ describe('QrExportView.vue', () => {
     await (wrapper.vm as any).renderQrCode();
     expect((wrapper.vm as any).canvasError).toBe('Failed to acquire 2D canvas context');
     expect(wrapper.find('.canvas-error-text').exists()).toBe(true);
+  });
+
+  it('logs structured warning and updates canvasError when QRCode.toCanvas fails (MAJ-001)', async () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      fatal: vi.fn(),
+      child: vi.fn(),
+    };
+    const wrapper = mount(QrExportView, {
+      props: {
+        payload,
+        qrString: 'FC1:corrupt_qr_data',
+      },
+      global: {
+        provide: {
+          [LOGGER_KEY]: mockLogger,
+        },
+      },
+    });
+
+    const QRCode = await import('qrcode');
+    vi.spyOn(QRCode.default, 'toCanvas').mockRejectedValueOnce(new Error('Canvas render overflow'));
+
+    await (wrapper.vm as any).renderQrCode();
+    expect((wrapper.vm as any).canvasError).toBe('Canvas render overflow');
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'QR canvas generation note',
+      expect.objectContaining({
+        operation: 'qr_export_canvas_render',
+        error: 'Canvas render overflow',
+      }),
+    );
   });
 });

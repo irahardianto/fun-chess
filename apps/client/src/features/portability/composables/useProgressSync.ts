@@ -19,8 +19,8 @@ import {
   defaultProgressFileService,
 } from '../services/progress_file.service';
 import { LocalStorageUnifiedStore } from '../store/local_storage_unified.store';
-import { defaultLocalStorageProgressStore } from '@/features/scenarios/store/local_storage_progress.store';
-import { defaultLocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_progress.store';
+import { defaultLocalStorageProgressStore } from '@/features/scenarios';
+import { defaultLocalStoragePuzzleProgressStore } from '@/features/puzzles';
 import { useInjectLogger, useInjectProgressStorage, PROGRESS_STORAGE_KEY } from '@/platform/di';
 import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
@@ -78,7 +78,11 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
   function resolveFallbackStorage(): ProgressStorage {
     try {
       return useInjectProgressStorage();
-    } catch {
+    } catch (err: unknown) {
+      logger.debug('Failed to inject progress storage, using LocalStorageUnifiedStore', {
+        operation: 'progress_sync_resolve_storage',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return new LocalStorageUnifiedStore(
         defaultLocalStorageProgressStore,
         defaultLocalStoragePuzzleProgressStore,
@@ -153,6 +157,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.info('Unified progress loaded successfully', {
         operation: 'progress_sync_load',
         correlationId,
+        duration: durationMs,
         durationMs,
       });
       return payload;
@@ -161,6 +166,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.error('Failed to load unified progress', {
         operation: 'progress_sync_load',
         correlationId,
+        duration: durationMs,
         durationMs,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -198,6 +204,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.info('Unified progress exported to JSON successfully', {
         operation: 'progress_sync_export_json',
         correlationId,
+        duration: durationMs,
         durationMs,
         filename,
       });
@@ -207,6 +214,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.error('Failed to export JSON backup', {
         operation: 'progress_sync_export_json',
         correlationId,
+        duration: durationMs,
         durationMs,
         filename,
         error: err instanceof Error ? err.message : String(err),
@@ -243,6 +251,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.info('Unified progress exported to QR string successfully', {
         operation: 'progress_sync_export_qr',
         correlationId,
+        duration: durationMs,
         durationMs,
       });
       return qrString;
@@ -251,6 +260,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.error('Failed to generate QR code payload', {
         operation: 'progress_sync_export_qr',
         correlationId,
+        duration: durationMs,
         durationMs,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -321,6 +331,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.info('Progress payload imported successfully', {
         operation: 'progress_sync_import',
         correlationId,
+        duration: durationMs,
         durationMs,
         hasDifferences: diff.hasDifferences,
       });
@@ -339,6 +350,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.warn('Import validation failed', {
         operation: 'progress_sync_import',
         correlationId,
+        duration: durationMs,
         durationMs,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -417,6 +429,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.info('Merge strategy executed successfully', {
         operation: 'progress_sync_merge',
         correlationId,
+        duration: durationMs,
         durationMs,
         strategy,
       });
@@ -427,6 +440,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       logger.error('Failed to execute merge strategy', {
         operation: 'progress_sync_merge',
         correlationId,
+        duration: durationMs,
         durationMs,
         strategy,
         error: err instanceof Error ? err.message : String(err),

@@ -22,6 +22,8 @@ export * from './eval/material_delta';
 export * from './pedagogy/rules_of_thumb';
 export * from './tactics/theme_detector';
 
+import { logger } from '@/platform/telemetry';
+
 import {
   getMaterialCount,
   calculateMaterialDelta,
@@ -80,7 +82,12 @@ function simulateSolutionMoves(
         to: to as unknown as import('chess.js').Square,
         promotion,
       });
-    } catch {
+    } catch (err: unknown) {
+      logger.debug('Illegal move during solution simulation', {
+        operation: 'simulate_solution_moves',
+        moveUci,
+        error: err instanceof Error ? err.message : String(err),
+      });
       break;
     }
   }
@@ -100,7 +107,12 @@ export function analyzePuzzleSolution(puzzle: Puzzle): PuzzleAnalysisResult {
   try {
     chessInit = createSafeChess(puzzle.fen);
     chessSim = createSafeChess(puzzle.fen);
-  } catch {
+  } catch (err: unknown) {
+    logger.debug('Invalid FEN in analyzePuzzleSolution', {
+      operation: 'analyze_puzzle_solution_fen_parse',
+      fen: puzzle.fen,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return createFallbackAnalysisResult(puzzle);
   }
 

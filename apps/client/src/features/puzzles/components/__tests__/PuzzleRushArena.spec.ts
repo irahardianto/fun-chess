@@ -283,6 +283,38 @@ describe('PuzzleRushArena.vue', () => {
     expect(hudBar.attributes('aria-hidden')).toBe('true');
     expect(boardContainer.attributes('aria-hidden')).toBe('true');
   });
+
+  it('does not mutate readonly frozen props during mounting and gameplay lifecycle [MAJ-005]', async () => {
+    const store = new InMemoryPuzzleProgressStore();
+    const frozenProps = Object.freeze({
+      subMode: 'puzzle_rush' as const,
+      customStore: store,
+      initialDurationSeconds: 120,
+      maxStrikes: 3,
+    });
+
+    const wrapper = mount(PuzzleRushArena, {
+      props: frozenProps,
+    });
+
+    expect(wrapper.find('[data-testid="puzzle-rush-arena"]').exists()).toBe(true);
+    expect(wrapper.vm.rush.timeRemainingSeconds.value).toBe(120);
+
+    // Perform operations: restart, selection, moves
+    await wrapper.vm.handleRestart();
+    await wrapper.vm.$nextTick();
+
+    const board = wrapper.findComponent(PuzzleBoardWrapper);
+    await board.vm.$emit('select', 'e2');
+    await board.vm.$emit('move', { from: 'e2', to: 'e4' });
+    await wrapper.vm.$nextTick();
+
+    // Verify frozenProps remains strictly frozen and unmutated
+    expect(Object.isFrozen(frozenProps)).toBe(true);
+    expect(frozenProps.subMode).toBe('puzzle_rush');
+    expect(frozenProps.initialDurationSeconds).toBe(120);
+    expect(frozenProps.maxStrikes).toBe(3);
+  });
 });
 
 

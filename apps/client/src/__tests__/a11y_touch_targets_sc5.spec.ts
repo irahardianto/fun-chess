@@ -12,6 +12,8 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
   const baseModalPath = path.resolve(__dirname, '../components/base/BaseModal.vue');
   const baseButtonPath = path.resolve(__dirname, '../components/base/BaseButton.vue');
   const appVuePath = path.resolve(__dirname, '../App.vue');
+  const appNavbarPath = path.resolve(__dirname, '../components/layout/AppNavbar.vue');
+  const appToastManagerPath = path.resolve(__dirname, '../components/layout/AppToastManager.vue');
   const aiGameHudPath = path.resolve(__dirname, '../features/ai/components/AiGameHud.vue');
   const offlineIndicatorPath = path.resolve(__dirname, '../features/pwa/components/OfflineIndicator.vue');
   const pwaInstallBannerPath = path.resolve(__dirname, '../features/pwa/components/PwaInstallBanner.vue');
@@ -20,10 +22,14 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
   const soloAiArenaPath = path.resolve(__dirname, '../features/ai/SoloAiArena.vue');
   const aiMascotBadgePath = path.resolve(__dirname, '../features/ai/components/AiMascotBadge.vue');
   const scenarioCategoryListPath = path.resolve(__dirname, '../features/scenarios/components/ScenarioCategoryList.vue');
+  const scenarioCardPath = path.resolve(__dirname, '../features/scenarios/components/ScenarioCard.vue');
 
   const baseModalSrc = fs.readFileSync(baseModalPath, 'utf-8');
   const baseButtonSrc = fs.readFileSync(baseButtonPath, 'utf-8');
   const appVueSrc = fs.readFileSync(appVuePath, 'utf-8');
+  const appNavbarSrc = fs.existsSync(appNavbarPath) ? fs.readFileSync(appNavbarPath, 'utf-8') : '';
+  const appToastManagerSrc = fs.existsSync(appToastManagerPath) ? fs.readFileSync(appToastManagerPath, 'utf-8') : '';
+  const appFullSrc = [appVueSrc, appNavbarSrc, appToastManagerSrc].join('\n');
   const aiGameHudSrc = fs.readFileSync(aiGameHudPath, 'utf-8');
   const offlineIndicatorSrc = fs.readFileSync(offlineIndicatorPath, 'utf-8');
   const pwaInstallBannerSrc = fs.readFileSync(pwaInstallBannerPath, 'utf-8');
@@ -32,6 +38,7 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
   const soloAiArenaSrc = fs.readFileSync(soloAiArenaPath, 'utf-8');
   const aiMascotBadgeSrc = fs.readFileSync(aiMascotBadgePath, 'utf-8');
   const scenarioCategoryListSrc = fs.readFileSync(scenarioCategoryListPath, 'utf-8');
+  const scenarioCardSrc = fs.readFileSync(scenarioCardPath, 'utf-8');
 
   describe('1. WCAG 2.5.5 Touch Target Sizing (>= 44x44px)', () => {
     it('BaseModal close button enforces 44px minimum touch target', () => {
@@ -46,9 +53,9 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
     });
 
     it('App.vue navbar icon buttons enforce 44px minimum touch target across viewports', () => {
-      expect(appVueSrc).toMatch(/\.nav-icon-btn\s*\{[^}]*min-width:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.nav-icon-btn\s*\{[^}]*min-height:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.nav-icon-btn\s*\{[^}]*height:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.nav-icon-btn\s*\{[^}]*min-width:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.nav-icon-btn\s*\{[^}]*min-height:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.nav-icon-btn\s*\{[^}]*height:\s*44px/s);
     });
 
     it('AiGameHud action buttons enforce 44px min-width and min-height in base and mobile media query', () => {
@@ -72,6 +79,16 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
       expect(pwaInstallBannerSrc).toMatch(/\.banner-close-btn\s*\{[^}]*height:\s*44px/s);
     });
 
+    it('PwaInstallBanner action buttons enforce 44px minimum touch target', () => {
+      expect(pwaInstallBannerSrc).toMatch(/\.banner-btn-secondary,\s*\.banner-btn-primary\s*\{[^}]*min-height:\s*44px/s);
+      expect(pwaInstallBannerSrc).toMatch(/\.banner-btn-secondary,\s*\.banner-btn-primary\s*\{[^}]*min-width:\s*44px/s);
+    });
+
+    it('ScenarioCard action button enforces 44px minimum touch target', () => {
+      expect(scenarioCardSrc).toMatch(/\.scenario-play-btn\s*\{[^}]*min-height:\s*44px/s);
+      expect(scenarioCardSrc).toMatch(/\.scenario-play-btn\s*\{[^}]*min-width:\s*80px/s);
+    });
+
     it('QrCodeModal LAN config quick prefill chips have accessible target height', () => {
       expect(qrCodeModalSrc).toMatch(/\.prefill-tag\s*\{[^}]*min-height:\s*36px/s);
     });
@@ -91,14 +108,14 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
     });
 
     it('App.vue interactive pills and action buttons enforce 44px minimum touch target', () => {
-      expect(appVueSrc).toMatch(/\.navbar-brand\s*\{[^}]*min-height:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.navbar-brand\s*\{[^}]*min-width:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.room-code-chip\s*\{[^}]*min-height:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.room-code-chip\s*\{[^}]*min-width:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.nav-install-btn\s*\{[^}]*min-height:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.nav-install-btn\s*\{[^}]*min-width:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.notification-dismiss-btn\s*\{[^}]*min-width:\s*44px/s);
-      expect(appVueSrc).toMatch(/\.notification-dismiss-btn\s*\{[^}]*min-height:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.navbar-brand\s*\{[^}]*min-height:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.navbar-brand\s*\{[^}]*min-width:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.room-code-chip\s*\{[^}]*min-height:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.room-code-chip\s*\{[^}]*min-width:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.nav-install-btn\s*\{[^}]*min-height:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.nav-install-btn\s*\{[^}]*min-width:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.notification-dismiss-btn\s*\{[^}]*min-width:\s*44px/s);
+      expect(appFullSrc).toMatch(/\.notification-dismiss-btn\s*\{[^}]*min-height:\s*44px/s);
     });
 
     it('ScenarioCategoryList category tab buttons enforce 44px min-height on mobile', () => {

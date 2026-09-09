@@ -31,7 +31,7 @@ import {
   useInjectWebRtcDiscovery,
   useInjectClipboardService,
   useInjectCameraService,
-} from './index';
+} from './resolvers';
 
 export function useApiClient(custom?: IApiClient): IApiClient {
   return custom ?? useInjectApiClient();

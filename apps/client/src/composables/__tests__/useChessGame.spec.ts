@@ -15,20 +15,22 @@ describe('useChessGame composable', () => {
     expect(game.selectedSquare.value).toBeNull();
     expect(game.isCheck.value).toBe(false);
     expect(game.isGameOver.value).toBe(false);
+    expect((game as Record<string, unknown>).legalMovesForSelected).toBeUndefined();
+    expect((game as Record<string, unknown>).checkRequiresPromotion).toBeUndefined();
   });
 
   it('should select player piece and calculate legal moves', () => {
     game.selectSquare('e2');
 
     expect(game.selectedSquare.value).toBe('e2');
-    expect(game.legalMovesForSelected.value).toEqual(expect.arrayContaining(['e3', 'e4']));
+    expect(game.legalMoves.value).toEqual(expect.arrayContaining(['e3', 'e4']));
   });
 
   it('should not select opponent piece when not their turn', () => {
     game.selectSquare('e7'); // Black pawn on White turn
 
     expect(game.selectedSquare.value).toBeNull();
-    expect(game.legalMovesForSelected.value).toEqual([]);
+    expect(game.legalMoves.value).toEqual([]);
   });
 
   it('should apply legal move and advance turn to Black', () => {
@@ -132,10 +134,10 @@ describe('useChessGame composable', () => {
     expect(epGame.isCapturableTarget('d6')).toBe(true); // en passant square
   });
 
-  it('handles checkRequiresPromotion, completePromotion, and cancelPromotion', () => {
+  it('handles isPromotionMove, completePromotion, and cancelPromotion', () => {
     const promoGame = useChessGame('8/4P3/8/8/8/8/8/k6K w - - 0 1');
-    expect(promoGame.checkRequiresPromotion('e7', 'e8')).toBe(true);
-    expect(promoGame.checkRequiresPromotion('e7', 'e6')).toBe(false);
+    expect(promoGame.isPromotionMove('e7', 'e8')).toBe(true);
+    expect(promoGame.isPromotionMove('e7', 'e6')).toBe(false);
 
     promoGame.selectSquare('e7');
     promoGame.selectSquare('e8');

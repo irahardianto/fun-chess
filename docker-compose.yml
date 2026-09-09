@@ -4,7 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: fun-chess
-    network_mode: host
+    ports:
+      - "3000:3000"
+    security_opt:
+      - no-new-privileges:true
     environment:
       - PORT=3000
       - NODE_ENV=production
@@ -18,7 +21,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-10000}
       - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-60}
-      - DEFAULT_RATE_LIMIT_MAX_REQUESTS=${DEFAULT_RATE_LIMIT_MAX_REQUESTS:-60}
+      - RATE_LIMIT_ROOM_CREATE_MAX=${RATE_LIMIT_ROOM_CREATE_MAX:-3}
       - RATE_LIMIT_MAX_KEYS=${RATE_LIMIT_MAX_KEYS:-10000}
     restart: unless-stopped
     healthcheck:

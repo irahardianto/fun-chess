@@ -63,6 +63,18 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
       vi.useRealTimers();
     });
 
+    it('BrowserFileDownloader returns early when window is undefined', () => {
+      const downloader = new BrowserFileDownloader();
+      const originalWindow = globalThis.window;
+      // @ts-expect-error simulating non-browser environment
+      delete globalThis.window;
+      try {
+        expect(() => downloader.download('test', 'test.txt')).not.toThrow();
+      } finally {
+        globalThis.window = originalWindow;
+      }
+    });
+
     it('BrowserFileDownloader handles Blob content directly', () => {
       const mockAnchor = {
         href: '',
@@ -270,6 +282,72 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
       vi.unstubAllGlobals();
     });
 
+    it('BrowserWebRtcDiscovery handles null/empty candidate in onicecandidate', async () => {
+      let iceCallback: ((event: any) => void) | null = null;
+      class MockRTCPeerConnectionCandidate {
+        createDataChannel = vi.fn();
+        createOffer = vi.fn().mockResolvedValue({});
+        setLocalDescription = vi.fn().mockResolvedValue(undefined);
+        close = vi.fn();
+        set onicecandidate(cb: any) {
+          iceCallback = cb;
+        }
+      }
+
+      vi.stubGlobal('RTCPeerConnection', MockRTCPeerConnectionCandidate);
+
+      const discovery = new BrowserWebRtcDiscovery();
+      const promise = discovery.discoverLocalIp(50);
+
+      // Trigger with null event or empty candidate
+      (iceCallback as any)?.(null);
+      (iceCallback as any)?.({ candidate: null });
+      (iceCallback as any)?.({ candidate: { candidate: '' } });
+
+      const ip = await promise;
+      expect(ip).toBeNull();
+      vi.unstubAllGlobals();
+    });
+
+    it('BrowserWebRtcDiscovery returns null when constructor throws', async () => {
+      const mockLogger = { debug: vi.fn(), warn: vi.fn(), info: vi.fn(), error: vi.fn() } as any;
+      class CrashingRTCPeerConnection {
+        constructor() {
+          throw new Error('WebRTC constructor failure');
+        }
+      }
+
+      vi.stubGlobal('RTCPeerConnection', CrashingRTCPeerConnection);
+
+      const discovery = new BrowserWebRtcDiscovery(mockLogger);
+      const ip = await discovery.discoverLocalIp(50);
+      expect(ip).toBeNull();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'WebRTC initialization failed',
+        expect.objectContaining({ operation: 'webrtc_discover_ip' })
+      );
+
+      vi.unstubAllGlobals();
+    });
+
+    it('returns undefined from createOffer then handler when already resolved', async () => {
+      class PreResolvedRTCPeerConnection {
+        createDataChannel = vi.fn();
+        createOffer = vi.fn().mockImplementation(async () => {
+          return {};
+        });
+        setLocalDescription = vi.fn();
+        close = vi.fn();
+      }
+
+      vi.stubGlobal('RTCPeerConnection', PreResolvedRTCPeerConnection);
+
+      const discovery = new BrowserWebRtcDiscovery();
+      const ip = await discovery.discoverLocalIp(5);
+      expect(ip).toBeNull();
+      vi.unstubAllGlobals();
+    });
+
     it('MockWebRtcDiscovery returns configured IP', async () => {
       const mock = new MockWebRtcDiscovery('10.0.0.42');
       expect(await mock.discoverLocalIp()).toBe('10.0.0.42');
@@ -354,6 +432,45 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
       expect(await service.readText()).toBe('');
 
       vi.unstubAllGlobals();
+    });
+
+    it('BrowserClipboardService readText catches error and logs warn when readText rejects', async () => {
+      const mockLogger = { debug: vi.fn(), warn: vi.fn(), info: vi.fn(), error: vi.fn() } as any;
+      vi.stubGlobal('navigator', {
+        clipboard: {
+          readText: vi.fn().mockRejectedValue(new Error('User denied read permission')),
+        },
+      });
+
+      const service = new BrowserClipboardService(mockLogger);
+      const text = await service.readText();
+      expect(text).toBe('');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'navigator.clipboard.readText failed',
+        expect.objectContaining({ operation: 'clipboard_read_text' })
+      );
+
+      vi.unstubAllGlobals();
+    });
+
+    it('isSupported returns true when navigator.clipboard is absent but document.execCommand exists', () => {
+      vi.stubGlobal('navigator', {});
+      document.execCommand = vi.fn();
+      const service = new BrowserClipboardService();
+      expect(service.isSupported()).toBe(true);
+      vi.unstubAllGlobals();
+    });
+
+    it('copyText returns false when window is undefined', async () => {
+      const origWindow = globalThis.window;
+      // @ts-expect-error simulating non-window
+      delete globalThis.window;
+      try {
+        const service = new BrowserClipboardService();
+        expect(await service.copyText('test')).toBe(false);
+      } finally {
+        globalThis.window = origWindow;
+      }
     });
 
     it('MockClipboardService stores text and tracks history', async () => {

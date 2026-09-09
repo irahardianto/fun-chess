@@ -27,6 +27,36 @@ export interface AppNavigationOptions {
   playStart?: () => void;
 }
 
+/**
+ * Extracts and normalizes a room code from URL search query parameters (ENH-014).
+ * Inspects both `join` and `room` query parameters, trimming whitespace and converting to uppercase.
+ *
+ * @param search - Optional query string (e.g. `?join=WXYZ`). If omitted, defaults to `window.location.search`.
+ * @param logger - Optional logger instance for capturing debug diagnostics on malformed query strings.
+ * @returns Normalized uppercase room code string, or empty string if not present.
+ */
+export function parseRoomCodeFromUrl(search?: string, logger?: ILogger): string {
+  if (search === undefined && typeof window === 'undefined') {
+    return '';
+  }
+  const queryString = search ?? (typeof window !== 'undefined' ? window.location?.search : '');
+  if (!queryString) {
+    return '';
+  }
+
+  try {
+    const params = new URLSearchParams(queryString);
+    const candidate = params.get('join') || params.get('room');
+    return candidate ? candidate.trim().toUpperCase() : '';
+  } catch (err) {
+    logger?.debug('Failed to parse URL query params for initial room code', {
+      operation: 'app_get_initial_room_code',
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return '';
+  }
+}
+
 export function useAppNavigation(options: AppNavigationOptions) {
   const { storage, apiClient, logger, onLeaveRoom, playStart } = options;
 
@@ -56,21 +86,7 @@ export function useAppNavigation(options: AppNavigationOptions) {
   }
 
   function getInitialRoomCode(): string {
-    if (typeof window !== 'undefined' && window.location?.search) {
-      try {
-        const p =
-          new URLSearchParams(window.location.search).get('join') ||
-          new URLSearchParams(window.location.search).get('room');
-        return p ? p.toUpperCase() : '';
-      } catch (err) {
-        logger.debug('Failed to parse URL query params for initial room code', {
-          operation: 'app_get_initial_room_code',
-          error: err instanceof Error ? err.message : String(err),
-        });
-        return '';
-      }
-    }
-    return '';
+    return parseRoomCodeFromUrl(undefined, logger);
   }
 
   function getInitialAvatar(): string {
@@ -90,20 +106,9 @@ export function useAppNavigation(options: AppNavigationOptions) {
   const myPlayerAvatar = ref<string>(getInitialAvatar());
 
   async function loadInitialNetworkAndProgress(defaultProgressStore?: { getProgressMap: () => Promise<Record<string, { starsEarned?: number }>> }): Promise<void> {
-    if (typeof window !== 'undefined' && window.location?.search) {
-      try {
-        const roomParam =
-          new URLSearchParams(window.location.search).get('join') ||
-          new URLSearchParams(window.location.search).get('room');
-        if (roomParam) {
-          initialRoomCode.value = roomParam.toUpperCase();
-        }
-      } catch (err) {
-        logger.debug('Failed to parse URL search params on mount', {
-          operation: 'app_mount_room_param',
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+    const roomParam = parseRoomCodeFromUrl(undefined, logger);
+    if (roomParam) {
+      initialRoomCode.value = roomParam;
     }
 
     try {

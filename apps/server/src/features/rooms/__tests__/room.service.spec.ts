@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { RoomService } from "../room.service.js";
 import { MockRoomStore } from "../mock_room.store.js";
 import { InMemorySessionRegistry } from "../in_memory_session_registry.js";
@@ -9,6 +9,8 @@ import {
   UnauthorizedError,
   PlayerNotInRoomError,
   InvalidPayloadError,
+  RoomCapacityExceededError,
+  RoomAlreadyExistsError,
 } from "../room.errors.js";
 import { DisconnectTimerRegistry } from "../disconnect_timer_registry.js";
 import { NullLogger } from "../../../platform/logger/null_logger.js";
@@ -104,6 +106,26 @@ describe("RoomService", () => {
           "sock_1",
         ),
       ).rejects.toThrow(InvalidPayloadError);
+    });
+
+    it("throws RoomCapacityExceededError with status 429 when 100 random code attempts and fallback all collide", async () => {
+      vi.spyOn(store, "createIfAbsent").mockImplementation(async (room) => {
+        throw new RoomAlreadyExistsError(room.roomCode);
+      });
+
+      await expect(
+        service.createRoom({ playerName: "Alice" }, "sock_host"),
+      ).rejects.toThrow(RoomCapacityExceededError);
+
+      try {
+        await service.createRoom({ playerName: "Alice" }, "sock_host");
+        expect.unreachable("should have thrown RoomCapacityExceededError");
+      } catch (err) {
+        expect(err).toBeInstanceOf(RoomCapacityExceededError);
+        const capErr = err as RoomCapacityExceededError;
+        expect(capErr.statusCode).toBe(429);
+        expect(capErr.code).toBe("ERR_ROOM_CAPACITY_EXCEEDED");
+      }
     });
   });
 
@@ -561,6 +583,77 @@ describe("RoomService", () => {
           joiner.id,
         ),
       ).toBeNull();
+    });
+
+    it("isolates per-room deletion errors so one failure does not abort remaining rooms (ENH-003)", async () => {
+      const logger = new NullLogger();
+      const customService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        undefined,
+        logger,
+      );
+
+      const { room: room1 } = await customService.createRoom(
+        { playerName: "User1", preferredColor: "w" },
+        "sock_1",
+      );
+      const { room: room2 } = await customService.createRoom(
+        { playerName: "User2", preferredColor: "w" },
+        "sock_2",
+      );
+
+      // Make both rooms old
+      const r1 = (await customService.getRoom(room1.roomCode))!;
+      r1.lastActivityAt = Date.now() - 20 * 60 * 1000;
+      await store.save(r1);
+
+      const r2 = (await customService.getRoom(room2.roomCode))!;
+      r2.lastActivityAt = Date.now() - 20 * 60 * 1000;
+      await store.save(r2);
+
+      // Mock store.delete to fail for room1 but succeed for room2
+      const origDelete = store.delete.bind(store);
+      vi.spyOn(store, "delete").mockImplementation(async (code: string) => {
+        if (code === room1.roomCode) {
+          throw new Error("Disk corruption during delete");
+        }
+        return origDelete(code);
+      });
+
+      const cleaned = await customService.cleanupAbandonedRooms(10 * 60 * 1000);
+      expect(cleaned).toBe(1);
+
+      // room2 was successfully cleaned
+      expect(await customService.getRoom(room2.roomCode)).toBeNull();
+
+      // Error was logged with structured context
+      const errorLog = logger.errorLogs.find(
+        (l) =>
+          l.context?.operation === "room_cleanup_abandoned_error" &&
+          l.context?.roomCode === room1.roomCode,
+      );
+      expect(errorLog).toBeDefined();
+      expect(errorLog?.context?.error).toBeDefined();
+    });
+
+    it("returns sessionToken in reconnect response (ENH-015)", async () => {
+      const { room, sessionToken } = await service.createRoom(
+        { playerName: "Host", preferredColor: "w" },
+        "sock_host",
+      );
+      const reconnectResult = await service.reconnect(
+        {
+          roomCode: room.roomCode,
+          playerId: room.hostId,
+          sessionToken,
+        },
+        "sock_reconnect",
+      );
+      expect(reconnectResult.sessionToken).toBe(sessionToken);
+      expect(reconnectResult.player.id).toBe(room.hostId);
     });
 
     it("cleans up expired sessions via cleanupExpiredSessions", async () => {

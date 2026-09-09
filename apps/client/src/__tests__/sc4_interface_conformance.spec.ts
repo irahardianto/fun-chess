@@ -10,6 +10,8 @@ import JoinCard from '../features/lobby/JoinCard.vue';
 
 describe('SC-4 Interface Specifications & UI/UX Conformance Suite', () => {
   const appVuePath = path.resolve(__dirname, '../App.vue');
+  const multiplayerArenaPath = path.resolve(__dirname, '../features/multiplayer/MultiplayerArena.vue');
+  const useGameSessionSyncPath = path.resolve(__dirname, '../components/layout/composables/useGameSessionSync.ts');
   const aiGameHudPath = path.resolve(__dirname, '../features/ai/components/AiGameHud.vue');
   const pwaInstallBannerPath = path.resolve(__dirname, '../features/pwa/components/PwaInstallBanner.vue');
   const progressConflictModalPath = path.resolve(__dirname, '../features/portability/components/ProgressConflictModal.vue');
@@ -22,6 +24,8 @@ describe('SC-4 Interface Specifications & UI/UX Conformance Suite', () => {
   const designTokensPath = path.resolve(__dirname, '../assets/design-tokens.css');
 
   const appVueSrc = fs.readFileSync(appVuePath, 'utf-8');
+  const multiplayerArenaSrc = fs.existsSync(multiplayerArenaPath) ? fs.readFileSync(multiplayerArenaPath, 'utf-8') : '';
+  const useGameSessionSyncSrc = fs.existsSync(useGameSessionSyncPath) ? fs.readFileSync(useGameSessionSyncPath, 'utf-8') : '';
   const aiGameHudSrc = fs.readFileSync(aiGameHudPath, 'utf-8');
   const pwaInstallBannerSrc = fs.readFileSync(pwaInstallBannerPath, 'utf-8');
   const progressConflictModalSrc = fs.readFileSync(progressConflictModalPath, 'utf-8');
@@ -74,9 +78,10 @@ describe('SC-4 Interface Specifications & UI/UX Conformance Suite', () => {
     });
 
     it('App.vue in-game action toolbar uses sentence-case copy', () => {
-      expect(appVueSrc).toContain('Flip board');
-      expect(appVueSrc).toContain('Offer draw');
-      expect(appVueSrc).toContain("'Hide moves' : 'View moves'");
+      const src = [appVueSrc, multiplayerArenaSrc].join('\n');
+      expect(src).toContain('Flip board');
+      expect(src).toContain('Offer draw');
+      expect(src).toContain("'Hide moves' : 'View moves'");
     });
   });
 
@@ -108,8 +113,9 @@ describe('SC-4 Interface Specifications & UI/UX Conformance Suite', () => {
     });
 
     it('App.vue uses actionable error notifications for room failures', () => {
-      expect(appVueSrc).toContain("'Unable to create room. Check your connection and try again.'");
-      expect(appVueSrc).toContain("'Unable to join room. Check the 4-letter room code and try again.'");
+      const src = [appVueSrc, useGameSessionSyncSrc].join('\n');
+      expect(src).toContain("'Unable to create room. Check your connection and try again.'");
+      expect(src).toContain("'Unable to join room. Check the 4-letter room code and try again.'");
     });
 
     it('QrScannerView provides helpful camera permission fallback error', () => {

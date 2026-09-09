@@ -18,6 +18,7 @@ describe('Zero-CLS Layout Stability & Visual Layering Invariants', () => {
   const puzzleArenaPath = path.resolve(__dirname, '../features/puzzles/PuzzleArena.vue');
   const puzzleRushArenaPath = path.resolve(__dirname, '../features/puzzles/components/PuzzleRushArena.vue');
   const appVuePath = path.resolve(__dirname, '../App.vue');
+  const appToastManagerPath = path.resolve(__dirname, '../components/layout/AppToastManager.vue');
   const lobbyViewPath = path.resolve(__dirname, '../features/lobby/LobbyView.vue');
   const lobbyModeSelectorPath = path.resolve(__dirname, '../features/lobby/LobbyModeSelector.vue');
   const aiOpponentSelectPath = path.resolve(__dirname, '../features/ai/components/AiOpponentSelect.vue');
@@ -34,6 +35,8 @@ describe('Zero-CLS Layout Stability & Visual Layering Invariants', () => {
   const puzzleArenaSrc = fs.readFileSync(puzzleArenaPath, 'utf-8');
   const puzzleRushArenaSrc = fs.readFileSync(puzzleRushArenaPath, 'utf-8');
   const appVueSrc = fs.readFileSync(appVuePath, 'utf-8');
+  const appToastManagerSrc = fs.existsSync(appToastManagerPath) ? fs.readFileSync(appToastManagerPath, 'utf-8') : '';
+  const appFullSrc = [appVueSrc, appToastManagerSrc].join('\n');
   const lobbyViewSrc = fs.readFileSync(lobbyViewPath, 'utf-8');
   const lobbyModeSelectorSrc = fs.readFileSync(lobbyModeSelectorPath, 'utf-8');
   const aiOpponentSelectSrc = fs.readFileSync(aiOpponentSelectPath, 'utf-8');
@@ -211,12 +214,12 @@ describe('Zero-CLS Layout Stability & Visual Layering Invariants', () => {
 
   describe('4. Multiplayer & App Shell Layout Stability & Positioning', () => {
     it('App.vue has a fixed global notification banner positioned below navbar', () => {
-      expect(appVueSrc).toMatch(/\.app-notification-banner\s*\{[^}]*position:\s*fixed/s);
-      expect(appVueSrc).toMatch(/\.app-notification-banner\s*\{[^}]*top:\s*68px/s);
-      expect(appVueSrc).toMatch(/\.app-notification-banner\s*\{[^}]*left:\s*50%/s);
-      expect(appVueSrc).toMatch(/\.app-notification-banner\s*\{[^}]*transform:\s*translateX\(-50%\)/s);
-      expect(appVueSrc).toMatch(/\.app-notification-banner\s*\{[^}]*z-index:\s*var\(--z-global-notification,\s*100\)/s);
-      expect(appVueSrc).toContain('data-testid="app-notification-banner"');
+      expect(appFullSrc).toMatch(/\.app-notification-banner\s*\{[^}]*position:\s*fixed/s);
+      expect(appFullSrc).toMatch(/\.app-notification-banner\s*\{[^}]*top:\s*68px/s);
+      expect(appFullSrc).toMatch(/\.app-notification-banner\s*\{[^}]*left:\s*50%/s);
+      expect(appFullSrc).toMatch(/\.app-notification-banner\s*\{[^}]*transform:\s*translateX\(-50%\)/s);
+      expect(appFullSrc).toMatch(/\.app-notification-banner\s*\{[^}]*z-index:\s*var\(--z-global-notification,\s*100\)/s);
+      expect(appFullSrc).toContain('data-testid="app-notification-banner"');
     });
 
     it('App.vue has a relative arena container and absolute disconnect/draw offer overlay banners', () => {

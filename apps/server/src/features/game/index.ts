@@ -12,7 +12,4 @@ export type {
 } from "./chess_engine.js";
 export type { IGameService, MoveApplicationResult } from "./game.interface.js";
 export { GameService } from "./game.service.js";
-export {
-  registerGameSocketHandlers,
-  defaultSocketRateLimiter,
-} from "./game.socket_handler.js";
+export { registerGameSocketHandlers } from "./game.socket_handler.js";

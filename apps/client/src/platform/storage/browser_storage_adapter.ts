@@ -1,14 +1,19 @@
 import type { KeyValueStorage } from './key_value_storage';
 import { isQuotaExceededError, storageAlertDispatcher } from './storage_alert';
 import { logger } from '../telemetry';
+import type { IClock } from '@fun-chess/shared';
+import { SystemClock } from '../time';
 
 export class BrowserStorageAdapter implements KeyValueStorage {
   private available = false;
   private readonly fallback = new Map<string, string>();
+  private readonly clock: IClock;
 
   constructor(
-    private readonly storageType: 'localStorage' | 'sessionStorage' = 'localStorage'
+    private readonly storageType: 'localStorage' | 'sessionStorage' = 'localStorage',
+    clock?: IClock
   ) {
+    this.clock = clock ?? new SystemClock();
     this.probeAvailability();
   }
 
@@ -23,7 +28,7 @@ export class BrowserStorageAdapter implements KeyValueStorage {
         this.available = false;
         return false;
       }
-      const probeKey = `__fc_probe_${Date.now()}__`;
+      const probeKey = `__fc_probe_${this.clock.now()}__`;
       storage.setItem(probeKey, '1');
       storage.removeItem(probeKey);
       this.available = true;
@@ -102,7 +107,7 @@ export class BrowserStorageAdapter implements KeyValueStorage {
           type: 'STORAGE_QUOTA_EXCEEDED',
           store: 'unified',
           attemptedAction: 'save',
-          timestamp: Date.now(),
+          timestamp: this.clock.now(),
           message: 'Storage quota exceeded. Temporary in-memory cache activated.',
           suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
         });
@@ -129,7 +134,7 @@ export class BrowserStorageAdapter implements KeyValueStorage {
             type: 'STORAGE_QUOTA_EXCEEDED',
             store: 'unified',
             attemptedAction: 'save',
-            timestamp: Date.now(),
+            timestamp: this.clock.now(),
             message: 'Storage quota exceeded while removing item.',
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
           });
@@ -157,7 +162,7 @@ export class BrowserStorageAdapter implements KeyValueStorage {
             type: 'STORAGE_QUOTA_EXCEEDED',
             store: 'unified',
             attemptedAction: 'save',
-            timestamp: Date.now(),
+            timestamp: this.clock.now(),
             message: 'Storage quota exceeded while clearing storage.',
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
           });
@@ -220,7 +225,7 @@ export class BrowserStorageAdapter implements KeyValueStorage {
           type: 'STORAGE_QUOTA_EXCEEDED',
           store: 'unified',
           attemptedAction: 'save',
-          timestamp: Date.now(),
+          timestamp: this.clock.now(),
           message: 'Storage quota exceeded during safe write.',
           suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
         });

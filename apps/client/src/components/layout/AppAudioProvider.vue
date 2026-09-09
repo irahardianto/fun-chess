@@ -158,8 +158,9 @@ function setupSocketListeners(api?: GameDomainEventSource) {
     cleanupAudioListeners();
     cleanupAudioListeners = null;
   }
-  if (api) {
-    cleanupAudioListeners = audio.attachGameEventListeners(api);
+  const targetApi = api ?? props.socketApi;
+  if (targetApi) {
+    cleanupAudioListeners = audio.attachGameEventListeners(targetApi);
   }
 }
 
@@ -189,6 +190,8 @@ defineExpose({
   isMuted: audio.isMuted,
   toggleMute,
   setMuted,
+  setupSocketListeners,
+  reconnectAudioListeners: () => setupSocketListeners(props.socketApi),
   playMove: audio.playMove,
   playCapture: audio.playCapture,
   playCheck: audio.playCheck,

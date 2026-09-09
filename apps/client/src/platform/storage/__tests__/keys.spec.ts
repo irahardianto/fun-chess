@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { STORAGE_KEYS, migrateStorageV1ToV2 } from '../keys';
+import { STORAGE_KEYS } from '../keys';
+import { migrateStorageV1ToV2 } from '../migration';
 import { InMemoryStorageAdapter } from '../in_memory_storage_adapter';
 import type { KeyValueStorage } from '../key_value_storage';
 import type { ILogger } from '@/platform/telemetry';
@@ -23,6 +24,14 @@ describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
     expect(STORAGE_KEYS.THEME).toBe('fun_chess_theme');
     expect(STORAGE_KEYS.LAN_IP).toBe('fun_chess_lan_ip');
     expect(STORAGE_KEYS.MIGRATION_V1_V2_TIMESTAMP).toBe('fun_chess_puzzle_migration_v1_v2_timestamp');
+  });
+
+  it('ensures storage_keys.ts is cycle-free and does not import migration.ts (clean cycle-free DI & storage) [MAJ-002]', async () => {
+    const storageKeysModule = await import('../storage_keys');
+    expect((storageKeysModule as any).migrateStorageV1ToV2).toBeUndefined();
+    expect((storageKeysModule as any).cleanupExpiredV1Keys).toBeUndefined();
+    expect(storageKeysModule.STORAGE_KEYS).toBeDefined();
+    expect(storageKeysModule.LEGACY_STORAGE_DEPRECATION_WINDOW_MS).toBeDefined();
   });
 
   it('migrates legacy puzzle progress from PUZZLE_PROGRESS_V1 and RETAINS legacy key with timestamp [CRIT-001]', () => {

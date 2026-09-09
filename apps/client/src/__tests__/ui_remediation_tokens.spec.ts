@@ -13,6 +13,7 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
   const joinCardPath = path.resolve(__dirname, '../features/lobby/JoinCard.vue');
   const hostCardPath = path.resolve(__dirname, '../features/lobby/HostCard.vue');
   const appVuePath = path.resolve(__dirname, '../App.vue');
+  const useThemePath = path.resolve(__dirname, '../components/layout/composables/useTheme.ts');
 
   const indexHtml = fs.readFileSync(indexHtmlPath, 'utf-8');
   const designTokens = fs.readFileSync(designTokensPath, 'utf-8');
@@ -24,6 +25,8 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
   const joinCard = fs.readFileSync(joinCardPath, 'utf-8');
   const hostCard = fs.readFileSync(hostCardPath, 'utf-8');
   const appVue = fs.readFileSync(appVuePath, 'utf-8');
+  const useThemeSrc = fs.existsSync(useThemePath) ? fs.readFileSync(useThemePath, 'utf-8') : '';
+  const themeSource = [appVue, useThemeSrc].join('\n');
 
   it('Finding 1 & WCAG 1.4.4: index.html has zoom enabled with viewport-fit=cover and no max-scale/user-scalable restrictions', () => {
     expect(indexHtml).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />');
@@ -117,9 +120,9 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
     expect(appVue).toContain('100dvh');
 
     // Double requestAnimationFrame / transition suppression for theme switch
-    expect(appVue).toContain('theme-transition-suppress');
-    expect(appVue).toContain('transition: none !important;');
-    expect(appVue).toContain('requestAnimationFrame');
+    expect(themeSource).toContain('theme-transition-suppress');
+    expect(themeSource).toContain('transition: none !important;');
+    expect(themeSource).toContain('requestAnimationFrame');
   });
 
   it('BaseInput.vue enforces 16px font size to prevent iOS Safari auto-zoom', () => {

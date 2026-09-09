@@ -302,6 +302,8 @@ export class RelayAddressService implements IRelayAddressService {
     let base: string;
 
     if (this.isCloudRelay()) {
+      // Safe non-null assertion: isCloudRelay() verifies config.publicUrl is non-empty string,
+      // guaranteeing getPublicUrl() returns a normalized URL string (F-08).
       base = this.getPublicUrl()!;
     } else {
       const lanIp = this.getLocalLanIp(customInterfaces);
@@ -333,6 +335,8 @@ export class RelayAddressService implements IRelayAddressService {
     const localUrl = `http://localhost:${effectivePort}`;
 
     if (this.isCloudRelay()) {
+      // Safe non-null assertion: isCloudRelay() verifies config.publicUrl is non-empty string,
+      // guaranteeing getPublicUrl() returns a normalized URL string (F-08).
       const publicUrl = this.getPublicUrl()!;
       const joinUrl = publicUrl;
 
@@ -367,7 +371,6 @@ export class RelayAddressService implements IRelayAddressService {
       isCloudRelay: false,
     };
   }
-
 }
 
 /**
@@ -414,66 +417,4 @@ export class MockRelayAddressService implements IRelayAddressService {
       ? [...this.mockInfo.interfaces]
       : ["127.0.0.1"];
   }
-}
-
-// Functional helpers creating instances on demand (MAJ-010: no global mutable singleton)
-
-/**
- * Helper for resolving addressing info.
- */
-export function getRelayAddressingInfo(
-  port?: number,
-  customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-): LanInfoResponse {
-  return new RelayAddressService().getAddressingInfo(port, customInterfaces);
-}
-
-/**
- * Helper for generating room join URLs.
- */
-export function generateRelayJoinUrl(
-  port: number,
-  roomCode?: string,
-  customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-): string {
-  return new RelayAddressService().generateJoinUrl(
-    port,
-    roomCode,
-    customInterfaces,
-  );
-}
-
-/**
- * Helper for checking Cloud Relay mode.
- */
-export function isCloudRelay(): boolean {
-  return new RelayAddressService().isCloudRelay();
-}
-
-/**
- * Helper for retrieving primary local LAN IP.
- */
-export function getRelayLocalLanIp(
-  customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-): string {
-  return new RelayAddressService().getLocalLanIp(customInterfaces);
-}
-
-/**
- * Helper for retrieving all local LAN interfaces.
- */
-export function getAllRelayLanInterfaces(
-  customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-): string[] {
-  return new RelayAddressService().getAllLanInterfaces(customInterfaces);
-}
-
-/**
- * Functional alias matching getAddressingInfo.
- */
-export function getAddressingInfo(
-  port?: number,
-  customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-): LanInfoResponse {
-  return new RelayAddressService().getAddressingInfo(port, customInterfaces);
 }

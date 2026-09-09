@@ -46,6 +46,7 @@ export interface EmitWithTimeoutOptions<TRes extends { success: boolean; error?:
   timeoutMessage: string;
   operation: string;
   correlationId?: string;
+  rejectOnError?: boolean; // MIN-003: Optional flag allowing caller to reject promise
   callback?: (res: TRes) => void;
   onSuccess?: (res: Extract<TRes, { success: true }>) => void;
   onError?: (err: SocketErrorPayload) => void;
@@ -230,6 +231,19 @@ export const InboundPlayerJoinedSchema = z.object({
     .passthrough(),
 });
 
+/**
+ * Permissive Inbound Player Left Schema (MIN-024):
+ *
+ * In ServerToClientEvents, room:player_left payload specifies { playerId: string; playerName: string; reason?: ... }.
+ * On the client ingress boundary, this schema intentionally marks `playerName` and `reason` as optional (.optional()).
+ *
+ * Architectural Rationale:
+ * 1. Robustness: The client UI composables only strictly require `playerId` to perform active player/spectator
+ *    eviction and UI teardown.
+ * 2. Resilience against Partial Payloads: In transient disconnections, abrupt socket teardowns, or backward-compatible
+ *    relay messages from older proxies/servers, `playerName` might be absent. Enforcing `playerName` here would reject
+ *    the entire event via validateInboundPayload, leaving the disconnected player stuck in room state.
+ */
 export const InboundPlayerLeftSchema = z.object({
   playerId: z.string().min(1),
   playerName: z.string().optional(),
@@ -398,7 +412,7 @@ export function createInboundHandler<T, TDispatched = T>(
     const startTime = performance.now();
     const correlationId = generateCorrelationId();
 
-    logger.debug(`Inbound socket event received: ${event}`, {
+    logger.debug('Inbound socket event received', {
       operation: `${operation}_received`,
       event,
       correlationId,
@@ -407,10 +421,13 @@ export function createInboundHandler<T, TDispatched = T>(
     const data = validateInboundPayload(event, schema, raw);
     if (!data) {
       const durationMs = Math.round(performance.now() - startTime);
-      logger.error(`Inbound socket event validation failed: ${event}`, {
+      logger.warn('Inbound socket event validation failed', {
         operation,
+        event,
         correlationId,
+        duration: durationMs,
         durationMs,
+        payload: raw,
         error: 'Inbound payload validation failed',
       });
       return;
@@ -492,6 +509,11 @@ const handlePlayerDisconnected = createInboundHandler({
   operation: 'socket_event_player_disconnected',
   getContext: (data) => ({
     playerId: data.playerId ?? data.player?.id,
+    gracePeriodMs: data.gracePeriodMs,
+    roomStatus: data.roomStatus,
+  }),
+  transform: (data) => ({
+    playerId: (data.playerId ?? data.player?.id) as string,
     gracePeriodMs: data.gracePeriodMs,
     roomStatus: data.roomStatus,
   }),
@@ -757,12 +779,16 @@ export function connect(url?: string): void {
 
 /**
  * Disconnects socket connection and updates reactive state.
+ * @param reset - Optional flag to reset module-level transport state on clean disconnect (MIN-015).
  */
-export function disconnect(): void {
+export function disconnect(reset = false): void {
   if (socket.value) {
     socket.value.disconnect();
     isConnected.value = false;
     isReconnecting.value = false;
+    if (reset) {
+      resetTransportState();
+    }
   }
 }
 
@@ -786,7 +812,7 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
     event,
   });
 
-  return new Promise<TRes>((resolve) => {
+  return new Promise<TRes>((resolve, reject) => {
     let settled = false;
 
     const timer = setTimeout(() => {
@@ -816,7 +842,11 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
       if (callback) {
         callback(res);
       }
-      resolve(res);
+      if (options.rejectOnError) {
+        reject(err);
+      } else {
+        resolve(res);
+      }
     }, timeoutMs);
 
     (targetSocket as unknown as { emit: (e: string, p: unknown, cb: (r: TRes) => void) => void }).emit(event, payload, (res: TRes) => {
@@ -835,6 +865,10 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
           event,
         });
         options.onSuccess?.(res as Extract<TRes, { success: true }>);
+        if (callback) {
+          callback(res);
+        }
+        resolve(res);
       } else {
         const errPayload: SocketErrorPayload = res?.error ?? {
           code: 'ERR_INTERNAL_SERVER',
@@ -852,18 +886,22 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
           error: errPayload,
         });
         options.onError?.(errPayload);
+        if (callback) {
+          callback(res);
+        }
+        if (options.rejectOnError) {
+          reject(errPayload);
+        } else {
+          resolve(res);
+        }
       }
-
-      if (callback) {
-        callback(res);
-      }
-      resolve(res);
     });
   });
 }
 
 /**
  * Resets socket transport state to initial values.
+ * Allows deterministic resetting of module-level socket transport state in test suites and clean disconnects (MIN-015).
  */
 export function resetTransportState(): void {
   socket.value = null;

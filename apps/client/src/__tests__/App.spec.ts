@@ -613,6 +613,37 @@ describe('App.vue Shell & Navigation Integration', () => {
     expect(mockLeaveRoom).toHaveBeenCalledWith('GAME2');
   });
 
+  it('safely handles async rejections in confirmation callbacks (handleResign, handleLeaveRoom) without uncaught error (MAJ-003)', async () => {
+    mockCurrentRoom.value = {
+      roomCode: 'GAME1',
+      status: 'playing',
+      hostId: 'p1',
+    };
+    mockResign.mockRejectedValueOnce(new Error('Network error during resign'));
+    mockLeaveRoom.mockRejectedValueOnce(new Error('Network error during leave'));
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    // Confirm resign with async rejection
+    (wrapper.vm as any).handleResign();
+    await flushPromises();
+    expect((wrapper.vm as any).showConfirmModal).toBe(true);
+    await expect(async () => {
+      (wrapper.vm as any).handleConfirmProceed();
+      await flushPromises();
+    }).not.toThrow();
+
+    // Confirm leave room with async rejection
+    (wrapper.vm as any).handleLeaveRoom();
+    await flushPromises();
+    expect((wrapper.vm as any).showConfirmModal).toBe(true);
+    await expect(async () => {
+      (wrapper.vm as any).handleConfirmProceed();
+      await flushPromises();
+    }).not.toThrow();
+  });
+
   it('handles rematch requests and responses from AppModalContainer', async () => {
     mockCurrentRoom.value = { roomCode: 'REM1', status: 'game_over' };
     const wrapper = mount(App);
@@ -668,7 +699,7 @@ describe('App.vue Shell & Navigation Integration', () => {
     expect((wrapper.vm as any).currentAppMode).toBe('lobby');
   });
 
-  it('handles puzzle-rush-exit and puzzle-back events to resolve exit trap and restore view state', async () => {
+  it('handles canonical puzzle-exit event to restore view state across puzzle modes (MIN-021)', async () => {
     const wrapper = mount(App);
     await flushPromises();
     const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
@@ -678,8 +709,8 @@ describe('App.vue Shell & Navigation Integration', () => {
     expect((wrapper.vm as any).currentAppMode).toBe('puzzle_hub');
     expect((wrapper.vm as any).puzzleSubMode).toBe('puzzle_rush');
 
-    // Emit puzzle-rush-exit from AppViewRouter
-    await viewRouter.vm.$emit('puzzle-rush-exit');
+    // Emit canonical puzzle-exit from AppViewRouter
+    await viewRouter.vm.$emit('puzzle-exit');
     expect((wrapper.vm as any).currentAppMode).toBe('lobby');
     expect((wrapper.vm as any).lobbyActiveMode).toBe('puzzle_hub');
     expect((wrapper.vm as any).puzzleSubMode).toBe('hub');
@@ -689,28 +720,28 @@ describe('App.vue Shell & Navigation Integration', () => {
     expect((wrapper.vm as any).currentAppMode).toBe('puzzle_hub');
     expect((wrapper.vm as any).puzzleSubMode).toBe('streak_survivor');
 
-    // Emit puzzle-rush-exit again to exit Streak Survivor
-    await viewRouter.vm.$emit('puzzle-rush-exit');
+    // Emit canonical puzzle-exit again to exit Streak Survivor
+    await viewRouter.vm.$emit('puzzle-exit');
     expect((wrapper.vm as any).currentAppMode).toBe('lobby');
     expect((wrapper.vm as any).lobbyActiveMode).toBe('puzzle_hub');
     expect((wrapper.vm as any).puzzleSubMode).toBe('hub');
 
-    // 3. Enter Drills mode and emit puzzle-back
+    // 3. Enter Drills mode and emit puzzle-exit
     await viewRouter.vm.$emit('launch-drills', 'fork');
     expect((wrapper.vm as any).currentAppMode).toBe('puzzle_hub');
     expect((wrapper.vm as any).puzzleSubMode).toBe('themed_drills');
 
-    await viewRouter.vm.$emit('puzzle-back');
+    await viewRouter.vm.$emit('puzzle-exit');
     expect((wrapper.vm as any).currentAppMode).toBe('lobby');
     expect((wrapper.vm as any).lobbyActiveMode).toBe('puzzle_hub');
     expect((wrapper.vm as any).puzzleSubMode).toBe('hub');
 
-    // 4. Enter Ladder mode and emit generic exit
+    // 4. Enter Ladder mode and emit puzzle-exit
     await viewRouter.vm.$emit('launch-ladder');
     expect((wrapper.vm as any).currentAppMode).toBe('puzzle_hub');
     expect((wrapper.vm as any).puzzleSubMode).toBe('adaptive_ladder');
 
-    await viewRouter.vm.$emit('exit');
+    await viewRouter.vm.$emit('puzzle-exit');
     expect((wrapper.vm as any).currentAppMode).toBe('lobby');
     expect((wrapper.vm as any).lobbyActiveMode).toBe('puzzle_hub');
     expect((wrapper.vm as any).puzzleSubMode).toBe('hub');

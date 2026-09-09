@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import LobbyView from '../LobbyView.vue';
+import { PuzzleHubView } from '@/features/puzzles';
 import { STORAGE_KEYS } from '@/platform/storage/keys';
 import { safeLocalStorage } from '@/platform/storage';
 
@@ -292,6 +293,80 @@ describe('LobbyView.vue', () => {
       },
     });
     expect(wrapperEmpty.find('.academy-browser-container').exists()).toBe(true);
+  });
+
+  describe('Puzzle Hub navigation and drill event standardization (MAJ-004)', () => {
+    it('switches to puzzle_hub mode and renders PuzzleHubView', async () => {
+      const wrapper = mount(LobbyView);
+
+      const puzzleHubTab = wrapper.find('[data-testid="mode-tab-puzzle_hub"]');
+      expect(puzzleHubTab.exists()).toBe(true);
+      await puzzleHubTab.trigger('click');
+
+      expect(wrapper.find('[data-testid="puzzle-hub-panel"]').exists()).toBe(true);
+      expect(wrapper.findComponent(PuzzleHubView).exists()).toBe(true);
+      expect(wrapper.emitted('modeChange')).toContainEqual(['puzzle_hub']);
+    });
+
+    it('standardizes and forwards launch-drills event with optional theme', () => {
+      const wrapper = mount(LobbyView, {
+        props: { initialMode: 'puzzle_hub' },
+      });
+
+      const hub = wrapper.findComponent(PuzzleHubView);
+      expect(hub.exists()).toBe(true);
+
+      hub.vm.$emit('launch-drills', 'fork');
+
+      expect(wrapper.emitted('launchDrills')).toHaveLength(1);
+      expect(wrapper.emitted('launchDrills')?.[0]).toEqual(['fork']);
+      expect(wrapper.emitted('launch-drills')).toHaveLength(1);
+      expect(wrapper.emitted('launch-drills')?.[0]).toEqual(['fork']);
+
+      hub.vm.$emit('launch-drills');
+      expect(wrapper.emitted('launchDrills')).toHaveLength(2);
+      expect(wrapper.emitted('launchDrills')?.[1]).toEqual([undefined]);
+      expect(wrapper.emitted('launch-drills')).toHaveLength(2);
+      expect(wrapper.emitted('launch-drills')?.[1]).toEqual([undefined]);
+    });
+
+    it('standardizes and forwards launch-ladder event', () => {
+      const wrapper = mount(LobbyView, {
+        props: { initialMode: 'puzzle_hub' },
+      });
+
+      const hub = wrapper.findComponent(PuzzleHubView);
+      expect(hub.exists()).toBe(true);
+
+      hub.vm.$emit('launch-ladder');
+
+      expect(wrapper.emitted('launchLadder')).toHaveLength(1);
+      expect(wrapper.emitted('launchLadder')?.[0]).toEqual([]);
+      expect(wrapper.emitted('launch-ladder')).toHaveLength(1);
+      expect(wrapper.emitted('launch-ladder')?.[0]).toEqual([]);
+    });
+
+    it('standardizes and forwards launch-rush event with optional subMode', () => {
+      const wrapper = mount(LobbyView, {
+        props: { initialMode: 'puzzle_hub' },
+      });
+
+      const hub = wrapper.findComponent(PuzzleHubView);
+      expect(hub.exists()).toBe(true);
+
+      hub.vm.$emit('launch-rush', 'streak_survivor');
+
+      expect(wrapper.emitted('launchRush')).toHaveLength(1);
+      expect(wrapper.emitted('launchRush')?.[0]).toEqual(['streak_survivor']);
+      expect(wrapper.emitted('launch-rush')).toHaveLength(1);
+      expect(wrapper.emitted('launch-rush')?.[0]).toEqual(['streak_survivor']);
+
+      hub.vm.$emit('launch-rush', 'puzzle_rush');
+      expect(wrapper.emitted('launchRush')).toHaveLength(2);
+      expect(wrapper.emitted('launchRush')?.[1]).toEqual(['puzzle_rush']);
+      expect(wrapper.emitted('launch-rush')).toHaveLength(2);
+      expect(wrapper.emitted('launch-rush')?.[1]).toEqual(['puzzle_rush']);
+    });
   });
 });
 

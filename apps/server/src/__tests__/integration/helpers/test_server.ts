@@ -1,48 +1,25 @@
-import http from "node:http";
-import net from "node:net";
-import path from "node:path";
-import { createHttpServer, HttpRateLimiter } from "../../../platform/http/index.js";
+import type http from "node:http";
+import type { HttpRateLimiter } from "../../../platform/http/index.js";
 import {
-  createSocketServer,
   SocketRateLimiter,
-  TypedSocketServer,
+  type TypedSocketServer,
 } from "../../../platform/socket/index.js";
 import { NullLogger } from "../../../platform/logger/index.js";
 import type { Logger } from "../../../platform/logger/index.js";
 import type { ServerEnv } from "../../../platform/config/index.js";
-import {
+import type {
   InMemoryRoomStore,
   InMemorySessionRegistry,
   RoomService,
-  registerRoomSocketHandlers,
-  handleSocketDisconnect,
-  clearAllDisconnectTimers,
-  DisconnectTimerRegistry,
-  roomCreateRateLimiter,
-  type IDisconnectTimerRegistry,
-  type IRoomGameAdapter,
+  IDisconnectTimerRegistry,
 } from "../../../features/rooms/index.js";
+import type { GameService } from "../../../features/game/index.js";
 import {
-  ChessEngine,
-  GameService,
-  registerGameSocketHandlers,
-} from "../../../features/game/index.js";
-import { Chess } from "chess.js";
-import { RelayAddressService } from "../../../features/lan/relay_address.service.js";
+  startServer,
+  type ServerInstance,
+} from "../../../index.js";
 
-if (typeof (ChessEngine as unknown as { findKingSquare?: unknown }).findKingSquare !== "function") {
-  (ChessEngine as unknown as { findKingSquare: (fen: string, color: unknown) => unknown }).findKingSquare = (fen: string, color: unknown) => {
-    try {
-      const chess = new Chess(fen);
-      return ChessEngine.getKingSquare(chess, color as "w" | "b");
-    } catch {
-      return null;
-    }
-  };
-}
-
-
-export interface TestServerInstance {
+export interface TestServerInstance extends ServerInstance {
   server: http.Server;
   io: TypedSocketServer;
   port: number;
@@ -62,19 +39,26 @@ export interface CreateTestServerOptions {
   logger?: Logger;
   allowedOrigins?: string[];
   rateLimiter?: HttpRateLimiter;
+  roomCreateRateLimiter?: SocketRateLimiter;
 }
+
+export const defaultTestRoomCreateRateLimiter = new SocketRateLimiter({
+  maxRequests: 3,
+  windowMs: 60_000,
+  pruneIntervalMs: 0,
+});
 
 /**
  * Resets socket rate limiter tracking entries to prevent cross-test interference.
  */
 export function resetTestRateLimiters(): void {
-  roomCreateRateLimiter.clear();
+  defaultTestRoomCreateRateLimiter.clear();
 }
 
 /**
- * Creates, configures, and starts a test server using the real production server modules.
- * Replaces the former 1,146-line shadow server implementation to ensure contract and integration
- * tests exercise production backend behavior directly (CRIT-004).
+ * Creates, configures, and starts a test server using the production composition root (ENH-007).
+ * Deduplicates shared test server creation logic, ensuring it uses consistent factory patterns
+ * aligned with the production composition root.
  */
 export async function createTestServer(
   customPortOrOptions: number | CreateTestServerOptions = 0,
@@ -85,155 +69,39 @@ export async function createTestServer(
       ? { customPort: customPortOrOptions }
       : customPortOrOptions;
 
-  const customPort = options.customPort ?? 0;
-  const logger = (options.logger as NullLogger) ?? new NullLogger();
-  const roomStore = new InMemoryRoomStore();
-  const sessionRegistry = new InMemorySessionRegistry();
-  const timerRegistry = new DisconnectTimerRegistry();
-  const roomService = new RoomService(
-    roomStore,
-    sessionRegistry,
-    undefined,
-    undefined,
-    timerRegistry,
-  );
+  const testLogger = (options.logger as NullLogger) ?? new NullLogger();
 
-  // Safe fallback delegation so roomService can satisfy either IRoomGameAdapter or direct RoomStore callers
-  const roomServiceRecord = roomService as unknown as Record<string, unknown>;
-  if (typeof roomServiceRecord.mutate !== "function") {
-    roomServiceRecord.mutate = roomStore.mutate.bind(roomStore);
-  }
-  if (typeof roomServiceRecord.withLock !== "function") {
-    roomServiceRecord.withLock = roomStore.withLock.bind(roomStore);
-  }
-  if (typeof roomServiceRecord.findByCode !== "function") {
-    roomServiceRecord.findByCode = roomStore.findByCode.bind(roomStore);
-  }
-  if (typeof roomServiceRecord.save !== "function") {
-    roomServiceRecord.save = roomStore.save.bind(roomStore);
-  }
-  if (typeof roomServiceRecord.delete !== "function") {
-    roomServiceRecord.delete = roomStore.delete.bind(roomStore);
-  }
-
-  // Instantiate GameService passing roomService (IRoomGameAdapter) instead of roomStore directly
-  const gameService = new GameService(roomService as unknown as IRoomGameAdapter);
-
-  // Rate limiter for tests: high capacity and disabled background interval to prevent timer leaks
-  const rateLimiter = new SocketRateLimiter({
+  // Test rate limiter with high capacity and disabled prune interval to prevent timer leaks
+  const testSocketRateLimiter = new SocketRateLimiter({
     maxRequests: 10_000,
     windowMs: 60_000,
     pruneIntervalMs: 0,
   });
 
-  // Delegate request listener so HTTP requests can route to createHttpServer
-  // after the ephemeral port has been bound.
-  let httpHandler: http.RequestListener = (_req, res) => {
-    res.writeHead(503);
-    res.end("Server initializing");
-  };
+  const roomCreateLimiter =
+    options.roomCreateRateLimiter ?? defaultTestRoomCreateRateLimiter;
 
-  const allowedOrigins =
-    options.allowedOrigins ??
-    (options.env?.CORS_ORIGIN
-      ? options.env.CORS_ORIGIN.split(",").map((s) => s.trim())
-      : ["*"]);
-
-  const server = http.createServer((req, res) => {
-    httpHandler(req, res);
-  });
-
-  const io = createSocketServer(server, {
-    allowedOrigins: ["*"],
-  });
-
-  io.on("connection", (socket) => {
-    registerRoomSocketHandlers(
-      io,
-      socket,
-      roomService,
-      logger,
-      rateLimiter,
-      timerRegistry,
-    );
-    registerGameSocketHandlers(
-      io,
-      socket,
-      gameService,
-      logger,
-      rateLimiter,
-      timerRegistry,
-    );
-
-    socket.on("disconnect", async () => {
-      await handleSocketDisconnect(
-        io,
-        socket.id,
-        roomService,
-        logger,
-        undefined,
-        rateLimiter,
-        timerRegistry,
-      );
-    });
-  });
-
-  await new Promise<void>((resolve) => {
-    server.listen(customPort, "127.0.0.1", () => resolve());
-  });
-
-  const address = server.address() as net.AddressInfo;
-  const assignedPort = address.port;
-  const url = `http://127.0.0.1:${assignedPort}`;
-
-  const relayAddressService = new RelayAddressService({
+  const serverInstance = await startServer({
+    port: options.customPort ?? 0,
     host: "127.0.0.1",
-    port: assignedPort,
-    lanIp: "127.0.0.1",
+    logger: testLogger,
+    config: {
+      NODE_ENV: "test",
+      ...options.env,
+    },
+    allowedOrigins: options.allowedOrigins,
+    httpRateLimiter: options.rateLimiter,
+    socketRateLimiter: testSocketRateLimiter,
+    roomCreateRateLimiter: roomCreateLimiter,
   });
-
-  const clientDistPath = path.resolve(
-    process.cwd().endsWith("apps/server")
-      ? path.resolve(process.cwd(), "../client/dist")
-      : path.resolve(process.cwd(), "apps/client/dist"),
-  );
-
-  httpHandler = createHttpServer({
-    roomStore,
-    relayAddressService,
-    logger,
-    port: assignedPort,
-    distPath: clientDistPath,
-    allowedOrigins,
-    getActiveSocketCount: () => (io ? io.sockets.sockets.size : 0),
-    env: options.env as ServerEnv,
-    rateLimiter: options.rateLimiter,
-  });
-
-  const close = async () => {
-    options.rateLimiter?.destroy();
-    rateLimiter.destroy();
-    timerRegistry.clear();
-    clearAllDisconnectTimers();
-    const sockets = await io.fetchSockets();
-    for (const s of sockets) {
-      s.disconnect(true);
-    }
-    await new Promise<void>((resolve) => io.close(() => resolve()));
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  };
 
   return {
-    server,
-    io,
-    port: assignedPort,
-    url,
-    roomStore,
-    sessionRegistry,
-    roomService,
-    gameService,
-    timerRegistry,
-    logger,
-    close,
+    ...serverInstance,
+    roomStore: serverInstance.roomStore as InMemoryRoomStore,
+    sessionRegistry: serverInstance.sessionRegistry as InMemorySessionRegistry,
+    roomService: serverInstance.roomService as RoomService,
+    gameService: serverInstance.gameService as GameService,
+    timerRegistry: serverInstance.timerRegistry,
+    logger: testLogger,
   };
 }

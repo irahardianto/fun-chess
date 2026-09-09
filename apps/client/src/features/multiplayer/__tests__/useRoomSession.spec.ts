@@ -545,6 +545,23 @@ describe('useRoomSession composable', () => {
       expect(session.currentRoom.value?.blackPlayer?.isConnected).toBe(false);
     });
 
+    it('authoritatively updates roomStatus from room:player_disconnected event (MAJ-008)', () => {
+      const session = useRoomSession();
+      const room = createTestRoom({ status: 'playing' });
+      session.currentRoom.value = room;
+      session.currentPlayer.value = room.whitePlayer;
+
+      // Authoritative status passed from server (e.g. paused_disconnect or game_over)
+      eventHandlers['room:player_disconnected']!({
+        playerId: UUID_P2,
+        gracePeriodMs: 60000,
+        roomStatus: 'paused_disconnect',
+      });
+
+      expect(session.currentRoom.value?.status).toBe('paused_disconnect');
+      expect(session.currentRoom.value?.blackPlayer?.isConnected).toBe(false);
+    });
+
     it('does NOT transition room status to paused_disconnect when spectator drops', () => {
       const session = useRoomSession();
       const room = createTestRoom({ status: 'playing' });
@@ -570,6 +587,25 @@ describe('useRoomSession composable', () => {
 
       expect(session.currentRoom.value?.status).toBe('playing');
       expect(session.currentRoom.value?.spectators[0]?.isConnected).toBe(false);
+    });
+
+    it('does not mutate currentRoom on deprecated room:created or room:joined socket events (MAJ-008)', () => {
+      const session = useRoomSession();
+      session.currentRoom.value = null;
+
+      const dummyRoom = createTestRoom();
+
+      // Triggering deprecated room:created should NOT update currentRoom
+      if (eventHandlers['room:created']) {
+        eventHandlers['room:created'](dummyRoom);
+      }
+      expect(session.currentRoom.value).toBeNull();
+
+      // Triggering deprecated room:joined should NOT update currentRoom
+      if (eventHandlers['room:joined']) {
+        eventHandlers['room:joined'](dummyRoom);
+      }
+      expect(session.currentRoom.value).toBeNull();
     });
 
     it('restores room status to playing when disconnected player reconnects', () => {
@@ -602,13 +638,9 @@ describe('useRoomSession composable', () => {
       expect(session.currentRoom.value?.blackPlayer).toBeNull();
     });
 
-    it('clears session and redirects to /multiplayer when host_left reason is received (CRIT-004)', () => {
-      const originalLocation = window.location;
-      const assignMock = vi.fn();
-      delete (window as any).location;
-      (window as any).location = { assign: assignMock };
-
-      const session = useRoomSession();
+    it('clears session and invokes onRoomClosed when host_left reason is received (MAJ-006)', () => {
+      const onRoomClosed = vi.fn();
+      const session = useRoomSession({ onRoomClosed });
       session.currentRoom.value = createTestRoom();
       session.currentPlayer.value = createTestPlayer();
       session.sessionToken.value = 'tok_active';
@@ -628,18 +660,12 @@ describe('useRoomSession composable', () => {
       expect(session.currentPlayer.value).toBeNull();
       expect(session.sessionToken.value).toBeNull();
       expect(getSavedSession()).toBeNull();
-      expect(assignMock).toHaveBeenCalledWith('/multiplayer');
-
-      (window as any).location = originalLocation;
+      expect(onRoomClosed).toHaveBeenCalled();
     });
 
-    it('clears session and redirects to /multiplayer when room_closed reason is received (CRIT-004)', () => {
-      const originalLocation = window.location;
-      const assignMock = vi.fn();
-      delete (window as any).location;
-      (window as any).location = { assign: assignMock };
-
-      const session = useRoomSession();
+    it('clears session and calls navigate when room_closed reason is received (MAJ-006)', () => {
+      const navigate = vi.fn();
+      const session = useRoomSession({ navigate });
       session.currentRoom.value = createTestRoom();
       session.currentPlayer.value = createTestPlayer();
       session.sessionToken.value = 'tok_active';
@@ -659,9 +685,32 @@ describe('useRoomSession composable', () => {
       expect(session.currentPlayer.value).toBeNull();
       expect(session.sessionToken.value).toBeNull();
       expect(getSavedSession()).toBeNull();
-      expect(assignMock).toHaveBeenCalledWith('/multiplayer');
+      expect(navigate).toHaveBeenCalledWith('/multiplayer');
+    });
 
-      (window as any).location = originalLocation;
+    it('clears session and falls back safely without throwing when no navigation callback provided (MAJ-006)', () => {
+      const session = useRoomSession();
+      session.currentRoom.value = createTestRoom();
+      session.currentPlayer.value = createTestPlayer();
+      session.sessionToken.value = 'tok_active';
+      saveSession({
+        roomCode: 'STAR',
+        playerId: UUID_P1,
+        sessionToken: 'tok_active',
+      });
+
+      expect(() => {
+        eventHandlers['room:player_left']!({
+          playerId: UUID_P1,
+          playerName: 'Alice',
+          reason: 'room_closed',
+        });
+      }).not.toThrow();
+
+      expect(session.currentRoom.value).toBeNull();
+      expect(session.currentPlayer.value).toBeNull();
+      expect(session.sessionToken.value).toBeNull();
+      expect(getSavedSession()).toBeNull();
     });
 
     it('completely resets room session state on resetRoomSessionState()', () => {

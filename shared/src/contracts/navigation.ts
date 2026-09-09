@@ -68,19 +68,3 @@ export interface AppShellState {
   /** Dark mode toggle */
   readonly isDarkMode: boolean;
 }
-
-/**
- * Navigation actions emitted by sub-views to the top-level shell.
- */
-export type AppShellEventMap = {
-  /** Navigate back to the main Lobby */
-  "navigate:lobby": void;
-  /** Launch a LAN multiplayer room host/join */
-  "navigate:multiplayer": void;
-  /** Launch Solo AI mode with mascot setup */
-  "navigate:solo_ai": SoloAiLaunchConfig;
-  /** Launch Chess Academy scenario or category browser */
-  "navigate:academy": AcademyLaunchConfig | undefined;
-  /** Launch Gamified Tactical Puzzle Hub */
-  "navigate:puzzle_hub": PuzzleHubLaunchConfig | undefined;
-};

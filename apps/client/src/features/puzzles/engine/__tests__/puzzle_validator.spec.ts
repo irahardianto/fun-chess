@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Puzzle } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 import {
   validatePuzzleMove,
   formatPlayerMoveToUci,
@@ -396,6 +397,79 @@ describe('Puzzle Validator Engine', () => {
         );
         expect(outcome.isCorrect).toBe(true);
         expect(outcome.botReplyMove).toBeUndefined();
+      });
+
+      it('logs structured warning when createSafeChess fails on corrupted board state (MAJ-001)', async () => {
+        const warnSpy = vi.spyOn(logger, 'warn');
+        // Valid FEN format that fails chess instantiation
+        const validFormatFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+        const chessFactory = await import('@fun-chess/shared');
+        vi.spyOn(chessFactory, 'createSafeChess').mockImplementationOnce(() => {
+          throw new Error('Simulated engine crash on corrupted position');
+        });
+
+        const outcome = validatePuzzleMove(
+          singlePlyPuzzle,
+          0,
+          validFormatFen,
+          { from: 'a1', to: 'a8' }
+        );
+
+        expect(outcome.isCorrect).toBe(false);
+        expect(outcome.feedback).toBe('Corrupted board state.');
+        expect(warnSpy).toHaveBeenCalledWith(
+          'Corrupted board state during move validation',
+          expect.objectContaining({
+            operation: 'puzzle_validate_move_safe_chess',
+            currentFen: validFormatFen,
+          })
+        );
+        warnSpy.mockRestore();
+      });
+
+      it('logs structured debug message when player move execution fails in engine (MAJ-001)', () => {
+        const debugSpy = vi.spyOn(logger, 'debug');
+        const outcome = validatePuzzleMove(
+          singlePlyPuzzle,
+          0,
+          singlePlyPuzzle.fen,
+          { from: 'z9' as any, to: 'z10' as any }
+        );
+
+        expect(outcome.isCorrect).toBe(false);
+        expect(debugSpy).toHaveBeenCalledWith(
+          'Illegal player move execution in chess engine',
+          expect.objectContaining({
+            operation: 'puzzle_validate_player_move',
+            from: 'z9',
+            to: 'z10',
+          })
+        );
+        debugSpy.mockRestore();
+      });
+
+      it('logs structured debug message when bot counter-move execution fails in engine (MAJ-001)', () => {
+        const debugSpy = vi.spyOn(logger, 'debug');
+        const badOpponentPuzzle: Puzzle = {
+          ...multiPlyPuzzle,
+          moves: ['c3b5', 'e8a1', 'b5c7'],
+        };
+        const outcome = validatePuzzleMove(
+          badOpponentPuzzle,
+          0,
+          badOpponentPuzzle.fen,
+          { from: 'c3', to: 'b5' }
+        );
+
+        expect(outcome.isCorrect).toBe(true);
+        expect(debugSpy).toHaveBeenCalledWith(
+          'Illegal bot counter-move execution in chess engine',
+          expect.objectContaining({
+            operation: 'puzzle_validate_bot_move',
+            opponentUci: 'e8a1',
+          })
+        );
+        debugSpy.mockRestore();
       });
     });
   });

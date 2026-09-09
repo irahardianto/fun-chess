@@ -6,6 +6,7 @@ import {
   GameOverPayload,
   createInitialGameState,
   createGameOverPayload,
+  type IClock,
 } from "@fun-chess/shared";
 import { RoomNotFoundError } from "../room.errors.js";
 
@@ -243,6 +244,48 @@ describe("MockRoomStore (MAJ-018)", () => {
       expect(store.saveCalls.length).toBe(0);
       expect(store.deleteCalls.length).toBe(0);
       expect(await store.findByCode("RM2")).toBeNull();
+    });
+  });
+
+  describe("clock injection (MAJ-013)", () => {
+    it("uses injected IClock.now() across mutation operations", async () => {
+      let currentTime = 123456789;
+      const fakeClock: IClock = {
+        now: () => currentTime,
+      };
+
+      const customStore = new MockRoomStore(fakeClock);
+      const room = createTestRoom("CLOK");
+      // Intentionally omit lastActivityAt so save falls back to clock
+      const roomWithoutLastActivity = { ...room, lastActivityAt: undefined as unknown as number };
+      await customStore.save(roomWithoutLastActivity);
+
+      const saved = await customStore.findByCode("CLOK");
+      expect(saved?.lastActivityAt).toBe(123456789);
+
+      // Advance time and perform applyGameMove
+      currentTime = 987654321;
+      const nextGame = { ...room.game, moveCount: 1 };
+      const updatedMove = await customStore.applyGameMove("CLOK", nextGame);
+      expect(updatedMove.lastActivityAt).toBe(987654321);
+
+      // Advance time and updateDrawOffer
+      currentTime = 999999999;
+      const updatedDraw = await customStore.updateDrawOffer("CLOK", null);
+      expect(updatedDraw.lastActivityAt).toBe(999999999);
+    });
+
+    it("defaults to SystemClock when no clock is provided", async () => {
+      const defaultStore = new MockRoomStore();
+      const before = Date.now();
+      const room = createTestRoom("DFLT");
+      const roomWithoutLastActivity = { ...room, lastActivityAt: undefined as unknown as number };
+      await defaultStore.save(roomWithoutLastActivity);
+      const after = Date.now();
+
+      const saved = await defaultStore.findByCode("DFLT");
+      expect(saved?.lastActivityAt).toBeGreaterThanOrEqual(before);
+      expect(saved?.lastActivityAt).toBeLessThanOrEqual(after);
     });
   });
 });

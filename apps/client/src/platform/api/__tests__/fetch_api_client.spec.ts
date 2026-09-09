@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { FetchApiClient } from '../fetch_api_client';
+import { FetchApiClient, ApiClientError } from '../fetch_api_client';
 import { MockApiClient } from '../mock_api_client';
 import { apiClient } from '../index';
 import type { ILogger } from '../../telemetry';
@@ -504,6 +504,163 @@ describe('FetchApiClient', () => {
     });
     const noMethodRes = await client.get('/no-method');
     expect(noMethodRes.data).toBeNull();
+  });
+
+  it('parses HttpErrorEnvelope and throws typed ApiClientError with code and correlationId (MAJ-022)', async () => {
+    const errorEnvelope = {
+      status: 'error',
+      code: 429,
+      error: {
+        code: 'ERR_RATE_LIMITED',
+        message: 'Rate limit exceeded. Maximum 3 requests per 60 seconds.',
+        correlationId: 'test-corr-429',
+        details: { retryAfterMs: 5000 },
+      },
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify(errorEnvelope),
+    });
+
+    const client = new FetchApiClient('http://localhost:3000');
+
+    await expect(client.getLanInfo()).rejects.toThrow(ApiClientError);
+
+    try {
+      await client.getLanInfo();
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiClientError);
+      const apiErr = err as ApiClientError;
+      expect(apiErr.status).toBe(429);
+      expect(apiErr.code).toBe('ERR_RATE_LIMITED');
+      expect(apiErr.correlationId).toBe('test-corr-429');
+      expect(apiErr.message).toBe('Rate limit exceeded. Maximum 3 requests per 60 seconds.');
+      expect(apiErr.details).toEqual({ retryAfterMs: 5000 });
+    }
+  });
+
+  it('forwards optional authToken in Authorization header for protected probes (ENH-007)', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({
+        status: 'ok',
+        uptimeSeconds: 10,
+        timestamp: '2026-09-09T00:00:00Z',
+        activeRooms: 0,
+        activeSockets: 0,
+        memoryUsageMb: { rss: 10, heapTotal: 10, heapUsed: 10 },
+      }),
+    });
+
+    const client = new FetchApiClient('http://localhost:3000');
+    await client.getDetailedHealth({ authToken: 'secret-admin-token-xyz' });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/health/detail',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer secret-admin-token-xyz',
+        }),
+      })
+    );
+  });
+
+  it('uses injected IClock for request duration telemetry (MAJ-008)', async () => {
+    let mockTime = 1000;
+    const mockClock = {
+      now: () => {
+        mockTime += 50;
+        return mockTime;
+      },
+    };
+
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({ ok: true }),
+    });
+
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as unknown as ILogger, mockClock);
+    await client.get('/clock-test');
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'HTTP request completed',
+      expect.objectContaining({
+        duration: 50,
+      })
+    );
+  });
+
+  it('handles AbortSignal unsupported by Request gracefully (get_safe_signal fallback)', async () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    const realFetch = async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    globalThis.fetch = realFetch as any;
+
+    const originalRequest = globalThis.Request;
+    globalThis.Request = class extends originalRequest {
+      constructor(input: any, init?: any) {
+        if (init?.signal) {
+          throw new Error('Signal unsupported in this environment');
+        }
+        super(input, init);
+      }
+    } as any;
+
+    try {
+      const client = new FetchApiClient('http://localhost:3000', mockLogger as unknown as ILogger);
+      const controller = new AbortController();
+      const res = await client.get('/api/test', { signal: controller.signal });
+      expect(res.data).toEqual({ ok: true });
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'AbortSignal unsupported by Request',
+        expect.objectContaining({ operation: 'get_safe_signal' })
+      );
+    } finally {
+      globalThis.Request = originalRequest;
+    }
+  });
+
+  it('resolveUrl returns url as-is when no baseUrl and does not start with slash', async () => {
+    const client = new FetchApiClient('');
+    const rawFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({ ok: true }),
+      json: async () => ({ ok: true }),
+    });
+    globalThis.fetch = rawFetch;
+    await client.get('http://external.domain/endpoint');
+    expect(rawFetch).toHaveBeenCalledWith('http://external.domain/endpoint', expect.anything());
   });
 });
 

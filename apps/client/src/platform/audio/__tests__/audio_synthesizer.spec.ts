@@ -598,6 +598,90 @@ describe('AudioSynthesizer', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('handles visibilitychange when hidden and visible, and pagehide lifecycle event', async () => {
+    const s = new AudioSynthesizer({ muted: false });
+    s.bootstrap();
+    const resumeSpy = vi.spyOn(s, 'resumeContext').mockResolvedValue(undefined);
+
+    // Trigger visibilitychange when hidden
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(resumeSpy).not.toHaveBeenCalled();
+
+    // Trigger visibilitychange when visible
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(resumeSpy).toHaveBeenCalled();
+
+    // Trigger pagehide
+    const disposeSpy = vi.spyOn(s, 'dispose');
+    window.dispatchEvent(new Event('pagehide'));
+    expect(disposeSpy).toHaveBeenCalled();
+
+    await s.dispose();
+  });
+
+  it('handles exceptions during dispose event listener removal gracefully', async () => {
+    const s = new AudioSynthesizer({ muted: false });
+    s.bootstrap();
+    const warnSpy = vi.spyOn(logger, 'warn');
+
+    vi.spyOn(document, 'removeEventListener').mockImplementation(() => {
+      throw new Error('document removeEventListener failure');
+    });
+    vi.spyOn(window, 'removeEventListener').mockImplementation(() => {
+      throw new Error('window removeEventListener failure');
+    });
+
+    await expect(s.dispose()).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to remove visibilitychange listener',
+      expect.objectContaining({ operation: 'audio_dispose' })
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to remove pagehide listener',
+      expect.objectContaining({ operation: 'audio_dispose' })
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to remove unlock listener',
+      expect.objectContaining({ operation: 'audio_dispose' })
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it('logs warning when window.addEventListener throws during unlock attachment', () => {
+    const s = new AudioSynthesizer({ muted: false });
+    const warnSpy = vi.spyOn(logger, 'warn');
+    vi.spyOn(window, 'addEventListener').mockImplementationOnce(() => {
+      throw new Error('addEventListener blocked by policy');
+    });
+
+    s.bootstrap();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to attach unlock listener',
+      expect.objectContaining({ operation: 'audio_attach_unlock_listener' })
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('logs warning when window.removeEventListener throws during user gesture unlock', () => {
+    const s = new AudioSynthesizer({ muted: false });
+    const warnSpy = vi.spyOn(logger, 'warn');
+    s.bootstrap();
+
+    vi.spyOn(window, 'removeEventListener').mockImplementation(() => {
+      throw new Error('removeEventListener blocked');
+    });
+
+    window.dispatchEvent(new Event('pointerdown'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to remove unlock listener',
+      expect.objectContaining({ operation: 'audio_remove_unlock_listener' })
+    );
+    warnSpy.mockRestore();
+  });
 });
 
 describe('NullAudioService', () => {

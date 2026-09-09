@@ -32,7 +32,7 @@ import {
 } from './platform/hardware';
 import { defaultLocalStorageProgressStore } from './features/scenarios';
 import { defaultLocalStoragePuzzleProgressStore } from './features/puzzles';
-import { LocalStorageUnifiedStore } from './features/portability/store/local_storage_unified.store';
+import { LocalStorageUnifiedStore } from './features/portability';
 
 // Storage Migration: Execute V1 to V2 schema migration prior to store mounting (CRIT-001)
 migrateStorageV1ToV2(safeLocalStorage);

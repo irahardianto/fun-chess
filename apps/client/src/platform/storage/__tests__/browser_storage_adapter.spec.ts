@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowserStorageAdapter } from '../browser_storage_adapter';
 import { InMemoryStorageAdapter } from '../in_memory_storage_adapter';
 import { createSafeStorage, safeLocalStorage, safeSessionStorage } from '../index';
-import { storageAlertDispatcher, isQuotaExceededError, type StorageQuotaAlertEvent } from '../storage_alert';
+import {
+  storageAlertDispatcher,
+  StorageAlertDispatcher,
+  isQuotaExceededError,
+  type StorageQuotaAlertEvent,
+} from '../storage_alert';
+import { logger } from '../../telemetry';
 
 describe('BrowserStorageAdapter', () => {
   let mockStore: Record<string, string>;
@@ -237,6 +243,47 @@ describe('BrowserStorageAdapter', () => {
     expect(adapter.isAvailable()).toBe(false);
     expect(adapter.getItem('missing')).toBeNull();
   });
+
+  it('probeAvailability and rawStorage handle undefined window gracefully', () => {
+    const origWindow = globalThis.window;
+    // @ts-expect-error simulating non-window
+    delete globalThis.window;
+    try {
+      const adapter = new BrowserStorageAdapter('localStorage');
+      expect(adapter.probeAvailability()).toBe(false);
+      expect((adapter as any).rawStorage).toBeNull();
+      expect(adapter.getItem('test')).toBeNull();
+    } finally {
+      globalThis.window = origWindow;
+    }
+  });
+
+  it('rawStorage returns null and logs debug when window property access throws', () => {
+    const adapter = new BrowserStorageAdapter('localStorage');
+    (adapter as any).available = true;
+    const debugSpy = vi.spyOn(logger, 'debug');
+
+    const origDesc = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', {
+      get() {
+        throw new Error('Access denied to window.localStorage');
+      },
+      configurable: true,
+    });
+
+    try {
+      expect((adapter as any).rawStorage).toBeNull();
+      expect(debugSpy).toHaveBeenCalledWith(
+        'Failed to access window storage property, falling back to memory',
+        expect.objectContaining({ operation: 'browser_storage_raw_access' })
+      );
+    } finally {
+      if (origDesc) {
+        Object.defineProperty(window, 'localStorage', origDesc);
+      }
+      debugSpy.mockRestore();
+    }
+  });
 });
 
 describe('FileReader Error Recovery Paths (MAJ-039)', () => {
@@ -331,11 +378,54 @@ describe('Storage Factory & Predicate', () => {
     expect(safeSessionStorage).toBeDefined();
   });
 
+  it('returns InMemoryStorageAdapter when window is undefined in createSafeStorage', () => {
+    const origWindow = globalThis.window;
+    // @ts-expect-error simulating SSR environment
+    delete globalThis.window;
+    try {
+      const storage = createSafeStorage('localStorage');
+      expect(storage).toBeInstanceOf(InMemoryStorageAdapter);
+    } finally {
+      globalThis.window = origWindow;
+    }
+  });
+
   it('detects quota exceeded errors across standard and non-standard runtimes', () => {
     expect(isQuotaExceededError(new DOMException('quota', 'QuotaExceededError'))).toBe(true);
     expect(isQuotaExceededError({ name: 'QuotaExceededError' })).toBe(true);
     expect(isQuotaExceededError({ name: 'NS_ERROR_DOM_QUOTA_REACHED' })).toBe(true);
+    expect(isQuotaExceededError({ code: 22 })).toBe(true);
+    expect(isQuotaExceededError({ code: 1014 })).toBe(true);
+    expect(isQuotaExceededError({ message: 'Error: QuotaExceededError in test' })).toBe(true);
     expect(isQuotaExceededError(new Error('Random error'))).toBe(false);
     expect(isQuotaExceededError(null)).toBe(false);
+    expect(isQuotaExceededError('string-primitive')).toBe(false);
+    expect(isQuotaExceededError(123)).toBe(false);
+  });
+
+  it('handles StorageAlertDispatcher listener throwing error during notify', () => {
+    const mockLogger = { debug: vi.fn(), warn: vi.fn(), info: vi.fn(), error: vi.fn() } as any;
+    const dispatcher = new StorageAlertDispatcher(mockLogger);
+    dispatcher.subscribe(() => {
+      throw new Error('Listener crash');
+    });
+
+    expect(() =>
+      dispatcher.notify({
+        type: 'STORAGE_QUOTA_EXCEEDED',
+        store: 'scenarios',
+        attemptedAction: 'save',
+        timestamp: Date.now(),
+        message: 'Quota exceeded',
+        suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+      })
+    ).not.toThrow();
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Error in storage alert listener',
+      expect.objectContaining({ operation: 'storage_alert_notify' })
+    );
+
+    dispatcher.clear();
   });
 });

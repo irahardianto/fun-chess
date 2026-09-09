@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PUZZLE_THEMES } from "./puzzle.js";
 
 /**
  * 4-letter alphanumeric room code schema.
@@ -69,11 +70,11 @@ export type PromotionPieceDto = z.infer<typeof PromotionPieceSchema>;
 
 /**
  * Public player representation schema.
- * All Player objects are strictly free of private credentials (CRIT-001).
+ * All Player objects are strictly free of private credentials (CRIT-001)
+ * and raw transport socket identifiers (ENH-001).
  */
 export const PlayerSchema = z.object({
   id: z.string().uuid("Player ID must be a valid UUID"),
-  socketId: z.string().min(1, "Socket ID must not be empty"),
   name: PlayerNameSchema,
   avatar: AvatarEmojiSchema,
   color: PieceColorSchema,
@@ -511,7 +512,9 @@ export const UrlSchema = z.preprocess(
 );
 
 /**
- * Server environment configuration validation schema.
+ * Server environment configuration validation schema (MIN-023).
+ * Canonical shared contract for server environment variables.
+ * Extended by server platform configuration (apps/server/src/platform/config/env.ts).
  */
 export const ServerEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -539,6 +542,18 @@ export const ServerEnvSchema = z.object({
     z.string().ip("HOST_IP must be a valid IP address").optional(),
   ),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
+  METRICS_SECRET: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  MAX_ROOMS: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce
+      .number()
+      .int()
+      .positive("MAX_ROOMS must be a positive integer")
+      .optional(),
+  ),
+  SESSION_SECRET: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  CLIENT_URL: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  CLIENT_DIST_PATH: z.preprocess(emptyStringToUndefined, z.string().optional()),
 });
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
 
@@ -600,10 +615,18 @@ export const AdaptiveRatingStateSchema = z.object({
 export type AdaptiveRatingStateDto = z.infer<typeof AdaptiveRatingStateSchema>;
 
 /**
+ * Authoritative schema for valid tactical and positional puzzle themes.
+ * Reconciled with PuzzleTheme union in puzzle.ts (MAJ-024).
+ */
+export const PuzzleThemeSchema = z.enum(PUZZLE_THEMES);
+export type PuzzleThemeDto = z.infer<typeof PuzzleThemeSchema>;
+
+/**
  * Theme mastery progress record schema.
+ * Constrains theme using PuzzleThemeSchema to eliminate schema drift (MAJ-024).
  */
 export const ThemeMasteryProgressSchema = z.object({
-  theme: z.string().min(1),
+  theme: PuzzleThemeSchema,
   attempted: z.number().int().nonnegative(),
   solved: z.number().int().nonnegative(),
   starsEarned: z.number().int().nonnegative(),

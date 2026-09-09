@@ -193,6 +193,16 @@ describe('ConfettiTrigger', () => {
     }).not.toThrow();
   });
 
+  it('handles canvas 2D context throwing error during canExecute check', () => {
+    const defaultTrigger = new ConfettiTrigger();
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementationOnce(() => {
+      throw new Error('Canvas allocation failure');
+    });
+
+    expect(() => defaultTrigger.triggerVictoryConfetti()).not.toThrow();
+    createElementSpy.mockRestore();
+  });
+
   it('exports triggerVictoryConfetti convenience function and defaultConfettiTrigger singleton', async () => {
     const { triggerVictoryConfetti, confettiTrigger, defaultConfettiTrigger } = await import('../confetti_trigger');
     expect(defaultConfettiTrigger).toBeDefined();

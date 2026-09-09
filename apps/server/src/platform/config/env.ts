@@ -63,6 +63,10 @@ export const ServerEnvSchema = BaseServerEnvSchema.extend({
     emptyStringToUndefined,
     z.coerce.number().int().positive().default(3),
   ),
+  METRICS_SECRET: z.preprocess(
+    emptyStringToUndefined,
+    z.string().optional(),
+  ),
 }).superRefine((val, ctx) => {
   if (val.NODE_ENV === "production") {
     if (!val.CORS_ORIGIN && !val.PUBLIC_URL && !val.CLIENT_URL) {
@@ -72,16 +76,6 @@ export const ServerEnvSchema = BaseServerEnvSchema.extend({
         message: "Either CORS_ORIGIN, PUBLIC_URL, or CLIENT_URL must be configured in production mode.",
       });
     }
-    if (val.CORS_ORIGIN) {
-      const origins = val.CORS_ORIGIN.split(",").map((s) => s.trim());
-      if (origins.includes("*")) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["CORS_ORIGIN"],
-          message: "Wildcard CORS_ORIGIN '*' is forbidden in production mode.",
-        });
-      }
-    }
     if (val.PUBLIC_URL) {
       const parsed = safeParseUrl(val.PUBLIC_URL);
       if (!parsed) {
@@ -90,6 +84,29 @@ export const ServerEnvSchema = BaseServerEnvSchema.extend({
           path: ["PUBLIC_URL"],
           message: "PUBLIC_URL must be a valid URL.",
         });
+      }
+    }
+  }
+  if (val.CORS_ORIGIN) {
+    const origins = val.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const origin of origins) {
+      if (origin === "*") {
+        if (val.NODE_ENV === "production") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["CORS_ORIGIN"],
+            message: "Wildcard CORS_ORIGIN '*' is forbidden in production mode.",
+          });
+        }
+      } else {
+        const parsed = safeParseUrl(origin);
+        if (!parsed || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["CORS_ORIGIN"],
+            message: `CORS_ORIGIN contains invalid origin URL: '${origin}'.`,
+          });
+        }
       }
     }
   }
@@ -145,19 +162,24 @@ export function resolveAllowedOrigins(env?: Partial<ServerEnv>): string[] {
     throw new Error("FATAL: CORS_ORIGIN, PUBLIC_URL, or CLIENT_URL must be configured in production mode.");
   }
   // Safe development fallbacks
-  return ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"];
+  return ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"];
 }
 
 /**
  * Checks whether an incoming origin header is allowed by the configured origin allowlist.
+ *
+ * Origin Policy Rationale (MIN-004):
+ * Requests without an Origin header (undefined) are permitted because they represent
+ * same-origin browser navigations, server-to-server calls, or non-browser HTTP clients
+ * (e.g. curl, container health probes) that do not enforce or send CORS headers.
+ * Cross-origin browser requests will always attach an Origin header.
  */
 export function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
-  if (!origin) return true; // Same-origin or non-browser/server-to-server request
+  if (!origin) return true; // Same-origin navigation or non-browser client (see rationale above)
   const normalizedOrigin = origin.trim().replace(/\/+$/, "").toLowerCase();
   return (
     allowedOrigins.includes("*") ||
     allowedOrigins.some((allowed) => {
-      if (allowed === "*") return true;
       const normalizedAllowed = allowed.trim().replace(/\/+$/, "").toLowerCase();
       return normalizedAllowed === normalizedOrigin;
     })

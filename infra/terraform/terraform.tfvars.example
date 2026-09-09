@@ -28,6 +28,6 @@ memory_limit = "512Mi"
 # Public URL (e.g. custom domain or pre-allocated Cloud Run domain)
 public_url = "https://fun-chess.example.com"
 
-# Allowed CORS origins (comma-separated list or "*", e.g. "https://fun-chess.example.com")
+# Allowed CORS origins (comma-separated list of valid HTTP/HTTPS origins, e.g. "https://fun-chess.example.com")
 cors_origin = "https://fun-chess.example.com"
 

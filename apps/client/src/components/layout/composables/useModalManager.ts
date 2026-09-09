@@ -12,7 +12,7 @@ export interface ConfirmationOptions {
   message: string;
   confirmButtonText?: string;
   cancelButtonText?: string;
-  variant?: 'primary' | 'danger';
+  variant?: 'primary' | 'danger' | 'warning';
   onConfirm: () => void;
 }
 
@@ -30,7 +30,7 @@ export function useModalManager(options?: ModalManagerOptions) {
   const confirmMessage = ref('');
   const confirmButtonText = ref('Confirm');
   const cancelButtonText = ref('Cancel');
-  const confirmVariant = ref<'primary' | 'danger'>('danger');
+  const confirmVariant = ref<'primary' | 'danger' | 'warning'>('danger');
   let pendingConfirmAction: (() => void) | null = null;
 
   function requestConfirmation(opts: ConfirmationOptions): void {

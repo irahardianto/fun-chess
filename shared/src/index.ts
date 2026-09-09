@@ -28,3 +28,6 @@ export * from "./utils/chess_evaluation.js";
 export * from "./utils/uci.js";
 export * from "./utils/game_over.js";
 export * from "./utils/star_calculator.js";
+export * from "./utils/coordinates.js";
+export * from "./utils/system_clock.js";
+export * from "./utils/normalization.js";

@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Puzzle } from '@fun-chess/shared';
-import { generateProgressiveHint } from '../hint_generator';
+import { createSafeChess } from '@fun-chess/shared';
+import {
+  generateProgressiveHint,
+  resolveHintPieceDetails,
+  formatHintByLevel,
+  type HintContext,
+} from '../hint_generator';
 import { logger } from '@/platform/telemetry';
 
 
@@ -156,6 +162,62 @@ describe('Progressive Hint Generator Engine', () => {
       })
     );
     debugSpy.mockRestore();
+  });
+
+  describe('resolveHintPieceDetails', () => {
+    it('resolves piece details for a valid piece square', () => {
+      const chess = createSafeChess(samplePuzzle.fen);
+      const details = resolveHintPieceDetails('a1', chess);
+      expect(details.pieceType).toBe('r');
+      expect(details.color).toBe('w');
+      expect(details.pieceName).toBe('Rook');
+    });
+
+    it('falls back to default Piece for an empty square', () => {
+      const chess = createSafeChess(samplePuzzle.fen);
+      const details = resolveHintPieceDetails('e4', chess);
+      expect(details.pieceName).toBe('Piece');
+      expect(details.pieceType).toBeUndefined();
+    });
+  });
+
+  describe('formatHintByLevel', () => {
+    const mockContext: HintContext = {
+      from: 'a1',
+      to: 'a8',
+      san: 'Ra8#',
+      expectedUci: 'a1a8',
+      pieceName: 'Rook',
+      themeIcon: '👑',
+      tacticalObjective: 'Deliver checkmate',
+    };
+
+    it('formats level 1 hint correctly', () => {
+      const hint = formatHintByLevel(1, mockContext);
+      expect(hint.level).toBe(1);
+      expect(hint.tier).toBe('piece_nudge');
+      expect(hint.sourceSquare).toBe('a1');
+    });
+
+    it('formats level 2 hint correctly', () => {
+      const hint = formatHintByLevel(2, mockContext);
+      expect(hint.level).toBe(2);
+      expect(hint.tier).toBe('target_glow');
+      expect(hint.targetSquare).toBe('a8');
+    });
+
+    it('formats level 3 hint correctly', () => {
+      const hint = formatHintByLevel(3, mockContext);
+      expect(hint.level).toBe(3);
+      expect(hint.tier).toBe('full_solution');
+      expect(hint.solutionSan).toBe('Ra8#');
+    });
+
+    it('formats default / level 0 hint correctly', () => {
+      const hint = formatHintByLevel(0, mockContext);
+      expect(hint.level).toBe(0);
+      expect(hint.tier).toBe('none');
+    });
   });
 });
 

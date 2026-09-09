@@ -2,14 +2,21 @@ import { test, expect, type Browser, type BrowserContext } from '@playwright/tes
 import { LobbyPage, GamePage } from '../src/index.js';
 
 let clientIpCounter = 1;
-function newIsolatedContext(browser: Browser): Promise<BrowserContext> {
+async function newIsolatedContext(browser: Browser): Promise<BrowserContext> {
   const ip = `10.42.${Math.floor(clientIpCounter / 250)}.${(clientIpCounter % 250) + 1}`;
   clientIpCounter++;
-  return browser.newContext({
+  const context = await browser.newContext({
     extraHTTPHeaders: {
       'x-forwarded-for': ip,
     },
   });
+  await context.addInitScript(() => {
+    window.localStorage.setItem(
+      'fun_chess_pwa_install_snoozed_until',
+      String(Date.now() + 86400000),
+    );
+  });
+  return context;
 }
 
 test.describe('Multiplayer LAN / Online Journey', () => {
@@ -203,6 +210,87 @@ test.describe('Multiplayer LAN / Online Journey', () => {
 
       await expect(hostPage.locator('.banner-headline')).toContainText('Draw');
       await expect(guestPage.locator('.banner-headline')).toContainText('Draw');
+    } finally {
+      await hostContext.close();
+      await guestContext.close();
+    }
+  });
+
+  test('handles draw offer declined flow and continues active gameplay', async ({ browser }) => {
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
+
+    const hostPage = await hostContext.newPage();
+    const guestPage = await guestContext.newPage();
+
+    try {
+      const hostLobby = new LobbyPage(hostPage);
+      const guestLobby = new LobbyPage(guestPage);
+      const hostGame = new GamePage(hostPage);
+      const guestGame = new GamePage(guestPage);
+
+      // 1. Host creates room, Guest joins via 4-character room code
+      await hostLobby.goto();
+      await hostLobby.hostGame('DeclineHost', 'w');
+      const roomCode = await hostLobby.getRoomCode();
+
+      await guestLobby.goto();
+      await guestLobby.joinGame('DeclineGuest', roomCode);
+
+      // 2. Both players transition to the game arena and match begins in 'playing' status
+      await Promise.all([
+        hostGame.waitForArena(),
+        guestGame.waitForArena(),
+      ]);
+
+      await expect(hostPage.locator('[data-testid="game-arena-container"]')).toBeVisible();
+      await expect(guestPage.locator('[data-testid="game-arena-container"]')).toBeVisible();
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 15_000 });
+
+      // 3. Move 1: Host plays e2 -> e4, Guest responds e7 -> e5
+      await hostGame.makeMove('e2', 'e4');
+      await expect(guestPage.locator('[data-square="e4"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(guestPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+
+      await guestGame.makeMove('e7', 'e5');
+      await expect(hostPage.locator('[data-square="e5"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+
+      // 4. Host proposes a draw via the UI ("Offer draw" button)
+      await hostGame.offerDraw();
+
+      // Verify Host receives confirmation banner / notification indicating draw offer was sent
+      const hostNotification = hostPage.locator('[data-testid="app-notification-banner"]');
+      await expect(hostNotification).toBeVisible({ timeout: 10_000 });
+      await expect(hostNotification).toContainText(/draw offer sent/i);
+
+      // 5. Guest receives incoming draw offer prompt and clicks "Decline draw"
+      const guestDrawBanner = guestPage.locator('.draw-offer-banner');
+      await expect(guestDrawBanner).toBeVisible({ timeout: 10_000 });
+      await expect(guestDrawBanner).toContainText('offered a peaceful draw!');
+
+      const declineDrawBtn = guestPage.locator('.draw-offer-banner button:has-text("Decline draw")');
+      await expect(declineDrawBtn).toBeVisible({ timeout: 5_000 });
+      await declineDrawBtn.click();
+
+      // 6. Verify draw offer prompt is dismissed on Guest
+      await expect(guestDrawBanner).not.toBeVisible({ timeout: 10_000 });
+
+      // 7. Verify match remains in active playing status with board active and no game over dialog
+      await expect(hostPage.locator('[data-testid="game-arena-container"]')).toBeVisible();
+      await expect(guestPage.locator('[data-testid="game-arena-container"]')).toBeVisible();
+      await expect(hostPage.locator('[data-testid="request-rematch-btn"]')).not.toBeVisible();
+      await expect(guestPage.locator('[data-testid="request-rematch-btn"]')).not.toBeVisible();
+
+      // Turn indicator remains active for Host (White's turn)
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
+
+      // 8. Verify game continues with move progression: Host plays g1 -> f3
+      await hostGame.makeMove('g1', 'f3');
+
+      // Guest verifies board reflects g1 -> f3 and turn transfers to Black
+      await expect(guestPage.locator('[data-square="f3"] [data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
+      await expect(guestPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 10_000 });
     } finally {
       await hostContext.close();
       await guestContext.close();

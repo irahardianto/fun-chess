@@ -2,14 +2,14 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue';
 import type { StarRating, Puzzle, PuzzleAttemptResult, PuzzleAnalysisResult } from '@fun-chess/shared';
 import { BaseModal, BaseButton } from '@/components/base';
-import { useConfetti } from '@/composables';
+import { useConfetti } from '@/composables/useConfetti';
 import {
   PuzzleCelebrationHeader,
   PuzzleCoachBreakdown,
   PuzzleReplayToolbar,
   PuzzleStatsDisplay,
   PuzzleDockedBar,
-} from './completion/index.js';
+} from './completion';
 
 interface Props {
   modelValue?: boolean;

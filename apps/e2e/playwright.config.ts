@@ -14,7 +14,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: process.env.CI ? 'github' : 'list',
+  reporter: process.env.CI
+    ? [['github'], ['html', { outputFolder: 'playwright-report', open: 'never' }]]
+    : 'list',
   timeout: 60_000,
   expect: {
     timeout: 10_000,
@@ -37,7 +39,7 @@ export default defineConfig({
       testMatch: ['**/*.e2e.test.ts', '**/*.spec.ts'],
       use: {
         ...devices['Desktop Chrome'],
-        channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
+        ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}),
       },
     },
     {
@@ -46,7 +48,7 @@ export default defineConfig({
       testMatch: ['**/*.e2e.test.ts', '**/*.spec.ts'],
       use: {
         ...devices['Pixel 5'],
-        channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
+        ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}),
       },
     },
   ],

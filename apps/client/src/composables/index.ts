@@ -21,6 +21,7 @@ export * from '../features/lobby/useLanDiscovery';
 
 // Multimedia & Sensory Effects
 export * from './useAudio';
+export * from './useHaptics';
 export * from './useConfetti';
 
 // Platform & Hardware Integrations

@@ -1,6 +1,7 @@
 import type { PieceColor, IClock, IIdGenerator } from "@fun-chess/shared";
 import { SessionRecord, SessionRegistry } from "./session_registry.js";
 import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
+import { type Logger, defaultLogger } from "../../platform/logger/index.js";
 
 /**
  * In-memory production implementation of SessionRegistry.
@@ -21,6 +22,7 @@ export class InMemorySessionRegistry implements SessionRegistry {
   constructor(
     private readonly clock: IClock = new SystemClock(),
     private readonly idGenerator: IIdGenerator = new UuidGenerator(),
+    private readonly logger: Logger = defaultLogger,
   ) {}
 
   public now(): number {
@@ -65,6 +67,13 @@ export class InMemorySessionRegistry implements SessionRegistry {
     // Index by room + player
     this.playerIndex.set(`${code}:${params.playerId}`, sessionToken);
 
+    this.logger.debug("Session created", {
+      operation: "session_storage_create",
+      roomCode: code,
+      playerId: params.playerId,
+      sessionToken,
+    });
+
     return structuredClone(record);
   }
 
@@ -105,12 +114,6 @@ export class InMemorySessionRegistry implements SessionRegistry {
     return structuredClone(record);
   }
 
-  public async findSessionByToken(
-    sessionToken: string,
-  ): Promise<SessionRecord | null> {
-    return this.getSessionByToken(sessionToken);
-  }
-
   public async getSessionTokenForPlayer(
     roomCode: string,
     playerId: string,
@@ -144,6 +147,11 @@ export class InMemorySessionRegistry implements SessionRegistry {
       record.socketId = newSocketId;
       record.lastSeenAt = now;
       record.expiresAt = now + (extensionTtlMs ?? this.DEFAULT_TTL_MS);
+      this.logger.debug("Session touched", {
+        operation: "session_storage_touch",
+        sessionToken,
+        newSocketId,
+      });
     }
   }
 
@@ -159,6 +167,12 @@ export class InMemorySessionRegistry implements SessionRegistry {
       if (record) {
         record.color = newColor;
         record.lastSeenAt = this.clock.now();
+        this.logger.debug("Session color updated", {
+          operation: "session_storage_update_color",
+          roomCode: code,
+          playerId,
+          newColor,
+        });
       }
     }
   }
@@ -224,6 +238,12 @@ export class InMemorySessionRegistry implements SessionRegistry {
         cleaned++;
       }
     }
+
+    this.logger.debug("Expired sessions cleaned up", {
+      operation: "session_storage_cleanup_expired",
+      cleanedCount: cleaned,
+    });
+
     return cleaned;
   }
 

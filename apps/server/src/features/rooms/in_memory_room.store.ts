@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { RoomState, IClock, IIdGenerator } from "@fun-chess/shared";
-import { RoomStore, RoomMutator } from "./room.store.js";
+import { RoomStore, RoomMutator, MAX_ROOMS } from "./room.store.js";
 import {
   RoomNotFoundError,
   OptimisticLockConflictError,
@@ -9,11 +9,22 @@ import {
   RoomAlreadyExistsError,
   StaleLockExecutionError,
   RoomCapacityExceededError,
+  RoomBusyError,
 } from "./room.errors.js";
 import { SystemClock } from "../../platform/time/index.js";
 import { type Logger, defaultLogger } from "../../platform/logger/index.js";
 
-export const MAX_ROOMS = 10_000;
+export { MAX_ROOMS };
+
+export interface InMemoryRoomStoreOptions {
+  clock?: IClock;
+  logger?: Logger;
+  maxRooms?: number;
+  maxCancelledTickets?: number;
+  lockTimeoutMs?: number;
+  executionTimeoutMs?: number;
+  maxQueueDepth?: number;
+}
 
 export interface LockContext {
   roomCode: string;
@@ -48,26 +59,49 @@ export class InMemoryRoomStore implements RoomStore {
   private readonly cancelledTickets = new Set<number>();
   private readonly lockContextStorage = new AsyncLocalStorage<LockContext>();
 
-  public readonly MAX_CANCELLED_TICKETS = 5_000;
+  public readonly MAX_CANCELLED_TICKETS: number;
 
   private trackCancelledTicket(ticket: number): void {
     this.cancelledTickets.add(ticket);
-    if (this.cancelledTickets.size > this.MAX_CANCELLED_TICKETS) {
+    while (this.cancelledTickets.size > this.MAX_CANCELLED_TICKETS) {
       const oldest = this.cancelledTickets.values().next().value;
-      if (oldest !== undefined) {
-        this.cancelledTickets.delete(oldest);
-      }
+      if (oldest === undefined) break;
+      this.cancelledTickets.delete(oldest);
     }
   }
 
-  public LOCK_TIMEOUT_MS = 5000;
-  public EXECUTION_TIMEOUT_MS = 5000;
-  public maxRooms: number = MAX_ROOMS;
+  public LOCK_TIMEOUT_MS: number;
+  public EXECUTION_TIMEOUT_MS: number;
+  public maxRooms: number;
+  public maxQueueDepth: number;
   private readonly clock: IClock;
   private readonly logger: Logger;
 
+  constructor(options?: InMemoryRoomStoreOptions);
   constructor(
     clockOrLogger?: IClock | Logger,
+    idGenerator?: IIdGenerator,
+    optionsOrLogger?:
+      | Logger
+      | {
+          lockTimeoutMs?: number;
+          executionTimeoutMs?: number;
+          maxRooms?: number;
+          maxCancelledTickets?: number;
+          maxQueueDepth?: number;
+          logger?: Logger;
+        },
+    options?: {
+      lockTimeoutMs?: number;
+      executionTimeoutMs?: number;
+      maxRooms?: number;
+      maxCancelledTickets?: number;
+      maxQueueDepth?: number;
+      logger?: Logger;
+    },
+  );
+  constructor(
+    clockOrLoggerOrOptions?: IClock | Logger | InMemoryRoomStoreOptions,
     _idGenerator?: IIdGenerator,
     optionsOrLogger?:
       | Logger
@@ -75,26 +109,57 @@ export class InMemoryRoomStore implements RoomStore {
           lockTimeoutMs?: number;
           executionTimeoutMs?: number;
           maxRooms?: number;
+          maxCancelledTickets?: number;
+          maxQueueDepth?: number;
           logger?: Logger;
         },
     options?: {
       lockTimeoutMs?: number;
       executionTimeoutMs?: number;
       maxRooms?: number;
+      maxCancelledTickets?: number;
+      maxQueueDepth?: number;
       logger?: Logger;
     },
   ) {
-    let resolvedLogger: Logger | undefined;
+    let resolvedClock: IClock = new SystemClock();
+    let resolvedLogger: Logger = defaultLogger;
+    let resolvedMaxRooms: number = MAX_ROOMS;
+    let resolvedMaxCancelled: number = 5_000;
+    let resolvedLockTimeout: number = 5_000;
+    let resolvedExecutionTimeout: number = 5_000;
+    let resolvedMaxQueueDepth: number = 100;
+
     if (
-      clockOrLogger &&
-      "info" in clockOrLogger &&
-      typeof clockOrLogger.info === "function" &&
-      !("now" in clockOrLogger)
+      clockOrLoggerOrOptions &&
+      typeof clockOrLoggerOrOptions === "object" &&
+      !("now" in clockOrLoggerOrOptions) &&
+      !("info" in clockOrLoggerOrOptions)
     ) {
-      resolvedLogger = clockOrLogger as Logger;
-      this.clock = new SystemClock();
+      const opts = clockOrLoggerOrOptions as InMemoryRoomStoreOptions;
+      if (opts.clock) resolvedClock = opts.clock;
+      if (opts.logger) resolvedLogger = opts.logger;
+      if (opts.maxRooms !== undefined) resolvedMaxRooms = opts.maxRooms;
+      if (opts.maxCancelledTickets !== undefined)
+        resolvedMaxCancelled = opts.maxCancelledTickets;
+      if (opts.lockTimeoutMs !== undefined)
+        resolvedLockTimeout = opts.lockTimeoutMs;
+      if (opts.executionTimeoutMs !== undefined)
+        resolvedExecutionTimeout = opts.executionTimeoutMs;
+      if (opts.maxQueueDepth !== undefined)
+        resolvedMaxQueueDepth = opts.maxQueueDepth;
     } else {
-      this.clock = (clockOrLogger as IClock) ?? new SystemClock();
+      if (
+        clockOrLoggerOrOptions &&
+        "info" in clockOrLoggerOrOptions &&
+        typeof clockOrLoggerOrOptions.info === "function" &&
+        !("now" in clockOrLoggerOrOptions)
+      ) {
+        resolvedLogger = clockOrLoggerOrOptions as Logger;
+      } else if (clockOrLoggerOrOptions && "now" in clockOrLoggerOrOptions) {
+        resolvedClock = clockOrLoggerOrOptions as IClock;
+      }
+
       if (optionsOrLogger) {
         if (
           "info" in optionsOrLogger &&
@@ -106,26 +171,44 @@ export class InMemoryRoomStore implements RoomStore {
             lockTimeoutMs?: number;
             executionTimeoutMs?: number;
             maxRooms?: number;
+            maxCancelledTickets?: number;
+            maxQueueDepth?: number;
             logger?: Logger;
           };
           if (opts.lockTimeoutMs !== undefined)
-            this.LOCK_TIMEOUT_MS = opts.lockTimeoutMs;
+            resolvedLockTimeout = opts.lockTimeoutMs;
           if (opts.executionTimeoutMs !== undefined)
-            this.EXECUTION_TIMEOUT_MS = opts.executionTimeoutMs;
-          if (opts.maxRooms !== undefined) this.maxRooms = opts.maxRooms;
+            resolvedExecutionTimeout = opts.executionTimeoutMs;
+          if (opts.maxRooms !== undefined) resolvedMaxRooms = opts.maxRooms;
+          if (opts.maxCancelledTickets !== undefined)
+            resolvedMaxCancelled = opts.maxCancelledTickets;
+          if (opts.maxQueueDepth !== undefined)
+            resolvedMaxQueueDepth = opts.maxQueueDepth;
           if (opts.logger) resolvedLogger = opts.logger;
         }
       }
+
+      if (options) {
+        if (options.lockTimeoutMs !== undefined)
+          resolvedLockTimeout = options.lockTimeoutMs;
+        if (options.executionTimeoutMs !== undefined)
+          resolvedExecutionTimeout = options.executionTimeoutMs;
+        if (options.maxRooms !== undefined) resolvedMaxRooms = options.maxRooms;
+        if (options.maxCancelledTickets !== undefined)
+          resolvedMaxCancelled = options.maxCancelledTickets;
+        if (options.maxQueueDepth !== undefined)
+          resolvedMaxQueueDepth = options.maxQueueDepth;
+        if (options.logger) resolvedLogger = options.logger;
+      }
     }
-    if (options) {
-      if (options.lockTimeoutMs !== undefined)
-        this.LOCK_TIMEOUT_MS = options.lockTimeoutMs;
-      if (options.executionTimeoutMs !== undefined)
-        this.EXECUTION_TIMEOUT_MS = options.executionTimeoutMs;
-      if (options.maxRooms !== undefined) this.maxRooms = options.maxRooms;
-      if (options.logger) resolvedLogger = options.logger;
-    }
-    this.logger = resolvedLogger ?? defaultLogger;
+
+    this.clock = resolvedClock;
+    this.logger = resolvedLogger;
+    this.maxRooms = resolvedMaxRooms;
+    this.MAX_CANCELLED_TICKETS = resolvedMaxCancelled;
+    this.LOCK_TIMEOUT_MS = resolvedLockTimeout;
+    this.EXECUTION_TIMEOUT_MS = resolvedExecutionTimeout;
+    this.maxQueueDepth = resolvedMaxQueueDepth;
   }
 
   private indexSockets(room: RoomState): void {
@@ -232,9 +315,200 @@ export class InMemoryRoomStore implements RoomStore {
     return null;
   }
 
+  /**
+   * Enqueues and acquires exclusive access for a room code within acquisition timeout.
+   * Enforces queue-depth circuit breaker limit (ENH-004, ENH-013).
+   */
+  private async acquireLock(
+    code: string,
+    ticket: number,
+    correlationId?: string,
+  ): Promise<{ acquiredAt: number; releaseSignal: () => void }> {
+    let entry = this.lockQueues.get(code);
+
+    if (entry && entry.waitersCount >= this.maxQueueDepth) {
+      this.trackCancelledTicket(ticket);
+      this.logger.warn("Lock acquisition rejected: queue depth limit exceeded", {
+        operation: "room_lock_queue_depth_exceeded",
+        roomCode: code,
+        waitersCount: entry.waitersCount,
+        maxQueueDepth: this.maxQueueDepth,
+        ticket,
+        ...(correlationId ? { correlationId } : {}),
+      });
+      throw new RoomBusyError(code, this.maxQueueDepth);
+    }
+
+    if (!entry) {
+      entry = { tail: Promise.resolve(), waitersCount: 0 };
+      this.lockQueues.set(code, entry);
+    }
+
+    entry.waitersCount++;
+    const prevTail = entry.tail;
+
+    let releaseSignal!: () => void;
+    const currentLock = new Promise<void>((resolve) => {
+      releaseSignal = resolve;
+    });
+
+    entry.tail = prevTail.then(
+      () => currentLock,
+      () => currentLock,
+    );
+
+    let acquireTimer: NodeJS.Timeout | undefined;
+    try {
+      // 1. Lock Acquisition Race (5000ms acquisition timeout)
+      await Promise.race([
+        prevTail,
+        new Promise<never>((_, reject) => {
+          acquireTimer = setTimeout(() => {
+            this.trackCancelledTicket(ticket);
+            this.logger.warn("Lock acquisition timed out", {
+              operation: "room_lock_acquire_timeout",
+              roomCode: code,
+              ticket,
+              ...(correlationId ? { correlationId } : {}),
+            });
+            reject(new LockTimeoutError(code, this.LOCK_TIMEOUT_MS));
+          }, this.LOCK_TIMEOUT_MS);
+        }),
+      ]);
+
+      const acquiredAt = performance.now();
+      this.activeTickets.set(code, ticket);
+      this.logger.debug("Lock acquired", {
+        operation: "room_lock_acquired",
+        roomCode: code,
+        ticket,
+        ...(correlationId ? { correlationId } : {}),
+      });
+
+      return { acquiredAt, releaseSignal };
+    } catch (err) {
+      // Invalidate ticket on timeout before acquisition (CRIT-002)
+      this.trackCancelledTicket(ticket);
+      prevTail.finally(() => {
+        releaseSignal();
+        const currentEntry = this.lockQueues.get(code);
+        if (currentEntry) {
+          currentEntry.waitersCount--;
+          if (currentEntry.waitersCount <= 0) {
+            this.lockQueues.delete(code);
+          }
+        }
+      });
+      throw err;
+    } finally {
+      if (acquireTimer) clearTimeout(acquireTimer);
+    }
+  }
+
+  /**
+   * Executes an action under lock within the execution timeout boundary.
+   * Absorbs orphaned promise rejections on execution timeout (CRIT-002, MAJ-005, ENH-013).
+   */
+  private async executeWithTimeout<T>(
+    code: string,
+    ticket: number,
+    context: LockContext,
+    acquiredAt: number,
+    action: (context?: LockContext) => Promise<T>,
+    correlationId?: string,
+  ): Promise<T> {
+    let executionTimer: NodeJS.Timeout | undefined;
+    let timedOut = false;
+
+    try {
+      const executionTimeoutPromise = new Promise<never>((_, reject) => {
+        executionTimer = setTimeout(() => {
+          timedOut = true;
+          this.trackCancelledTicket(ticket);
+          if (this.activeTickets.get(code) === ticket) {
+            this.activeTickets.delete(code);
+          }
+          const holdDurationMs = Math.round(performance.now() - acquiredAt);
+          this.logger.warn("Lock execution timed out", {
+            operation: "room_lock_execution_timeout",
+            roomCode: code,
+            ticket,
+            duration: holdDurationMs,
+            durationMs: holdDurationMs,
+            ...(correlationId ? { correlationId } : {}),
+          });
+          reject(
+            new LockExecutionTimeoutError(code, this.EXECUTION_TIMEOUT_MS),
+          );
+        }, this.EXECUTION_TIMEOUT_MS);
+      });
+
+      const actionPromise = this.lockContextStorage.run(context, () =>
+        action(context),
+      );
+
+      // Absorb post-timeout rejections to prevent unhandled promise rejection (CRIT-002)
+      actionPromise.catch((err) => {
+        if (timedOut) {
+          this.logger.warn(
+            "Orphaned lock action rejected after execution timeout",
+            {
+              operation: "room_lock_orphaned_action_rejection",
+              roomCode: code,
+              ticket,
+              ...(correlationId ? { correlationId } : {}),
+              error:
+                err instanceof Error
+                  ? { name: err.name, message: err.message, stack: err.stack }
+                  : { raw: err },
+            },
+          );
+        }
+      });
+
+      return await Promise.race([actionPromise, executionTimeoutPromise]);
+    } finally {
+      if (executionTimer) clearTimeout(executionTimer);
+    }
+  }
+
+  /**
+   * Releases an acquired exclusive lock, clearing active ticket and unblocking queue (ENH-013).
+   */
+  private releaseLock(
+    code: string,
+    ticket: number,
+    acquiredAt: number,
+    releaseSignal: () => void,
+    correlationId?: string,
+  ): void {
+    const holdDurationMs = Math.round(performance.now() - acquiredAt);
+    if (this.activeTickets.get(code) === ticket) {
+      this.activeTickets.delete(code);
+    }
+    this.logger?.debug("Lock released", {
+      operation: "room_lock_released",
+      roomCode: code,
+      ticket,
+      duration: holdDurationMs,
+      durationMs: holdDurationMs,
+      ...(correlationId ? { correlationId } : {}),
+    });
+    releaseSignal();
+    const currentEntry = this.lockQueues.get(code);
+    if (currentEntry) {
+      currentEntry.waitersCount--;
+      if (currentEntry.waitersCount <= 0) {
+        // Prevent memory leak: purge drained queue
+        this.lockQueues.delete(code);
+      }
+    }
+  }
+
   public async withLock<T>(
     roomCode: string,
     action: (context?: LockContext) => Promise<T>,
+    correlationId?: string,
   ): Promise<T> {
     const code = roomCode.toUpperCase();
     const currentContext = this.lockContextStorage.getStore();
@@ -258,195 +532,95 @@ export class InMemoryRoomStore implements RoomStore {
       operation: "room_lock_acquire_requested",
       roomCode: code,
       ticket,
+      ...(correlationId ? { correlationId } : {}),
     });
 
-    let entry = this.lockQueues.get(code);
+    const acquired = await this.acquireLock(code, ticket, correlationId);
 
-    if (!entry) {
-      entry = { tail: Promise.resolve(), waitersCount: 0 };
-      this.lockQueues.set(code, entry);
-    }
-
-    entry.waitersCount++;
-    const prevTail = entry.tail;
-
-    let releaseLock!: () => void;
-    const currentLock = new Promise<void>((resolve) => {
-      releaseLock = resolve;
-    });
-
-    entry.tail = prevTail.then(
-      () => currentLock,
-      () => currentLock,
-    );
-
-    let acquireTimer: NodeJS.Timeout | undefined;
-    let executionTimer: NodeJS.Timeout | undefined;
-    let acquired = false;
-    let timedOut = false;
     try {
-      // 1. Lock Acquisition Race (5000ms acquisition timeout)
-      await Promise.race([
-        prevTail,
-        new Promise((_, reject) => {
-          acquireTimer = setTimeout(() => {
-            this.trackCancelledTicket(ticket);
-            this.logger.warn("Lock acquisition timed out", {
-              operation: "room_lock_acquire_timeout",
-              roomCode: code,
-              ticket,
-            });
-            reject(new LockTimeoutError(code, this.LOCK_TIMEOUT_MS));
-          }, this.LOCK_TIMEOUT_MS);
-        }),
-      ]);
-      acquired = true;
-      if (acquireTimer) clearTimeout(acquireTimer);
-
-      this.activeTickets.set(code, ticket);
-      this.logger.debug("Lock acquired", {
-        operation: "room_lock_acquired",
-        roomCode: code,
+      return await this.executeWithTimeout(
+        code,
         ticket,
-      });
-
-      // 2. Lock Execution Race (5000ms execution timeout) — MAJ-005, CRIT-002
-      const executionTimeoutPromise = new Promise<never>((_, reject) => {
-        executionTimer = setTimeout(() => {
-          timedOut = true;
-          this.trackCancelledTicket(ticket);
-          if (this.activeTickets.get(code) === ticket) {
-            this.activeTickets.delete(code);
-          }
-          this.logger.warn("Lock execution timed out", {
-            operation: "room_lock_execution_timeout",
-            roomCode: code,
-            ticket,
-          });
-          reject(
-            new LockExecutionTimeoutError(code, this.EXECUTION_TIMEOUT_MS),
-          );
-        }, this.EXECUTION_TIMEOUT_MS);
-      });
-
-      const actionPromise = this.lockContextStorage.run(context, () =>
-        action(context),
+        context,
+        acquired.acquiredAt,
+        action,
+        correlationId,
       );
-
-      // Absorb post-timeout rejections to prevent unhandled promise rejection (CRIT-002)
-      actionPromise.catch((err) => {
-        if (timedOut) {
-          this.logger.warn(
-            "Orphaned lock action rejected after execution timeout",
-            {
-              operation: "room_lock_orphaned_action_rejection",
-              roomCode: code,
-              ticket,
-              error:
-                err instanceof Error
-                  ? { name: err.name, message: err.message, stack: err.stack }
-                  : { raw: err },
-            },
-          );
-        }
-      });
-
-      return await Promise.race([actionPromise, executionTimeoutPromise]);
     } finally {
-      if (acquireTimer) clearTimeout(acquireTimer);
-      if (executionTimer) clearTimeout(executionTimer);
-      if (acquired) {
-        if (this.activeTickets.get(code) === ticket) {
-          this.activeTickets.delete(code);
-        }
-        this.logger?.debug("Lock released", {
-          operation: "room_lock_released",
-          roomCode: code,
-          ticket,
-        });
-        releaseLock();
-        const currentEntry = this.lockQueues.get(code);
-        if (currentEntry) {
-          currentEntry.waitersCount--;
-          if (currentEntry.waitersCount <= 0) {
-            // Prevent memory leak: purge drained queue
-            this.lockQueues.delete(code);
-          }
-        }
-      } else {
-        // CRIT-002: Invalidate ticket on timeout before acquisition
-        this.trackCancelledTicket(ticket);
-        prevTail.finally(() => {
-          releaseLock();
-          const currentEntry = this.lockQueues.get(code);
-          if (currentEntry) {
-            currentEntry.waitersCount--;
-            if (currentEntry.waitersCount <= 0) {
-              this.lockQueues.delete(code);
-            }
-          }
-        });
-      }
+      this.releaseLock(
+        code,
+        ticket,
+        acquired.acquiredAt,
+        acquired.releaseSignal,
+        correlationId,
+      );
     }
   }
 
   public async mutate<T>(
     roomCode: string,
     mutator: RoomMutator<T>,
+    correlationId?: string,
   ): Promise<T> {
-    return this.withLock(roomCode, async (context) => {
-      const code = roomCode.toUpperCase();
-      this.assertTicketValid(code, context);
+    return this.withLock(
+      roomCode,
+      async (context) => {
+        const code = roomCode.toUpperCase();
+        this.assertTicketValid(code, context);
 
-      const existing = this.rooms.get(code);
-      if (!existing) {
-        throw new RoomNotFoundError(code);
-      }
+        const existing = this.rooms.get(code);
+        if (!existing) {
+          throw new RoomNotFoundError(code);
+        }
 
-      const clone = structuredClone(existing);
-      const expectedVersion = clone.version || 1;
+        const clone = structuredClone(existing);
+        const expectedVersion = clone.version || 1;
 
-      this.logger?.debug("Room mutation started", {
-        operation: "room_mutate_started",
-        roomCode: code,
-        expectedVersion,
-        ticket: context?.ticket,
-      });
+        this.logger?.debug("Room mutation started", {
+          operation: "room_mutate_started",
+          roomCode: code,
+          expectedVersion,
+          ticket: context?.ticket,
+          ...(correlationId ? { correlationId } : {}),
+        });
 
-      const { updatedRoom, result } = await mutator(clone);
+        const { updatedRoom, result } = await mutator(clone);
 
-      // Re-assert ticket is still valid after mutator resolves (CRIT-002)
-      this.assertTicketValid(code, context);
+        // Re-assert ticket is still valid after mutator resolves (CRIT-002)
+        this.assertTicketValid(code, context);
 
-      if (updatedRoom.roomCode.toUpperCase() !== code) {
-        throw new Error(
-          `Mutation cannot alter roomCode: expected ${code}, received ${updatedRoom.roomCode}`,
-        );
-      }
+        if (updatedRoom.roomCode.toUpperCase() !== code) {
+          throw new Error(
+            `Mutation cannot alter roomCode: expected ${code}, received ${updatedRoom.roomCode}`,
+          );
+        }
 
-      // Increment version and persist
-      const nextVersion = expectedVersion + 1;
-      const roomToSave: RoomState = {
-        ...structuredClone(updatedRoom),
-        version: nextVersion,
-        lastActivityAt:
-          updatedRoom.lastActivityAt !== existing.lastActivityAt
-            ? updatedRoom.lastActivityAt
-            : this.clock.now(),
-      };
+        // Increment version and persist
+        const nextVersion = expectedVersion + 1;
+        const roomToSave: RoomState = {
+          ...structuredClone(updatedRoom),
+          version: nextVersion,
+          lastActivityAt:
+            updatedRoom.lastActivityAt !== existing.lastActivityAt
+              ? updatedRoom.lastActivityAt
+              : this.clock.now(),
+        };
 
-      this.rooms.set(code, roomToSave);
-      this.indexSockets(roomToSave);
+        this.rooms.set(code, roomToSave);
+        this.indexSockets(roomToSave);
 
-      this.logger?.debug("Room mutation completed", {
-        operation: "room_mutate_completed",
-        roomCode: code,
-        nextVersion,
-        ticket: context?.ticket,
-      });
+        this.logger?.debug("Room mutation completed", {
+          operation: "room_mutate_completed",
+          roomCode: code,
+          nextVersion,
+          ticket: context?.ticket,
+          ...(correlationId ? { correlationId } : {}),
+        });
 
-      return result;
-    });
+        return result;
+      },
+      correlationId,
+    );
   }
 
   public async save(room: RoomState, expectedVersion?: number): Promise<void> {
@@ -481,6 +655,12 @@ export class InMemoryRoomStore implements RoomStore {
 
     this.rooms.set(code, roomToSave);
     this.indexSockets(roomToSave);
+
+    this.logger.debug("Room saved to storage", {
+      operation: "room_storage_save",
+      roomCode: code,
+      version: nextVersion,
+    });
   }
 
   public async createIfAbsent(room: RoomState): Promise<void> {
@@ -499,6 +679,12 @@ export class InMemoryRoomStore implements RoomStore {
       };
       this.rooms.set(code, roomToSave);
       this.indexSockets(roomToSave);
+
+      this.logger.debug("Room created in storage", {
+        operation: "room_storage_create",
+        roomCode: code,
+        version: roomToSave.version,
+      });
     });
   }
 
@@ -506,7 +692,13 @@ export class InMemoryRoomStore implements RoomStore {
     const code = roomCode.toUpperCase();
     return this.withLock(code, async () => {
       this.unindexSockets(code);
-      return this.rooms.delete(code);
+      const existed = this.rooms.delete(code);
+      this.logger.debug("Room deleted from storage", {
+        operation: "room_storage_delete",
+        roomCode: code,
+        existed,
+      });
+      return existed;
     });
   }
 

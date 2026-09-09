@@ -14,3 +14,4 @@ export {
 export * from "./logger/index.js";
 export * from "./time/index.js";
 export * from "./lifecycle/index.js";
+export * from "./rate_limiter/index.js";

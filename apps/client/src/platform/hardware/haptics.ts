@@ -3,6 +3,8 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Finding MAJ-012.
  */
 
+import { logger } from '../telemetry';
+
 export interface IHapticsService {
   /**
    * Pulses the vibration hardware with a duration or vibration pattern.
@@ -35,7 +37,12 @@ export class BrowserHapticsService implements IHapticsService {
     }
     try {
       return navigator.vibrate(pattern);
-    } catch {
+    } catch (err: unknown) {
+      logger.debug('navigator.vibrate failed', {
+        operation: 'haptics_vibrate',
+        pattern,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return false;
     }
   }

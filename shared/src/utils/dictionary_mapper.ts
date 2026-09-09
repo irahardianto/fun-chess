@@ -404,7 +404,6 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
  * Singleton instance of DefaultDictionaryMapper.
  */
 export const defaultDictionaryMapper = new DefaultDictionaryMapper();
-export const dictionaryMapper = defaultDictionaryMapper;
 
 /**
  * Convenience helper to compress domain payload into compact DTO.

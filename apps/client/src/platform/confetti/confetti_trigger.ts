@@ -40,7 +40,11 @@ export class ConfettiTrigger {
     try {
       const testCanvas = document.createElement('canvas');
       return !!testCanvas.getContext?.('2d');
-    } catch {
+    } catch (err: unknown) {
+      logger.debug('Canvas 2D context not available for confetti test', {
+        operation: 'confetti_can_execute_check',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return false;
     }
   }

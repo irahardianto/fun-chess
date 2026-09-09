@@ -7,12 +7,6 @@ export {
   MockRelayAddressService,
   normalizePublicUrl,
   extractHostnameFromUrl,
-  getAddressingInfo,
-  getRelayAddressingInfo,
-  generateRelayJoinUrl,
-  isCloudRelay,
-  getRelayLocalLanIp,
-  getAllRelayLanInterfaces,
 } from "./relay_address.service.js";
 export type {
   IRelayAddressService,

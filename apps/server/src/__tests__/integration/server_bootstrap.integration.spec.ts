@@ -5,16 +5,18 @@ import {
   setupDomainServices,
   setupSocketGateway,
   setupBackgroundJobs,
+  parseFallbackLogLevel,
+  FALLBACK_LOG_LEVELS,
   type ServerInstance,
-} from "../index.js";
-import { NullLogger } from "../platform/logger/null_logger.js";
+} from "../../index.js";
+import { NullLogger } from "../../platform/logger/null_logger.js";
 import type {
   LanInfoResponse,
   LivenessHealthResponse,
   DetailedHealthResponse,
 } from "@fun-chess/shared";
-import type { ServerEnv } from "../platform/config/index.js";
-import { createSocketRateLimiter } from "../platform/socket/index.js";
+import type { ServerEnv } from "../../platform/config/index.js";
+import { createSocketRateLimiter } from "../../platform/socket/index.js";
 
 describe("Server Bootstrap Integration (MAJ-033)", () => {
   let instance: ServerInstance | undefined;
@@ -425,7 +427,9 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     await new Promise<void>((resolve) => {
       const checkInterval = setInterval(() => {
         const found = logger.errorLogs.some(
-          (l) => l.context?.operation === "socket_disconnect_error",
+          (l) =>
+            l.context?.operation === "socket_disconnected" &&
+            l.context?.status === "failed",
         );
         if (found) {
           clearInterval(checkInterval);
@@ -439,7 +443,9 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     });
 
     const disconnectErrorLog = logger.errorLogs.find(
-      (l) => l.context?.operation === "socket_disconnect_error",
+      (l) =>
+        l.context?.operation === "socket_disconnected" &&
+        l.context?.status === "failed",
     );
     expect(disconnectErrorLog).toBeDefined();
     expect(disconnectErrorLog?.message).toBe(
@@ -461,8 +467,9 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
       TRUST_PROXY: false,
     };
     const logger = new NullLogger();
-    const services = setupDomainServices({}, env, 3000);
+    const services = setupDomainServices({}, env, 3000, logger);
     const rateLimiter = createSocketRateLimiter({ logger });
+    const roomCreateRateLimiter = createSocketRateLimiter({ logger });
 
     expect(typeof setupSocketGateway).toBe("function");
     const mockIo = {
@@ -474,9 +481,11 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
       rateLimiter,
       env,
       logger,
+      roomCreateRateLimiter,
     );
     expect(mockIo.on).toHaveBeenCalledWith("connection", expect.any(Function));
     rateLimiter.destroy();
+    roomCreateRateLimiter.destroy();
   });
 
   it("wires sessionRegistry with clock and idGenerator into GameService and returns on ServerInstance (CRIT-002)", async () => {
@@ -518,5 +527,32 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     expect(typeof failureLog?.context?.duration).toBe("number");
     expect(typeof failureLog?.context?.durationMs).toBe("number");
   });
-});
 
+  describe("parseFallbackLogLevel (ENH-001)", () => {
+    it("should correctly parse and allow valid log levels", () => {
+      for (const level of FALLBACK_LOG_LEVELS) {
+        expect(parseFallbackLogLevel(level)).toBe(level);
+      }
+    });
+
+    it("should normalize mixed case and trim surrounding whitespace", () => {
+      expect(parseFallbackLogLevel("  DEBUG ")).toBe("debug");
+      expect(parseFallbackLogLevel("WARN")).toBe("warn");
+      expect(parseFallbackLogLevel(" Fatal  ")).toBe("fatal");
+    });
+
+    it("should safely fall back to info for unrecognized or invalid log levels", () => {
+      expect(parseFallbackLogLevel("verbose")).toBe("info");
+      expect(parseFallbackLogLevel("invalid-level")).toBe("info");
+      expect(parseFallbackLogLevel("")).toBe("info");
+      expect(parseFallbackLogLevel("   ")).toBe("info");
+    });
+
+    it("should safely fall back to info for non-string, null, or undefined values", () => {
+      expect(parseFallbackLogLevel(undefined)).toBe("info");
+      expect(parseFallbackLogLevel(null)).toBe("info");
+      expect(parseFallbackLogLevel(123)).toBe("info");
+      expect(parseFallbackLogLevel({})).toBe("info");
+    });
+  });
+});

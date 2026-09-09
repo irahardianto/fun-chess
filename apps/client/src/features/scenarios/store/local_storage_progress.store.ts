@@ -3,10 +3,12 @@ import type {
   ScenarioProgressMap,
   ScenarioProgressStore,
   StarRating,
+  IClock,
 } from '@fun-chess/shared';
 import { safeLocalStorage, STORAGE_KEYS, type KeyValueStorage } from '@/platform/storage';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
 import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+import { SystemClock } from '@/platform/time';
 
 export const SCENARIO_PROGRESS_STORAGE_KEY = STORAGE_KEYS.SCENARIO_PROGRESS;
 
@@ -19,16 +21,19 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
   private readonly storageKey: string;
   private readonly storage: KeyValueStorage;
   private readonly logger: ILogger;
+  private readonly clock: IClock;
   private memoryFallback: Map<string, ScenarioProgress> = new Map();
 
   constructor(
     storageKey: string = SCENARIO_PROGRESS_STORAGE_KEY,
     storage: KeyValueStorage = safeLocalStorage,
-    logger: ILogger = defaultLogger
+    logger: ILogger = defaultLogger,
+    clock?: IClock
   ) {
     this.storageKey = storageKey;
     this.storage = storage;
     this.logger = logger;
+    this.clock = clock ?? new SystemClock();
   }
 
   private sanitizeRecord(raw: unknown): ScenarioProgress | null {
@@ -51,7 +56,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
       ? item.hintsUsedTotal
       : 0;
 
-    const now = Date.now();
+    const now = this.clock.now();
     const firstCompletedAt = typeof item.firstCompletedAt === 'number' && item.firstCompletedAt > 0
       ? item.firstCompletedAt
       : now;
@@ -124,7 +129,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
   ): Promise<ScenarioProgress> {
     const currentMap = await this.getProgressMap();
     const existing = currentMap[scenarioId];
-    const now = Date.now();
+    const now = this.clock.now();
 
     const updated: ScenarioProgress = {
       scenarioId,
@@ -147,7 +152,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
             type: 'STORAGE_QUOTA_EXCEEDED',
             store: 'scenarios',
             attemptedAction: 'save',
-            timestamp: Date.now(),
+            timestamp: this.clock.now(),
             message: 'Storage quota exceeded while saving scenario progress.',
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
           });
@@ -184,7 +189,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
             type: 'STORAGE_QUOTA_EXCEEDED',
             store: 'scenarios',
             attemptedAction: 'save',
-            timestamp: Date.now(),
+            timestamp: this.clock.now(),
             message: 'Storage quota exceeded while restoring scenario progress.',
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
           });
@@ -216,9 +221,10 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
 export function createDefaultLocalStorageProgressStore(
   storageKey: string = SCENARIO_PROGRESS_STORAGE_KEY,
   storage: KeyValueStorage = safeLocalStorage,
-  logger: ILogger = defaultLogger
+  logger: ILogger = defaultLogger,
+  clock?: IClock
 ): LocalStorageProgressStore {
-  return new LocalStorageProgressStore(storageKey, storage, logger);
+  return new LocalStorageProgressStore(storageKey, storage, logger, clock);
 }
 
 export const defaultLocalStorageProgressStore = createDefaultLocalStorageProgressStore();

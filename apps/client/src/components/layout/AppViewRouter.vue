@@ -20,7 +20,6 @@ import { MultiplayerArena } from '@/features/multiplayer';
 
 interface Props {
   currentAppMode?: AppGameMode | 'puzzle_drills' | 'puzzle_ladder' | 'puzzle_rush' | string;
-  currentMode?: AppGameMode | 'puzzle_drills' | 'puzzle_ladder' | 'puzzle_rush' | string;
   lobbyActiveMode?: AppGameMode;
   currentRoom?: RoomState | null;
   currentPlayer?: Player | null;
@@ -53,7 +52,6 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   currentAppMode: 'lobby',
-  currentMode: undefined,
   lobbyActiveMode: 'multiplayer_lan',
   currentRoom: null,
   currentPlayer: null,
@@ -86,7 +84,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:currentAppMode': [mode: AppGameMode];
-  'update:currentMode': [mode: AppGameMode];
   'mode-change': [mode: AppGameMode];
   host: [payload: { playerName: string; preferredColor: 'w' | 'b' | 'random'; avatar?: string }];
   join: [payload: { roomCode: string; playerName: string; avatar?: string }];
@@ -101,14 +98,9 @@ const emit = defineEmits<{
   'solo-ai-exit': [];
   'solo-ai-change-opponent': [];
   'academy-back': [];
-  'academy-next-lesson': [scenario: ChessScenario];
-  'academy-completed': [stars: number];
   'next-lesson': [scenario: ChessScenario];
   'scenario-completed': [stars?: number];
-  'puzzle-back': [];
-  'puzzle-rush-exit': [];
   'puzzle-exit': [];
-  'exit': [];
   'puzzle-completed': [stars: number];
   'select-square': [sq: Square];
   'execute-move': [move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }];
@@ -121,7 +113,7 @@ const emit = defineEmits<{
   notify: [payload: { message: string; type: 'error' | 'info' | 'success'; durationMs?: number }];
 }>();
 
-const resolvedMode = computed<string>(() => (props.currentMode || props.currentAppMode || 'lobby') as string);
+const resolvedMode = computed<string>(() => (props.currentAppMode || 'lobby') as string);
 
 const resolvedPuzzleArenaMode = computed<'themed_drills' | 'adaptive_ladder'>(() => {
   if (resolvedMode.value === 'puzzle_ladder' || props.puzzleSubMode === 'adaptive_ladder') {
@@ -152,22 +144,16 @@ function handleSoloAiExit() { emit('solo-ai-exit'); }
 function handleSoloAiChangeOpponent() { emit('solo-ai-change-opponent'); }
 function handleAcademyBack() { emit('academy-back'); }
 function handleAcademyNextLesson(scenario: ChessScenario) {
-  emit('academy-next-lesson', scenario);
   emit('next-lesson', scenario);
 }
 function handleAcademyCompleted(stars: number) {
-  emit('academy-completed', stars);
   emit('scenario-completed', stars);
 }
 function handlePuzzleBack() {
-  emit('puzzle-back');
   emit('puzzle-exit');
-  emit('exit');
 }
 function handlePuzzleRushExit() {
-  emit('puzzle-rush-exit');
   emit('puzzle-exit');
-  emit('exit');
 }
 function handlePuzzleCompleted(stars: number) { emit('puzzle-completed', stars); }
 function handleSelectSquare(sq: Square) { emit('select-square', sq); }
@@ -248,7 +234,6 @@ function handleFlipBoard() { emit('flip-board'); }
       :material-advantage="materialAdvantage"
       :move-history="moveHistory"
       :my-player-avatar="myPlayerAvatar"
-      :draw-offered_by="drawOfferedBy"
       :draw-offered-by="drawOfferedBy"
       @select-square="handleSelectSquare"
       @execute-move="handleExecuteMove"

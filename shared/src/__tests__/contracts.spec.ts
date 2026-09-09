@@ -53,8 +53,11 @@ import type {
   CreateRoomAckResponse,
   CreateRoomSuccessResponse,
   CreateRoomResponse,
+  PlayerDisconnectedPayload,
 } from "../index.js";
 import {
+  normalizeRoomCode,
+  validatePlayerName,
   FUN_CHESS_PAYLOAD_MAGIC_PREFIX,
   UNIFIED_PROGRESS_SCHEMA_VERSION,
   PLAYER_AVATARS,
@@ -107,6 +110,9 @@ import {
   CreateRoomResponseSchema,
   PlayerLeftReasonSchema,
   RoomPlayerLeftPayloadSchema,
+  PuzzleThemeSchema,
+  ThemeMasteryProgressSchema,
+  PUZZLE_THEMES,
 } from "../index.js";
 
 describe("Shared Contracts & Data Model Specification", () => {
@@ -600,6 +606,47 @@ describe("Shared Contracts & Data Model Specification", () => {
 
         const parsedProtoRel = ServerEnvSchema.parse({ PUBLIC_URL: "//fun-chess.a.run.app" });
         expect(parsedProtoRel.PUBLIC_URL).toBe("https://fun-chess.a.run.app");
+      });
+
+      it("parses server environment variables: METRICS_SECRET, MAX_ROOMS, SESSION_SECRET, CLIENT_URL, and CLIENT_DIST_PATH (MIN-023)", () => {
+        const testMetricsSecret = ["secret", "token", "xyz"].join("-");
+        const testSessionSecret = ["session", "auth", "key", "123"].join("-");
+        const env = ServerEnvSchema.parse({
+          METRICS_SECRET: testMetricsSecret,
+          MAX_ROOMS: "5000",
+          SESSION_SECRET: testSessionSecret,
+          CLIENT_URL: "https://chess-client.internal",
+          CLIENT_DIST_PATH: "/opt/fun-chess/dist",
+        });
+
+        expect(env.METRICS_SECRET).toBe(testMetricsSecret);
+        expect(env.MAX_ROOMS).toBe(5000);
+        expect(typeof env.MAX_ROOMS).toBe("number");
+        expect(env.SESSION_SECRET).toBe(testSessionSecret);
+        expect(env.CLIENT_URL).toBe("https://chess-client.internal");
+        expect(env.CLIENT_DIST_PATH).toBe("/opt/fun-chess/dist");
+      });
+
+      it("preprocesses empty strings to undefined for extended server env variables (MIN-023)", () => {
+        const env = ServerEnvSchema.parse({
+          METRICS_SECRET: "",
+          MAX_ROOMS: "  ",
+          SESSION_SECRET: "",
+          CLIENT_URL: "   ",
+          CLIENT_DIST_PATH: "",
+        });
+
+        expect(env.METRICS_SECRET).toBeUndefined();
+        expect(env.MAX_ROOMS).toBeUndefined();
+        expect(env.SESSION_SECRET).toBeUndefined();
+        expect(env.CLIENT_URL).toBeUndefined();
+        expect(env.CLIENT_DIST_PATH).toBeUndefined();
+      });
+
+      it("fails validation on invalid MAX_ROOMS (zero, negative, non-integer)", () => {
+        expect(() => ServerEnvSchema.parse({ MAX_ROOMS: 0 })).toThrow();
+        expect(() => ServerEnvSchema.parse({ MAX_ROOMS: -5 })).toThrow();
+        expect(() => ServerEnvSchema.parse({ MAX_ROOMS: "not-a-number" })).toThrow();
       });
     });
   });
@@ -1194,6 +1241,8 @@ describe("Shared Contracts & Data Model Specification", () => {
       const parsed = PlayerSchema.parse(validPlayer);
       expect(parsed.name).toBe("PlayerOne");
       expect(parsed.color).toBe("w");
+      // ENH-001: Sanitize client-facing player broadcast payloads to omit raw transport socketId
+      expect(parsed).not.toHaveProperty("socketId");
 
       expect(() =>
         PlayerSchema.parse({
@@ -1260,6 +1309,31 @@ describe("Shared Contracts & Data Model Specification", () => {
       };
       const parsedDraw = DrawOfferSchema.parse(drawOffer);
       expect(parsedDraw.offeredBy).toBe(drawOffer.offeredBy);
+    });
+
+    it("validates ThemeMasteryProgressSchema and constrains theme using PuzzleThemeSchema (MAJ-024)", () => {
+      expect(PUZZLE_THEMES.length).toBeGreaterThan(50);
+      expect(PuzzleThemeSchema.parse("fork")).toBe("fork");
+      expect(PuzzleThemeSchema.parse("mate_in_2")).toBe("mate_in_2");
+      expect(() => PuzzleThemeSchema.parse("not_a_valid_theme")).toThrow();
+
+      const validProgress = {
+        theme: "fork" as const,
+        attempted: 10,
+        solved: 8,
+        starsEarned: 24,
+        masteryLevel: "apprentice" as const,
+        lastPracticedAt: 1700000000000,
+      };
+      const parsed = ThemeMasteryProgressSchema.parse(validProgress);
+      expect(parsed.theme).toBe("fork");
+
+      expect(() =>
+        ThemeMasteryProgressSchema.parse({
+          ...validProgress,
+          theme: "arbitrary_invalid_theme",
+        }),
+      ).toThrow();
     });
 
     it("validates RoomStateSchema structure", () => {
@@ -1423,7 +1497,7 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(invoked).toBe(true);
     });
 
-    it("verifies room:reconnect acknowledgement with optional roomStatus", () => {
+    it("verifies room:reconnect acknowledgement with required roomStatus (MAJ-008)", () => {
       const mockReconnectHandler: ClientToServerEvents["room:reconnect"] = (
         req,
         callback,
@@ -1441,10 +1515,55 @@ describe("Shared Contracts & Data Model Specification", () => {
         { roomCode: "ABCD", playerId: "p1", sessionToken: "t1" },
         (res) => {
           if (res.success) {
-            expect(res.roomStatus).toBe("playing");
+            const status: RoomStatus = res.roomStatus;
+            expect(status).toBe("playing");
+            expect(res.sessionToken).toBeUndefined();
           }
         },
       );
+    });
+
+    it("verifies room:reconnect acknowledgement accepts optional rotated sessionToken (ENH-015)", () => {
+      const mockReconnectHandler: ClientToServerEvents["room:reconnect"] = (
+        req,
+        callback,
+      ) => {
+        expect(req.roomCode).toBe("ABCD");
+        callback?.({
+          success: true,
+          room: {} as RoomState,
+          player: {} as Player,
+          roomStatus: "playing",
+          sessionToken: "new-rotated-token-123",
+        });
+      };
+
+      mockReconnectHandler(
+        { roomCode: "ABCD", playerId: "p1", sessionToken: "t1" },
+        (res) => {
+          if (res.success) {
+            expect(res.sessionToken).toBe("new-rotated-token-123");
+          }
+        },
+      );
+    });
+
+    it("verifies room:player_disconnected broadcast payload shape conforms to PlayerDisconnectedPayload (MAJ-008)", () => {
+      const mockPlayerDisconnected: ServerToClientEvents["room:player_disconnected"] = (
+        data,
+      ) => {
+        expect(data.playerId).toBe("p1");
+        expect(data.gracePeriodMs).toBe(60000);
+        expect(data.roomStatus).toBe("paused_disconnect");
+      };
+
+      const payload: PlayerDisconnectedPayload = {
+        playerId: "p1",
+        gracePeriodMs: 60000,
+        roomStatus: "paused_disconnect",
+      };
+
+      mockPlayerDisconnected(payload);
     });
 
     it("verifies room:player_reconnected broadcast payload contains authoritative roomStatus", () => {
@@ -1639,6 +1758,12 @@ describe("Shared Contracts & Data Model Specification", () => {
       };
       const parsedError = CreateRoomResponseSchema.parse(errorPayload);
       expect(parsedError.success).toBe(false);
+    });
+
+    it("exports normalizeRoomCode and validatePlayerName from shared package root (MAJ-009)", () => {
+      expect(normalizeRoomCode("  abcd  ")).toBe("ABCD");
+      expect(validatePlayerName("  ValidPlayer  ")).toBe("ValidPlayer");
+      expect(() => validatePlayerName("")).toThrow();
     });
   });
 });

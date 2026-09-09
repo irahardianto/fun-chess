@@ -32,7 +32,7 @@ interface Props {
   isConflictModalOpen?: boolean;
   currentProgress?: UnifiedProgressPayload | null;
   incomingPayload?: UnifiedProgressPayload | null;
-  diffPreview?: ProgressDiffPreview | Record<string, unknown> | null;
+  diffPreview?: ProgressDiffPreview | null;
   isInstallModalOpen?: boolean;
   showInstallBanner?: boolean;
   showConfirmModal?: boolean;
@@ -40,7 +40,7 @@ interface Props {
   confirmMessage?: string;
   confirmButtonText?: string;
   cancelButtonText?: string;
-  confirmVariant?: 'primary' | 'danger';
+  confirmVariant?: 'primary' | 'danger' | 'warning';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -232,7 +232,7 @@ onUnmounted(() => {
       :model-value="isConflictModalOpen"
       :current-progress="currentProgress"
       :incoming-progress="incomingPayload"
-      :diff-preview="(diffPreview as any)"
+      :diff-preview="diffPreview"
       @update:model-value="emit('update:isConflictModalOpen', $event)"
       @resolve="handleResolveConflict"
       @merge="handleResolveConflict('smart_merge')"
@@ -277,7 +277,7 @@ onUnmounted(() => {
           {{ props.cancelButtonText || 'Cancel' }}
         </BaseButton>
         <BaseButton
-          :variant="props.confirmVariant || 'danger'"
+          :variant="props.confirmVariant === 'warning' ? 'accent' : (props.confirmVariant || 'danger')"
           size="md"
           data-testid="confirm-proceed-btn"
           @click="handleConfirmProceed"

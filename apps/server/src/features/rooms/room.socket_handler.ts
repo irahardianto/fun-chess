@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Socket } from "socket.io";
 import { z } from "zod";
 import {
@@ -10,21 +11,21 @@ import {
   ReconnectRequest,
   ReconnectRequestSchema,
   RoomState,
+  RoomStatus,
   Player,
   GameOverPayload,
+  normalizeRoomCode,
+  validatePlayerName,
 } from "@fun-chess/shared";
 import { type Logger } from "../../platform/logger/index.js";
-import { env } from "../../platform/config/index.js";
 import {
   type SocketRateLimiter,
   createSocketRateLimiter,
   type TypedSocketServer,
   type SocketOperationContext,
-} from "../../platform/socket/index.js";
-import {
   createFeatureSocketHandler,
   type FeatureSocketHandlerOptions,
-} from "../../platform/socket/socket_handler.utils.js";
+} from "../../platform/socket/index.js";
 import type { IRoomService } from "./room.interface.js";
 import {
   type IDisconnectTimerRegistry,
@@ -35,6 +36,7 @@ import {
   clearAllDisconnectTimers,
   DISCONNECT_GRACE_PERIOD_MS,
 } from "./disconnect_timer_registry.js";
+import { sanitizePublicRoom, sanitizePublicPlayer } from "./room.logic.js";
 
 export {
   createSocketRateLimiter,
@@ -46,12 +48,6 @@ export {
   clearAllDisconnectTimers,
   DISCONNECT_GRACE_PERIOD_MS,
 };
-
-export const defaultSocketRateLimiter = createSocketRateLimiter();
-export const roomCreateRateLimiter = createSocketRateLimiter({
-  maxRequests: env.RATE_LIMIT_ROOM_CREATE_MAX,
-  windowMs: 60_000,
-});
 
 function createRoomHandler<TReq, TRes>(
   logger: Logger,
@@ -108,6 +104,54 @@ function createRoomHandler<TReq, TRes>(
 }
 
 /**
+ * Safely executes socket.join(roomCode) wrapped in try/catch to isolate transport errors (ENH-005).
+ */
+async function safeSocketJoin(
+  socket: Socket | { id: string; join: (room: string) => Promise<void> | void },
+  roomCode: string,
+  logger: Logger,
+): Promise<void> {
+  try {
+    await socket.join(roomCode);
+  } catch (err) {
+    logger.warn("Failed to join socket room", {
+      operation: "socket_room_membership_error",
+      roomCode,
+      socketId: socket.id,
+      action: "join",
+      error:
+        err instanceof Error
+          ? { name: err.name, message: err.message, stack: err.stack }
+          : { raw: err },
+    });
+  }
+}
+
+/**
+ * Safely executes socket.leave(roomCode) wrapped in try/catch to isolate transport errors (ENH-005).
+ */
+async function safeSocketLeave(
+  socket: Socket | { id: string; leave: (room: string) => Promise<void> | void },
+  roomCode: string,
+  logger: Logger,
+): Promise<void> {
+  try {
+    await socket.leave(roomCode);
+  } catch (err) {
+    logger.warn("Failed to leave socket room", {
+      operation: "socket_room_membership_error",
+      roomCode,
+      socketId: socket.id,
+      action: "leave",
+      error:
+        err instanceof Error
+          ? { name: err.name, message: err.message, stack: err.stack }
+          : { raw: err },
+    });
+  }
+}
+
+/**
  * Registers Room lifecycle Socket.io event listeners.
  */
 export function registerRoomSocketHandlers(
@@ -115,16 +159,16 @@ export function registerRoomSocketHandlers(
   socket: Socket,
   roomService: IRoomService,
   logger: Logger,
-  rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
+  rateLimiter: SocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
-  createRateLimiter: SocketRateLimiter = roomCreateRateLimiter,
-  trustProxy: boolean = env.TRUST_PROXY,
+  createRateLimiter: SocketRateLimiter = rateLimiter,
+  trustProxy: boolean = false,
 ): void {
   const effectiveTrustProxy =
     (socket.data as { trustProxy?: boolean } | undefined)?.trustProxy ??
     trustProxy;
 
-  // 1. room:create - differential rate limit (MAJ-006)
+  // 1. room:create - differential rate limit (MAJ-006, MAJ-008 dual-delivery elimination)
   const handleCreate = createRoomHandler<
     CreateRoomRequest,
     { success: true; room: RoomState; player: Player; sessionToken: string }
@@ -138,19 +182,20 @@ export function registerRoomSocketHandlers(
       trustProxy: effectiveTrustProxy,
     },
     async (req) => {
+      validatePlayerName(req.playerName);
       const result = await roomService.createRoom(req, socket.id);
       if (socket.data) {
         socket.data.userId = result.player.id;
         socket.data.roomCode = result.room.roomCode;
         socket.data.sessionToken = result.sessionToken;
       }
-      await socket.join(result.room.roomCode);
+      await safeSocketJoin(socket, result.room.roomCode, logger);
 
-      socket.emit("room:created", result.room);
+      // MAJ-008: Dual delivery eliminated. State is delivered exclusively via ack callback.
       return {
         success: true,
-        room: result.room,
-        player: result.player,
+        room: sanitizePublicRoom(result.room),
+        player: sanitizePublicPlayer(result.player),
         sessionToken: result.sessionToken,
       };
     },
@@ -158,7 +203,7 @@ export function registerRoomSocketHandlers(
 
   socket.on("room:create", handleCreate);
 
-  // 2. room:join
+  // 2. room:join (MAJ-008 dual-delivery elimination, MAJ-009)
   const handleJoin = createRoomHandler<
     JoinRoomRequest,
     { success: true; room: RoomState; player: Player; sessionToken: string }
@@ -172,19 +217,24 @@ export function registerRoomSocketHandlers(
       trustProxy: effectiveTrustProxy,
     },
     async (req) => {
-      const result = await roomService.joinRoom(req, socket.id);
+      validatePlayerName(req.playerName);
+      const normalizedCode = normalizeRoomCode(req.roomCode);
+      const result = await roomService.joinRoom(
+        { ...req, roomCode: normalizedCode },
+        socket.id,
+      );
       if (socket.data) {
         socket.data.userId = result.player.id;
         socket.data.roomCode = result.room.roomCode;
         socket.data.sessionToken = result.sessionToken;
       }
       const roomCode = result.room.roomCode;
-      await socket.join(roomCode);
+      await safeSocketJoin(socket, roomCode, logger);
 
-      socket.emit("room:joined", result.room);
+      // MAJ-008: Dual delivery eliminated. Emit room:player_joined strictly to peer sockets.
       socket.to(roomCode).emit("room:player_joined", {
-        player: result.player,
-        room: result.room,
+        player: sanitizePublicPlayer(result.player),
+        room: sanitizePublicRoom(result.room),
       });
 
       if (result.room.status === "playing") {
@@ -193,8 +243,8 @@ export function registerRoomSocketHandlers(
 
       return {
         success: true,
-        room: result.room,
-        player: result.player,
+        room: sanitizePublicRoom(result.room),
+        player: sanitizePublicPlayer(result.player),
         sessionToken: result.sessionToken,
       };
     },
@@ -202,10 +252,16 @@ export function registerRoomSocketHandlers(
 
   socket.on("room:join", handleJoin);
 
-  // 3. room:reconnect
+  // 3. room:reconnect (MAJ-008: RoomStatus ack type narrowing, MAJ-009, ENH-005, ENH-015)
   const handleReconnect = createRoomHandler<
     ReconnectRequest,
-    { success: true; room: RoomState; player: Player; roomStatus?: string }
+    {
+      success: true;
+      room: RoomState;
+      player: Player;
+      roomStatus: RoomStatus;
+      sessionToken: string;
+    }
   >(
     logger,
     "room:reconnect",
@@ -216,14 +272,18 @@ export function registerRoomSocketHandlers(
       trustProxy: effectiveTrustProxy,
     },
     async (req) => {
-      const result = await roomService.reconnect(req, socket.id);
+      const normalizedCode = normalizeRoomCode(req.roomCode);
+      const result = await roomService.reconnect(
+        { ...req, roomCode: normalizedCode },
+        socket.id,
+      );
       if (socket.data) {
         socket.data.userId = result.player.id;
         socket.data.roomCode = result.room.roomCode;
-        socket.data.sessionToken = req.sessionToken;
+        socket.data.sessionToken = result.sessionToken ?? req.sessionToken;
       }
       const roomCode = result.room.roomCode;
-      await socket.join(roomCode);
+      await safeSocketJoin(socket, roomCode, logger);
 
       // Cancel any pending disconnect timer for this reconnected player
       timerRegistry.cancel(roomCode, result.player.id);
@@ -235,23 +295,24 @@ export function registerRoomSocketHandlers(
       });
 
       socket.emit("room:reconnected", {
-        room: result.room,
-        player: result.player,
+        room: sanitizePublicRoom(result.room),
+        player: sanitizePublicPlayer(result.player),
         roomStatus: result.room.status,
       });
 
       return {
         success: true,
-        room: result.room,
-        player: result.player,
+        room: sanitizePublicRoom(result.room),
+        player: sanitizePublicPlayer(result.player),
         roomStatus: result.room.status,
+        sessionToken: result.sessionToken ?? req.sessionToken,
       };
     },
   );
 
   socket.on("room:reconnect", handleReconnect);
 
-  // 4. room:leave
+  // 4. room:leave (MAJ-009, ENH-005)
   const handleLeave = createRoomHandler<LeaveRoomRequest, { success: true }>(
     logger,
     "room:leave",
@@ -262,8 +323,8 @@ export function registerRoomSocketHandlers(
       trustProxy: effectiveTrustProxy,
     },
     async (req) => {
-      const result = await roomService.leaveRoom(req.roomCode, socket.id);
-      const roomCode = req.roomCode.toUpperCase();
+      const roomCode = normalizeRoomCode(req.roomCode);
+      const result = await roomService.leaveRoom(roomCode, socket.id);
 
       // Cancel disconnect timers for this player
       timerRegistry.cancel(roomCode, result.player.id);
@@ -276,9 +337,21 @@ export function registerRoomSocketHandlers(
         });
         timerRegistry.cancelAllForRoom(roomCode);
         if (typeof io.in === "function") {
-          const socketsInRoom = await io.in(roomCode).fetchSockets();
-          for (const s of socketsInRoom) {
-            await s.leave(roomCode);
+          try {
+            const socketsInRoom = await io.in(roomCode).fetchSockets();
+            for (const s of socketsInRoom) {
+              await safeSocketLeave(s, roomCode, logger);
+            }
+          } catch (err) {
+            logger.warn("Failed to fetch sockets on room deletion", {
+              operation: "socket_room_membership_error",
+              roomCode,
+              action: "fetch_and_leave",
+              error:
+                err instanceof Error
+                  ? { name: err.name, message: err.message, stack: err.stack }
+                  : { raw: err },
+            });
           }
         }
       } else if (result.gameOverPayload) {
@@ -292,7 +365,7 @@ export function registerRoomSocketHandlers(
         });
       }
 
-      await socket.leave(roomCode);
+      await safeSocketLeave(socket, roomCode, logger);
       return { success: true };
     },
   );
@@ -304,6 +377,7 @@ export function registerRoomSocketHandlers(
  * Handles socket disconnection event across rooms.
  * Starts a grace timer under the room lock if the player was in an active game.
  * Uses standardized 3-point logged job for disconnect abandonment (MAJ-023).
+ * Remediated with correlationId default randomUUID(), duration logging, and clean payload (MIN-010, MIN-011).
  */
 export async function handleSocketDisconnect(
   io: TypedSocketServer,
@@ -315,16 +389,32 @@ export async function handleSocketDisconnect(
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
   correlationId?: string,
 ): Promise<void> {
+  const activeCorrelationId = correlationId ?? randomUUID();
+  const startTime = Date.now();
+
   const onForfeit = async (
     room: RoomState,
     gameOverPayload: GameOverPayload,
+    jobCorrelationId?: string,
+    forfeitedPlayerId?: string,
   ) => {
+    const activeJobCorrelationId = jobCorrelationId ?? activeCorrelationId;
+    const disconnectedPlayerId =
+      forfeitedPlayerId ??
+      (gameOverPayload.winner === "w"
+        ? room.blackPlayer?.id
+        : gameOverPayload.winner === "b"
+          ? room.whitePlayer?.id
+          : undefined);
+
     try {
+      // MIN-011: rename playerId field to winnerColor and emit disconnectedPlayerId
       logger.info("Game forfeited by abandonment", {
         operation: "game_abandoned",
-        correlationId,
+        correlationId: activeJobCorrelationId,
         roomCode: room.roomCode,
-        playerId: gameOverPayload.winner,
+        winnerColor: gameOverPayload.winner,
+        disconnectedPlayerId,
         winner: gameOverPayload.winner,
       });
       io.to(room.roomCode).emit("game:over", gameOverPayload);
@@ -332,12 +422,13 @@ export async function handleSocketDisconnect(
       logger.error("Failed to process disconnect grace period abandonment", {
         operation: "disconnect_grace_period_abandonment",
         roomCode: room.roomCode,
-        correlationId,
+        correlationId: activeJobCorrelationId,
         error:
           err instanceof Error
             ? { name: err.name, message: err.message, stack: err.stack }
             : { raw: err },
       });
+      throw err;
     }
   };
 
@@ -350,15 +441,21 @@ export async function handleSocketDisconnect(
   if (!result) return;
 
   const { room, player, wasActiveGame } = result;
+  const duration = Date.now() - startTime;
+
+  // MIN-010: ensure correlationId and duration / durationMs are logged
   logger.info("Player disconnected from room", {
     operation: "player_disconnected",
-    ...(correlationId ? { correlationId } : {}),
+    correlationId: activeCorrelationId,
     roomCode: room.roomCode,
     playerId: player.id,
     playerName: player.name,
     wasActiveGame,
+    duration,
+    durationMs: duration,
   });
 
+  // MAJ-008 / api_contracts.md §2.1: Align emission to { playerId, gracePeriodMs, roomStatus }
   io.to(room.roomCode).emit("room:player_disconnected", {
     playerId: player.id,
     gracePeriodMs,

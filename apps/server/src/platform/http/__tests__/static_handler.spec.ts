@@ -6,6 +6,7 @@ import fs from "node:fs/promises";
 import { serveStaticFile, checkPathTraversal } from "../static_handler.js";
 import { Logger } from "../../logger/logger.interface.js";
 import { defaultLogger } from "../../logger/index.js";
+import { NullLogger } from "../../logger/null_logger.js";
 
 describe("serveStaticFile", () => {
   let tempDir: string;
@@ -545,9 +546,11 @@ describe("serveStaticFile", () => {
           },
         } as IncomingMessage;
 
+        let responseHeaders: Record<string, string> = {};
         const mockRes = {
-          writeHead: (status: number) => {
+          writeHead: (status: number, headers?: Record<string, string | number | readonly string[]>) => {
             statusCode = status;
+            responseHeaders = (headers as Record<string, string>) || {};
             return mockRes;
           },
           end: (body?: string) => {
@@ -562,7 +565,15 @@ describe("serveStaticFile", () => {
 
         expect(handled).toBe(true);
         expect(statusCode).toBe(404);
-        expect(responseBody).toBe("Not Found");
+        expect(responseHeaders["Content-Type"]).toContain("application/json");
+        expect(JSON.parse(responseBody)).toEqual({
+          status: "error",
+          code: 404,
+          error: {
+            code: "ERR_NOT_FOUND",
+            message: "Not Found",
+          },
+        });
       }
     });
   });
@@ -833,30 +844,39 @@ describe("serveStaticFile", () => {
       expect(body).toBe("Internal Server Error");
     });
 
-    it("logs debug when URI decoding fails during traversal check (CRIT-005)", async () => {
+    it("handles malformed URI decoding during traversal check safely without logging side-effects (MIN-005)", async () => {
       const debugSpy = vi.spyOn(defaultLogger, "debug");
 
       // Malformed UTF-8 percent-encoding
-      checkPathTraversal("/virtual/dist", "/%E0%A4%A");
-      expect(debugSpy).toHaveBeenCalledWith(
-        "Initial URI decoding failed during traversal check",
-        expect.objectContaining({
-          operation: "check_path_traversal",
-          urlPath: "/%E0%A4%A",
-        }),
-      );
+      const malformedResult = checkPathTraversal("/virtual/dist", "/%E0%A4%A");
+      expect(typeof malformedResult).toBe("boolean");
+      expect(debugSpy).not.toHaveBeenCalled();
 
       // Malformed secondary decoding: "%25E0%25A4%25A" decodes once to "%E0%A4%A", then second decode fails
-      checkPathTraversal("/virtual/dist", "/%25E0%25A4%25A");
-      expect(debugSpy).toHaveBeenCalledWith(
-        "Secondary URI decoding failed during traversal check",
-        expect.objectContaining({
-          operation: "check_path_traversal",
-          urlPath: "/%25E0%25A4%25A",
-        }),
-      );
+      const secondaryMalformedResult = checkPathTraversal("/virtual/dist", "/%25E0%25A4%25A");
+      expect(typeof secondaryMalformedResult).toBe("boolean");
+      expect(debugSpy).not.toHaveBeenCalled();
 
       debugSpy.mockRestore();
+    });
+
+    it("emits security warning log when URI decoding encounters malformed components (MIN-002)", () => {
+      const logger = new NullLogger();
+      const isTraversal = checkPathTraversal(
+        "/virtual/dist",
+        "/%E0%A4%A",
+        logger,
+        "192.168.1.10",
+      );
+      expect(typeof isTraversal).toBe("boolean");
+
+      const warnLog = logger.warnLogs.find(
+        (l) => l.context?.["operation"] === "static_serve_decode_error",
+      );
+      expect(warnLog).toBeDefined();
+      expect(warnLog?.context?.["path"]).toBe("/%E0%A4%A");
+      expect(warnLog?.context?.["clientIp"]).toBe("192.168.1.10");
+      expect(warnLog?.context?.["error"]).toBeDefined();
     });
   });
 });

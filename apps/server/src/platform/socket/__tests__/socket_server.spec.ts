@@ -92,6 +92,39 @@ describe("createSocketServer (MAJ-002, MAJ-017)", () => {
     io.close();
   });
 
+  it("emits structured warning log when allowRequest rejects an unpermitted origin (MIN-012)", () => {
+    const logger = new NullLogger();
+    const httpServer = http.createServer();
+    const io = createSocketServer(httpServer, {
+      logger,
+      allowedOrigins: ["https://fun-chess.example.com"],
+    });
+
+    const allowRequest = io.opts.allowRequest!;
+    let rejected = false;
+    allowRequest(
+      {
+        headers: { origin: "https://hacker.com" },
+        url: "/socket.io/?token=secret",
+      } as unknown as http.IncomingMessage,
+      (err, success) => {
+        if (err === 3 && !success) rejected = true;
+      },
+    );
+    expect(rejected).toBe(true);
+
+    const warnLog = logger.warnLogs.find(
+      (l) => l.message === "Socket connection rejected: origin not allowed",
+    );
+    expect(warnLog).toBeDefined();
+    expect(warnLog?.context?.["operation"]).toBe("socket_cors_rejected");
+    expect(warnLog?.context?.["origin"]).toBe("https://hacker.com");
+    expect(warnLog?.context?.["url"]).toBe("/socket.io/");
+    expect(warnLog?.context?.["correlationId"]).toBeDefined();
+
+    io.close();
+  });
+
   it("fails fast with clear diagnostics when config resolution fails in production without direct process.env (MAJ-002, CRIT-006)", () => {
     const httpServer = http.createServer();
     expect(() =>

@@ -176,7 +176,7 @@ describe("Room Lifecycle Integration Tests", () => {
     if (!reconnectRes.success) return;
 
     expect(reconnectRes.player.id).toBe(playerId);
-    expect(reconnectRes.player.socketId).toBe(newClient.id);
+    expect((reconnectRes.player as Record<string, unknown>).socketId).toBeUndefined();
     expect(reconnectRes.player.isConnected).toBe(true);
     expect(reconnectRes.room.roomCode).toBe(roomCode);
 

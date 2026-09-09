@@ -123,6 +123,26 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       expect(config.RATE_LIMIT_ROOM_CREATE_MAX).toBe(5);
     });
 
+    it("parses METRICS_SECRET, MAX_ROOMS, and SESSION_SECRET", () => {
+      const testMetricsToken = ["secret", "token", "xyz"].join("-");
+      const testSessionToken = ["session", "secret", "abc"].join("-");
+      const config = loadServerConfig({
+        METRICS_SECRET: testMetricsToken,
+        MAX_ROOMS: "5000",
+        SESSION_SECRET: testSessionToken,
+      });
+
+      expect(config.METRICS_SECRET).toBe(testMetricsToken);
+      expect(config.MAX_ROOMS).toBe(5000);
+      expect(config.SESSION_SECRET).toBe(testSessionToken);
+    });
+
+    it("validates MAX_ROOMS must be a positive integer", () => {
+      expect(() => loadServerConfig({ MAX_ROOMS: "0" })).toThrow();
+      expect(() => loadServerConfig({ MAX_ROOMS: "-5" })).toThrow();
+      expect(() => loadServerConfig({ MAX_ROOMS: "abc" })).toThrow();
+    });
+
     it("parses and validates RATE_LIMIT_ROOM_CREATE_MAX", () => {
       expect(loadServerConfig({}).RATE_LIMIT_ROOM_CREATE_MAX).toBe(3);
       expect(loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: "" }).RATE_LIMIT_ROOM_CREATE_MAX).toBe(3);
@@ -227,6 +247,14 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
         expect(config.CORS_ORIGIN).toBe("https://fun-chess.com, https://play.fun-chess.com");
       });
 
+      it("fails fast when CORS_ORIGIN contains an invalid origin URL (ENH-002)", () => {
+        expect(() =>
+          loadServerConfig({
+            CORS_ORIGIN: "https://fun-chess.com, invalid url with spaces",
+          }),
+        ).toThrowError(/CORS_ORIGIN contains invalid origin URL/);
+      });
+
       it("succeeds in production mode with valid PUBLIC_URL", () => {
         const config = loadServerConfig({
           NODE_ENV: "production",
@@ -252,6 +280,7 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
       ]);
     });
 
@@ -358,6 +387,7 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
           "http://localhost:5173",
           "http://127.0.0.1:5173",
           "http://localhost:3000",
+          "http://127.0.0.1:3000",
         ]);
       } finally {
         if (originalEnv !== undefined) {

@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { Chess } from 'chess.js';
 import { useAiMoveExecution } from '../useAiMoveExecution';
 import type { MascotPersona, PieceColor } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 
 describe('useAiMoveExecution composable', () => {
   const defaultMascot: MascotPersona = {
@@ -176,6 +177,57 @@ describe('useAiMoveExecution composable', () => {
     env.banter.triggerBanter.mockClear();
     env.execution.resign();
     expect(env.banter.triggerBanter).not.toHaveBeenCalled();
+  });
+
+  it('instruments resign() with 3-point structured logging (start, success, and error) (MIN-011)', () => {
+    const infoSpy = vi.spyOn(logger, 'info');
+    const errorSpy = vi.spyOn(logger, 'error');
+    const env = createTestEnvironment();
+
+    env.execution.resign();
+
+    // 1. Operation Start log
+    expect(infoSpy).toHaveBeenCalledWith(
+      'Resigning AI game',
+      expect.objectContaining({
+        operation: 'ai_resign',
+        correlationId: expect.any(String),
+        playerColor: 'w',
+        aiColor: 'b',
+      })
+    );
+
+    // 2. Operation Success log
+    expect(infoSpy).toHaveBeenCalledWith(
+      'Resignation completed successfully',
+      expect.objectContaining({
+        operation: 'ai_resign',
+        correlationId: expect.any(String),
+        status: 'success',
+        duration: expect.any(Number),
+        durationMs: expect.any(Number),
+        winner: 'b',
+      })
+    );
+
+    // 3. Operation Failure log (when error thrown)
+    const errEnv = createTestEnvironment();
+    errEnv.aiWorker.cancelCalculation.mockImplementation(() => {
+      throw new Error('Worker termination failure');
+    });
+
+    expect(() => errEnv.execution.resign()).toThrow('Worker termination failure');
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Resignation failed',
+      expect.objectContaining({
+        operation: 'ai_resign',
+        status: 'failed',
+        error: expect.objectContaining({ message: 'Worker termination failure' }),
+      })
+    );
+
+    infoSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it('handles draw states (stalemate, threefold repetition, insufficient material)', () => {
