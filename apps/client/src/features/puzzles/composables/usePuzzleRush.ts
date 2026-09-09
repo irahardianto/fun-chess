@@ -3,7 +3,7 @@ import type {
   PuzzleProgressStore,
 } from '@fun-chess/shared';
 import { useInjectLogger } from '@/platform/di';
-import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
 import {
   calculateTimeTick,
@@ -71,6 +71,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   let timerInterval: ReturnType<typeof setInterval> | null = null;
   const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
   let puzzleStartTimeMs = Date.now();
+  let runCorrelationId = generateCorrelationId();
+  let runStartTimeMs = Date.now();
 
   function setTrackedTimeout(fn: () => void, ms: number): ReturnType<typeof setTimeout> {
     const timer = setTimeout(() => {
@@ -112,6 +114,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
   function startRun(selectedMode: 'puzzle_rush' | 'streak_survivor' = initialMode): void {
     clearAllTimers();
+    runCorrelationId = generateCorrelationId();
+    runStartTimeMs = Date.now();
     mode.value = selectedMode;
     timeRemainingSeconds.value = initialDuration;
     score.value = 0;
@@ -126,6 +130,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
     logger.info('Starting puzzle rush run', {
       operation: 'puzzle_rush_start',
+      correlationId: runCorrelationId,
+      durationMs: 0,
       mode: selectedMode,
       initialDuration,
       maxStrikes: maxStrikesLimit,
@@ -156,6 +162,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   async function handleRunnerSolved(): Promise<void> {
     if (isGameOver.value) return;
     const solveDurationMs = Date.now() - puzzleStartTimeMs;
+    const runDurationMs = Math.round(Date.now() - runStartTimeMs);
 
     if (mode.value === 'puzzle_rush') {
       const solveResult = applyRushSolve(
@@ -181,6 +188,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
       logger.info('Puzzle solved during rush run', {
         operation: 'puzzle_rush_solve',
+        correlationId: runCorrelationId,
+        durationMs: runDurationMs,
         mode: 'puzzle_rush',
         score: score.value,
         streak: currentStreak.value,
@@ -192,6 +201,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
       logger.info('Submitting arcade score for puzzle rush', {
         operation: 'puzzle_rush_submit_score',
+        correlationId: runCorrelationId,
+        durationMs: runDurationMs,
         mode: 'puzzle_rush',
         score: score.value,
         streak: currentStreak.value,
@@ -214,6 +225,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
       logger.info('Puzzle solved during survivor run', {
         operation: 'puzzle_survivor_solve',
+        correlationId: runCorrelationId,
+        durationMs: runDurationMs,
         mode: 'streak_survivor',
         score: score.value,
         streak: currentStreak.value,
@@ -224,6 +237,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
       logger.info('Submitting arcade score for streak survivor', {
         operation: 'puzzle_rush_submit_score',
+        correlationId: runCorrelationId,
+        durationMs: runDurationMs,
         mode: 'streak_survivor',
         score: score.value,
         bestStreak: bestStreak.value,
@@ -240,6 +255,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
   function handleRunnerFailed(): void {
     if (isGameOver.value) return;
+    const runDurationMs = Math.round(Date.now() - runStartTimeMs);
 
     if (mode.value === 'puzzle_rush') {
       const strikeResult = applyRushStrike(strikes.value, maxStrikesLimit);
@@ -249,6 +265,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
       logger.warn('Puzzle mistake during rush run', {
         operation: 'puzzle_rush_mistake',
+        correlationId: runCorrelationId,
+        durationMs: runDurationMs,
         mode: 'puzzle_rush',
         strikes: strikes.value,
         maxStrikes: maxStrikesLimit,
@@ -270,6 +288,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
       logger.warn('Puzzle mistake during survivor run', {
         operation: 'puzzle_survivor_mistake',
+        correlationId: runCorrelationId,
+        durationMs: runDurationMs,
         mode: 'streak_survivor',
         livesRemaining: livesRemaining.value,
         strikes: strikes.value,
@@ -290,8 +310,11 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   function endGame(): void {
     clearAllTimers();
     isGameOver.value = true;
+    const durationMs = Math.round(Date.now() - runStartTimeMs);
     logger.info('Ending puzzle rush run', {
       operation: 'puzzle_rush_end',
+      correlationId: runCorrelationId,
+      durationMs,
       mode: mode.value,
       finalScore: score.value,
       finalStreak: mode.value === 'puzzle_rush' ? currentStreak.value : bestStreak.value,
@@ -302,8 +325,11 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   function stopRun(): void {
     clearAllTimers();
     isGameOver.value = true;
+    const durationMs = Math.round(Date.now() - runStartTimeMs);
     logger.info('Stopping puzzle rush run manually', {
       operation: 'puzzle_rush_stop',
+      correlationId: runCorrelationId,
+      durationMs,
       mode: mode.value,
       score: score.value,
     });
@@ -321,6 +347,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
 
   return {
     runner,
+    correlationId: computed(() => runCorrelationId),
     mode: readonly(mode),
     timeRemainingSeconds: readonly(timeRemainingSeconds),
     score: readonly(score),
@@ -338,6 +365,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
     startRush: startRun,
     stopRun,
     stopTimer: stopRun,
+    endGame,
     applyMove: runner.applyPlayerMove,
     selectSquare: runner.selectSquare,
     handleSolve: handleRunnerSolved,

@@ -1,7 +1,7 @@
 /**
  * Reactive sound hook with state, triggers, and decoupled device haptics (MIN-017).
  */
-import { ref } from 'vue';
+import { ref, computed, inject, getCurrentInstance, type Ref } from 'vue';
 import type { MoveResult, GameState } from '@fun-chess/shared';
 import {
   type IAudioService,
@@ -12,6 +12,14 @@ import {
   defaultHapticsService,
 } from '../platform/hardware/index.js';
 import { logger } from '../platform/telemetry/index.js';
+import { AUDIO_CONTEXT_KEY, type AudioContextValue } from '../platform/di/tokens.js';
+
+export function useAudioContext(fallback?: AudioContextValue | null): AudioContextValue | null {
+  if (getCurrentInstance()) {
+    return inject(AUDIO_CONTEXT_KEY, fallback ?? null);
+  }
+  return fallback ?? null;
+}
 
 export interface GameDomainEventSource {
   onOpponentMove?: (cb: (data: { move: MoveResult; gameState: GameState }) => void) => (() => void);
@@ -105,21 +113,33 @@ export function useHaptics(injectedHaptics?: IHapticsService) {
  * Reactive audio composable with state, sound effects, and decoupled haptic triggers.
  */
 export function useAudio(injectedSynth?: IAudioService, injectedHaptics?: IHapticsService) {
+  const audioContext = getCurrentInstance() ? inject(AUDIO_CONTEXT_KEY, null) : null;
   const synth: IAudioService = injectedSynth || defaultSynth;
   const hapticController = useHaptics(injectedHaptics);
-  const isMuted = ref(synth.isMuted());
-  const isSoundEnabled = ref(!synth.isMuted());
+  const localMuted = ref(synth.isMuted());
+  const isMuted: Ref<boolean> = audioContext ? audioContext.isMuted : localMuted;
+  const isSoundEnabled = computed<boolean>({
+    get: () => !isMuted.value,
+    set: (enabled: boolean) => setMuted(!enabled),
+  });
 
   function setMuted(muted: boolean): void {
     synth.setMuted(muted);
-    isMuted.value = muted;
-    isSoundEnabled.value = !muted;
+    if (audioContext) {
+      audioContext.setMuted(muted);
+    } else {
+      localMuted.value = muted;
+    }
   }
 
   function toggleMute(): boolean {
+    if (audioContext) {
+      const newState = audioContext.toggleMute();
+      synth.setMuted(newState);
+      return newState;
+    }
     const newState = synth.toggleMute();
-    isMuted.value = newState;
-    isSoundEnabled.value = !newState;
+    localMuted.value = newState;
     return newState;
   }
 

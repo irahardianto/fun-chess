@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   SocketRateLimiter,
+  createSocketRateLimiter,
   extractClientIp,
 } from "../index.js";
 import { NullLogger } from "../../logger/null_logger.js";
@@ -335,6 +336,92 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it("re-throws errors during prune and records error log with correlationId (MAJ-015)", () => {
+      const logger = new NullLogger();
+      const limiter = new SocketRateLimiter({
+        maxRequests: 5,
+        windowMs: 1000,
+        pruneIntervalMs: 0,
+        logger,
+      });
+
+      // Force timestamps iteration to throw
+      const errorMap = {
+        entries: () => {
+          throw new Error("Simulated map iteration crash");
+        },
+      };
+      (limiter as unknown as { timestamps: unknown }).timestamps = errorMap;
+
+      const testCorrelationId = "test-corr-prune-123";
+      expect(() => limiter.prune(Date.now(), testCorrelationId)).toThrow("Simulated map iteration crash");
+
+      const errorLog = logger.errorLogs.find(
+        (l) => l.context?.["operation"] === "rate_limiter_prune_error",
+      );
+      expect(errorLog).toBeDefined();
+      expect(errorLog?.context?.["correlationId"]).toBe(testCorrelationId);
+    });
+
+    it("logs non-Error exception during prune with raw property", () => {
+      const logger = new NullLogger();
+      const limiter = new SocketRateLimiter({
+        maxRequests: 5,
+        windowMs: 1000,
+        pruneIntervalMs: 0,
+        logger,
+      });
+
+      const errorMap = {
+        entries: () => {
+          throw "string error";
+        },
+      };
+      (limiter as unknown as { timestamps: unknown }).timestamps = errorMap;
+
+      expect(() => limiter.prune(Date.now())).toThrow("string error");
+      const errorLog = logger.errorLogs.find(
+        (l) => l.context?.["operation"] === "rate_limiter_prune_error",
+      );
+      expect(errorLog).toBeDefined();
+      expect((errorLog?.context?.["error"] as { raw: unknown })?.raw).toBe("string error");
+    });
+
+    it("prunes partially expired timestamps when valid.length < list.length", () => {
+      const now = 500_000;
+      limiter.consume("partial-client", now - 15_000); // expired
+      limiter.consume("partial-client", now - 2_000); // active
+      expect(limiter.getRemaining("partial-client", now)).toBe(4);
+
+      const deleted = limiter.prune(now);
+      expect(deleted).toBe(0); // not deleted because 1 valid remains
+      expect(limiter.getRemaining("partial-client", now)).toBe(4);
+    });
+
+    it("check() and getRemaining() clean up key when all existing timestamps have expired", () => {
+      const now = 600_000;
+      limiter.consume("all-expired", now - 15_000);
+
+      // check() triggers cleanup
+      expect(limiter.check("all-expired", now)).toBe(true);
+
+      // re-consume and test getRemaining cleanup
+      limiter.consume("all-expired-2", now - 15_000);
+      expect(limiter.getRemaining("all-expired-2", now)).toBe(5);
+    });
+  });
+
+  describe("createSocketRateLimiter & getLimitDescription", () => {
+    it("creates configured instance and returns human-readable limit description", () => {
+      const instance = createSocketRateLimiter({ maxRequests: 20, windowMs: 5_000 });
+      expect(instance.getLimitDescription()).toBe("Maximum 20 requests per 5 seconds allowed.");
+      instance.destroy();
+
+      const defaultInstance = createSocketRateLimiter();
+      expect(defaultInstance.getLimitDescription()).toBe("Maximum 60 requests per 10 seconds allowed.");
+      defaultInstance.destroy();
     });
   });
 });

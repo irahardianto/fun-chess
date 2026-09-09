@@ -1,9 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type {
-  RoomState,
-  IClock,
-  IIdGenerator,
-} from "@fun-chess/shared";
+import type { RoomState, IClock, IIdGenerator } from "@fun-chess/shared";
 import { RoomStore, RoomMutator } from "./room.store.js";
 import {
   RoomNotFoundError,
@@ -14,7 +10,7 @@ import {
   StaleLockExecutionError,
   RoomCapacityExceededError,
 } from "./room.errors.js";
-import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
+import { SystemClock } from "../../platform/time/index.js";
 import { type Logger, defaultLogger } from "../../platform/logger/index.js";
 
 export const MAX_ROOMS = 10_000;
@@ -39,7 +35,10 @@ export class InMemoryRoomStore implements RoomStore {
   private readonly rooms = new Map<string, RoomState>();
   private readonly lockQueues = new Map<string, LockEntry>();
   // PERF: Reverse index from socketId -> { roomCode, playerId } for O(1) disconnect lookups (HIGH-006)
-  private readonly socketIndex = new Map<string, { roomCode: string; playerId: string }>();
+  private readonly socketIndex = new Map<
+    string,
+    { roomCode: string; playerId: string }
+  >();
   // PERF: Reverse index from roomCode -> Set<socketId> for O(k) cleanup instead of O(N) scan
   private readonly roomSockets = new Map<string, Set<string>>();
 
@@ -65,12 +64,11 @@ export class InMemoryRoomStore implements RoomStore {
   public EXECUTION_TIMEOUT_MS = 5000;
   public maxRooms: number = MAX_ROOMS;
   private readonly clock: IClock;
-  private readonly idGenerator: IIdGenerator;
   private readonly logger: Logger;
 
   constructor(
     clockOrLogger?: IClock | Logger,
-    idGenerator?: IIdGenerator,
+    _idGenerator?: IIdGenerator,
     optionsOrLogger?:
       | Logger
       | {
@@ -95,10 +93,8 @@ export class InMemoryRoomStore implements RoomStore {
     ) {
       resolvedLogger = clockOrLogger as Logger;
       this.clock = new SystemClock();
-      this.idGenerator = new UuidGenerator();
     } else {
       this.clock = (clockOrLogger as IClock) ?? new SystemClock();
-      this.idGenerator = idGenerator ?? new UuidGenerator();
       if (optionsOrLogger) {
         if (
           "info" in optionsOrLogger &&
@@ -138,11 +134,17 @@ export class InMemoryRoomStore implements RoomStore {
 
     const sockets = new Set<string>();
     if (room.whitePlayer?.socketId) {
-      this.socketIndex.set(room.whitePlayer.socketId, { roomCode: code, playerId: room.whitePlayer.id });
+      this.socketIndex.set(room.whitePlayer.socketId, {
+        roomCode: code,
+        playerId: room.whitePlayer.id,
+      });
       sockets.add(room.whitePlayer.socketId);
     }
     if (room.blackPlayer?.socketId) {
-      this.socketIndex.set(room.blackPlayer.socketId, { roomCode: code, playerId: room.blackPlayer.id });
+      this.socketIndex.set(room.blackPlayer.socketId, {
+        roomCode: code,
+        playerId: room.blackPlayer.id,
+      });
       sockets.add(room.blackPlayer.socketId);
     }
     if (room.spectators) {
@@ -174,7 +176,10 @@ export class InMemoryRoomStore implements RoomStore {
     if (!ctx) return;
     if (ctx.roomCode !== code) return;
 
-    if (this.cancelledTickets.has(ctx.ticket) || this.activeTickets.get(code) !== ctx.ticket) {
+    if (
+      this.cancelledTickets.has(ctx.ticket) ||
+      this.activeTickets.get(code) !== ctx.ticket
+    ) {
       throw new StaleLockExecutionError(code, ctx.ticket);
     }
   }
@@ -318,21 +323,31 @@ export class InMemoryRoomStore implements RoomStore {
             roomCode: code,
             ticket,
           });
-          reject(new LockExecutionTimeoutError(code, this.EXECUTION_TIMEOUT_MS));
+          reject(
+            new LockExecutionTimeoutError(code, this.EXECUTION_TIMEOUT_MS),
+          );
         }, this.EXECUTION_TIMEOUT_MS);
       });
 
-      const actionPromise = this.lockContextStorage.run(context, () => action(context));
+      const actionPromise = this.lockContextStorage.run(context, () =>
+        action(context),
+      );
 
       // Absorb post-timeout rejections to prevent unhandled promise rejection (CRIT-002)
       actionPromise.catch((err) => {
         if (timedOut) {
-          this.logger.warn("Orphaned lock action rejected after execution timeout", {
-            operation: "room_lock_orphaned_action_rejection",
-            roomCode: code,
-            ticket,
-            error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
-          });
+          this.logger.warn(
+            "Orphaned lock action rejected after execution timeout",
+            {
+              operation: "room_lock_orphaned_action_rejection",
+              roomCode: code,
+              ticket,
+              error:
+                err instanceof Error
+                  ? { name: err.name, message: err.message, stack: err.stack }
+                  : { raw: err },
+            },
+          );
         }
       });
 
@@ -455,7 +470,9 @@ export class InMemoryRoomStore implements RoomStore {
       }
     }
 
-    const nextVersion = existing ? (existing.version || 1) + 1 : (room.version || 1);
+    const nextVersion = existing
+      ? (existing.version || 1) + 1
+      : room.version || 1;
     const roomToSave: RoomState = {
       ...structuredClone(room),
       version: nextVersion,

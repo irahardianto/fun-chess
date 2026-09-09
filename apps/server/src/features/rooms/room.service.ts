@@ -16,7 +16,11 @@ import { IRoomService, IRoomGameAdapter } from "./room.interface.js";
 import { SessionRegistry } from "./session_registry.js";
 import { InMemorySessionRegistry } from "./in_memory_session_registry.js";
 import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
-import { type Logger, defaultLogger, runLoggedJob } from "../../platform/logger/index.js";
+import {
+  type Logger,
+  defaultLogger,
+  runLoggedJob,
+} from "../../platform/logger/index.js";
 import {
   type IDisconnectTimerRegistry,
   DisconnectTimerRegistry,
@@ -332,8 +336,11 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       this.timerRegistry.cancel(normalizedCode, leavingPlayer.id);
 
       const now = this.clock.now();
-      const { nextRoom, shouldDelete, gameOverPayload } =
-        leaveRoomTransition(room, leavingPlayer.id, now);
+      const { nextRoom, shouldDelete, gameOverPayload } = leaveRoomTransition(
+        room,
+        leavingPlayer.id,
+        now,
+      );
 
       if (shouldDelete || gameOverPayload) {
         this.timerRegistry.cancelAllForRoom(normalizedCode);
@@ -344,6 +351,10 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         await this.sessionRegistry.deleteSessionsForRoom(normalizedCode);
       } else {
         await this.store.save(nextRoom);
+        await this.sessionRegistry.deleteSessionForPlayer(
+          normalizedCode,
+          leavingPlayer.id,
+        );
       }
 
       return {
@@ -361,7 +372,10 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
    */
   public async handleDisconnect(
     socketId: string,
-    onForfeit?: (room: RoomState, gameOverPayload: GameOverPayload) => void | Promise<void>,
+    onForfeit?: (
+      room: RoomState,
+      gameOverPayload: GameOverPayload,
+    ) => void | Promise<void>,
     gracePeriodMs = DISCONNECT_GRACE_PERIOD_MS,
     timerRegistry?: IDisconnectTimerRegistry,
   ): Promise<{
@@ -378,6 +392,27 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     return this.store.withLock(matchedRoom.roomCode, async () => {
       const room = await this.store.findByCode(matchedRoom.roomCode);
       if (!room) return null;
+
+      // CRIT-001: verify under lock that player's current socket matches the disconnecting socket
+      const currentPlayer =
+        room.whitePlayer?.id === playerId
+          ? room.whitePlayer
+          : room.blackPlayer?.id === playerId
+            ? room.blackPlayer
+            : (room.spectators.find((s) => s.id === playerId) ?? null);
+
+      if (!currentPlayer) return null;
+
+      if (currentPlayer.socketId !== socketId) {
+        this.logger.debug("Stale disconnect event ignored", {
+          operation: "handle_disconnect",
+          roomCode: matchedRoom.roomCode,
+          playerId,
+          expectedSocketId: currentPlayer.socketId,
+          actualSocketId: socketId,
+        });
+        return null;
+      }
 
       const now = this.clock.now();
       const { nextRoom, paused, droppedPlayer } = disconnectPlayerTransition(
@@ -412,7 +447,10 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
                   playerId,
                 );
                 if (forfeitResult && onForfeit) {
-                  await onForfeit(forfeitResult.room, forfeitResult.gameOverPayload);
+                  await onForfeit(
+                    forfeitResult.room,
+                    forfeitResult.gameOverPayload,
+                  );
                 }
                 return {
                   roomCode: matchedRoom.roomCode,
@@ -422,15 +460,18 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
               },
             );
           } catch (err) {
-            this.logger.error("Disconnect grace period abandonment job failed", {
-              operation: "disconnect_grace_period_abandonment",
-              roomCode: matchedRoom.roomCode,
-              playerId,
-              error:
-                err instanceof Error
-                  ? { name: err.name, message: err.message, stack: err.stack }
-                  : { raw: err },
-            });
+            this.logger.error(
+              "Disconnect grace period abandonment job failed",
+              {
+                operation: "disconnect_grace_period_abandonment",
+                roomCode: matchedRoom.roomCode,
+                playerId,
+                error:
+                  err instanceof Error
+                    ? { name: err.name, message: err.message, stack: err.stack }
+                    : { raw: err },
+              },
+            );
           }
         }, gracePeriodMs);
 
@@ -675,23 +716,5 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       code += ROOM_CODE_CHARSET.charAt(idx);
     }
     return code;
-  }
-
-  /**
-   * Generates a 4-letter uppercase room code, ensuring uniqueness against current store.
-   */
-  private async generateUniqueRoomCode(): Promise<string> {
-    let attempts = 0;
-    while (attempts < 100) {
-      const code = this.generateRoomCodeCandidate();
-      const existing = await this.store.findByCode(code);
-      if (!existing) {
-        return code;
-      }
-      attempts++;
-    }
-
-    // Fallback timestamp code
-    return `R${this.clock.now().toString(36).toUpperCase().slice(-3)}`;
   }
 }

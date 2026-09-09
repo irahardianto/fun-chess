@@ -128,4 +128,51 @@ describe('AiGameOverModal.vue', () => {
     expect(rematchBtn).not.toBeNull();
     expect(document.activeElement).toBe(rematchBtn);
   });
+
+  it('renders draw outcome accurately with draw banner and dialogue', () => {
+    wrapper = mount(AiGameOverModal, {
+      props: {
+        modelValue: true,
+        isDraw: true,
+        payload: { ...mockPayload, durationSeconds: 125, winner: 'draw' },
+        mascot: peanutPup,
+      },
+    });
+
+    expect(document.body.textContent).toContain("It's a Draw! ⚖️");
+    expect(document.body.textContent).toContain('A balanced match against Peanut the Pup');
+    expect(document.body.textContent).toContain('2m 5s');
+    expect(document.body.textContent).toContain('Draw ⚖️');
+  });
+
+  it('renders defeat outcome when AI wins', () => {
+    wrapper = mount(AiGameOverModal, {
+      props: {
+        modelValue: true,
+        isPlayerWinner: false,
+        isDraw: false,
+        payload: { ...mockPayload, durationSeconds: 30, winner: 'b' },
+        mascot: peanutPup,
+      },
+    });
+
+    expect(document.body.textContent).toContain('Good Match! 👏');
+    expect(document.body.textContent).toContain('Great effort against Peanut the Pup');
+    expect(document.body.textContent).toContain('Completed');
+  });
+
+  it('handles undefined mascot, null payload, and isOpen prop gracefully', () => {
+    wrapper = mount(AiGameOverModal, {
+      props: {
+        isOpen: true,
+        payload: null,
+        mascot: undefined,
+      },
+    });
+
+    expect(document.body.textContent).toContain('Good Match! 👏');
+    expect(document.body.textContent).toContain('Great effort against the AI!');
+    expect(document.body.textContent).toContain('0s');
+    expect(document.body.textContent).toContain('Play Again with AI');
+  });
 });

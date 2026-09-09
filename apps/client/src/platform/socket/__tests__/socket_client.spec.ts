@@ -53,4 +53,30 @@ describe('socket_client factory', () => {
       query: { correlationId: 'corr-xyz-123' },
     }));
   });
+
+  it('falls back to http://localhost:3000 when window is undefined', () => {
+    const originalWindow = globalThis.window;
+    // @ts-expect-error test environment manipulation
+    delete globalThis.window;
+    try {
+      createSocketClient();
+      expect(io).toHaveBeenCalledWith('http://localhost:3000', expect.any(Object));
+    } finally {
+      globalThis.window = originalWindow;
+    }
+  });
+
+  it('passes custom reconnectionDelayMax when provided in options', () => {
+    createSocketClient({ reconnectionDelayMax: 5000 });
+    expect(io).toHaveBeenCalledWith(window.location.origin, expect.objectContaining({
+      reconnectionDelayMax: 5000,
+    }));
+  });
+
+  it('defaults reconnectionDelayMax to 10000 when options object is provided without reconnectionDelayMax', () => {
+    createSocketClient({});
+    expect(io).toHaveBeenCalledWith(window.location.origin, expect.objectContaining({
+      reconnectionDelayMax: 10000,
+    }));
+  });
 });

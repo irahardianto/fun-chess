@@ -12,6 +12,7 @@ import {
   resetTransportState,
 } from '../composables/useSocketTransport';
 import { STORAGE_KEYS } from '@/platform/storage';
+import { logger } from '@/platform/telemetry';
 import type { Player, RoomState, SavedSession, GameState } from '@fun-chess/shared';
 
 describe('useRoomSession composable', () => {
@@ -270,6 +271,7 @@ describe('useRoomSession composable', () => {
           ack({
             success: true,
             room: mockCreatedRoom,
+            player: mockCreatedRoom.whitePlayer!,
             sessionToken: 'token_created_123',
           });
         }
@@ -600,6 +602,68 @@ describe('useRoomSession composable', () => {
       expect(session.currentRoom.value?.blackPlayer).toBeNull();
     });
 
+    it('clears session and redirects to /multiplayer when host_left reason is received (CRIT-004)', () => {
+      const originalLocation = window.location;
+      const assignMock = vi.fn();
+      delete (window as any).location;
+      (window as any).location = { assign: assignMock };
+
+      const session = useRoomSession();
+      session.currentRoom.value = createTestRoom();
+      session.currentPlayer.value = createTestPlayer();
+      session.sessionToken.value = 'tok_active';
+      saveSession({
+        roomCode: 'STAR',
+        playerId: UUID_P1,
+        sessionToken: 'tok_active',
+      });
+
+      eventHandlers['room:player_left']!({
+        playerId: UUID_P1,
+        playerName: 'Alice',
+        reason: 'host_left',
+      });
+
+      expect(session.currentRoom.value).toBeNull();
+      expect(session.currentPlayer.value).toBeNull();
+      expect(session.sessionToken.value).toBeNull();
+      expect(getSavedSession()).toBeNull();
+      expect(assignMock).toHaveBeenCalledWith('/multiplayer');
+
+      (window as any).location = originalLocation;
+    });
+
+    it('clears session and redirects to /multiplayer when room_closed reason is received (CRIT-004)', () => {
+      const originalLocation = window.location;
+      const assignMock = vi.fn();
+      delete (window as any).location;
+      (window as any).location = { assign: assignMock };
+
+      const session = useRoomSession();
+      session.currentRoom.value = createTestRoom();
+      session.currentPlayer.value = createTestPlayer();
+      session.sessionToken.value = 'tok_active';
+      saveSession({
+        roomCode: 'STAR',
+        playerId: UUID_P1,
+        sessionToken: 'tok_active',
+      });
+
+      eventHandlers['room:player_left']!({
+        playerId: UUID_P1,
+        playerName: 'Alice',
+        reason: 'room_closed',
+      });
+
+      expect(session.currentRoom.value).toBeNull();
+      expect(session.currentPlayer.value).toBeNull();
+      expect(session.sessionToken.value).toBeNull();
+      expect(getSavedSession()).toBeNull();
+      expect(assignMock).toHaveBeenCalledWith('/multiplayer');
+
+      (window as any).location = originalLocation;
+    });
+
     it('completely resets room session state on resetRoomSessionState()', () => {
       const session = useRoomSession();
       session.currentRoom.value = createTestRoom();
@@ -617,6 +681,255 @@ describe('useRoomSession composable', () => {
       expect(session.currentPlayer.value).toBeNull();
       expect(session.sessionToken.value).toBeNull();
       expect(getSavedSession()).toBeNull();
+    });
+
+    it('handles custom storage injection and storage failure catch blocks', () => {
+      const originalSetItem = sessionStorage.setItem;
+      const originalRemoveItem = sessionStorage.removeItem;
+      sessionStorage.setItem = vi.fn(() => {
+        throw new Error('Quota exceeded');
+      });
+      sessionStorage.removeItem = vi.fn(() => {
+        throw new Error('Storage delete error');
+      });
+
+      try {
+        expect(() => {
+          saveSession({ roomCode: 'FAIL', playerId: UUID_P1, sessionToken: 'tok_fail' });
+        }).not.toThrow();
+
+        expect(() => {
+          clearSession();
+        }).not.toThrow();
+      } finally {
+        sessionStorage.setItem = originalSetItem;
+        sessionStorage.removeItem = originalRemoveItem;
+      }
+
+      // getSavedSession returns null when JSON is invalid
+      sessionStorage.setItem(SESSION_STORAGE_KEY, '{ invalid_json');
+      expect(getSavedSession()).toBeNull();
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    });
+
+    it('accurately computes isSpectator when currentPlayer is in spectator list', () => {
+      const session = useRoomSession();
+      const specPlayer = createTestPlayer({ id: UUID_SPEC, isHost: false });
+      const room = createTestRoom({
+        spectators: [specPlayer],
+      });
+
+      session.currentRoom.value = room;
+      session.currentPlayer.value = specPlayer;
+
+      expect(session.isSpectator.value).toBe(true);
+      expect(session.isHost.value).toBe(false);
+
+      session.currentPlayer.value = null;
+      expect(session.isSpectator.value).toBe(false);
+      expect(session.isHost.value).toBe(false);
+    });
+
+    it('rejects createRoom and joinRoom with validation error on invalid input', async () => {
+      const session = useRoomSession();
+      resetTransportState();
+      useSocketTransport();
+
+      // createRoom with empty playerName
+      const createRes = await session.createRoom('');
+      expect(createRes.success).toBe(false);
+      if (!createRes.success) {
+        expect(createRes.error.code).toBe('ERR_INVALID_PAYLOAD');
+      }
+
+      // joinRoom with empty code and name
+      const joinRes = await session.joinRoom('', '');
+      expect(joinRes.success).toBe(false);
+      if (!joinRes.success) {
+        expect(joinRes.error.code).toBe('ERR_INVALID_PAYLOAD');
+      }
+    });
+
+    it('falls back to socket ID and host ID matching in createRoom when res.player is absent', async () => {
+      const session = useRoomSession();
+      const s = createMockSocket({ id: 'sock_white_1' });
+      s.emit = vi.fn((event: string, _payload: any, ack: Function) => {
+        if (event === 'room:create') {
+          const room = createTestRoom({
+            whitePlayer: createTestPlayer({ id: UUID_P1, socketId: 'sock_white_1' }),
+            blackPlayer: null,
+            hostId: UUID_P1,
+          });
+          ack({
+            success: true,
+            room,
+            sessionToken: 'tok_white',
+          });
+        }
+      });
+
+      resetTransportState();
+      const transport = useSocketTransport();
+      transport.socket.value = s as any;
+
+      const res = await session.createRoom('WhiteHost', 'w');
+      expect(res.success).toBe(true);
+      expect(session.currentPlayer.value?.id).toBe(UUID_P1);
+    });
+
+    it('falls back to blackPlayer when socketId matches blackPlayer or hostId matches blackPlayer', async () => {
+      const session = useRoomSession();
+      const s = createMockSocket({ id: 'sock_black_1' });
+      s.emit = vi.fn((event: string, _payload: any, ack: Function) => {
+        if (event === 'room:create') {
+          const room = createTestRoom({
+            whitePlayer: null,
+            blackPlayer: createTestPlayer({ id: UUID_P2, socketId: 'sock_black_1' }),
+            hostId: UUID_P2,
+          });
+          ack({
+            success: true,
+            room,
+            sessionToken: 'tok_black',
+          });
+        }
+      });
+
+      resetTransportState();
+      const transport = useSocketTransport();
+      transport.socket.value = s as any;
+
+      const res = await session.createRoom('BlackHost', 'b');
+      expect(res.success).toBe(true);
+      expect(session.currentPlayer.value?.id).toBe(UUID_P2);
+
+      // Also test hostId matches blackPlayer when socketId does not match
+      const s2 = createMockSocket({ id: 'other_sock' });
+      s2.emit = vi.fn((event: string, _payload: any, ack: Function) => {
+        if (event === 'room:create') {
+          const room = createTestRoom({
+            whitePlayer: null,
+            blackPlayer: createTestPlayer({ id: UUID_P2, socketId: 'different_sock' }),
+            hostId: UUID_P2,
+          });
+          ack({
+            success: true,
+            room,
+            sessionToken: 'tok_black_host',
+          });
+        }
+      });
+      transport.socket.value = s2 as any;
+      const res2 = await session.createRoom('BlackHost2', 'b');
+      expect(res2.success).toBe(true);
+      expect(session.currentPlayer.value?.id).toBe(UUID_P2);
+    });
+
+    it('handles leaveRoom failure response from server', async () => {
+      const session = useRoomSession();
+      const s = createMockSocket();
+      s.emit = vi.fn((event: string, _payload: any, ack: Function) => {
+        if (event === 'room:leave') {
+          ack({ success: false });
+        }
+      });
+
+      resetTransportState();
+      const transport = useSocketTransport();
+      transport.socket.value = s as any;
+
+      session.currentRoom.value = createTestRoom();
+      const cb = vi.fn();
+      const success = await session.leaveRoom('ROOM', cb);
+      expect(success).toBe(false);
+      expect(cb).toHaveBeenCalledWith({ success: false });
+    });
+
+    it('handles leaveRoom immediately when socket is disconnected', async () => {
+      const session = useRoomSession();
+      resetTransportState();
+      const transport = useSocketTransport();
+      transport.socket.value = null;
+
+      session.currentRoom.value = createTestRoom();
+      const res = await session.leaveRoom('ROOM');
+      expect(res).toBe(true);
+      expect(session.currentRoom.value).toBeNull();
+    });
+  });
+
+  describe('Mandatory Operation Start Logging (MIN-012)', () => {
+    it('logs operation start at info level for createRoom, joinRoom, reconnect, and leaveRoom', async () => {
+      const infoSpy = vi.spyOn(logger, 'info');
+      const session = useRoomSession();
+      const s = createMockSocket();
+      s.emit = vi.fn((event: string, _payload: any, ack?: Function) => {
+        if (ack) {
+          if (event === 'room:create' || event === 'room:join') {
+            ack({
+              success: true,
+              room: createTestRoom(),
+              player: createTestPlayer(),
+              sessionToken: 'token-123',
+            });
+          } else if (event === 'room:reconnect') {
+            ack({
+              success: true,
+              room: createTestRoom(),
+              player: createTestPlayer(),
+            });
+          } else if (event === 'room:leave') {
+            ack({ success: true });
+          }
+        }
+      });
+      useSocketTransport(s as any);
+
+      // createRoom
+      await session.createRoom('Alice', 'w');
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Creating room',
+        expect.objectContaining({
+          operation: 'socket_room_create',
+          playerName: 'Alice',
+          correlationId: expect.any(String),
+        })
+      );
+
+      // joinRoom
+      await session.joinRoom('ABCD', 'Bob');
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Joining room',
+        expect.objectContaining({
+          operation: 'socket_room_join',
+          roomCode: 'ABCD',
+          playerName: 'Bob',
+          correlationId: expect.any(String),
+        })
+      );
+
+      // reconnect
+      await session.reconnect('ABCD', UUID_P1, 'token-123');
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Reconnecting room',
+        expect.objectContaining({
+          operation: 'socket_room_reconnect',
+          roomCode: 'ABCD',
+          playerId: UUID_P1,
+          correlationId: expect.any(String),
+        })
+      );
+
+      // leaveRoom
+      await session.leaveRoom('ABCD');
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Leaving room',
+        expect.objectContaining({
+          operation: 'socket_room_leave',
+          roomCode: 'ABCD',
+          correlationId: expect.any(String),
+        })
+      );
     });
   });
 });

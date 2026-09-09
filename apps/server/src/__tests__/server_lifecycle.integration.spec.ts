@@ -453,7 +453,10 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
         "Uncaught syntax/runtime bug in thread",
       );
 
-      expect(shutdownSpy).toHaveBeenCalledWith("uncaughtException");
+      expect(shutdownSpy).toHaveBeenCalledWith(
+        "uncaughtException",
+        expect.any(String),
+      );
     });
 
     it("handles HTTP server socket fatal errors and initiates serverError shutdown", () => {
@@ -488,7 +491,10 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
         (fatalLog?.context?.error as { message?: string })?.message,
       ).toContain("EADDRINUSE");
 
-      expect(shutdownSpy).toHaveBeenCalledWith("serverError");
+      expect(shutdownSpy).toHaveBeenCalledWith(
+        "serverError",
+        expect.any(String),
+      );
     });
 
     it("registers SIGINT and SIGTERM handlers that initiate shutdown", () => {

@@ -31,6 +31,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean];
   rematch: [];
   changeOpponent: [];
+  'change-opponent': [];
   lobby: [];
   close: [];
 }>();

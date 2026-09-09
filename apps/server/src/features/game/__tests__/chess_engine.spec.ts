@@ -608,7 +608,18 @@ describe("ChessEngine", () => {
       const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
       expect(ChessEngine.findKingSquare(fen, "w")).toBe("e1");
       expect(ChessEngine.findKingSquare(fen, "b")).toBe("e8");
-      expect(ChessEngine.findKingSquare("invalid-fen", "w")).toBeNull();
+
+      const debugSpy = vi.fn();
+      const mockLogger = { debug: debugSpy } as unknown as import("../../../platform/logger/index.js").Logger;
+      expect(ChessEngine.findKingSquare("invalid-fen", "w", mockLogger)).toBeNull();
+      expect(debugSpy).toHaveBeenCalledWith(
+        "FEN parsing failed during king square lookup",
+        expect.objectContaining({
+          operation: "chess_engine_find_king_square",
+          fen: "invalid-fen",
+          color: "w",
+        }),
+      );
     });
   });
 });

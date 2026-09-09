@@ -369,6 +369,235 @@ describe('AudioSynthesizer', () => {
       }),
     );
   });
+
+  it('safely skips all 17 sound effect methods when muted is true', () => {
+    const mockAudioContext = {
+      currentTime: 0,
+      state: 'running',
+      destination: {},
+      createOscillator: vi.fn(),
+      createGain: vi.fn(),
+      resume: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.stubGlobal('AudioContext', vi.fn(function() { return mockAudioContext; }));
+
+    const audioSynth = new AudioSynthesizer({ muted: true });
+    expect(audioSynth.isMuted()).toBe(true);
+
+    audioSynth.playMove();
+    audioSynth.playCapture();
+    audioSynth.playCheck();
+    audioSynth.playCheckmate();
+    audioSynth.playVictory();
+    audioSynth.playDefeat();
+    audioSynth.playDraw();
+    audioSynth.playError();
+    audioSynth.playClick();
+    audioSynth.playPickup();
+    audioSynth.playTurnNotification();
+    audioSynth.playStart();
+    audioSynth.playHint();
+    audioSynth.playStarEarned();
+    audioSynth.playMascotHappy();
+    audioSynth.playMascotBlunder();
+    audioSynth.playStepComplete();
+
+    expect(mockAudioContext.createOscillator).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('safely handles audio synthesis error catches across all sound methods when Web Audio throws', () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const mockGain = {
+      gain: {
+        setValueAtTime: vi.fn(),
+        linearRampToValueAtTime: vi.fn(),
+        exponentialRampToValueAtTime: vi.fn(),
+      },
+      connect: vi.fn(),
+    };
+
+    const mockAudioContext = {
+      currentTime: 10,
+      state: 'running',
+      destination: {},
+      createGain: vi.fn(() => mockGain),
+      createOscillator: vi.fn(() => {
+        throw new Error('Hardware audio node allocation failure');
+      }),
+      resume: vi.fn().mockResolvedValue(undefined),
+    };
+
+    vi.stubGlobal('AudioContext', vi.fn(function() { return mockAudioContext; }));
+
+    const audioSynth = new AudioSynthesizer({ muted: false });
+    audioSynth.initContext();
+
+    audioSynth.playMove();
+    audioSynth.playCapture();
+    audioSynth.playCheck();
+    audioSynth.playCheckmate();
+    audioSynth.playVictory();
+    audioSynth.playDefeat();
+    audioSynth.playDraw();
+    audioSynth.playError();
+    audioSynth.playClick();
+    audioSynth.playPickup();
+    audioSynth.playTurnNotification();
+    audioSynth.playStart();
+    audioSynth.playHint();
+    audioSynth.playStarEarned();
+    audioSynth.playMascotHappy();
+    audioSynth.playMascotBlunder();
+    audioSynth.playStepComplete();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to play move sound',
+      expect.objectContaining({ operation: 'audio_play_move' }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to play capture sound',
+      expect.objectContaining({ operation: 'audio_play_capture' }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to play check sound',
+      expect.objectContaining({ operation: 'audio_play_check' }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to play checkmate sound',
+      expect.objectContaining({ operation: 'audio_play_checkmate' }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to play victory sound',
+      expect.objectContaining({ operation: 'audio_play_victory' }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to play defeat sound',
+      expect.objectContaining({ operation: 'audio_play_defeat' }),
+    );
+
+    warnSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('triggers user gesture unlock and document visibility change events via bootstrap()', () => {
+    const resumeSpy = vi.fn().mockResolvedValue(undefined);
+    const mockAudioContext = {
+      currentTime: 0,
+      state: 'suspended',
+      destination: {},
+      createGain: vi.fn(() => ({
+        gain: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      })),
+      resume: resumeSpy,
+    };
+    vi.stubGlobal('AudioContext', vi.fn(function() { return mockAudioContext; }));
+
+    const audioSynth = new AudioSynthesizer();
+    audioSynth.bootstrap();
+
+    // Trigger unlock event
+    window.dispatchEvent(new Event('pointerdown'));
+
+    // Trigger visibilitychange when document is visible
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    // Trigger visibilitychange when document is hidden
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    // Trigger pagehide
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(resumeSpy).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('safely handles all 17 sound effects when WebAudio is unsupported or masterGain is null', () => {
+    vi.stubGlobal('AudioContext', undefined);
+    vi.stubGlobal('webkitAudioContext', undefined);
+    const audioSynth = new AudioSynthesizer();
+    expect(audioSynth.initContext()).toBeNull();
+
+    expect(() => {
+      audioSynth.playClick();
+      audioSynth.playPickup();
+      audioSynth.playMove();
+      audioSynth.playCapture();
+      audioSynth.playCheck();
+      audioSynth.playCheckmate();
+      audioSynth.playVictory();
+      audioSynth.playDefeat();
+      audioSynth.playDraw();
+      audioSynth.playError();
+      audioSynth.playTurnNotification();
+      audioSynth.playStart();
+      audioSynth.playHint();
+      audioSynth.playStarEarned();
+      audioSynth.playMascotHappy();
+      audioSynth.playMascotBlunder();
+      audioSynth.playStepComplete();
+    }).not.toThrow();
+    vi.unstubAllGlobals();
+  });
+
+  it('safely catches errors and non-Error rejections during sound synthesis', () => {
+    const mockAudioContext = {
+      currentTime: 100,
+      state: 'running',
+      destination: {},
+      createOscillator: vi.fn(() => {
+        throw new Error('Oscillator hardware failure');
+      }),
+      createGain: vi.fn(() => ({
+        gain: {
+          setValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+          linearRampToValueAtTime: vi.fn(),
+        },
+        connect: vi.fn(),
+      })),
+      resume: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.stubGlobal('AudioContext', vi.fn(function () {
+      return mockAudioContext;
+    }));
+
+    const s = new AudioSynthesizer({ muted: false });
+    expect(() => {
+      s.playClick();
+      s.playMove();
+      s.playCapture();
+      s.playCheck();
+      s.playCheckmate();
+      s.playVictory();
+      s.playDefeat();
+      s.playDraw();
+      s.playError();
+      s.playTurnNotification();
+      s.playStart();
+      s.playHint();
+      s.playStarEarned();
+      s.playMascotHappy();
+      s.playMascotBlunder();
+      s.playStepComplete();
+    }).not.toThrow();
+
+    // Throw raw non-Error string
+    mockAudioContext.createOscillator = vi.fn(() => {
+      throw 'Raw string oscillator error';
+    });
+    expect(() => {
+      s.playClick();
+      s.playMove();
+      s.playCapture();
+    }).not.toThrow();
+
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('NullAudioService', () => {

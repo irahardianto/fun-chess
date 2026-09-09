@@ -104,6 +104,24 @@ describe('SC-5 Accessibility (a11y) & Touch Target Verification', () => {
     it('ScenarioCategoryList category tab buttons enforce 44px min-height on mobile', () => {
       expect(scenarioCategoryListSrc).toMatch(/@media\s*\(max-width:\s*640px\)[\s\S]*?\.category-tab-btn\s*\{[\s\S]*?min-height:\s*44px/);
     });
+
+    it('SoloAiArena hint close button enforces 44x44px touch target with flex centering (UX-002)', () => {
+      expect(soloAiArenaSrc).toMatch(/\.hint-close-btn\s*\{[^}]*min-width:\s*44px/s);
+      expect(soloAiArenaSrc).toMatch(/\.hint-close-btn\s*\{[^}]*min-height:\s*44px/s);
+      expect(soloAiArenaSrc).toMatch(/\.hint-close-btn\s*\{[^}]*display:\s*inline-flex/s);
+      expect(soloAiArenaSrc).toMatch(/\.hint-close-btn\s*\{[^}]*align-items:\s*center/s);
+      expect(soloAiArenaSrc).toMatch(/\.hint-close-btn\s*\{[^}]*justify-content:\s*center/s);
+    });
+
+    it('QrScannerView manual drawer toggle enforces 44px minimum touch target with flex centering (UX-002)', () => {
+      const qrScannerViewPath = path.resolve(__dirname, '../features/portability/components/QrScannerView.vue');
+      const qrScannerViewSrc = fs.readFileSync(qrScannerViewPath, 'utf-8');
+
+      expect(qrScannerViewSrc).toMatch(/\.manual-drawer-toggle\s*\{[^}]*min-height:\s*44px/s);
+      expect(qrScannerViewSrc).toMatch(/\.manual-drawer-toggle\s*\{[^}]*display:\s*inline-flex/s);
+      expect(qrScannerViewSrc).toMatch(/\.manual-drawer-toggle\s*\{[^}]*align-items:\s*center/s);
+      expect(qrScannerViewSrc).toMatch(/\.manual-drawer-toggle\s*\{[^}]*justify-content:\s*center/s);
+    });
   });
 
   describe('2. ARIA Roles, Labels, and Semantic Hierarchy', () => {

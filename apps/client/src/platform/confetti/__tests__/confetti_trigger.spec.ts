@@ -144,4 +144,59 @@ describe('ConfettiTrigger', () => {
     trigger.dispose();
     expect(clearSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('cancels existing burst timeout when triggerVictoryConfetti is called in quick succession', () => {
+    vi.useFakeTimers();
+
+    trigger.triggerVictoryConfetti();
+    expect(mockConfetti).toHaveBeenCalledTimes(2);
+
+    // Call again immediately before center burst fires
+    trigger.triggerVictoryConfetti();
+    // 2 initial cannons again = 4 calls total
+    expect(mockConfetti).toHaveBeenCalledTimes(4);
+
+    vi.advanceTimersByTime(350);
+    // Only one center burst fires for the second call
+    expect(mockConfetti).toHaveBeenCalledTimes(5);
+
+    vi.useRealTimers();
+  });
+
+  it('handles center burst errors gracefully when confetti function throws', () => {
+    vi.useFakeTimers();
+
+    let callCount = 0;
+    mockConfetti.mockImplementation(() => {
+      callCount++;
+      if (callCount === 3) {
+        throw new Error('Center burst explosion failure');
+      }
+    });
+
+    trigger.triggerVictoryConfetti();
+    expect(() => vi.advanceTimersByTime(350)).not.toThrow();
+
+    vi.useRealTimers();
+  });
+
+  it('handles non-Error thrown objects during confetti calls', () => {
+    const stringThrowConfetti = vi.fn(() => {
+      throw 'Raw string error in confetti';
+    });
+    const stringTrigger = new ConfettiTrigger(stringThrowConfetti as unknown as typeof import('canvas-confetti'));
+
+    expect(() => {
+      stringTrigger.triggerVictoryConfetti();
+      stringTrigger.triggerDrawCelebration();
+      stringTrigger.triggerCustom();
+    }).not.toThrow();
+  });
+
+  it('exports triggerVictoryConfetti convenience function and defaultConfettiTrigger singleton', async () => {
+    const { triggerVictoryConfetti, confettiTrigger, defaultConfettiTrigger } = await import('../confetti_trigger');
+    expect(defaultConfettiTrigger).toBeDefined();
+    expect(confettiTrigger).toBe(defaultConfettiTrigger);
+    expect(() => triggerVictoryConfetti()).not.toThrow();
+  });
 });

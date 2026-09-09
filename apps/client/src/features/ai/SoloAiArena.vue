@@ -8,6 +8,7 @@ import { PlayerBadge, CapturedTray, MoveHistoryList } from '../hud/index.js';
 import { PromotionModal } from '../modals/index.js';
 import BaseButton from '../../components/base/BaseButton.vue';
 import BaseModal from '../../components/base/BaseModal.vue';
+import { useAudioContext } from '@/platform/di';
 import { useAudio } from '../../composables/useAudio.js';
 import { useConfetti } from '../../composables/useConfetti.js';
 import type { MoveOutcomeEvent, GameCompletionOutcomeEvent } from './composables/useAiGame.js';
@@ -30,10 +31,14 @@ const emit = defineEmits<{
   exit: [];
   lobby: [];
   changeOpponent: [];
+  'change-opponent': [];
 }>();
 
-const audio = useAudio();
-const { isMuted, toggleMute } = audio;
+const audioContext = useAudioContext();
+const fallbackAudio = useAudio();
+const audio = audioContext ?? fallbackAudio;
+const isMuted = audio.isMuted;
+const toggleMute = () => audio.toggleMute();
 const { celebrate } = useConfetti();
 
 function handleMoveOutcome(event: MoveOutcomeEvent) {
@@ -146,6 +151,7 @@ function handleRematch() {
 
 function handleChangeOpponent() {
   emit('changeOpponent');
+  emit('change-opponent');
 }
 
 function handleExit() {
@@ -533,6 +539,11 @@ function handleExit() {
 }
 
 .hint-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   background: transparent;
   border: none;
   font-size: var(--text-sm);
@@ -540,6 +551,7 @@ function handleExit() {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
+  box-sizing: border-box;
 }
 
 .hint-close-btn:hover {
@@ -617,17 +629,5 @@ function handleExit() {
   justify-content: flex-end;
   gap: var(--space-3);
   margin-top: var(--space-2);
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
 }
 </style>

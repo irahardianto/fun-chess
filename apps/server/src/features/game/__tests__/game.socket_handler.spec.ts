@@ -906,4 +906,153 @@ describe("Game Socket Handlers", () => {
       expect(warnLog).toBeDefined();
     });
   });
+
+  describe("Session Sliding TTL on Valid Move (CRIT-002)", () => {
+    it("touches session via sessionRegistry when game:move succeeds", async () => {
+      await setupActiveRoom("SESS");
+      const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
+      const mockSessionRegistry = {
+        touchSession: touchSessionSpy,
+      } as unknown as import("../../rooms/index.js").SessionRegistry;
+
+      const customSocket = new TestSocket("sock_white");
+      customSocket.data = {
+        sessionToken: "token-socket-123",
+        userId: "p_white_id",
+        roomCode: "SESS",
+      };
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        customSocket as unknown as Socket,
+        service,
+        logger,
+        undefined,
+        undefined,
+        mockSessionRegistry,
+      );
+
+      let ack: SocketAckResponse | undefined;
+      await customSocket.trigger(
+        "game:move",
+        { roomCode: "SESS", move: { from: "e2", to: "e4" } },
+        (res) => {
+          ack = res as SocketAckResponse;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(touchSessionSpy).toHaveBeenCalledWith("token-socket-123", "sock_white");
+    });
+
+    it("touches session via getSessionTokenForPlayer when sessionToken is not on socket.data", async () => {
+      await setupActiveRoom("SES2");
+      const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
+      const mockSessionRegistry = {
+        touchSession: touchSessionSpy,
+        getSessionTokenForPlayer: vi.fn().mockReturnValue("token-lookup-456"),
+      } as unknown as import("../../rooms/index.js").SessionRegistry;
+
+      const customSocket = new TestSocket("sock_white");
+      customSocket.data = {
+        userId: "p_white_id",
+        roomCode: "SES2",
+      };
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        customSocket as unknown as Socket,
+        service,
+        logger,
+        undefined,
+        undefined,
+        mockSessionRegistry,
+      );
+
+      let ack: SocketAckResponse | undefined;
+      await customSocket.trigger(
+        "game:move",
+        { roomCode: "SES2", move: { from: "e2", to: "e4" } },
+        (res) => {
+          ack = res as SocketAckResponse;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(touchSessionSpy).toHaveBeenCalledWith("token-lookup-456", "sock_white");
+    });
+
+    it("touches session via playerIndex fallback map", async () => {
+      await setupActiveRoom("SES3");
+      const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
+      const playerIndexMap = new Map<string, string>();
+      playerIndexMap.set("SES3:p_white_id", "token-index-789");
+
+      const mockSessionRegistry = {
+        touchSession: touchSessionSpy,
+        playerIndex: playerIndexMap,
+      } as unknown as import("../../rooms/index.js").SessionRegistry;
+
+      const customSocket = new TestSocket("sock_white");
+      customSocket.data = {
+        userId: "p_white_id",
+        roomCode: "SES3",
+      };
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        customSocket as unknown as Socket,
+        service,
+        logger,
+        undefined,
+        undefined,
+        mockSessionRegistry,
+      );
+
+      let ack: SocketAckResponse | undefined;
+      await customSocket.trigger(
+        "game:move",
+        { roomCode: "SES3", move: { from: "e2", to: "e4" } },
+        (res) => {
+          ack = res as SocketAckResponse;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(touchSessionSpy).toHaveBeenCalledWith("token-index-789", "sock_white");
+    });
+
+    it("does not call touchSession when no sessionToken or userId is present", async () => {
+      await setupActiveRoom("SES4");
+      const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
+      const mockSessionRegistry = {
+        touchSession: touchSessionSpy,
+      } as unknown as import("../../rooms/index.js").SessionRegistry;
+
+      const customSocket = new TestSocket("sock_white");
+      customSocket.data = undefined;
+
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        customSocket as unknown as Socket,
+        service,
+        logger,
+        undefined,
+        undefined,
+        mockSessionRegistry,
+      );
+
+      let ack: SocketAckResponse | undefined;
+      await customSocket.trigger(
+        "game:move",
+        { roomCode: "SES4", move: { from: "e2", to: "e4" } },
+        (res) => {
+          ack = res as SocketAckResponse;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(touchSessionSpy).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -103,8 +103,12 @@ const emit = defineEmits<{
   'academy-back': [];
   'academy-next-lesson': [scenario: ChessScenario];
   'academy-completed': [stars: number];
+  'next-lesson': [scenario: ChessScenario];
+  'scenario-completed': [stars?: number];
   'puzzle-back': [];
   'puzzle-rush-exit': [];
+  'puzzle-exit': [];
+  'exit': [];
   'puzzle-completed': [stars: number];
   'select-square': [sq: Square];
   'execute-move': [move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }];
@@ -147,10 +151,24 @@ function handleOpenSync() { emit('open-sync'); }
 function handleSoloAiExit() { emit('solo-ai-exit'); }
 function handleSoloAiChangeOpponent() { emit('solo-ai-change-opponent'); }
 function handleAcademyBack() { emit('academy-back'); }
-function handleAcademyNextLesson(scenario: ChessScenario) { emit('academy-next-lesson', scenario); }
-function handleAcademyCompleted(stars: number) { emit('academy-completed', stars); }
-function handlePuzzleBack() { emit('puzzle-back'); }
-function handlePuzzleRushExit() { emit('puzzle-rush-exit'); }
+function handleAcademyNextLesson(scenario: ChessScenario) {
+  emit('academy-next-lesson', scenario);
+  emit('next-lesson', scenario);
+}
+function handleAcademyCompleted(stars: number) {
+  emit('academy-completed', stars);
+  emit('scenario-completed', stars);
+}
+function handlePuzzleBack() {
+  emit('puzzle-back');
+  emit('puzzle-exit');
+  emit('exit');
+}
+function handlePuzzleRushExit() {
+  emit('puzzle-rush-exit');
+  emit('puzzle-exit');
+  emit('exit');
+}
 function handlePuzzleCompleted(stars: number) { emit('puzzle-completed', stars); }
 function handleSelectSquare(sq: Square) { emit('select-square', sq); }
 function handleExecuteMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }) { emit('execute-move', move); }

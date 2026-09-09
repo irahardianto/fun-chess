@@ -37,7 +37,8 @@ import {
   type IDisconnectTimerRegistry,
   registerRoomSocketHandlers,
   handleSocketDisconnect,
-  roomCreateRateLimiter,
+  InMemorySessionRegistry,
+  type SessionRegistry,
 } from "./features/rooms/index.js";
 import {
   GameService,
@@ -56,6 +57,7 @@ export interface StartServerOptions {
   roomStore?: RoomStore;
   clock?: IClock;
   idGenerator?: IIdGenerator;
+  sessionRegistry?: SessionRegistry;
   distPath?: string;
   autoListen?: boolean;
   timerRegistry?: IDisconnectTimerRegistry;
@@ -69,7 +71,9 @@ export interface ServerInstance {
   roomStore: RoomStore;
   roomService: RoomService;
   gameService: GameService;
+  sessionRegistry: SessionRegistry;
   rateLimiter: SocketRateLimiter;
+  roomCreateRateLimiter: SocketRateLimiter;
   config: ServerEnv;
   port: number;
   url: string;
@@ -81,6 +85,7 @@ export interface DomainServices {
   roomStore: RoomStore;
   clock: IClock;
   idGenerator: IIdGenerator;
+  sessionRegistry: SessionRegistry;
   roomService: RoomService;
   gameService: GameService;
   relayAddressService: RelayAddressService;
@@ -98,16 +103,18 @@ export function setupDomainServices(
   const timerRegistry = options.timerRegistry ?? defaultDisconnectTimerRegistry;
   const clock = options.clock ?? new SystemClock();
   const idGenerator = options.idGenerator ?? new UuidGenerator();
+  const sessionRegistry =
+    options.sessionRegistry ?? new InMemorySessionRegistry(clock, idGenerator);
   const roomStore = options.roomStore ?? new InMemoryRoomStore(clock, idGenerator, logger);
   const roomService = new RoomService(
     roomStore,
-    undefined,
+    sessionRegistry,
     clock,
     idGenerator,
     timerRegistry,
     logger,
   );
-  const gameService = new GameService(roomService, clock, idGenerator);
+  const gameService = new GameService(roomService, clock, idGenerator, sessionRegistry);
   const relayAddressService = new RelayAddressService({
     publicUrl: env.PUBLIC_URL,
     host: env.HOST,
@@ -121,6 +128,7 @@ export function setupDomainServices(
     roomStore,
     clock,
     idGenerator,
+    sessionRegistry,
     roomService,
     gameService,
     relayAddressService,
@@ -136,8 +144,9 @@ export function setupSocketGateway(
   rateLimiter: SocketRateLimiter,
   env: ServerEnv,
   logger: Logger,
+  roomCreateRateLimiter?: SocketRateLimiter,
 ): void {
-  const { roomService, gameService, timerRegistry } = domainServices;
+  const { roomService, gameService, timerRegistry, sessionRegistry } = domainServices;
 
   io.on("connection", (socket) => {
     socket.data = socket.data || {};
@@ -173,6 +182,8 @@ export function setupSocketGateway(
       logger,
       rateLimiter,
       timerRegistry,
+      roomCreateRateLimiter,
+      env.TRUST_PROXY,
     );
     registerGameSocketHandlers(
       io,
@@ -181,6 +192,8 @@ export function setupSocketGateway(
       logger,
       rateLimiter,
       timerRegistry,
+      sessionRegistry,
+      env.TRUST_PROXY,
     );
 
     // Wrap async disconnect listener in try/catch with structured error log
@@ -338,8 +351,14 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     logger,
   });
 
+  const roomCreateRateLimiter = createSocketRateLimiter({
+    maxRequests: env.RATE_LIMIT_ROOM_CREATE_MAX,
+    windowMs: 60_000,
+    logger,
+  });
+
   // 5. Register Feature Socket Ingress Handlers & Transport Error Logging (MAJ-031)
-  setupSocketGateway(io, domainServices, rateLimiter, env, logger);
+  setupSocketGateway(io, domainServices, rateLimiter, env, logger, roomCreateRateLimiter);
 
   // 6. Periodic Abandoned Room & Expired Session Cleanup (MAJ-031)
   const cleanupInterval = setupBackgroundJobs(roomService, logger);
@@ -424,6 +443,20 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
       }
     }
   } catch (bootstrapError) {
+    const duration = Math.round(performance.now() - startTime);
+    logger.error("Fun Chess server bootstrap failed", {
+      operation: "server_bootstrap",
+      correlationId: bootstrapCorrelationId,
+      status: "failed",
+      duration,
+      durationMs: duration,
+      port,
+      host,
+      error:
+        bootstrapError instanceof Error
+          ? { name: bootstrapError.name, message: bootstrapError.message, stack: bootstrapError.stack }
+          : { raw: bootstrapError },
+    });
     // Clean up background jobs, rate limiters, and listeners on startup error (MAJ-009)
     clearInterval(cleanupInterval);
     timerRegistry.clear();
@@ -525,7 +558,9 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     roomStore,
     roomService,
     gameService,
+    sessionRegistry: domainServices.sessionRegistry,
     rateLimiter,
+    roomCreateRateLimiter,
     config: env,
     port: boundPort,
     url: boundUrl,

@@ -115,7 +115,7 @@ export function createSafeChess(
     if (!validation.ok) {
       const errorMsg = validation.error ?? "Malformed position";
       logger?.warn(
-        `[createSafeChess] Invalid FEN "${trimmed}": ${errorMsg}. Falling back to standard starting position.`,
+        "[createSafeChess] Invalid FEN. Falling back to standard starting position.",
         {
           operation: "create_safe_chess",
           fen: trimmed,
@@ -128,7 +128,7 @@ export function createSafeChess(
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     logger?.warn(
-      `[createSafeChess] Failed to initialize position "${trimmed}": ${errorMsg}. Falling back to standard starting position.`,
+      "[createSafeChess] Failed to initialize position. Falling back to standard starting position.",
       {
         operation: "create_safe_chess",
         fen: trimmed,
@@ -155,24 +155,26 @@ function restoreChessState(
   try {
     chess.load(previousFen);
   } catch (restoreErr) {
+    const errorMsg =
+      restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
     logger?.warn(
-      `[safeLoadFen] Failed to restore previous FEN "${previousFen}": ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
+      "[safeLoadFen] Failed to restore previous FEN.",
       {
         operation: "safe_load_fen_restore_previous",
         previousFen,
-        error:
-          restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
+        error: errorMsg,
       },
     );
     try {
       chess.reset();
     } catch (resetErr) {
+      const resetErrorMsg =
+        resetErr instanceof Error ? resetErr.message : String(resetErr);
       logger?.error?.(
-        `[safeLoadFen] Failed to reset chess instance after load failure: ${resetErr instanceof Error ? resetErr.message : String(resetErr)}`,
+        "[safeLoadFen] Failed to reset chess instance after load failure.",
         {
           operation: "safe_load_fen_reset_fallback",
-          error:
-            resetErr instanceof Error ? resetErr.message : String(resetErr),
+          error: resetErrorMsg,
         },
       );
     }
@@ -198,7 +200,7 @@ export function safeLoadFen(
     return false;
   }
   if (!isValidFen(fen)) {
-    logger?.warn(`[safeLoadFen] Invalid FEN "${fen}".`, {
+    logger?.warn("[safeLoadFen] Invalid FEN.", {
       operation: "safe_load_fen",
       fen,
       error: "Invalid FEN syntax or board state",
@@ -212,7 +214,7 @@ export function safeLoadFen(
     return true;
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logger?.warn(`[safeLoadFen] Failed to load FEN "${fen}": ${errorMsg}.`, {
+    logger?.warn("[safeLoadFen] Failed to load FEN.", {
       operation: "safe_load_fen",
       fen,
       error: errorMsg,

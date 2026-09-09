@@ -1,5 +1,4 @@
 import os, { NetworkInterfaceInfo } from "node:os";
-import QRCode from "qrcode";
 import { LanInfoResponse as BaseLanInfoResponse } from "@fun-chess/shared";
 import { Logger } from "../../platform/logger/index.js";
 
@@ -369,36 +368,6 @@ export class RelayAddressService implements IRelayAddressService {
     };
   }
 
-  /**
-   * Generates an SVG string representation of a QR code.
-   *
-   * @param text - Text content to encode into QR code
-   */
-  public async generateQrCodeSvg(text: string): Promise<string> {
-    return QRCode.toString(text, {
-      type: "svg",
-      margin: 2,
-      color: {
-        dark: "#1a1a2e",
-        light: "#ffffff",
-      },
-    });
-  }
-
-  /**
-   * Generates a base64 Data URL representation of a QR code.
-   *
-   * @param text - Text content to encode into QR code
-   */
-  public async generateQrCodeDataUrl(text: string): Promise<string> {
-    return QRCode.toDataURL(text, {
-      margin: 2,
-      color: {
-        dark: "#1a1a2e",
-        light: "#ffffff",
-      },
-    });
-  }
 }
 
 /**

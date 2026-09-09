@@ -213,6 +213,41 @@ export const CreateRoomRequestSchema = z.object({
 export type CreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;
 
 /**
+ * Socket acknowledgement payload schema for successful room:create response (MAJ-003).
+ */
+export const CreateRoomSuccessResponseSchema = z.object({
+  success: z.literal(true),
+  room: RoomStateSchema,
+  player: PlayerSchema,
+  sessionToken: z.string().min(1, "Session token is required"),
+});
+export type CreateRoomSuccessResponse = z.infer<typeof CreateRoomSuccessResponseSchema>;
+
+/**
+ * Socket acknowledgement payload schema for room:create error response (MAJ-003).
+ */
+export const CreateRoomErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    roomCode: z.string().optional(),
+    correlationId: z.string().optional(),
+    details: z.record(z.unknown()).optional(),
+  }),
+});
+export type CreateRoomErrorResponse = z.infer<typeof CreateRoomErrorResponseSchema>;
+
+/**
+ * Complete socket acknowledgement payload schema for room:create response (MAJ-003).
+ */
+export const CreateRoomResponseSchema = z.union([
+  CreateRoomSuccessResponseSchema,
+  CreateRoomErrorResponseSchema,
+]);
+export type CreateRoomResponse = z.infer<typeof CreateRoomResponseSchema>;
+
+/**
  * Socket request schema for joining an existing room with a 4-letter code.
  */
 export const JoinRoomRequestSchema = z.object({
@@ -242,6 +277,27 @@ export type LeaveRoomRequest = z.infer<typeof LeaveRoomRequestSchema>;
 
 export const RoomLeavePayloadSchema = LeaveRoomRequestSchema;
 export type RoomLeavePayload = LeaveRoomRequest;
+
+/**
+ * Authoritative player departure reason schema (CRIT-004).
+ */
+export const PlayerLeftReasonSchema = z.enum([
+  "player_left",
+  "host_left",
+  "kicked",
+  "room_closed",
+]);
+export type PlayerLeftReason = z.infer<typeof PlayerLeftReasonSchema>;
+
+/**
+ * Broadcast payload schema when a player leaves the room (CRIT-004).
+ */
+export const RoomPlayerLeftPayloadSchema = z.object({
+  playerId: z.string().min(1),
+  playerName: z.string().min(1),
+  reason: PlayerLeftReasonSchema.optional(),
+});
+export type RoomPlayerLeftPayload = z.infer<typeof RoomPlayerLeftPayloadSchema>;
 
 /**
  * Chess move coordinate and promotion payload schema.

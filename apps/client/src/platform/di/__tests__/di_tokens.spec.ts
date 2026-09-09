@@ -15,11 +15,14 @@ import {
   WEBRTC_DISCOVERY_KEY,
   CLIPBOARD_SERVICE_KEY,
   CAMERA_SERVICE_KEY,
+  CLOCK_KEY,
   useInjectApiClient,
   useInjectStorage,
   useInjectSessionStorage,
   useInjectAudioService,
   useInjectLogger,
+  resolveLogger,
+  useInjectClock,
   useInjectScenarioStore,
   useInjectPuzzleStore,
   useInjectProgressStorage,
@@ -34,6 +37,7 @@ import {
   useSessionStorage,
   useAudioService,
   useLogger,
+  useClock,
   useScenarioStore,
   usePuzzleStore,
   useProgressStorage,
@@ -55,11 +59,12 @@ import type {
   IClipboardService,
   ICameraService,
 } from '../../hardware';
-import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
+import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage, IClock } from '@fun-chess/shared';
 import { apiClient } from '../../api';
 import { safeLocalStorage, safeSessionStorage } from '../../storage';
 import { audioSynthesizer } from '../../audio/audio_synthesizer';
 import { logger } from '../../telemetry';
+import { SystemClock } from '../../time';
 import {
   defaultFileDownloader,
   defaultHapticsService,
@@ -84,6 +89,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       { name: 'WEBRTC_DISCOVERY_KEY', key: WEBRTC_DISCOVERY_KEY, expectedDesc: 'WEBRTC_DISCOVERY' },
       { name: 'CLIPBOARD_SERVICE_KEY', key: CLIPBOARD_SERVICE_KEY, expectedDesc: 'CLIPBOARD_SERVICE' },
       { name: 'CAMERA_SERVICE_KEY', key: CAMERA_SERVICE_KEY, expectedDesc: 'CAMERA_SERVICE' },
+      { name: 'CLOCK_KEY', key: CLOCK_KEY, expectedDesc: 'CLOCK' },
     ];
 
     it.each(tokens)('$name is a valid Symbol with expected description "$expectedDesc"', ({ key, expectedDesc }) => {
@@ -113,6 +119,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       const mockWebRtcDiscovery = { discoverLocalIp: () => Promise.resolve('192.168.1.100') } as unknown as IWebRtcDiscovery;
       const mockClipboard = { copyText: () => Promise.resolve(true), readText: () => Promise.resolve(''), isSupported: () => true } as unknown as IClipboardService;
       const mockCamera = { getUserMedia: () => Promise.resolve({} as MediaStream), isSupported: () => true } as unknown as ICameraService;
+      const mockClock = { now: () => 1700000000000 } as unknown as IClock;
 
       const app = createApp({});
       app.provide(API_CLIENT_KEY, mockApiClient);
@@ -120,6 +127,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       app.provide(SESSION_STORAGE_KEY, mockSessionStorage);
       app.provide(AUDIO_SERVICE_KEY, mockAudio);
       app.provide(LOGGER_KEY, mockLogger);
+      app.provide(CLOCK_KEY, mockClock);
       app.provide(SCENARIO_STORE_KEY, mockScenarioStore);
       app.provide(PUZZLE_STORE_KEY, mockPuzzleStore);
       app.provide(PROGRESS_STORAGE_KEY, mockProgressStorage);
@@ -135,6 +143,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectSessionStorage()).toBe(mockSessionStorage);
         expect(useInjectAudioService()).toBe(mockAudio);
         expect(useInjectLogger()).toBe(mockLogger);
+        expect(useInjectClock()).toBe(mockClock);
         expect(useInjectScenarioStore()).toBe(mockScenarioStore);
         expect(useInjectPuzzleStore()).toBe(mockPuzzleStore);
         expect(useInjectProgressStorage()).toBe(mockProgressStorage);
@@ -180,6 +189,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectSessionStorage()).toBe(safeSessionStorage);
         expect(useInjectAudioService()).toBe(audioSynthesizer);
         expect(useInjectLogger()).toBe(logger);
+        expect(useInjectClock()).toBeInstanceOf(SystemClock);
         expect(useInjectFileDownloader()).toBe(defaultFileDownloader);
         expect(useInjectHaptics()).toBe(defaultHapticsService);
         expect(useInjectWebRtcDiscovery()).toBe(defaultWebRtcDiscovery);
@@ -193,6 +203,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       const customStorage = { key: () => null } as unknown as KeyValueStorage;
       const customAudio = { isMuted: () => true } as unknown as IAudioService;
       const customLogger = { debug: () => {} } as unknown as ILogger;
+      const customClock = { now: () => 12345 } as unknown as IClock;
       const customScenarioStore = { resetAllProgress: () => Promise.resolve() } as unknown as ScenarioProgressStore;
       const customPuzzleStore = { resetAll: () => Promise.resolve() } as unknown as PuzzleProgressStore;
       const customProgressStorage = { saveUnifiedProgress: () => Promise.resolve() } as unknown as ProgressStorage;
@@ -208,6 +219,9 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectSessionStorage(customStorage)).toBe(customStorage);
         expect(useInjectAudioService(customAudio)).toBe(customAudio);
         expect(useInjectLogger(customLogger)).toBe(customLogger);
+        expect(useInjectClock(customClock)).toBe(customClock);
+        expect(resolveLogger(customLogger)).toBe(customLogger);
+        expect(resolveLogger()).toBe(logger);
         expect(useInjectScenarioStore(customScenarioStore)).toBe(customScenarioStore);
         expect(useInjectPuzzleStore(customPuzzleStore)).toBe(customPuzzleStore);
         expect(useInjectProgressStorage(customProgressStorage)).toBe(customProgressStorage);
@@ -260,6 +274,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       const mockSessionStorage = { setItem: () => {} } as unknown as KeyValueStorage;
       const mockAudio = { playMove: () => {} } as unknown as IAudioService;
       const mockLogger = { info: () => {} } as unknown as ILogger;
+      const mockClock = { now: () => 1000 } as IClock;
       const mockScenarioStore = {} as ScenarioProgressStore;
       const mockPuzzleStore = {} as PuzzleProgressStore;
       const mockProgressStorage = {} as ProgressStorage;
@@ -275,6 +290,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       app.provide(SESSION_STORAGE_KEY, mockSessionStorage);
       app.provide(AUDIO_SERVICE_KEY, mockAudio);
       app.provide(LOGGER_KEY, mockLogger);
+      app.provide(CLOCK_KEY, mockClock);
       app.provide(SCENARIO_STORE_KEY, mockScenarioStore);
       app.provide(PUZZLE_STORE_KEY, mockPuzzleStore);
       app.provide(PROGRESS_STORAGE_KEY, mockProgressStorage);
@@ -290,6 +306,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useSessionStorage()).toBe(mockSessionStorage);
         expect(useAudioService()).toBe(mockAudio);
         expect(useLogger()).toBe(mockLogger);
+        expect(useClock()).toBe(mockClock);
         expect(useScenarioStore()).toBe(mockScenarioStore);
         expect(usePuzzleStore()).toBe(mockPuzzleStore);
         expect(useProgressStorage()).toBe(mockProgressStorage);
@@ -307,6 +324,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       const customSessionStorage = {} as KeyValueStorage;
       const customAudio = {} as IAudioService;
       const customLogger = {} as ILogger;
+      const customClock = {} as IClock;
       const customScenario = {} as ScenarioProgressStore;
       const customPuzzle = {} as PuzzleProgressStore;
       const customProgress = {} as ProgressStorage;
@@ -321,6 +339,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       expect(useSessionStorage(customSessionStorage)).toBe(customSessionStorage);
       expect(useAudioService(customAudio)).toBe(customAudio);
       expect(useLogger(customLogger)).toBe(customLogger);
+      expect(useClock(customClock)).toBe(customClock);
       expect(useScenarioStore(customScenario)).toBe(customScenario);
       expect(usePuzzleStore(customPuzzle)).toBe(customPuzzle);
       expect(useProgressStorage(customProgress)).toBe(customProgress);
@@ -340,6 +359,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useSessionStorage()).toBe(safeSessionStorage);
         expect(useAudioService()).toBe(audioSynthesizer);
         expect(useLogger()).toBe(logger);
+        expect(useClock()).toBeInstanceOf(SystemClock);
         expect(useFileDownloader()).toBe(defaultFileDownloader);
         expect(useHaptics()).toBe(defaultHapticsService);
         expect(useWebRtcDiscovery()).toBe(defaultWebRtcDiscovery);

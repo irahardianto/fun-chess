@@ -40,6 +40,15 @@ export default defineConfig({
         channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
       },
     },
+    {
+      name: 'mobile-chrome',
+      testDir: './ui',
+      testMatch: ['**/*.e2e.test.ts', '**/*.spec.ts'],
+      use: {
+        ...devices['Pixel 5'],
+        channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
+      },
+    },
   ],
   webServer: [
     {
@@ -51,6 +60,7 @@ export default defineConfig({
       env: {
         ...process.env,
         RATE_LIMIT_MAX_REQUESTS: '1000',
+        RATE_LIMIT_ROOM_CREATE_MAX: '1000',
         TRUST_PROXY: 'true',
       },
     },

@@ -8,6 +8,7 @@ import {
   disconnect,
   emitWithTimeout,
   registerSocketEventListener,
+  detachSocketListeners,
 } from '../composables/useSocketTransport';
 import { logger } from '@/platform/telemetry';
 import type {
@@ -455,7 +456,7 @@ describe('useSocketTransport composable', () => {
       { event: 'room:created', payload: validRoom, expectedOperation: 'socket_event_room_created', level: 'info' },
       { event: 'room:joined', payload: validRoom, expectedOperation: 'socket_event_room_joined', level: 'info' },
       { event: 'room:player_joined', payload: { player: validPlayer, room: validRoom }, expectedOperation: 'socket_event_player_joined', level: 'info' },
-      { event: 'room:player_left', payload: { playerId: validPlayer.id, playerName: 'Bob', reason: 'quit' }, expectedOperation: 'socket_event_player_left', level: 'info' },
+      { event: 'room:player_left', payload: { playerId: validPlayer.id, playerName: 'Bob', reason: 'player_left' }, expectedOperation: 'socket_event_player_left', level: 'info' },
       { event: 'room:player_disconnected', payload: { playerId: validPlayer.id, gracePeriodMs: 30000, roomStatus: 'paused_disconnect' }, expectedOperation: 'socket_event_player_disconnected', level: 'info' },
       { event: 'room:player_reconnected', payload: { playerId: validPlayer.id, playerName: 'Bob', roomStatus: 'playing' }, expectedOperation: 'socket_event_player_reconnected', level: 'info' },
       { event: 'room:reconnected', payload: { room: validRoom, player: validPlayer }, expectedOperation: 'socket_event_room_reconnected', level: 'info' },
@@ -734,6 +735,32 @@ describe('useSocketTransport composable', () => {
         })
       );
     });
+
+    it('clears registered event subscribers when resetTransportState() is called (MAJ-011)', () => {
+      useSocketTransport(mockSocket);
+      const subscriber = vi.fn();
+
+      registerSocketEventListener('game:started', subscriber);
+
+      // Verify subscriber receives events while registered
+      eventHandlers['game:started'](validGameState);
+      expect(subscriber).toHaveBeenCalledTimes(1);
+
+      // Invoke resetTransportState() which must purge all eventSubscribers
+      resetTransportState();
+
+      // Triggering event on previous socket should not notify subscriber
+      eventHandlers['game:started'](validGameState);
+      expect(subscriber).toHaveBeenCalledTimes(1);
+
+      // Re-initialize transport with new mock socket
+      const newMockSocket = createMockSocket();
+      useSocketTransport(newMockSocket as any);
+
+      // Trigger event on new socket; subscriber must remain uncalled
+      eventHandlers['game:started'](validGameState);
+      expect(subscriber).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ==========================================================================
@@ -795,6 +822,52 @@ describe('useSocketTransport composable', () => {
           event: 'game:check',
         })
       );
+    });
+
+    it('safely handles non-string disconnect reason, object/string connect errors, and undefined errors', () => {
+      const transport = useSocketTransport(mockSocket);
+
+      // Disconnect with number or object reason
+      eventHandlers['disconnect']({ code: 1000 });
+      expect(transport.isConnected.value).toBe(false);
+
+      // Connect error with object containing message
+      eventHandlers['connect_error']({ message: 'Object error message' });
+      expect(transport.connectionError.value).toBe('Object error message');
+
+      // Connect error with raw string
+      eventHandlers['connect_error']('Raw string error');
+      expect(transport.connectionError.value).toBe('Raw string error');
+
+      // Connect error with undefined
+      eventHandlers['connect_error'](undefined);
+      expect(transport.connectionError.value).toBe('Connection error');
+    });
+
+    it('safely catches errors thrown inside socket event subscribers during dispatchEvent', () => {
+      useSocketTransport(mockSocket);
+      const warnSpy = vi.spyOn(logger, 'warn');
+      const faultySubscriber = vi.fn(() => {
+        throw new Error('Subscriber crashed');
+      });
+      const goodSubscriber = vi.fn();
+
+      registerSocketEventListener('connect', faultySubscriber);
+      registerSocketEventListener('connect', goodSubscriber);
+
+      // Trigger event dispatch via connect
+      eventHandlers['connect']();
+      expect(faultySubscriber).toHaveBeenCalled();
+      expect(goodSubscriber).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('handles detachSocketListeners on unattached socket and disconnect when socket is null', () => {
+      const unattached = createMockSocket({ id: 'unattached_1' });
+      expect(() => detachSocketListeners(unattached as any)).not.toThrow();
+
+      resetTransportState();
+      expect(() => disconnect()).not.toThrow();
     });
   });
 });

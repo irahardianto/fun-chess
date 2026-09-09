@@ -31,6 +31,7 @@ function resolveClipboardService(): IClipboardService {
 const clipboardService = resolveClipboardService();
 const logger = useInjectLogger();
 const canvasRef = ref<HTMLCanvasElement | null>(null);
+const canvasError = ref<string | null>(null);
 const isCopied = ref(false);
 let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -53,6 +54,7 @@ const solvedPuzzlesCount = computed(() => {
 
 async function renderQrCode() {
   if (!canvasRef.value || !props.qrString) return;
+  canvasError.value = null;
 
   try {
     let ctx: CanvasRenderingContext2D | null = null;
@@ -61,19 +63,22 @@ async function renderQrCode() {
     } catch {
       ctx = null;
     }
-    if (ctx) {
-      await QRCode.toCanvas(canvasRef.value, props.qrString, {
-        errorCorrectionLevel: 'M',
-        margin: 2,
-        scale: 6,
-        width: 240,
-        color: {
-          dark: '#000000',
-          light: '#ffffff',
-        },
-      });
+    if (!ctx) {
+      canvasError.value = 'Failed to acquire 2D canvas context';
+      return;
     }
+    await QRCode.toCanvas(canvasRef.value, props.qrString, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      scale: 6,
+      width: 240,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
   } catch (err: unknown) {
+    canvasError.value = err instanceof Error ? err.message : 'QR code generation failed';
     logger.warn('QR canvas generation note', {
       operation: 'qr_export_canvas_render',
       error: err instanceof Error ? err.message : String(err),
@@ -117,6 +122,12 @@ onUnmounted(() => {
     copyTimeout = null;
   }
 });
+
+defineExpose({
+  canvasRef,
+  canvasError,
+  renderQrCode,
+});
 </script>
 
 <template>
@@ -124,6 +135,7 @@ onUnmounted(() => {
     <!-- QR Code Canvas Frame -->
     <div class="qr-canvas-frame" role="img" aria-label="QR Code containing user game progress">
       <canvas ref="canvasRef" class="qr-canvas-element" width="240" height="240" />
+      <p v-if="canvasError" class="canvas-error-text" role="alert">{{ canvasError }}</p>
     </div>
 
     <!-- Kid-Friendly Help Copy -->

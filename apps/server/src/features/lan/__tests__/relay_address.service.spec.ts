@@ -474,25 +474,6 @@ describe("RelayAddressService", () => {
     });
   });
 
-  describe("QR Code Generation", () => {
-    const service = new RelayAddressService();
-
-    it("generates a valid SVG string", async () => {
-      const svg = await service.generateQrCodeSvg(
-        "https://fun-chess-xyz.a.run.app?room=STAR",
-      );
-      expect(svg).toContain("<svg");
-      expect(svg).toContain("</svg>");
-    });
-
-    it("generates a valid base64 data URL", async () => {
-      const dataUrl = await service.generateQrCodeDataUrl(
-        "https://fun-chess-xyz.a.run.app?room=STAR",
-      );
-      expect(dataUrl).toMatch(/^data:image\/png;base64,/);
-    });
-  });
-
   describe("MockRelayAddressService Test Double", () => {
     it("allows mocking addressing info and cloud mode for pure unit testing", () => {
       const mockService = new MockRelayAddressService(

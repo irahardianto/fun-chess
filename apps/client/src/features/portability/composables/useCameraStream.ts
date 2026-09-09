@@ -142,11 +142,15 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
 
       try {
         acquiredStream = await activeService.getUserMedia(constraints);
-      } catch (firstErr: any) {
+      } catch (firstErr: unknown) {
+        const firstErrName =
+          firstErr instanceof Error
+            ? firstErr.name
+            : (firstErr as { name?: string } | null | undefined)?.name;
         if (
-          firstErr?.name === 'NotAllowedError' ||
-          firstErr?.name === 'PermissionDeniedError' ||
-          firstErr?.name === 'NotFoundError'
+          firstErrName === 'NotAllowedError' ||
+          firstErrName === 'PermissionDeniedError' ||
+          firstErrName === 'NotFoundError'
         ) {
           throw firstErr;
         }
@@ -175,7 +179,7 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
       });
 
       return acquiredStream;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // CRIT-007: Unconditionally stop all tracks on stream and nullify video.srcObject
       if (acquiredStream) {
         stopMediaStreamTracks(acquiredStream);
@@ -199,14 +203,21 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
       hasCamera.value = false;
       isStreaming.value = false;
 
-      if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+      const errName =
+        err instanceof Error ? err.name : (err as { name?: string } | null | undefined)?.name;
+      const errMessage =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string } | null | undefined)?.message;
+
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
         cameraError.value = 'Camera permission was denied. Allow camera access in browser settings to scan QR codes.';
-      } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
+      } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
         cameraError.value = 'No camera found on this device.';
-      } else if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
+      } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
         cameraError.value = 'Camera is already in use by another application.';
       } else {
-        cameraError.value = err?.message || 'Unable to access camera.';
+        cameraError.value = errMessage || 'Unable to access camera.';
       }
 
       const durationMs = Math.round(performance.now() - startTime);

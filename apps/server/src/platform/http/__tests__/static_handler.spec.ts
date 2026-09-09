@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import http, { IncomingMessage, ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { serveStaticFile } from "../static_handler.js";
+import { serveStaticFile, checkPathTraversal } from "../static_handler.js";
 import { Logger } from "../../logger/logger.interface.js";
+import { defaultLogger } from "../../logger/index.js";
 
 describe("serveStaticFile", () => {
   let tempDir: string;
@@ -220,6 +221,8 @@ describe("serveStaticFile", () => {
         path: "/../../../etc/passwd",
         clientIp: "192.168.1.100",
       });
+      expect(typeof loggedWarnings[0]?.meta?.["duration"]).toBe("number");
+      expect(typeof loggedWarnings[0]?.meta?.["durationMs"]).toBe("number");
     });
 
     it("detects /.. and /../ returning 403 rather than masking with 200 index.html", async () => {
@@ -695,6 +698,165 @@ describe("serveStaticFile", () => {
       expect(handled).toBe(true);
       expect(statusCode).toBe(500);
       expect(body).toBe("Internal Server Error");
+    });
+
+    it("returns 500 on non-ENOENT realpath errors (MAJ-014)", async () => {
+      const { MemoryFileStorage } = await import("../file_storage.js");
+      const memoryStorage = new MemoryFileStorage({
+        "/virtual/dist/index.html": "content",
+      });
+
+      memoryStorage.setErrorSimulator((_path, op) => {
+        if (op === "realpath") {
+          const err = Object.assign(new Error("EIO error"), {
+            code: "EIO",
+          });
+          return err;
+        }
+        return undefined;
+      });
+
+      let statusCode: number | undefined;
+      let body = "";
+
+      const mockReq = {
+        method: "GET",
+        url: "/index.html",
+        headers: {},
+      } as IncomingMessage;
+
+      const mockRes = {
+        writeHead: (status: number) => {
+          statusCode = status;
+          return mockRes;
+        },
+        end: (data?: string | Uint8Array) => {
+          if (data) body += data.toString();
+          return mockRes;
+        },
+      } as unknown as ServerResponse;
+
+      const handled = await serveStaticFile(mockReq, mockRes, {
+        distPath: "/virtual/dist",
+        fileStorage: memoryStorage,
+      });
+
+      expect(handled).toBe(true);
+      expect(statusCode).toBe(500);
+      expect(body).toBe("Internal Server Error");
+    });
+
+    it("returns 500 when sending static asset response throws (CRIT-005)", async () => {
+      const { MemoryFileStorage } = await import("../file_storage.js");
+      const memoryStorage = new MemoryFileStorage({
+        "/virtual/dist/index.html": "content",
+      });
+
+      let statusCode: number | undefined;
+      let body = "";
+      let callCount = 0;
+
+      const mockReq = {
+        method: "GET",
+        url: "/index.html",
+        headers: {},
+      } as IncomingMessage;
+
+      const mockRes = {
+        get headersSent() {
+          return false;
+        },
+        writeHead: (status: number) => {
+          callCount++;
+          if (callCount === 1) {
+            throw new Error("Socket write failed");
+          }
+          statusCode = status;
+          return mockRes;
+        },
+        end: (data?: string | Uint8Array) => {
+          if (data) body += data.toString();
+          return mockRes;
+        },
+      } as unknown as ServerResponse;
+
+      const handled = await serveStaticFile(mockReq, mockRes, {
+        distPath: "/virtual/dist",
+        fileStorage: memoryStorage,
+      });
+
+      expect(handled).toBe(true);
+      expect(statusCode).toBe(500);
+      expect(body).toBe("Internal Server Error");
+    });
+
+    it("returns 500 when sending fallback HTML response throws (CRIT-005)", async () => {
+      const { MemoryFileStorage } = await import("../file_storage.js");
+      const memoryStorage = new MemoryFileStorage({});
+
+      let statusCode: number | undefined;
+      let body = "";
+      let callCount = 0;
+
+      const mockReq = {
+        method: "GET",
+        url: "/app-route",
+        headers: { accept: "text/html" },
+      } as IncomingMessage;
+
+      const mockRes = {
+        get headersSent() {
+          return false;
+        },
+        writeHead: (status: number) => {
+          callCount++;
+          if (callCount === 1) {
+            throw new Error("Socket broken on fallback");
+          }
+          statusCode = status;
+          return mockRes;
+        },
+        end: (data?: string | Uint8Array) => {
+          if (data) body += data.toString();
+          return mockRes;
+        },
+      } as unknown as ServerResponse;
+
+      const handled = await serveStaticFile(mockReq, mockRes, {
+        distPath: "/virtual/dist",
+        fileStorage: memoryStorage,
+        fallbackHtml: "<html><body>Fallback</body></html>",
+      });
+
+      expect(handled).toBe(true);
+      expect(statusCode).toBe(500);
+      expect(body).toBe("Internal Server Error");
+    });
+
+    it("logs debug when URI decoding fails during traversal check (CRIT-005)", async () => {
+      const debugSpy = vi.spyOn(defaultLogger, "debug");
+
+      // Malformed UTF-8 percent-encoding
+      checkPathTraversal("/virtual/dist", "/%E0%A4%A");
+      expect(debugSpy).toHaveBeenCalledWith(
+        "Initial URI decoding failed during traversal check",
+        expect.objectContaining({
+          operation: "check_path_traversal",
+          urlPath: "/%E0%A4%A",
+        }),
+      );
+
+      // Malformed secondary decoding: "%25E0%25A4%25A" decodes once to "%E0%A4%A", then second decode fails
+      checkPathTraversal("/virtual/dist", "/%25E0%25A4%25A");
+      expect(debugSpy).toHaveBeenCalledWith(
+        "Secondary URI decoding failed during traversal check",
+        expect.objectContaining({
+          operation: "check_path_traversal",
+          urlPath: "/%25E0%25A4%25A",
+        }),
+      );
+
+      debugSpy.mockRestore();
     });
   });
 });

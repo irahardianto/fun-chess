@@ -15,6 +15,7 @@ export type ErrorCode =
   | "ERR_RATE_LIMITED"
   | "ERR_SOCKET_TIMEOUT"
   | "ERR_CONFLICT"
+  | "ERR_STALE_LOCK_EXECUTION"
   | "ERR_INTERNAL_SERVER";
 
 /**

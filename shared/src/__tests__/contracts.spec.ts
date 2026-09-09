@@ -43,9 +43,16 @@ import type {
   SyncMergeStrategy,
   IClock,
   IIdGenerator,
+  ErrorCode,
   ClientToServerEvents,
   ServerToClientEvents,
   RoomLeavePayload,
+  PlayerLeftReason,
+  RoomPlayerLeftPayload,
+  CreateRoomSuccessAck,
+  CreateRoomAckResponse,
+  CreateRoomSuccessResponse,
+  CreateRoomResponse,
 } from "../index.js";
 import {
   FUN_CHESS_PAYLOAD_MAGIC_PREFIX,
@@ -96,6 +103,10 @@ import {
   GameOverPayloadSchema,
   UnifiedProgressPayloadSchema,
   UnifiedProgressEnvelopeSchema,
+  CreateRoomSuccessResponseSchema,
+  CreateRoomResponseSchema,
+  PlayerLeftReasonSchema,
+  RoomPlayerLeftPayloadSchema,
 } from "../index.js";
 
 describe("Shared Contracts & Data Model Specification", () => {
@@ -1486,6 +1497,148 @@ describe("Shared Contracts & Data Model Specification", () => {
         },
       );
       expect(ackInvoked).toBe(true);
+    });
+
+    it("validates ERR_STALE_LOCK_EXECUTION error code assignment without casting (MIN-023)", () => {
+      const code: ErrorCode = "ERR_STALE_LOCK_EXECUTION";
+      expect(code).toBe("ERR_STALE_LOCK_EXECUTION");
+    });
+
+    it("verifies room:player_left event and schema with typed reasons (CRIT-004)", () => {
+      const validReasons: PlayerLeftReason[] = [
+        "player_left",
+        "host_left",
+        "kicked",
+        "room_closed",
+      ];
+
+      for (const reason of validReasons) {
+        expect(PlayerLeftReasonSchema.parse(reason)).toBe(reason);
+        const parsed = RoomPlayerLeftPayloadSchema.parse({
+          playerId: "player-123",
+          playerName: "Alice",
+          reason,
+        });
+        expect(parsed.reason).toBe(reason);
+      }
+
+      // reason is optional
+      const noReasonParsed = RoomPlayerLeftPayloadSchema.parse({
+        playerId: "player-123",
+        playerName: "Alice",
+      });
+      expect(noReasonParsed.reason).toBeUndefined();
+
+      // invalid reason rejected
+      expect(() => PlayerLeftReasonSchema.parse("invalid_reason")).toThrow();
+      expect(() =>
+        RoomPlayerLeftPayloadSchema.parse({
+          playerId: "player-123",
+          playerName: "Alice",
+          reason: "invalid_reason",
+        }),
+      ).toThrow();
+
+      // Handler type check and interface type validation
+      const mockPlayerLeftHandler: ServerToClientEvents["room:player_left"] = (data) => {
+        expect(data.playerId).toBe("p1");
+        expect(data.playerName).toBe("Bob");
+        expect(data.reason).toBe("host_left");
+      };
+      const leftPayload: RoomPlayerLeftPayload = {
+        playerId: "p1",
+        playerName: "Bob",
+        reason: "host_left",
+      };
+      mockPlayerLeftHandler(leftPayload);
+    });
+
+    it("validates CreateRoomSuccessResponseSchema and CreateRoomResponseSchema (MAJ-003)", () => {
+      const mockRoom = {
+        roomCode: "ABCD",
+        status: "lobby",
+        hostId: "11111111-1111-4111-8111-111111111111",
+        whitePlayer: {
+          id: "11111111-1111-4111-8111-111111111111",
+          socketId: "sock-1",
+          name: "HostPlayer",
+          avatar: "🦁",
+          color: "w",
+          isHost: true,
+          isConnected: true,
+          connectedAt: 1000,
+        },
+        blackPlayer: null,
+        spectators: [],
+        game: {
+          fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          turn: "w",
+          isCheck: false,
+          isCheckmate: false,
+          isDraw: false,
+          isStalemate: false,
+          isThreefoldRepetition: false,
+          isInsufficientMaterial: false,
+          isFiftyMoveRule: false,
+          moveHistory: [],
+          capturedWhite: [],
+          capturedBlack: [],
+          materialAdvantage: { white: 0, black: 0 },
+          lastMove: null,
+          moveCount: 0,
+        },
+        rematch: null,
+        createdAt: 1000,
+        lastActivityAt: 1000,
+      };
+
+      const mockPlayer: Player = {
+        id: "11111111-1111-4111-8111-111111111111",
+        socketId: "sock-1",
+        name: "HostPlayer",
+        avatar: "🦁",
+        color: "w",
+        isHost: true,
+        isConnected: true,
+        connectedAt: 1000,
+      };
+
+      const successPayload = {
+        success: true as const,
+        room: mockRoom,
+        player: mockPlayer,
+        sessionToken: "sec-token-12345",
+      };
+
+      const parsedSuccess = CreateRoomSuccessResponseSchema.parse(successPayload);
+      expect(parsedSuccess.success).toBe(true);
+      expect(parsedSuccess.player.id).toBe(mockPlayer.id);
+      expect(parsedSuccess.sessionToken).toBe("sec-token-12345");
+
+      const successAck: CreateRoomSuccessAck = {
+        success: true,
+        room: mockRoom as unknown as RoomState,
+        player: mockPlayer,
+        sessionToken: "sec-token-12345",
+      };
+      const ackResponse: CreateRoomAckResponse = successAck;
+      expect(ackResponse.success).toBe(true);
+
+      const successResponse: CreateRoomSuccessResponse = parsedSuccess;
+      const parsedUnion = CreateRoomResponseSchema.parse(successPayload);
+      const unionResponse: CreateRoomResponse = parsedUnion;
+      expect(successResponse.success).toBe(true);
+      expect(unionResponse.success).toBe(true);
+
+      const errorPayload = {
+        success: false as const,
+        error: {
+          code: "ERR_RATE_LIMITED",
+          message: "Rate limit exceeded",
+        },
+      };
+      const parsedError = CreateRoomResponseSchema.parse(errorPayload);
+      expect(parsedError.success).toBe(false);
     });
   });
 });

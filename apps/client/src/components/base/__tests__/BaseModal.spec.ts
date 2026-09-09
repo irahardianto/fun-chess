@@ -184,4 +184,45 @@ describe('BaseModal.vue', () => {
     wrapper.unmount();
     triggerBtn.remove();
   });
+
+  it('does not close on Escape when closeOnEsc is false', async () => {
+    const wrapper = mount(BaseModal, {
+      props: {
+        modelValue: true,
+        closeOnEsc: false,
+      },
+    });
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapper.emitted('close')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('supports isOpen prop, showCloseButton false, size variants, and ariaLabel', async () => {
+    const wrapper = mount(BaseModal, {
+      props: {
+        isOpen: true,
+        showCloseButton: false,
+        size: 'lg',
+        ariaLabel: 'Accessible Dialog',
+      },
+      slots: {
+        default: '<span>Plain text without buttons</span>',
+      },
+      attachTo: document.body,
+    });
+
+    await wrapper.vm.$nextTick();
+    const container = document.body.querySelector('.base-modal-container');
+    expect(container).not.toBeNull();
+    expect(container?.classList.contains('base-modal--lg')).toBe(true);
+    expect(container?.getAttribute('aria-label')).toBe('Accessible Dialog');
+    expect(document.body.querySelector('.base-modal-close-btn')).toBeNull();
+
+    // Tab with 0 focusable elements
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(document.activeElement).toBe(container);
+
+    wrapper.unmount();
+  });
 });

@@ -42,6 +42,7 @@ defineExpose({
 const buttonClasses = computed(() => [
   'btn-tactile',
   `btn-tactile--${props.variant}`,
+  ...(props.variant === 'primary' ? ['btn-primary'] : []),
   `btn-tactile--${props.size}`,
   {
     'is-disabled': props.disabled || props.loading,
@@ -168,19 +169,22 @@ function handleClick(event: MouseEvent) {
 
 /* VARIANTS */
 /* Primary — Electric Violet */
-.btn-tactile--primary {
+.btn-tactile--primary,
+.btn-primary {
   background-color: var(--color-primary);
   color: var(--text-on-primary);
   box-shadow: var(--shadow-btn-primary);
 }
 
-.btn-tactile--primary:hover:not(:disabled) {
+.btn-tactile--primary:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
   filter: brightness(1.06);
   transform: translateY(-2px);
   box-shadow: var(--shadow-btn-primary-hover);
 }
 
-.btn-tactile--primary:active:not(:disabled) {
+.btn-tactile--primary:active:not(:disabled),
+.btn-primary:active:not(:disabled) {
   transform: translateY(4px) scale(0.96);
   box-shadow: var(--shadow-btn-primary-active);
 }

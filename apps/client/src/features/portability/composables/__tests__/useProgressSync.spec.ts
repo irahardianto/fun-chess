@@ -218,4 +218,148 @@ describe('useProgressSync Composable', () => {
     expect(result).toBe(false);
     expect(syncError.value).toBe('Select a valid save file (.json) or scan a QR code.');
   });
+
+  it('sets syncError reactivity and rethrows when QR export generation fails (MAJ-019)', async () => {
+    const failingCodec = {
+      encodeToQrString: vi.fn().mockRejectedValue(new Error('QR compression buffer overflow')),
+      decodeFromQrString: vi.fn(),
+      encodeToEnvelopeJson: vi.fn(),
+      decodeFromEnvelopeJson: vi.fn(),
+    };
+
+    const { exportQrString, syncError } = useProgressSync({
+      storage: mockStorage,
+      codec: failingCodec as any,
+    });
+
+    await expect(exportQrString()).rejects.toThrow('QR compression buffer overflow');
+    expect(syncError.value).toBe('QR compression buffer overflow');
+  });
+
+  it('handles corrupted JSON payload parsing with warning and sets syncError reactivity (MAJ-019)', async () => {
+    const { importPayload, syncError } = useProgressSync({
+      storage: mockStorage,
+    });
+
+    const result = await importPayload('{ bad_json: undefined, "unclosed": [');
+    expect(result).toBe(false);
+    expect(syncError.value).toBe('Invalid JSON format in save data.');
+  });
+
+  it('sets syncError reactivity and rethrows when storage write fails during executeMerge (MAJ-019)', async () => {
+    const failingStorage = {
+      getUnifiedProgress: vi.fn().mockResolvedValue(samplePayload),
+      saveUnifiedProgress: vi.fn().mockRejectedValue(new Error('IndexedDB quota exceeded')),
+    };
+
+    const { importPayload, executeMerge, syncError } = useProgressSync({
+      storage: failingStorage,
+    });
+
+    const validJson = JSON.stringify(samplePayload);
+    await importPayload(validJson);
+
+    await expect(executeMerge('replace_local')).rejects.toThrow('IndexedDB quota exceeded');
+    expect(syncError.value).toBe('IndexedDB quota exceeded');
+  });
+
+  it('logs warning and safely completes merge when celebration trigger fails (MAJ-019)', async () => {
+    const failingConfetti = {
+      celebrateVictory: vi.fn().mockImplementation(() => {
+        throw new Error('Canvas not supported');
+      }),
+    };
+
+    const { executeMerge, syncError } = useProgressSync({
+      storage: mockStorage,
+      confetti: failingConfetti as any,
+    });
+
+    const merged = await executeMerge('smart_merge');
+    expect(merged).toBeDefined();
+    expect(syncError.value).toBeNull();
+  });
+
+  describe('Modal and UI State Management', () => {
+    it('manages sync and conflict modal visibility and error clearing', async () => {
+      const {
+        openSyncModal,
+        closeSyncModal,
+        openConflictModal,
+        closeConflictModal,
+        clearError,
+        isSyncModalOpen,
+        isConflictModalOpen,
+        syncError,
+      } = useProgressSync({ storage: mockStorage });
+
+      expect(isSyncModalOpen.value).toBe(false);
+      openSyncModal();
+      expect(isSyncModalOpen.value).toBe(true);
+
+      closeSyncModal();
+      expect(isSyncModalOpen.value).toBe(false);
+
+      expect(isConflictModalOpen.value).toBe(false);
+      openConflictModal();
+      expect(isConflictModalOpen.value).toBe(true);
+
+      closeConflictModal();
+      expect(isConflictModalOpen.value).toBe(false);
+
+      syncError.value = 'temporary error';
+      clearError();
+      expect(syncError.value).toBeNull();
+    });
+
+    it('triggers onMergeCelebration callback when merge strategy succeeds', async () => {
+      const onMergeCelebration = vi.fn();
+      const { importPayload, executeMerge } = useProgressSync({
+        storage: mockStorage,
+        onMergeCelebration,
+      });
+
+      const validJson = JSON.stringify(samplePayload);
+      await importPayload(validJson);
+      await executeMerge('smart_merge');
+
+      expect(onMergeCelebration).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not trigger celebration when keep_local strategy is chosen', async () => {
+      const onMergeCelebration = vi.fn();
+      const { importPayload, executeMerge } = useProgressSync({
+        storage: mockStorage,
+        onMergeCelebration,
+      });
+
+      const validJson = JSON.stringify(samplePayload);
+      await importPayload(validJson);
+      await executeMerge('keep_local');
+
+      expect(onMergeCelebration).not.toHaveBeenCalled();
+    });
+
+    it('uses cached currentProgress for exportJson and exportQrString when already loaded', async () => {
+      const mockFileService: IProgressFileService = {
+        downloadProgressFile: vi.fn(),
+        readProgressFile: vi.fn(),
+      };
+
+      const { loadCurrentProgress, exportJson, exportQrString } = useProgressSync({
+        storage: mockStorage,
+        fileService: mockFileService,
+      });
+
+      // Pre-load progress
+      await loadCurrentProgress();
+
+      // Subsequent exports should utilize cached progress
+      const json = await exportJson('cached.json');
+      expect(json).toBeDefined();
+
+      const qr = await exportQrString();
+      expect(qr.startsWith('FC1:')).toBe(true);
+    });
+  });
 });

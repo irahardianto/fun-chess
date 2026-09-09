@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Fun Chess pre-push gate.
+#
+# Enforces comprehensive branch coverage thresholds and contract/integration test
+# verification across all monorepo workspaces before code can be pushed to remote branches.
+#
+# Design:
+# - Runs `pnpm test:coverage`
+# - Zero tolerance for broken coverage thresholds or failing suites
+# - Honors FUN_CHESS_HOOK_SKIP=push,coverage or FUN_CHESS_HOOK_FAST=1 if explicitly bypassed
+
+set -uo pipefail
+
+if [[ "${FUN_CHESS_HOOK_NO_COLOR:-0}" == "1" ]] || [[ ! -t 1 ]]; then
+  C_RED=""; C_YEL=""; C_GRN=""; C_CYN=""; C_DIM=""; C_RST=""
+else
+  C_RED=$'\033[31m'; C_YEL=$'\033[33m'; C_GRN=$'\033[32m'
+  C_CYN=$'\033[36m'; C_DIM=$'\033[2m'; C_RST=$'\033[0m'
+fi
+
+SKIP_RAW="${FUN_CHESS_HOOK_SKIP:-${CHESS_HOOK_SKIP:-}}"
+FAST="${FUN_CHESS_HOOK_FAST:-${CHESS_HOOK_FAST:-0}}"
+
+if [[ "$FAST" == "1" || "$SKIP_RAW" == *"coverage"* || "$SKIP_RAW" == *"push"* ]]; then
+  printf '%s[SKIP]%s pre-push coverage gate bypassed via FUN_CHESS_HOOK_SKIP / FAST\n' "$C_DIM" "$C_RST"
+  exit 0
+fi
+
+# When called by Git, stdin receives ref lines.
+# If stdin is a terminal (manual invocation), assume a push is intended.
+has_pushes=0
+if [[ -t 0 ]]; then
+  has_pushes=1
+else
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    if [[ -n "$local_sha" && "$local_sha" != "0000000000000000000000000000000000000000" ]]; then
+      has_pushes=1
+    fi
+  done
+fi
+
+if [[ $has_pushes -eq 0 ]]; then
+  exit 0
+fi
+
+printf '%sFun Chess pre-push gate: verifying test suites & coverage thresholds...%s\n' "$C_CYN" "$C_RST"
+
+if pnpm test:coverage; then
+  printf '%s  [ok]%s  all test coverage thresholds and test suites passed\n' "$C_GRN" "$C_RST"
+  printf '%sPush authorized.%s\n' "$C_GRN" "$C_RST"
+  exit 0
+else
+  printf '%s[FAIL]%s test coverage or test suite failed.\n' "$C_RED" "$C_RST" >&2
+  printf 'Push rejected. Run %s`pnpm test:coverage`%s to inspect and resolve coverage drag or test failures.\n' "$C_YEL" "$C_RST" >&2
+  exit 1
+fi

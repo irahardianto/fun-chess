@@ -68,8 +68,8 @@ export class SocketRateLimiter {
 
     if (pruneIntervalMs > 0) {
       this.pruneTimer = setInterval(() => {
-        void runLoggedJob(this.logger, "rate_limiter_prune", async () => {
-          return this.prune();
+        void runLoggedJob(this.logger, "rate_limiter_prune", async (correlationId) => {
+          return this.prune(Date.now(), correlationId);
         }).catch((err: unknown) => {
           this.logger.error("Unhandled failure in rate limiter prune job", {
             correlationId: randomUUID(),
@@ -173,7 +173,7 @@ export class SocketRateLimiter {
    * Prunes all expired timestamps and removes empty keys from memory.
    * Returns the count of deleted keys.
    */
-  public prune(now = Date.now()): number {
+  public prune(now = Date.now(), correlationId?: string): number {
     try {
       const cutoff = now - this.windowMs;
       let deletedCount = 0;
@@ -191,14 +191,14 @@ export class SocketRateLimiter {
       return deletedCount;
     } catch (err) {
       this.logger.error("Failed to prune socket rate limiter cache", {
-        correlationId: randomUUID(),
+        correlationId: correlationId ?? randomUUID(),
         operation: "rate_limiter_prune_error",
         error:
           err instanceof Error
             ? { name: err.name, message: err.message, stack: err.stack }
             : { raw: err },
       });
-      return 0;
+      throw err;
     }
   }
 

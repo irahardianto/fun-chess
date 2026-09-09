@@ -14,6 +14,7 @@ import {
   RespondRematchRequestSchema,
   MoveResult,
 } from "@fun-chess/shared";
+import { env } from "../../platform/config/index.js";
 import type { Logger } from "../../platform/logger/index.js";
 import {
   SocketRateLimiter,
@@ -25,6 +26,7 @@ import type { IGameService } from "./game.interface.js";
 import {
   type IDisconnectTimerRegistry,
   defaultDisconnectTimerRegistry,
+  type SessionRegistry,
 } from "../rooms/index.js";
 
 export const defaultSocketRateLimiter = createSocketRateLimiter();
@@ -39,7 +41,13 @@ export function registerGameSocketHandlers(
   logger: Logger,
   rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
+  sessionRegistry?: SessionRegistry,
+  trustProxy: boolean = env.TRUST_PROXY,
 ): void {
+  const effectiveTrustProxy =
+    (socket.data as { trustProxy?: boolean } | undefined)?.trustProxy ??
+    trustProxy;
+
   // 1. game:move
   const handleMove = createFeatureSocketHandler<
     MakeMoveRequest,
@@ -48,10 +56,31 @@ export function registerGameSocketHandlers(
     logger,
     "game:move",
     socket,
-    { schema: MakeMoveRequestSchema, rateLimiter },
+    { schema: MakeMoveRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
     async (req) => {
       const roomCode = req.roomCode.trim().toUpperCase();
       const result = await gameService.makeMove(req, socket.id);
+
+      if (sessionRegistry) {
+        const sessionToken = (socket.data as { sessionToken?: string } | undefined)?.sessionToken;
+        if (sessionToken) {
+          await sessionRegistry.touchSession(sessionToken, socket.id);
+        } else {
+          const playerId = (socket.data as { userId?: string } | undefined)?.userId;
+          let token: string | null | undefined;
+          if (playerId && typeof sessionRegistry.getSessionTokenForPlayer === "function") {
+            token = await sessionRegistry.getSessionTokenForPlayer(roomCode, playerId);
+          }
+          if (!token && playerId) {
+            token = (sessionRegistry as { playerIndex?: Map<string, string> }).playerIndex?.get(
+              `${roomCode}:${playerId}`,
+            );
+          }
+          if (token) {
+            await sessionRegistry.touchSession(token, socket.id);
+          }
+        }
+      }
 
       io.to(roomCode).emit("game:moved", {
         move: result.moveResult,
@@ -84,7 +113,7 @@ export function registerGameSocketHandlers(
     logger,
     "game:resign",
     socket,
-    { schema: ResignRequestSchema, rateLimiter },
+    { schema: ResignRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
     async (req) => {
       const roomCode = req.roomCode.trim().toUpperCase();
       const result = await gameService.resign(roomCode, socket.id);
@@ -104,7 +133,7 @@ export function registerGameSocketHandlers(
     logger,
     "game:offer_draw",
     socket,
-    { schema: OfferDrawRequestSchema, rateLimiter },
+    { schema: OfferDrawRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
     async (req) => {
       const roomCode = req.roomCode.trim().toUpperCase();
       const result = await gameService.offerDraw(roomCode, socket.id);
@@ -128,7 +157,7 @@ export function registerGameSocketHandlers(
     logger,
     "game:respond_draw",
     socket,
-    { schema: RespondDrawRequestSchema, rateLimiter },
+    { schema: RespondDrawRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
     async (req) => {
       const roomCode = req.roomCode.trim().toUpperCase();
       const result = await gameService.respondDraw(
@@ -160,7 +189,7 @@ export function registerGameSocketHandlers(
     logger,
     "game:request_rematch",
     socket,
-    { schema: RequestRematchRequestSchema, rateLimiter },
+    { schema: RequestRematchRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
     async (req) => {
       const roomCode = req.roomCode.trim().toUpperCase();
       const result = await gameService.requestRematch(roomCode, socket.id);
@@ -184,7 +213,7 @@ export function registerGameSocketHandlers(
     logger,
     "game:respond_rematch",
     socket,
-    { schema: RespondRematchRequestSchema, rateLimiter },
+    { schema: RespondRematchRequestSchema, rateLimiter, trustProxy: effectiveTrustProxy },
     async (req) => {
       const roomCode = req.roomCode.trim().toUpperCase();
       const result = await gameService.respondRematch(

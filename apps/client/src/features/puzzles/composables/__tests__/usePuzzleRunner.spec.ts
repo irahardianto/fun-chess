@@ -403,4 +403,111 @@ describe('usePuzzleRunner Composable', () => {
       vi.useRealTimers();
     });
   });
+
+  describe('Edge Cases and Branch Variations', () => {
+    it('handles initialization with initialPuzzle option and null puzzle defaults', () => {
+      const runnerWithInitial = usePuzzleRunner({
+        initialPuzzle: samplePuzzle,
+        autoPlayAudio: false,
+      });
+      expect(runnerWithInitial.puzzle.value?.id).toBe(samplePuzzle.id);
+
+      const emptyRunner = usePuzzleRunner();
+      expect(emptyRunner.puzzle.value).toBeNull();
+      expect(emptyRunner.playerColor.value).toBe('w');
+      expect(emptyRunner.analysis.value).toBeNull();
+      expect(emptyRunner.revealNextHint()).toBeNull();
+
+      // Calling operations on empty runner should safely no-op
+      emptyRunner.selectSquare('e4');
+      emptyRunner.applyPlayerMove({ from: 'e2', to: 'e4' });
+      emptyRunner.resetCurrentPuzzle();
+      emptyRunner.resetCurrentAttempt();
+      expect(emptyRunner.selectedSquare.value).toBeNull();
+    });
+
+    it('toggles selection off when clicking the currently selected square', () => {
+      const runner = usePuzzleRunner({ puzzle: samplePuzzle, autoPlayAudio: false });
+
+      runner.selectSquare('a1');
+      expect(runner.selectedSquare.value).toBe('a1');
+      expect(runner.legalMoves.value.length).toBeGreaterThan(0);
+
+      // Click same square again -> deselect
+      runner.selectSquare('a1');
+      expect(runner.selectedSquare.value).toBeNull();
+      expect(runner.legalMoves.value).toEqual([]);
+    });
+
+    it('ignores clicks on opponent piece or empty squares when no piece is selected', () => {
+      const runner = usePuzzleRunner({ puzzle: samplePuzzle, autoPlayAudio: false });
+
+      // Click opponent piece (g8 black King)
+      runner.selectSquare('g8');
+      expect(runner.selectedSquare.value).toBeNull();
+
+      // Click empty square
+      runner.selectSquare('e4');
+      expect(runner.selectedSquare.value).toBeNull();
+    });
+
+    it('ignores square clicks when puzzle is already completed', () => {
+      const runner = usePuzzleRunner({ puzzle: samplePuzzle, autoPlayAudio: false });
+
+      runner.selectSquare('a1');
+      runner.selectSquare('a8');
+      expect(runner.isCompleted.value).toBe(true);
+
+      // Clicks after completion
+      runner.selectSquare('a8');
+      expect(runner.selectedSquare.value).toBeNull();
+    });
+
+    it('marks attemptResult as solved_with_hints when hints are used before solving', () => {
+      const onSolve = vi.fn();
+      const runner = usePuzzleRunner({
+        puzzle: samplePuzzle,
+        autoPlayAudio: false,
+        onSolve, // test onSolve callback fallback
+      });
+
+      runner.revealNextHint();
+      expect(runner.hintsCount.value).toBe(1);
+
+      runner.selectSquare('a1');
+      runner.selectSquare('a8');
+
+      expect(runner.isCompleted.value).toBe(true);
+      expect(runner.attemptResult.value).toBe('solved_with_hints');
+      expect(onSolve).toHaveBeenCalledWith(samplePuzzle, 2, 1, 0);
+    });
+
+    it('supports Black player puzzle orientation', () => {
+      const blackPuzzle: Puzzle = {
+        ...samplePuzzle,
+        id: 'black_puzzle_001',
+        fen: '4k3/8/8/8/8/8/8/4K2r b - - 0 1',
+        playerColor: 'b',
+        moves: ['h1e1'],
+      };
+
+      const runner = usePuzzleRunner({ puzzle: blackPuzzle, autoPlayAudio: false });
+      expect(runner.playerColor.value).toBe('b');
+
+      runner.selectSquare('h1');
+      expect(runner.selectedSquare.value).toBe('h1');
+    });
+
+    it('deselects piece when clicking an empty non-legal square', () => {
+      const runner = usePuzzleRunner({ puzzle: samplePuzzle, autoPlayAudio: false });
+
+      runner.selectSquare('a1');
+      expect(runner.selectedSquare.value).toBe('a1');
+
+      // Click empty square 'e4' (not a legal move)
+      runner.selectSquare('e4');
+      expect(runner.selectedSquare.value).toBeNull();
+      expect(runner.legalMoves.value).toEqual([]);
+    });
+  });
 });

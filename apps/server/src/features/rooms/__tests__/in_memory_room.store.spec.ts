@@ -6,6 +6,7 @@ import {
   OptimisticLockConflictError,
   LockTimeoutError,
   LockExecutionTimeoutError,
+  RoomCapacityExceededError,
 } from "../room.errors.js";
 import type { Logger } from "../../../platform/logger/index.js";
 
@@ -344,7 +345,9 @@ describe("InMemoryRoomStore", () => {
       await expect(hangingAction).rejects.toThrow(LockExecutionTimeoutError);
 
       // Verify lock was released immediately: next waiter can acquire
-      (store as unknown as { EXECUTION_TIMEOUT_MS: number }).EXECUTION_TIMEOUT_MS = 5000;
+      (
+        store as unknown as { EXECUTION_TIMEOUT_MS: number }
+      ).EXECUTION_TIMEOUT_MS = 5000;
       const nextAction = await store.withLock(code, async () => "unblocked");
       expect(nextAction).toBe("unblocked");
     });
@@ -388,7 +391,8 @@ describe("InMemoryRoomStore", () => {
       await new Promise((resolve) => setTimeout(resolve, 15));
 
       const postTimeoutWarn = warnLogs.find(
-        (log) => log.msg === "Orphaned lock action rejected after execution timeout",
+        (log) =>
+          log.msg === "Orphaned lock action rejected after execution timeout",
       );
       expect(postTimeoutWarn).toBeDefined();
     });
@@ -417,9 +421,9 @@ describe("InMemoryRoomStore", () => {
         await blocker;
       });
 
-      await expect(customStore.withLock("WARN", async () => "ok")).rejects.toThrow(
-        LockTimeoutError,
-      );
+      await expect(
+        customStore.withLock("WARN", async () => "ok"),
+      ).rejects.toThrow(LockTimeoutError);
 
       releaseLock();
       await first;
@@ -523,7 +527,11 @@ describe("InMemoryRoomStore", () => {
       const queueEntry = testStore(store).lockQueues.get("HOLD");
       expect(queueEntry).toBeDefined();
 
-      const [res1, res2, deleted] = await Promise.all([action1, action2, deletePromise]);
+      const [res1, res2, deleted] = await Promise.all([
+        action1,
+        action2,
+        deletePromise,
+      ]);
       expect(res1).toBe("action1");
       expect(res2).toBe("action2");
       expect(deleted).toBe(true);
@@ -585,6 +593,72 @@ describe("InMemoryRoomStore", () => {
       // Newer tickets must remain present
       expect(set.has(101)).toBe(true);
       expect(set.has(max + 100)).toBe(true);
+    });
+  });
+
+  describe("Room Capacity Limit & RoomCapacityExceededError (MAJ-017)", () => {
+    it("throws RoomCapacityExceededError on save when maximum capacity is reached for a new room", async () => {
+      const capacityStore = new InMemoryRoomStore(undefined, undefined, {
+        maxRooms: 2,
+      });
+
+      await capacityStore.save(createDummyRoom("RM01"));
+      await capacityStore.save(createDummyRoom("RM02"));
+
+      // Attempting to save a 3rd new room should fail with RoomCapacityExceededError
+      let caughtError: unknown;
+      try {
+        await capacityStore.save(createDummyRoom("RM03"));
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(RoomCapacityExceededError);
+      const error = caughtError as RoomCapacityExceededError;
+      expect(error.name).toBe("RoomCapacityExceededError");
+      expect(error.code).toBe("ERR_INTERNAL_SERVER");
+      expect(error.statusCode).toBe(507);
+      expect(error.details).toEqual({ maxRooms: 2 });
+      expect(error.message).toContain("Maximum room capacity reached (2)");
+    });
+
+    it("allows updating existing rooms even when at maximum capacity", async () => {
+      const capacityStore = new InMemoryRoomStore(undefined, undefined, {
+        maxRooms: 2,
+      });
+
+      const r1 = createDummyRoom("RM01");
+      const r2 = createDummyRoom("RM02");
+      await capacityStore.save(r1);
+      await capacityStore.save(r2);
+
+      // Updating RM01 should succeed without throwing
+      await expect(
+        capacityStore.save({ ...r1, status: "playing" }),
+      ).resolves.not.toThrow();
+
+      const updated = await capacityStore.findByCode("RM01");
+      expect(updated?.status).toBe("playing");
+    });
+
+    it("throws RoomCapacityExceededError on createIfAbsent when maximum capacity is reached", async () => {
+      const capacityStore = new InMemoryRoomStore(undefined, undefined, {
+        maxRooms: 1,
+      });
+
+      await capacityStore.createIfAbsent(createDummyRoom("RM01"));
+
+      let caughtError: unknown;
+      try {
+        await capacityStore.createIfAbsent(createDummyRoom("RM02"));
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(RoomCapacityExceededError);
+      const error = caughtError as RoomCapacityExceededError;
+      expect(error.statusCode).toBe(507);
+      expect(error.details).toEqual({ maxRooms: 1 });
     });
   });
 });

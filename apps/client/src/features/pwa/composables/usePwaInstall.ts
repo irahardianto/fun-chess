@@ -40,8 +40,7 @@ function getEffectiveLogger(custom?: ILogger): ILogger {
 }
 
 function checkSnoozeStatus(customStorage?: KeyValueStorage, customLogger?: ILogger): boolean {
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-  snoozeTrigger.value; // reactive dependency
+  void snoozeTrigger.value; // reactive dependency
   try {
     const storage = getEffectiveStorage(customStorage);
     const snoozedUntil = storage.getItem(SNOOZE_STORAGE_KEY);

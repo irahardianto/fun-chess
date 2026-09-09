@@ -70,6 +70,7 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
     expect(designTokens).toContain('--cat-fundamentals-text: hsl(150, 85%, 20%);');
 
     // Dark theme contrast tokens (>= 4.5:1)
+    expect(designTokens).toContain('--text-on-primary:    #0f172a;');
     expect(designTokens).toContain('--color-primary-text: hsl(255 95% 78%);');
     expect(designTokens).toContain('--color-accent-text:  hsl(42 100% 75%);');
     expect(designTokens).toContain('--color-success-text: #34d399;');
@@ -78,6 +79,11 @@ describe('UI/UX Remediation Token & Asset Conformance (WCAG AA)', () => {
     expect(designTokens).toContain('--mode-ladder-bg:        hsl(271, 85%, 97%);');
     expect(designTokens).toContain('--mode-drills-bg:        hsl(244, 85%, 97%);');
     expect(designTokens).toContain('--mode-rush-bg:          hsl(24, 100%, 97%);');
+
+    // UX-001: All primary buttons use var(--text-on-primary) for text color
+    expect(designTokens).toContain('.btn-primary');
+    expect(designTokens).toContain('color: var(--text-on-primary);');
+    expect(baseButton).toContain('color: var(--text-on-primary);');
   });
 
   it('Finding 13: BaseButton.vue defines tactile active transform squish feedback', () => {

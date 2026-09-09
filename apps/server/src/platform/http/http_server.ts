@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Logger } from "../logger/logger.interface.js";
+import { defaultLogger } from "../logger/index.js";
 import { extractClientIp } from "./ip_utils.js";
 import { AppError } from "@fun-chess/shared";
 import { isOriginAllowed, resolveAllowedOrigins } from "../config/index.js";
@@ -121,8 +122,12 @@ export function resolveDistPath(config: HttpServerConfig): string {
       if (fs.existsSync(candidate)) {
         return candidate;
       }
-    } catch {
-      // Ignore filesystem access check errors and continue
+    } catch (err) {
+      defaultLogger.debug("Failed checking client dist directory candidate", {
+        operation: "resolve_client_dist_dir",
+        candidate,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -546,7 +551,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
 
       const duration = Math.round(performance.now() - startTime);
       const logContext = {
-        operation: "http_response",
+        operation: "http_request",
         correlationId,
         clientIp,
         method,
@@ -577,7 +582,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
 
       const duration = Math.round(performance.now() - startTime);
       const logContext = {
-        operation: "http_response",
+        operation: "http_request",
         correlationId,
         clientIp,
         method,

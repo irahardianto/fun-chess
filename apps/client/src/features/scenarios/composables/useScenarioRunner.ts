@@ -241,9 +241,9 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     }
 
     const step = nav.currentStep.value;
-    const isValidForStep = validateStepMove(step, move, chess);
+    const validation = validateStepMove(step, move, chess);
 
-    if (!isValidForStep) {
+    if (!validation.valid) {
       handleFailedPlayerMove();
       return false;
     }

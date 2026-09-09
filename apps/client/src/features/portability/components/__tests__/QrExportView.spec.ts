@@ -80,4 +80,18 @@ describe('QrExportView.vue', () => {
 
     expect(wrapper.emitted('downloadJson')).toBeDefined();
   });
+
+  it('sets canvasError when 2D canvas context acquisition fails', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    const wrapper = mount(QrExportView, {
+      props: {
+        payload,
+        qrString: 'FC1:test_qr_data',
+      },
+    });
+
+    await (wrapper.vm as any).renderQrCode();
+    expect((wrapper.vm as any).canvasError).toBe('Failed to acquire 2D canvas context');
+    expect(wrapper.find('.canvas-error-text').exists()).toBe(true);
+  });
 });

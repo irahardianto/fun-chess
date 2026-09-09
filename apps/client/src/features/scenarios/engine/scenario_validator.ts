@@ -1,14 +1,16 @@
-import { getCurrentInstance } from 'vue';
 import type { Square, TutorialStep, StepMoveConstraint } from '@fun-chess/shared';
 import type { Square as ChessSquare } from 'chess.js';
 import { createSafeChess } from '@fun-chess/shared';
-import { useInjectLogger } from '@/platform/di';
-import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
 export interface PlayerMoveInput {
   from: Square;
   to: Square;
   promotion?: 'q' | 'r' | 'b' | 'n' | string;
+}
+
+export interface StepMoveValidationResult {
+  valid: boolean;
+  reason?: string;
 }
 
 /**
@@ -19,18 +21,15 @@ export interface PlayerMoveInput {
  * @param step - Current active TutorialStep
  * @param move - Proposed move by the player
  * @param chess - Optional chess.js engine instance or object with .fen()
- * @param customLogger - Optional custom logger for DI
- * @returns true if the move satisfies the step constraints or delivers checkmate, false otherwise
+ * @returns validation result object with boolean valid flag and optional reason
  */
 export function validateStepMove(
   step: TutorialStep,
   move: PlayerMoveInput,
-  chess?: { fen(): string } | null,
-  customLogger?: ILogger
-): boolean {
-  const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
-  if (!step) return false;
-  if (!move || !move.from || !move.to) return false;
+  chess?: { fen(): string } | null
+): { valid: boolean; reason?: string } {
+  if (!step) return { valid: false, reason: 'No active tutorial step' };
+  if (!move || !move.from || !move.to) return { valid: false, reason: 'Invalid move input' };
 
   const normalizedPromotion = move.promotion ? move.promotion.toLowerCase() : undefined;
 
@@ -44,11 +43,11 @@ export function validateStepMove(
     });
 
     if (isConstraintMatched) {
-      return true;
+      return { valid: true };
     }
   } else {
     // If no specific allowed moves specified, any move is acceptable
-    return true;
+    return { valid: true };
   }
 
   // Check if proposed move delivers sound checkmate
@@ -62,17 +61,14 @@ export function validateStepMove(
         promotion: (normalizedPromotion as 'q' | 'r' | 'b' | 'n' | undefined) ?? 'q',
       });
       if (res && testEngine.isCheckmate()) {
-        return true;
+        return { valid: true, reason: 'Delivers sound checkmate' };
       }
     } catch (err) {
-      logger.debug('Invalid or illegal move during checkmate validation', {
-        operation: 'validate_step_move',
-        error: err instanceof Error ? err.message : String(err),
-      });
+      void err;
     }
   }
 
-  return false;
+  return { valid: false, reason: 'Move does not match required step constraints' };
 }
 
 /**
@@ -81,10 +77,8 @@ export function validateStepMove(
 export function isSourceSquareAllowed(
   step: TutorialStep,
   from: Square,
-  chess?: { fen(): string } | null,
-  customLogger?: ILogger
+  chess?: { fen(): string } | null
 ): boolean {
-  const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   if (!step || !step.allowedMoves || step.allowedMoves.length === 0) {
     return true;
   }
@@ -113,10 +107,7 @@ export function isSourceSquareAllowed(
         }
       }
     } catch (err) {
-      logger.debug('Move simulation failed during source square validation', {
-        operation: 'is_source_square_allowed',
-        error: err instanceof Error ? err.message : String(err),
-      });
+      void err;
     }
   }
 
@@ -129,10 +120,8 @@ export function isSourceSquareAllowed(
 export function getAllowedTargetsForSource(
   step: TutorialStep,
   from: Square,
-  chess?: { fen(): string } | null,
-  customLogger?: ILogger
+  chess?: { fen(): string } | null
 ): Square[] {
-  const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   if (!step) {
     return [];
   }
@@ -167,10 +156,7 @@ export function getAllowedTargetsForSource(
         }
       }
     } catch (err) {
-      logger.debug('Move simulation failed during allowed targets retrieval', {
-        operation: 'get_allowed_targets_for_source',
-        error: err instanceof Error ? err.message : String(err),
-      });
+      void err;
     }
   }
 

@@ -18,7 +18,7 @@ import {
   type IClock,
   type IIdGenerator,
 } from "@fun-chess/shared";
-import type { IRoomGameAdapter } from "../rooms/index.js";
+import type { IRoomGameAdapter, SessionRegistry } from "../rooms/index.js";
 import { ChessEngine } from "./chess_engine.js";
 import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
 import { IGameService, MoveApplicationResult } from "./game.interface.js";
@@ -33,25 +33,27 @@ export class GameService implements IGameService {
   private readonly roomAdapter: IRoomGameAdapter;
   private readonly clock: IClock;
   private readonly idGenerator: IIdGenerator;
+  private readonly sessionRegistry?: SessionRegistry;
 
   constructor(
     roomAdapter: IRoomGameAdapter,
     clock?: IClock,
     idGenerator?: IIdGenerator,
+    sessionRegistry?: SessionRegistry,
   ) {
     this.roomAdapter = roomAdapter;
     this.clock = clock ?? new SystemClock();
     this.idGenerator = idGenerator ?? new UuidGenerator();
+    this.sessionRegistry = sessionRegistry;
   }
 
   /**
-   * Validates and applies a move from a player socket through roomAdapter.
-   * Handles expectedMoveNumber idempotency and sequencing guards (MAJ-031).
+   * Validates room status and player socket membership prior to processing move (MAJ-008).
    */
-  public async makeMove(
+  private async validateMoveIngress(
     req: MakeMoveRequest,
     socketId: string,
-  ): Promise<MoveApplicationResult> {
+  ): Promise<{ room: RoomState; player: Player }> {
     const roomCode = (req.roomCode || "").trim().toUpperCase();
     const room = await this.roomAdapter.getRoom(roomCode);
 
@@ -68,7 +70,37 @@ export class GameService implements IGameService {
       throw new PlayerNotInRoomError(socketId);
     }
 
-    // Handle expectedMoveNumber and idempotencyKey (MAJ-031)
+    return { room, player };
+  }
+
+  /**
+   * Derives check state and checked king coordinates without duplication (MIN-016).
+   */
+  private resolveCheckInfo(
+    gameState: GameState,
+  ): { inCheck: PieceColor; kingSquare: string } | undefined {
+    if (!gameState.isCheck) {
+      return undefined;
+    }
+    const checkedColor: PieceColor = gameState.turn;
+    const kingSquare = ChessEngine.findKingSquare(gameState.fen, checkedColor);
+    if (kingSquare) {
+      return { inCheck: checkedColor, kingSquare };
+    }
+    return undefined;
+  }
+
+  /**
+   * Evaluates sequencing numbers and client idempotency keys to handle resubmission safely (MAJ-008, MAJ-031).
+   */
+  private checkIdempotentReplay(
+    req: MakeMoveRequest,
+    room: RoomState,
+    player: Player,
+  ): MoveApplicationResult | null {
+    const roomCode = room.roomCode;
+
+    // Handle expectedMoveNumber sequence validation (MAJ-031)
     if (
       req.expectedMoveNumber !== undefined &&
       req.expectedMoveNumber !== room.game.moveCount
@@ -82,19 +114,7 @@ export class GameService implements IGameService {
         if (isMatchingLastMove && room.game.moveHistory.length > 0) {
           const lastMoveResult =
             room.game.moveHistory[room.game.moveHistory.length - 1]!;
-
-          let checkInfo:
-            { inCheck: PieceColor; kingSquare: string } | undefined;
-          if (room.game.isCheck) {
-            const checkedColor: PieceColor = room.game.turn;
-            const kingSquare = ChessEngine.findKingSquare(
-              room.game.fen,
-              checkedColor,
-            );
-            if (kingSquare) {
-              checkInfo = { inCheck: checkedColor, kingSquare };
-            }
-          }
+          const checkInfo = this.resolveCheckInfo(room.game);
 
           return {
             room,
@@ -129,18 +149,7 @@ export class GameService implements IGameService {
     ) {
       const lastMoveResult =
         room.game.moveHistory[room.game.moveHistory.length - 1]!;
-
-      let checkInfo: { inCheck: PieceColor; kingSquare: string } | undefined;
-      if (room.game.isCheck) {
-        const checkedColor: PieceColor = room.game.turn;
-        const kingSquare = ChessEngine.findKingSquare(
-          room.game.fen,
-          checkedColor,
-        );
-        if (kingSquare) {
-          checkInfo = { inCheck: checkedColor, kingSquare };
-        }
-      }
+      const checkInfo = this.resolveCheckInfo(room.game);
 
       return {
         room,
@@ -148,6 +157,95 @@ export class GameService implements IGameService {
         gameState: room.game,
         checkInfo,
       };
+    }
+
+    return null;
+  }
+
+  /**
+   * Determines terminal checkmate or draw states and produces GameOverPayload (MAJ-008).
+   */
+  private classifyGameOverOutcome(
+    room: RoomState,
+    player: Player,
+    outcomeState: GameState,
+  ): {
+    gameOverPayload?: GameOverPayload;
+    checkInfo?: { inCheck: PieceColor; kingSquare: string };
+  } {
+    if (outcomeState.isCheckmate) {
+      const gameOverPayload = createGameOverPayload({
+        winner: player.color,
+        winnerName: player.name,
+        reason: "checkmate",
+        finalFen: outcomeState.fen,
+        totalMoves: outcomeState.moveCount,
+        startTimeMs: room.createdAt,
+      });
+      return { gameOverPayload };
+    }
+
+    if (outcomeState.isDraw) {
+      const reason: GameOverReason = outcomeState.isStalemate
+        ? "stalemate"
+        : outcomeState.isThreefoldRepetition
+          ? "threefold_repetition"
+          : outcomeState.isInsufficientMaterial
+            ? "insufficient_material"
+            : outcomeState.isFiftyMoveRule
+              ? "fifty_move_rule"
+              : "draw_agreement";
+
+      const gameOverPayload = createGameOverPayload({
+        winner: "draw",
+        reason,
+        finalFen: outcomeState.fen,
+        totalMoves: outcomeState.moveCount,
+        startTimeMs: room.createdAt,
+      });
+      return { gameOverPayload };
+    }
+
+    const checkInfo = this.resolveCheckInfo(outcomeState);
+    return { checkInfo };
+  }
+
+  /**
+   * Refreshes sliding session TTL in sessionRegistry for active player upon valid move (CRIT-002).
+   */
+  private async touchPlayerSession(
+    roomCode: string,
+    playerId: string,
+    socketId: string,
+  ): Promise<void> {
+    if (!this.sessionRegistry) return;
+    let token: string | null | undefined;
+    if (typeof this.sessionRegistry.getSessionTokenForPlayer === "function") {
+      token = await this.sessionRegistry.getSessionTokenForPlayer(roomCode, playerId);
+    }
+    if (!token) {
+      token = (this.sessionRegistry as { playerIndex?: Map<string, string> }).playerIndex?.get(
+        `${roomCode.toUpperCase()}:${playerId}`,
+      );
+    }
+    if (token) {
+      await this.sessionRegistry.touchSession(token, socketId);
+    }
+  }
+
+  /**
+   * Validates and applies a move from a player socket through roomAdapter.
+   * Handles expectedMoveNumber idempotency and sequencing guards (MAJ-031, MAJ-008).
+   */
+  public async makeMove(
+    req: MakeMoveRequest,
+    socketId: string,
+  ): Promise<MoveApplicationResult> {
+    const { room, player } = await this.validateMoveIngress(req, socketId);
+
+    const replayResult = this.checkIdempotentReplay(req, room, player);
+    if (replayResult) {
+      return replayResult;
     }
 
     if (player.color !== room.game.turn) {
@@ -166,52 +264,19 @@ export class GameService implements IGameService {
       throw new InvalidMoveError(outcome.error);
     }
 
-    let checkInfo: { inCheck: PieceColor; kingSquare: string } | undefined;
-    let gameOverPayload: GameOverPayload | undefined;
-
-    if (outcome.nextState.isCheckmate) {
-      gameOverPayload = createGameOverPayload({
-        winner: player.color,
-        winnerName: player.name,
-        reason: "checkmate",
-        finalFen: outcome.nextState.fen,
-        totalMoves: outcome.nextState.moveCount,
-        startTimeMs: room.createdAt,
-      });
-    } else if (outcome.nextState.isDraw) {
-      const reason: GameOverReason = outcome.nextState.isStalemate
-        ? "stalemate"
-        : outcome.nextState.isThreefoldRepetition
-          ? "threefold_repetition"
-          : outcome.nextState.isInsufficientMaterial
-            ? "insufficient_material"
-            : outcome.nextState.isFiftyMoveRule
-              ? "fifty_move_rule"
-              : "draw_agreement";
-
-      gameOverPayload = createGameOverPayload({
-        winner: "draw",
-        reason,
-        finalFen: outcome.nextState.fen,
-        totalMoves: outcome.nextState.moveCount,
-        startTimeMs: room.createdAt,
-      });
-    } else if (outcome.nextState.isCheck) {
-      const checkedColor: PieceColor = outcome.nextState.turn;
-      const kingSquare = ChessEngine.findKingSquare(
-        outcome.nextState.fen,
-        checkedColor,
-      );
-      if (kingSquare) {
-        checkInfo = { inCheck: checkedColor, kingSquare };
-      }
-    }
+    const { gameOverPayload, checkInfo } = this.classifyGameOverOutcome(
+      room,
+      player,
+      outcome.nextState,
+    );
 
     const updatedRoom = await this.roomAdapter.applyGameMove(
-      roomCode,
+      room.roomCode,
       outcome.nextState,
       gameOverPayload,
     );
+
+    await this.touchPlayerSession(room.roomCode, player.id, socketId);
 
     return {
       room: updatedRoom,

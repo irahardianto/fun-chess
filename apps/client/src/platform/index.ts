@@ -7,3 +7,4 @@ export * from './telemetry';
 export * from './hardware';
 export * from './di';
 export * from './ui';
+export * from './time';

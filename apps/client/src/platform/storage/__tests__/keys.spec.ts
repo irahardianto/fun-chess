@@ -196,4 +196,78 @@ describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
     migrateStorageV1ToV2(storage);
     expect(storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_V2)).toBeNull();
   });
+
+  it('returns early when storage is not available', () => {
+    const storage = new InMemoryStorageAdapter();
+    storage.isAvailable = () => false;
+    storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1, '{"solved":[1]}');
+
+    migrateStorageV1ToV2(storage);
+
+    expect(storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_V2)).toBeNull();
+  });
+
+  it('logs error when storage throws a non-Error string during migration', () => {
+    const throwingStorage: KeyValueStorage = {
+      isAvailable: () => true,
+      getItem: () => {
+        throw 'Raw string error in storage';
+      },
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+      key: vi.fn(),
+      length: 0,
+      safeGetItem: vi.fn(),
+      safeSetItem: vi.fn(),
+    };
+
+    const mockLogger = {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    expect(() => migrateStorageV1ToV2(throwingStorage, mockLogger as unknown as ILogger)).not.toThrow();
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Storage migration failed'),
+      expect.objectContaining({
+        error: 'Raw string error in storage',
+      })
+    );
+  });
+
+  it('handles invalid migration timestamp (NaN) gracefully without pruning', () => {
+    const storage = new InMemoryStorageAdapter();
+    storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V2, '{"solved":[1]}');
+    storage.setItem(STORAGE_KEYS.MIGRATION_V1_V2_TIMESTAMP, 'not-a-number');
+    storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1, '{"solved":[1]}');
+
+    migrateStorageV1ToV2(storage);
+
+    expect(storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1)).not.toBeNull();
+  });
+
+  it('returns early when v2Data exists but migration timestamp is absent', () => {
+    const storage = new InMemoryStorageAdapter();
+    storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V2, '{"solved":[1]}');
+    storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1, '{"solved":[1]}');
+
+    migrateStorageV1ToV2(storage);
+
+    expect(storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1)).not.toBeNull();
+  });
+
+  it('does not set v2 when parsed json is not an object', () => {
+    const storage = new InMemoryStorageAdapter();
+    storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1, '"primitive-string"');
+
+    migrateStorageV1ToV2(storage);
+
+    expect(storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_V2)).toBeNull();
+  });
 });

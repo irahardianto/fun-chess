@@ -181,4 +181,24 @@ export function loadServerConfig(rawEnv: Record<string, unknown> = process.env):
 
 export const validateServerConfig = loadServerConfig;
 
-export const env: ServerEnv = loadServerConfig();
+let cachedEnv: ServerEnv | undefined;
+
+/**
+ * Resets the cached environment configuration proxy state (for testing).
+ */
+export function resetCachedEnv(): void {
+  cachedEnv = undefined;
+}
+
+/**
+ * Lazy proxy to server environment configuration.
+ * Avoids throwing at import-time when configuration is not yet available (CRIT-003).
+ */
+export const env: ServerEnv = new Proxy({} as ServerEnv, {
+  get(_target, prop: string | symbol) {
+    if (!cachedEnv) {
+      cachedEnv = loadServerConfig();
+    }
+    return (cachedEnv as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});

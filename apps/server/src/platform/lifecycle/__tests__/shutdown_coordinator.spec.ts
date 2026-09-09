@@ -145,6 +145,42 @@ describe("ShutdownCoordinator", () => {
     expect(completeLog?.context?.["correlationId"]).toBe("custom-corr-id-123");
   });
 
+  it("propagates correlationId in emergency handlers to shutdown (MAJ-016)", async () => {
+    const coordinator = new ShutdownCoordinator({
+      server: mockServer,
+      io: mockIo,
+      logger,
+      onExit: (code) => exitCalls.push(code),
+    });
+
+    const shutdownSpy = vi.spyOn(coordinator, "shutdown").mockResolvedValue();
+    coordinator.installProcessHandlers();
+
+    const testError = new Error("Boom");
+    const uncaughtHandler = (
+      coordinator as unknown as { uncaughtExceptionHandler: (err: Error) => void }
+    ).uncaughtExceptionHandler;
+    uncaughtHandler(testError);
+
+    expect(shutdownSpy).toHaveBeenCalledWith("uncaughtException", expect.any(String));
+    const passedCorrId = shutdownSpy.mock.calls[0]?.[1];
+    const fatalLog = logger.fatalLogs.find((l) => l.context?.["operation"] === "uncaught_exception");
+    expect(fatalLog?.context?.["correlationId"]).toBe(passedCorrId);
+
+    shutdownSpy.mockClear();
+    const serverErrorHandler = (
+      coordinator as unknown as { serverErrorHandler: (err: Error) => void }
+    ).serverErrorHandler;
+    serverErrorHandler(testError);
+
+    expect(shutdownSpy).toHaveBeenCalledWith("serverError", expect.any(String));
+    const passedServerCorrId = shutdownSpy.mock.calls[0]?.[1];
+    const serverFatalLog = logger.fatalLogs.find((l) => l.context?.["operation"] === "server_error");
+    expect(serverFatalLog?.context?.["correlationId"]).toBe(passedServerCorrId);
+
+    coordinator.uninstallProcessHandlers();
+  });
+
   it("exits with code 1 and logs error when server.close yields an error", async () => {
     const errorServer = {
       close: vi.fn((cb?: (err?: Error) => void) => {

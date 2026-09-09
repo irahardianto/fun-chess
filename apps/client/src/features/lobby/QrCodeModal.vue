@@ -755,7 +755,7 @@ function handleClose() {
 
 .pill-btn.is-selected {
   background: var(--color-primary);
-  color: #ffffff;
+  color: var(--text-on-primary);
   border-color: var(--color-primary);
   font-weight: bold;
 }

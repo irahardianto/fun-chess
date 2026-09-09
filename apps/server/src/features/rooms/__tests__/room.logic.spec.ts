@@ -18,6 +18,7 @@ import {
   createGameOverPayload,
   RoomFullError,
   PlayerNotInRoomError,
+  GameNotActiveError,
 } from "@fun-chess/shared";
 
 describe("room.logic pure functions", () => {
@@ -176,6 +177,60 @@ describe("room.logic pure functions", () => {
         RoomFullError,
       );
     });
+
+    it("throws GameNotActiveError when non-spectator joins a non-lobby room (CRIT-004)", () => {
+      const statuses = ["playing", "paused_disconnect", "game_over"] as const;
+
+      for (const status of statuses) {
+        const nonLobbyRoom: RoomState = {
+          ...createInitialRoomState({
+            roomCode: "TEST",
+            hostPlayer: basePlayer,
+            createdAt: 1000,
+          }),
+          status,
+        };
+
+        const joiningPlayer: Player = {
+          id: "p_joiner",
+          socketId: "sock_joiner",
+          name: "Joiner",
+          color: "b",
+          isHost: false,
+          isConnected: true,
+          connectedAt: 2000,
+        };
+
+        expect(() =>
+          addPlayerToRoom(nonLobbyRoom, joiningPlayer, false, 2500),
+        ).toThrow(GameNotActiveError);
+      }
+    });
+
+    it("allows spectator to join even when room is not in lobby status (CRIT-004)", () => {
+      const playingRoom: RoomState = {
+        ...createInitialRoomState({
+          roomCode: "TEST",
+          hostPlayer: basePlayer,
+          createdAt: 1000,
+        }),
+        status: "playing",
+      };
+
+      const spectator: Player = {
+        id: "p_spec",
+        socketId: "sock_spec",
+        name: "Spectator",
+        color: "w",
+        isHost: false,
+        isConnected: true,
+        connectedAt: 2000,
+      };
+
+      const result = addPlayerToRoom(playingRoom, spectator, true, 2500);
+      expect(result.isSpectator).toBe(true);
+      expect(result.nextRoom.spectators).toHaveLength(1);
+    });
   });
 
   describe("disconnectPlayerTransition", () => {
@@ -292,7 +347,12 @@ describe("room.logic pure functions", () => {
 
     it("throws PlayerNotInRoomError if playerId does not match any participant", () => {
       expect(() =>
-        reconnectPlayerTransition(pausedRoom, "unknown_player", "new_sock", 5000),
+        reconnectPlayerTransition(
+          pausedRoom,
+          "unknown_player",
+          "new_sock",
+          5000,
+        ),
       ).toThrow(PlayerNotInRoomError);
     });
   });
@@ -408,7 +468,12 @@ describe("room.logic pure functions", () => {
       };
 
       const nextGame = { ...createInitialGameState(), turn: "b" as const };
-      const updated = applyGameMoveTransition(roomWithDraw, nextGame, undefined, 2000);
+      const updated = applyGameMoveTransition(
+        roomWithDraw,
+        nextGame,
+        undefined,
+        2000,
+      );
 
       expect(updated.game.turn).toBe("b");
       expect(updated.drawOffer).toBeNull();

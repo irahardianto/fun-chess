@@ -410,6 +410,101 @@ describe('FetchApiClient', () => {
       })
     );
   });
+
+  it('throws descriptive error when getLanInfo, checkHealth, or getDetailedHealth returns non-ok status', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      headers: new Headers(),
+      text: async () => 'Service Unavailable',
+    });
+
+    const client = new FetchApiClient('http://localhost:3000');
+    await expect(client.getLanInfo()).rejects.toThrow('Failed to fetch LAN info: HTTP 503');
+    await expect(client.checkHealth()).rejects.toThrow('Health check failed: HTTP 503');
+    await expect(client.getDetailedHealth()).rejects.toThrow('Detailed health check failed: HTTP 503');
+  });
+
+  it('handles post without body and catches post network errors', async () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+      getLevel: vi.fn(),
+      setLevel: vi.fn(),
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({ done: true }),
+    });
+
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as unknown as ILogger);
+    const res = await client.post('/empty-post');
+    expect(res.ok).toBe(true);
+
+    // Test post rejection
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network drop'));
+    await expect(client.post('/fail-post')).rejects.toThrow('Network drop');
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'HTTP request failed',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('handles pre-aborted callerSignal and parsing without text method', async () => {
+    const client = new FetchApiClient();
+
+    // 1. Pre-aborted caller signal
+    const abortedController = new AbortController();
+    abortedController.abort(new Error('Pre-aborted'));
+    await expect(client.get('/aborted', { signal: abortedController.signal })).rejects.toThrow();
+
+    // 2. Response with empty text
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'text/plain' }),
+      text: async () => '',
+    });
+    const emptyTextRes = await client.get('/empty-text');
+    expect(emptyTextRes.data).toBeNull();
+
+    // 3. Response without text method but with json method
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({ key: 'value' }),
+    });
+    const jsonOnlyRes = await client.get('/json-only');
+    expect(jsonOnlyRes.data).toEqual({ key: 'value' });
+
+    // 4. Response without text method and json() throws
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => {
+        throw new Error('JSON parse error');
+      },
+    });
+    const jsonErrorRes = await client.get('/json-err');
+    expect(jsonErrorRes.data).toBeNull();
+
+    // 5. Response with neither text nor json method
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+    });
+    const noMethodRes = await client.get('/no-method');
+    expect(noMethodRes.data).toBeNull();
+  });
 });
 
 describe('MockApiClient & Default Singleton', () => {

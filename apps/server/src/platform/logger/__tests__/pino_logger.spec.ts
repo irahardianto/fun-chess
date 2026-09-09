@@ -14,8 +14,8 @@ describe("PinoLogger", () => {
         try {
           const parsed = JSON.parse(chunk.toString());
           logs.push(parsed);
-        } catch {
-          // Ignore non-json
+        } catch (_err) {
+          logs.push({ raw: chunk.toString() });
         }
         callback();
       },

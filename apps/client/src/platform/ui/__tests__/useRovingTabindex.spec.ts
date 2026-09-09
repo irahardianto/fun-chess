@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref, nextTick } from 'vue';
-import { useRovingTabindex } from '../useRovingTabindex';
+import { useRovingTabindex, getLinearNextIndex, getGridNextIndex } from '../useRovingTabindex';
 
 describe('useRovingTabindex composable (Gap 1 / MIN-019)', () => {
   let container: HTMLDivElement;
@@ -582,6 +582,105 @@ describe('useRovingTabindex composable (Gap 1 / MIN-019)', () => {
         handleKeyDown(createKeyboardEvent('ArrowRight'));
       }).not.toThrow();
       expect(focusedId.value).toBe('missing-2');
+    });
+  });
+
+  describe('Pure helper functions (MAJ-006)', () => {
+    it('getLinearNextIndex handles linear navigation, boundaries, and keys', () => {
+      expect(getLinearNextIndex(0, 3, 'ArrowRight', 'horizontal', true)).toBe(1);
+      expect(getLinearNextIndex(2, 3, 'ArrowRight', 'horizontal', true)).toBe(0);
+      expect(getLinearNextIndex(2, 3, 'ArrowRight', 'horizontal', false)).toBe(2);
+      expect(getLinearNextIndex(0, 3, 'ArrowLeft', 'horizontal', true)).toBe(2);
+      expect(getLinearNextIndex(0, 3, 'ArrowLeft', 'horizontal', false)).toBe(0);
+      expect(getLinearNextIndex(1, 3, 'Home', 'horizontal', true)).toBe(0);
+      expect(getLinearNextIndex(1, 3, 'End', 'horizontal', true)).toBe(2);
+      expect(getLinearNextIndex(0, 0, 'ArrowRight', 'horizontal', true)).toBeNull();
+      expect(getLinearNextIndex(0, 3, 'ArrowUp', 'horizontal', true)).toBeNull();
+    });
+
+    it('getGridNextIndex handles 2D grid wrapping, columns, and keys', () => {
+      expect(getGridNextIndex(0, 6, 'ArrowRight', 3, true)).toBe(1);
+      expect(getGridNextIndex(5, 6, 'ArrowRight', 3, true)).toBe(0);
+      expect(getGridNextIndex(0, 6, 'ArrowLeft', 3, true)).toBe(5);
+      expect(getGridNextIndex(1, 6, 'ArrowDown', 3, true)).toBe(4);
+      expect(getGridNextIndex(4, 6, 'ArrowDown', 3, true)).toBe(1);
+      expect(getGridNextIndex(4, 6, 'ArrowDown', 3, false)).toBe(4);
+      expect(getGridNextIndex(1, 6, 'ArrowUp', 3, true)).toBe(4);
+      expect(getGridNextIndex(1, 6, 'ArrowUp', 3, false)).toBe(1);
+      expect(getGridNextIndex(0, 0, 'ArrowDown', 3, true)).toBeNull();
+      expect(getGridNextIndex(1, 6, 'Space', 3, true)).toBeNull();
+    });
+  });
+
+  describe('Edge Cases and Dynamic Reactions', () => {
+    it('updates focusedId dynamically when rawItems changes', async () => {
+      const items = ref(['item-1', 'item-2', 'item-3']);
+      const modelValue = ref('item-2');
+      const { focusedId } = useRovingTabindex({ items, modelValue });
+      expect(focusedId.value).toBe('item-2');
+
+      // 1. Items array emptied
+      items.value = [];
+      await nextTick();
+      expect(focusedId.value).toBeNull();
+
+      // 2. Items array repopulated with modelValue included
+      items.value = ['item-4', 'item-2'];
+      await nextTick();
+      expect(focusedId.value).toBe('item-2');
+
+      // 3. Items array changed where neither focused nor modelValue is included
+      modelValue.value = 'missing';
+      items.value = ['item-5', 'item-6'];
+      await nextTick();
+      expect(focusedId.value).toBe('item-5');
+    });
+
+    it('handles getTabindex when focusedId is null', () => {
+      const items = ref(['first', 'second']);
+      const modelValue = ref('second');
+      const { focusedId, getTabindex } = useRovingTabindex({ items, modelValue });
+
+      // Force focusedId to null
+      focusedId.value = null;
+
+      // With modelValue
+      expect(getTabindex('second')).toBe(0);
+      expect(getTabindex('first')).toBe(-1);
+
+      // Without modelValue
+      const { focusedId: f2, getTabindex: g2 } = useRovingTabindex({ items: ['a', 'b'] });
+      f2.value = null;
+      expect(g2('a')).toBe(0);
+      expect(g2('b')).toBe(-1);
+    });
+
+    it('safely no-ops in handleKeyDown when items array is empty or activeId is unknown', () => {
+      const items = ref<string[]>([]);
+      const { handleKeyDown } = useRovingTabindex({ items });
+
+      const ev = createKeyboardEvent('ArrowRight');
+      expect(() => handleKeyDown(ev)).not.toThrow();
+      expect(ev.preventDefault).not.toHaveBeenCalled();
+
+      // Unknown activeId
+      const items2 = ref(['x', 'y']);
+      const { handleKeyDown: h2, focusedId } = useRovingTabindex({ items: items2 });
+      h2(createKeyboardEvent('ArrowRight'), 'non-existent' as any);
+      expect(focusedId.value).toBe('y');
+    });
+
+    it('supports gridColumns as a getter function or reactive ref', () => {
+      const items = ['1', '2', '3', '4', '5', '6'];
+      const columnsFn = () => 3;
+      const { handleKeyDown, focusedId } = useRovingTabindex({
+        items,
+        orientation: 'grid',
+        gridColumns: columnsFn,
+      });
+
+      handleKeyDown(createKeyboardEvent('ArrowDown'));
+      expect(focusedId.value).toBe('4');
     });
   });
 });

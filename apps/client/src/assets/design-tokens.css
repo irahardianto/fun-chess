@@ -293,6 +293,13 @@
   --soft-error-text:        hsl(350, 75%, 35%);
   --soft-error-icon:        hsl(350, 85%, 55%);
 
+  /* Floating Glass Overlay Tokens */
+  --hint-banner-glass:   rgba(254, 249, 195, 0.94);
+  --soft-error-glass:    rgba(255, 241, 242, 0.94);
+  --soft-info-glass:     rgba(240, 249, 255, 0.94);
+  --soft-success-glass:  rgba(240, 253, 244, 0.94);
+  --glow-hint-banner:    0 0 20px 4px rgba(255, 193, 7, 0.38);
+
   /* --------------------------------------------------------------------------
      PUZZLE HUB & MODE IDENTITY TOKENS
      -------------------------------------------------------------------------- */
@@ -495,6 +502,7 @@
   --text-main:          hsl(220, 20%, 96%);
   --text-muted:         hsl(220, 14%, 68%);
   --text-faint:         hsl(220, 14%, 60%);
+  --text-on-primary:    #0f172a; /* Dark navy text ensures >= 7.5:1 WCAG AA contrast against light lavender primary */
   --color-primary:        hsl(255, 85%, 72%);
   --color-primary-hover:  hsl(255, 85%, 66%);
   --color-primary-active: hsl(255, 85%, 60%);
@@ -797,13 +805,6 @@
   --z-modal-backdrop:      50;
   --z-modal-card:          60;
   --z-global-notification: 100;
-
-  /* Floating Glass Overlay Tokens */
-  --hint-banner-glass:   rgba(254, 249, 195, 0.94);
-  --soft-error-glass:    rgba(255, 241, 242, 0.94);
-  --soft-info-glass:     rgba(240, 249, 255, 0.94);
-  --soft-success-glass:  rgba(240, 253, 244, 0.94);
-  --glow-hint-banner:    0 0 20px 4px rgba(255, 193, 7, 0.38);
 }
 
 /* --------------------------------------------------------------------------
@@ -1293,6 +1294,25 @@ button, input, select, textarea {
 
 .text-pretty {
   text-wrap: pretty;
+}
+
+/* Primary Action Button Utility (WCAG AA Compliant) */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--text-on-primary);
+  box-shadow: var(--shadow-btn-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+  color: var(--text-on-primary);
+  box-shadow: var(--shadow-btn-primary-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  background-color: var(--color-primary-active);
+  color: var(--text-on-primary);
+  box-shadow: var(--shadow-btn-primary-active);
 }
 
 /* Subdued Destructive Action Button */

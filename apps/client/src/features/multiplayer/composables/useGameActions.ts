@@ -100,14 +100,14 @@ const isCheckmate: ComputedRef<boolean> = computed(() => {
 // ----------------------------------------------------------------------------
 // Internal Event Listeners Registration
 // ----------------------------------------------------------------------------
-registerSocketEventListener('game:started', () => {
+function handleGameStarted() {
   lastGameOver.value = null;
   kingInCheck.value = null;
   drawOfferedBy.value = null;
   rematchRequestedBy.value = null;
-});
+}
 
-registerSocketEventListener('game:moved', (data: { move: MoveResult; gameState: GameState }) => {
+function handleGameMoved(data: { move: MoveResult; gameState: GameState }) {
   // [MAJ-031] Monotonic move sequence guard
   const localMoveCount = currentRoom.value?.game?.moveCount ?? 0;
   if (data.move && typeof data.move.moveNumber === 'number' && data.move.moveNumber < localMoveCount) {
@@ -142,30 +142,30 @@ registerSocketEventListener('game:moved', (data: { move: MoveResult; gameState: 
       }
     });
   }
-});
+}
 
-registerSocketEventListener('game:check', (data: { inCheck: PieceColor; kingSquare: string }) => {
+function handleGameCheck(data: { inCheck: PieceColor; kingSquare: string }) {
   kingInCheck.value = data;
-});
+}
 
-registerSocketEventListener('game:over', (payload: GameOverPayload) => {
+function handleGameOver(payload: GameOverPayload) {
   lastGameOver.value = payload;
   drawOfferedBy.value = null;
-});
+}
 
-registerSocketEventListener('game:draw_offered', (data: { fromPlayerId: string; fromPlayerName: string }) => {
+function handleGameDrawOffered(data: { fromPlayerId: string; fromPlayerName: string }) {
   drawOfferedBy.value = data;
-});
+}
 
-registerSocketEventListener('game:draw_declined', () => {
+function handleGameDrawDeclined() {
   drawOfferedBy.value = null;
-});
+}
 
-registerSocketEventListener('game:rematch_requested', (data: { requestedBy: string; requesterName: string }) => {
+function handleGameRematchRequested(data: { requestedBy: string; requesterName: string }) {
   rematchRequestedBy.value = data;
-});
+}
 
-registerSocketEventListener('game:rematch_started', (payload: unknown) => {
+function handleGameRematchStarted(payload: unknown) {
   rematchRequestedBy.value = null;
   drawOfferedBy.value = null;
   lastGameOver.value = null;
@@ -203,13 +203,13 @@ registerSocketEventListener('game:rematch_started', (payload: unknown) => {
       sessionToken: sToken,
     });
   }
-});
+}
 
-registerSocketEventListener('game:rematch_declined', () => {
+function handleGameRematchDeclined() {
   rematchRequestedBy.value = null;
-});
+}
 
-registerSocketEventListener('room:reconnected', (data: { room: RoomState; player: Player }) => {
+function handleRoomReconnected(data: { room: RoomState; player: Player }) {
   // Re-hydrate draw offer and rematch request state upon reconnection
   if (data?.room && data?.player) {
     const opponent =
@@ -240,7 +240,23 @@ registerSocketEventListener('room:reconnected', (data: { room: RoomState; player
       rematchRequestedBy.value = null;
     }
   }
-});
+}
+
+export function initGameActionsListeners(): void {
+  registerSocketEventListener('game:started', handleGameStarted);
+  registerSocketEventListener('game:moved', handleGameMoved);
+  registerSocketEventListener('game:check', handleGameCheck);
+  registerSocketEventListener('game:over', handleGameOver);
+  registerSocketEventListener('game:draw_offered', handleGameDrawOffered);
+  registerSocketEventListener('game:draw_declined', handleGameDrawDeclined);
+  registerSocketEventListener('game:rematch_requested', handleGameRematchRequested);
+  registerSocketEventListener('game:rematch_started', handleGameRematchStarted);
+  registerSocketEventListener('game:rematch_declined', handleGameRematchDeclined);
+  registerSocketEventListener('room:reconnected', handleRoomReconnected);
+}
+
+// Initial registration on module load
+initGameActionsListeners();
 
 // ----------------------------------------------------------------------------
 // Public Game Operations
@@ -595,12 +611,14 @@ export function resetGameActionsState(): void {
   lastMoveEvent.value = null;
   opponentMoveListeners.clear();
   customLogger = null;
+  initGameActionsListeners();
 }
 
 /**
  * Primary composable exposing game action controls and in-game state.
  */
 export function useGameActions(options?: { logger?: ILogger }) {
+  initGameActionsListeners();
   if (options?.logger) {
     customLogger = options.logger;
   }
@@ -627,5 +645,6 @@ export function useGameActions(options?: { logger?: ILogger }) {
     declineRematch,
     leaveRoom,
     resetGameActionsState,
+    initGameActionsListeners,
   };
 }

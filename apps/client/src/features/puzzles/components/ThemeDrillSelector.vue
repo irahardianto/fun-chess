@@ -441,7 +441,7 @@ function handleCategoryKeyDown(
 
 .primer-info-btn:hover {
   background: var(--color-primary);
-  color: #ffffff;
+  color: var(--text-on-primary);
   transform: scale(1.05);
 }
 

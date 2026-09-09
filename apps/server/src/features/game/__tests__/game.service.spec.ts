@@ -724,4 +724,33 @@ describe("GameService", () => {
       expect(roomWithDraw?.drawOffer?.offeredAt).toBe(fixedTime);
     });
   });
+
+  describe("Session Sliding TTL (CRIT-002)", () => {
+    it("calls touchSession on sessionRegistry when a valid move is applied", async () => {
+      const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
+      const mockSessionRegistry = {
+        touchSession: touchSessionSpy,
+        playerIndex: new Map([["SESS:p_white_id", "token-p1-123"]]),
+      } as unknown as import("../../rooms/index.js").SessionRegistry;
+
+      const customService = new GameService(
+        store,
+        undefined,
+        undefined,
+        mockSessionRegistry,
+      );
+
+      const room = createActiveGameRoom("SESS");
+      await store.save(room);
+
+      const result = await customService.makeMove(
+        { roomCode: "SESS", move: { from: "e2", to: "e4" } },
+        "sock_white",
+      );
+
+      expect(result.moveResult.from).toBe("e2");
+      expect(result.moveResult.to).toBe("e4");
+      expect(touchSessionSpy).toHaveBeenCalledWith("token-p1-123", "sock_white");
+    });
+  });
 });

@@ -713,5 +713,215 @@ describe('PuzzleCompletionModal.vue Component', () => {
       wrapper.unmount();
     });
   });
-});
 
+  describe('Keyboard Shortcuts & Event Handlers', () => {
+    it('handles Escape, ArrowLeft, ArrowRight, Home, and End keys when modal is open', async () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: true,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+        },
+        attachTo: document.body,
+      });
+
+      // ArrowLeft triggers prev
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('replay-step')).toContainEqual([2]);
+
+      // ArrowRight triggers next
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('replay-step')).toContainEqual([3]);
+
+      // Home triggers start (step 0)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('replay-step')).toContainEqual([0]);
+
+      // End triggers end (step 3)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'End' }));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('replay-step')).toContainEqual([3]);
+
+      // Escape toggles inspect board
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-testid="docked-inspect-bar"]').exists()).toBe(true);
+
+      wrapper.unmount();
+    });
+
+    it('ignores key events when modal is closed (modelValue is false)', async () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: false,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+        },
+        attachTo: document.body,
+      });
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('replay-step')).toBeUndefined();
+
+      wrapper.unmount();
+    });
+  });
+
+  describe('Motif Theme and Material Gain Pill Variants', () => {
+    const testCases: Array<{ theme: string; expectedName: string; expectedBadgeClass: string }> = [
+      { theme: 'pin', expectedName: 'Sneaky Pin', expectedBadgeClass: 'badge--pin' },
+      { theme: 'skewer', expectedName: 'Laser Skewer', expectedBadgeClass: 'badge--skewer' },
+      { theme: 'discovered_attack', expectedName: 'Discovered Attack', expectedBadgeClass: 'badge--discovered' },
+      { theme: 'discovered_check', expectedName: 'Discovered Attack', expectedBadgeClass: 'badge--discovered' },
+      { theme: 'double_check', expectedName: 'Discovered Attack', expectedBadgeClass: 'badge--discovered' },
+      { theme: 'deflection', expectedName: 'Decoy & Deflection', expectedBadgeClass: 'badge--decoy' },
+      { theme: 'decoy', expectedName: 'Decoy & Deflection', expectedBadgeClass: 'badge--decoy' },
+      { theme: 'greek_gift', expectedName: 'Greek Gift', expectedBadgeClass: 'badge--gift' },
+      { theme: 'windmill', expectedName: 'Windmill Carousel', expectedBadgeClass: 'badge--wind' },
+      { theme: 'pawn_endgame', expectedName: 'Endgame Technique', expectedBadgeClass: 'badge--endgame' },
+      { theme: 'rook_endgame', expectedName: 'Endgame Technique', expectedBadgeClass: 'badge--endgame' },
+      { theme: 'queen_endgame', expectedName: 'Endgame Technique', expectedBadgeClass: 'badge--endgame' },
+      { theme: 'minor_piece_endgame', expectedName: 'Endgame Technique', expectedBadgeClass: 'badge--endgame' },
+      { theme: 'other_custom_theme', expectedName: 'Tactical Motif', expectedBadgeClass: 'badge--fork' },
+    ];
+
+    testCases.forEach(({ theme, expectedName, expectedBadgeClass }) => {
+      it(`renders motif badge correctly for theme: ${theme}`, () => {
+        const customPuzzle = { ...mockForkPuzzle, primaryTheme: theme, themes: [theme] };
+        const wrapper = mount(PuzzleCompletionModal, {
+          props: {
+            modelValue: true,
+            puzzle: customPuzzle as unknown as Puzzle,
+            stars: 3,
+          },
+          global: { stubs: { teleport: true } },
+        });
+
+        const badge = wrapper.find('[data-testid="motif-outcome-badge"]');
+        expect(badge.text()).toContain(expectedName);
+        expect(badge.classes()).toContain(expectedBadgeClass);
+      });
+    });
+
+    it('renders different material gain pills for Queen, Minor piece, Pawn, and generic advantages', () => {
+      // Queen (+9 Queen ♛)
+      const queenPuz = { ...mockForkPuzzle, outcomeAdvantage: '+9 Queen ♛' };
+      const queenWrapper = mount(PuzzleCompletionModal, {
+        props: { modelValue: true, puzzle: queenPuz, stars: 3 },
+        global: { stubs: { teleport: true } },
+      });
+      expect(queenWrapper.find('[data-testid="material-gain-pill"]').classes()).toContain('pill--queen');
+
+      // Minor Piece (+3 Bishop ♝)
+      const minorPuz = { ...mockForkPuzzle, outcomeAdvantage: '+3 Bishop ♝' };
+      const minorWrapper = mount(PuzzleCompletionModal, {
+        props: { modelValue: true, puzzle: minorPuz, stars: 3 },
+        global: { stubs: { teleport: true } },
+      });
+      expect(minorWrapper.find('[data-testid="material-gain-pill"]').classes()).toContain('pill--minor');
+
+      // Pawn (+1 Pawn ♟)
+      const pawnPuz = { ...mockForkPuzzle, outcomeAdvantage: '+1 Pawn ♟' };
+      const pawnWrapper = mount(PuzzleCompletionModal, {
+        props: { modelValue: true, puzzle: pawnPuz, stars: 3 },
+        global: { stubs: { teleport: true } },
+      });
+      expect(pawnWrapper.find('[data-testid="material-gain-pill"]').classes()).toContain('pill--pawn');
+
+      // Generic advantage string
+      const genericPuz = { ...mockForkPuzzle, outcomeAdvantage: 'Decisive Advantage' };
+      const genericWrapper = mount(PuzzleCompletionModal, {
+        props: { modelValue: true, puzzle: genericPuz, stars: 3 },
+        global: { stubs: { teleport: true } },
+      });
+      expect(genericWrapper.find('[data-testid="material-gain-pill"]').classes()).toContain('pill--minor');
+    });
+
+    it('handles fallback material gain when outcomeAdvantage is absent but tacticalReward is checkmate', () => {
+      const mateNoAdvantage = {
+        ...mockMatePuzzle,
+        outcomeAdvantage: undefined as unknown as string,
+        tacticalReward: 'checkmate' as const,
+      };
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: { modelValue: true, puzzle: mateNoAdvantage, stars: 3 },
+        global: { stubs: { teleport: true } },
+      });
+      expect(wrapper.find('[data-testid="material-gain-pill"]').text()).toContain('Checkmate 👑');
+    });
+  });
+
+  describe('Replay Props, Step SAN and Narrative Watchers', () => {
+    it('updates currentPlyIndex when replayStepIndex and currentReplayPly props change', async () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: true,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+          replayStepIndex: 1,
+        },
+        global: { stubs: { teleport: true } },
+      });
+
+      expect(wrapper.find('[data-testid="replay-step-counter"]').text()).toBe('Step 1 of 3');
+
+      await wrapper.setProps({ replayStepIndex: 2 });
+      expect(wrapper.find('[data-testid="replay-step-counter"]').text()).toBe('Step 2 of 3');
+
+      await wrapper.setProps({ currentReplayPly: 1, replayStepIndex: undefined });
+      expect(wrapper.find('[data-testid="replay-step-counter"]').text()).toBe('Step 1 of 3');
+    });
+
+    it('uses custom currentReplaySan and currentStepExplanation when matching current ply', () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: true,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+          replayStepIndex: 1,
+          currentReplaySan: 'CustomSan!',
+          currentStepExplanation: 'Custom move explanation detail',
+        },
+        global: { stubs: { teleport: true } },
+      });
+
+      expect(wrapper.find('[data-testid="replay-step-san"]').text()).toBe('CustomSan!');
+      expect(wrapper.find('[data-testid="replay-step-explanation"]').text()).toContain('Custom move explanation detail');
+    });
+
+    it('resets internal state when modelValue changes from false to true', async () => {
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: false,
+          puzzle: mockForkPuzzle,
+          stars: 3,
+        },
+        global: { stubs: { teleport: true } },
+      });
+
+      await wrapper.setProps({ modelValue: true });
+      expect(wrapper.find('[data-testid="puzzle-completion-modal"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="docked-inspect-bar"]').exists()).toBe(false);
+    });
+
+    it('falls back when puzzle has no moves', () => {
+      const noMovesPuzzle = { ...mockForkPuzzle, moves: [] };
+      const wrapper = mount(PuzzleCompletionModal, {
+        props: {
+          modelValue: true,
+          puzzle: noMovesPuzzle,
+          stars: 3,
+          totalReplaySteps: 2,
+          replayStepIndex: 1,
+        },
+        global: { stubs: { teleport: true } },
+      });
+
+      expect(wrapper.find('[data-testid="replay-step-san"]').exists()).toBe(false);
+    });
+  });
+});

@@ -41,7 +41,10 @@ function asRecord(val: unknown): Record<string, unknown> {
 
 class TestSocket {
   public id: string;
-  public handshake = { address: "127.0.0.1" };
+  public handshake: {
+    address: string;
+    headers?: Record<string, string | string[] | undefined>;
+  } = { address: "127.0.0.1" };
   public rooms = new Set<string>();
   public data: Record<string, unknown> = {};
   public handlers = new Map<string, TestHandler>();
@@ -1289,6 +1292,7 @@ describe("Room Socket Handlers", () => {
 
       expect(testSock.data.userId).toBe(createAck?.player?.id);
       expect(testSock.data.roomCode).toBe(createAck?.room?.roomCode);
+      expect(testSock.data.sessionToken).toBe(createAck?.sessionToken);
 
       // 2. Join Room
       const joinerSock = new TestSocket("sock_context_join");
@@ -1312,6 +1316,7 @@ describe("Room Socket Handlers", () => {
 
       expect(joinerSock.data.userId).toBe(joinAck?.player?.id);
       expect(joinerSock.data.roomCode).toBe(createAck?.room?.roomCode);
+      expect(joinerSock.data.sessionToken).toBe(joinAck?.sessionToken);
 
       // 3. Reconnect
       await handleSocketDisconnect(
@@ -1347,6 +1352,7 @@ describe("Room Socket Handlers", () => {
 
       expect(reconnSock.data.userId).toBe(reconnAck?.player?.id);
       expect(reconnSock.data.roomCode).toBe(createAck?.room?.roomCode);
+      expect(reconnSock.data.sessionToken).toBe(joinAck?.sessionToken);
     });
 
     it("enforces differential rate limit of 3 creations / min / IP (MAJ-006)", async () => {
@@ -1435,6 +1441,194 @@ describe("Room Socket Handlers", () => {
         (l) => l.context?.operation === "disconnect_grace_period_abandonment",
       );
       expect(errorLogs.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("SEC/DEV-001 and SEC-002: trustProxy Forwarding & Session Token Attachment", () => {
+    it("respects trustProxy=true by using x-forwarded-for header for rate limiting (SEC/DEV-001)", async () => {
+      const customRateLimiter = new SocketRateLimiter({
+        maxRequests: 1,
+        windowMs: 60_000,
+        pruneIntervalMs: 0,
+      });
+
+      const proxySocket = new TestSocket("sock_proxy_test");
+      proxySocket.handshake.address = "10.0.0.1";
+      proxySocket.handshake.headers = { "x-forwarded-for": "203.0.113.50" };
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        proxySocket as unknown as Socket,
+        service,
+        logger,
+        customRateLimiter,
+        undefined,
+        customRateLimiter,
+        true, // trustProxy = true
+      );
+
+      // First create under IP 203.0.113.50 succeeds
+      let ack1: TestAckResponse | undefined;
+      await proxySocket.trigger(
+        "room:create",
+        { playerName: "User1", preferredColor: "w" },
+        (res) => {
+          ack1 = res;
+        },
+      );
+      expect(ack1?.success).toBe(true);
+
+      // Second create with a different forwarded IP succeeds because trustProxy is active
+      proxySocket.handshake.headers = { "x-forwarded-for": "203.0.113.99" };
+      let ack2: TestAckResponse | undefined;
+      await proxySocket.trigger(
+        "room:create",
+        { playerName: "User2", preferredColor: "w" },
+        (res) => {
+          ack2 = res;
+        },
+      );
+      expect(ack2?.success).toBe(true);
+
+      // Third create returning to IP 203.0.113.50 gets rate limited
+      proxySocket.handshake.headers = { "x-forwarded-for": "203.0.113.50" };
+      let ack3: TestAckResponse | undefined;
+      await proxySocket.trigger(
+        "room:create",
+        { playerName: "User3", preferredColor: "w" },
+        (res) => {
+          ack3 = res;
+        },
+      );
+      expect(ack3?.success).toBe(false);
+      expect(ack3?.error?.code).toBe("ERR_RATE_LIMITED");
+    });
+
+    it("ignores x-forwarded-for when trustProxy=false (SEC/DEV-001)", async () => {
+      const customRateLimiter = new SocketRateLimiter({
+        maxRequests: 1,
+        windowMs: 60_000,
+        pruneIntervalMs: 0,
+      });
+
+      const untrustedSocket = new TestSocket("sock_untrusted_test");
+      untrustedSocket.handshake.address = "10.0.0.1";
+      untrustedSocket.handshake.headers = { "x-forwarded-for": "203.0.113.50" };
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        untrustedSocket as unknown as Socket,
+        service,
+        logger,
+        customRateLimiter,
+        undefined,
+        customRateLimiter,
+        false, // trustProxy = false
+      );
+
+      // First create succeeds
+      let ack1: TestAckResponse | undefined;
+      await untrustedSocket.trigger(
+        "room:create",
+        { playerName: "User1", preferredColor: "w" },
+        (res) => {
+          ack1 = res;
+        },
+      );
+      expect(ack1?.success).toBe(true);
+
+      // Changing x-forwarded-for has NO effect; rate limited on direct address 10.0.0.1
+      untrustedSocket.handshake.headers = { "x-forwarded-for": "203.0.113.99" };
+      let ack2: TestAckResponse | undefined;
+      await untrustedSocket.trigger(
+        "room:create",
+        { playerName: "User2", preferredColor: "w" },
+        (res) => {
+          ack2 = res;
+        },
+      );
+      expect(ack2?.success).toBe(false);
+      expect(ack2?.error?.code).toBe("ERR_RATE_LIMITED");
+    });
+
+    it("attaches sessionToken to socket.data on room:create, room:join, and room:reconnect (SEC-002)", async () => {
+      // 1. Create room
+      const creatorSocket = new TestSocket("sock_sec002_create");
+      creatorSocket.data = {};
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        creatorSocket as unknown as Socket,
+        service,
+        logger,
+      );
+
+      let createAck: TestAckResponse | undefined;
+      await creatorSocket.trigger(
+        "room:create",
+        { playerName: "HostP1", preferredColor: "w" },
+        (res) => {
+          createAck = res;
+        },
+      );
+
+      expect(createAck?.success).toBe(true);
+      expect(creatorSocket.data.sessionToken).toBe(createAck?.sessionToken);
+
+      // 2. Join room
+      const joinerSocket = new TestSocket("sock_sec002_join");
+      joinerSocket.data = {};
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        joinerSocket as unknown as Socket,
+        service,
+        logger,
+      );
+
+      let joinAck: TestAckResponse | undefined;
+      await joinerSocket.trigger(
+        "room:join",
+        { roomCode: createAck?.room?.roomCode || "", playerName: "GuestP2" },
+        (res) => {
+          joinAck = res;
+        },
+      );
+
+      expect(joinAck?.success).toBe(true);
+      expect(joinerSocket.data.sessionToken).toBe(joinAck?.sessionToken);
+
+      // 3. Reconnect
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        joinerSocket.id,
+        service,
+        logger,
+        60_000,
+      );
+
+      const reconnSocket = new TestSocket("sock_sec002_recon");
+      reconnSocket.data = {};
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        reconnSocket as unknown as Socket,
+        service,
+        logger,
+      );
+
+      let reconnAck: TestAckResponse | undefined;
+      await reconnSocket.trigger(
+        "room:reconnect",
+        {
+          roomCode: createAck?.room?.roomCode || "",
+          playerId: joinAck?.player?.id || "",
+          sessionToken: joinAck?.sessionToken || "",
+        },
+        (res) => {
+          reconnAck = res;
+        },
+      );
+
+      expect(reconnAck?.success).toBe(true);
+      expect(reconnSocket.data.sessionToken).toBe(joinAck?.sessionToken);
     });
   });
 });

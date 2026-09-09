@@ -42,7 +42,7 @@ export class MemoryFileStorage implements IFileStorage {
   private readonly directories = new Set<string>();
   private errorSimulator?: (
     filePath: string,
-    operation: "stat" | "readFile",
+    operation: "stat" | "readFile" | "realpath",
   ) => Error | undefined;
 
   constructor(initialFiles?: Record<string, string | Buffer>) {
@@ -63,14 +63,14 @@ export class MemoryFileStorage implements IFileStorage {
   }
 
   public setErrorSimulator(
-    simulator?: (filePath: string, operation: "stat" | "readFile") => Error | undefined,
+    simulator?: (filePath: string, operation: "stat" | "readFile" | "realpath") => Error | undefined,
   ): void {
     this.errorSimulator = simulator;
   }
 
   async realpath(filePath: string): Promise<string> {
     if (this.errorSimulator) {
-      const simulated = this.errorSimulator(filePath, "stat");
+      const simulated = this.errorSimulator(filePath, "realpath");
       if (simulated) throw simulated;
     }
     if (this.files.has(filePath) || this.directories.has(filePath)) {

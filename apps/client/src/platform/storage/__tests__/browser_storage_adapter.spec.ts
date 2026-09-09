@@ -185,6 +185,58 @@ describe('BrowserStorageAdapter', () => {
       unsubscribe();
     }
   });
+
+  it('handles generic errors during getItem, setItem, removeItem, clear, key, and length gracefully', () => {
+    const adapter = new BrowserStorageAdapter('localStorage');
+
+    // 1. getItem throws generic error
+    vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+      throw new Error('Disk read fault');
+    });
+    adapter.setItem('fallback-key', 'fallback-value');
+    expect(adapter.getItem('fallback-key')).toBe('fallback-value');
+
+    // 2. setItem throws generic error (not quota exceeded)
+    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('IO error');
+    });
+    expect(() => adapter.setItem('io-key', 'io-val')).not.toThrow();
+    expect(adapter.getItem('io-key')).toBe('io-val');
+
+    // 3. removeItem throws generic error
+    vi.spyOn(window.localStorage, 'removeItem').mockImplementation(() => {
+      throw new Error('IO remove error');
+    });
+    expect(() => adapter.removeItem('io-key')).not.toThrow();
+
+    // 4. clear throws generic error
+    vi.spyOn(window.localStorage, 'clear').mockImplementation(() => {
+      throw new Error('IO clear error');
+    });
+    expect(() => adapter.clear()).not.toThrow();
+
+    // 5. key throws error
+    vi.spyOn(window.localStorage, 'key').mockImplementation(() => {
+      throw new Error('Key inspect error');
+    });
+    expect(adapter.key(0)).toBeNull();
+
+    // 6. length getter throws error
+    Object.defineProperty(window.localStorage, 'length', {
+      get: () => {
+        throw new Error('Length inspect error');
+      },
+      configurable: true,
+    });
+    expect(adapter.length).toBe(0);
+  });
+
+  it('handles probeAvailability when storage object is not present', () => {
+    vi.stubGlobal('localStorage', null);
+    const adapter = new BrowserStorageAdapter('localStorage');
+    expect(adapter.isAvailable()).toBe(false);
+    expect(adapter.getItem('missing')).toBeNull();
+  });
 });
 
 describe('FileReader Error Recovery Paths (MAJ-039)', () => {

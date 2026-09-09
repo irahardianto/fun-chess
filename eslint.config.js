@@ -83,12 +83,5 @@ export default tseslint.config(
       'prefer-const': 'off',
       'no-useless-assignment': 'off',
     },
-  },
-  {
-    // WebRTC camera constraints fallback catch clauses
-    files: ['**/useCameraStream.ts'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-    },
   }
 );

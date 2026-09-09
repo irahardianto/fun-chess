@@ -8,6 +8,7 @@ import {
   createGameOverPayload,
   RoomFullError,
   PlayerNotInRoomError,
+  GameNotActiveError,
 } from "@fun-chess/shared";
 
 /**
@@ -78,6 +79,10 @@ export function addPlayerToRoom(
     throw new RoomFullError(room.roomCode);
   }
 
+  if (room.status !== "lobby") {
+    throw new GameNotActiveError(room.status);
+  }
+
   let assignedColor: PieceColor;
   let nextWhite = room.whitePlayer;
   let nextBlack = room.blackPlayer;
@@ -91,7 +96,8 @@ export function addPlayerToRoom(
   }
 
   const bothPlayersPresent = nextWhite !== null && nextBlack !== null;
-  const nextStatus = bothPlayersPresent && room.status === "lobby" ? "playing" : room.status;
+  const nextStatus =
+    bothPlayersPresent && room.status === "lobby" ? "playing" : room.status;
 
   return {
     nextRoom: {
@@ -183,9 +189,15 @@ export function reconnectPlayerTransition(
   } else {
     const spectator = room.spectators.find((s) => s.id === playerId);
     if (spectator) {
-      const updated = { ...spectator, socketId: newSocketId, isConnected: true };
+      const updated = {
+        ...spectator,
+        socketId: newSocketId,
+        isConnected: true,
+      };
       reconnectedPlayer = updated;
-      spectators = room.spectators.map((s) => (s.id === playerId ? updated : s));
+      spectators = room.spectators.map((s) =>
+        s.id === playerId ? updated : s,
+      );
     } else {
       throw new PlayerNotInRoomError(newSocketId);
     }
@@ -285,8 +297,7 @@ export function leaveRoomTransition(
   // In lobby or game over: check if room is completely empty or host left
   const nextWhite = isWhite ? null : room.whitePlayer;
   const nextBlack = isBlack ? null : room.blackPlayer;
-  const shouldDelete =
-    leavingPlayer.isHost || (!nextWhite && !nextBlack);
+  const shouldDelete = leavingPlayer.isHost || (!nextWhite && !nextBlack);
 
   return {
     nextRoom: {

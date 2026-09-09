@@ -6,7 +6,7 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Findings CRIT-005, MAJ-017, MAJ-020.
  */
 
-import { ref, shallowRef, getCurrentInstance } from 'vue';
+import { ref, shallowRef } from 'vue';
 import { z } from 'zod';
 import {
   GameOverReasonSchema,
@@ -18,8 +18,8 @@ import {
   type SocketErrorPayload,
 } from '@fun-chess/shared';
 import { createSocketClient, type TypedSocket } from '@/platform/socket/socket_client';
-import { useInjectLogger } from '@/platform/di';
-import { generateCorrelationId, logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+import { resolveLogger } from '@/platform/di';
+import { generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
 let customLogger: ILogger | null = null;
 export function setSocketTransportLogger(logger: ILogger | null): void {
@@ -27,7 +27,7 @@ export function setSocketTransportLogger(logger: ILogger | null): void {
 }
 
 function getActiveLogger(): ILogger {
-  return customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+  return resolveLogger(customLogger);
 }
 
 const logger: ILogger = {
@@ -196,7 +196,19 @@ function handleReconnectFailed() {
 }
 
 // ----------------------------------------------------------------------------
-// Inbound Socket Payload Validation Schemas (MAJ-029)
+// Inbound Socket Payload Validation Schemas (MAJ-029 / MIN-025)
+//
+// Architectural Rationale [MIN-025]:
+// Inbound socket events on the client deliberately maintain flexible/passthrough validation
+// rather than strictly requiring all fields from authoritative shared schemas (such as RoomStateSchema,
+// PlayerSchema, RoomPlayerLeftPayloadSchema, GameOverPayloadSchema, GameStateSchema, MoveResultSchema).
+// This design ensures that:
+// 1. The client gracefully handles intermediate, optimistic, and transitional event payloads
+//    during reconnection, spectator joins, and game-phase handshakes where optional fields might not yet be populated.
+// 2. Permissive parsing on client boundaries protects the UI from unhandled runtime parse crashes
+//    if the server emits backwards-compatible payload enhancements.
+// 3. Strict schema validation is enforced at the server ingress boundary, while client inbound
+//    schemas validate the structural presence of critical fields required by UI composables.
 // ----------------------------------------------------------------------------
 export const InboundRoomSchema = z
   .object({
@@ -302,7 +314,8 @@ export const InboundRematchStartedSchema = z.union([
     .passthrough(),
   z
     .object({
-      fen: z.string(),
+      fen: z.string().optional(),
+      turn: PieceColorSchema.optional(),
     })
     .passthrough(),
 ]);
@@ -382,11 +395,32 @@ export function createInboundHandler<T, TDispatched = T>(
   const { event, schema, logMessage, operation, logLevel = 'info', getContext, transform, onValid } = config;
 
   return (raw: unknown) => {
-    const data = validateInboundPayload(event, schema, raw);
-    if (!data) return;
+    const startTime = performance.now();
+    const correlationId = generateCorrelationId();
 
+    logger.debug(`Inbound socket event received: ${event}`, {
+      operation: `${operation}_received`,
+      event,
+      correlationId,
+    });
+
+    const data = validateInboundPayload(event, schema, raw);
+    if (!data) {
+      const durationMs = Math.round(performance.now() - startTime);
+      logger.error(`Inbound socket event validation failed: ${event}`, {
+        operation,
+        correlationId,
+        durationMs,
+        error: 'Inbound payload validation failed',
+      });
+      return;
+    }
+
+    const durationMs = Math.round(performance.now() - startTime);
     const context: Record<string, unknown> = {
       operation,
+      correlationId,
+      durationMs,
       ...(getContext ? getContext(data) : {}),
     };
 
@@ -840,6 +874,7 @@ export function resetTransportState(): void {
   lastError.value = null;
   latencyMs.value = 0;
   customLogger = null;
+  eventSubscribers.clear();
 }
 
 export const resetSocketTransportState = resetTransportState;

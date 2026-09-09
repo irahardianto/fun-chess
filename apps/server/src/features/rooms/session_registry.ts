@@ -53,6 +53,27 @@ export interface SessionRegistry {
   ): Promise<SessionRecord | null>;
 
   /**
+   * Retrieves an active session record by its token.
+   * Returns null if the session does not exist or has expired.
+   */
+  getSessionByToken(sessionToken: string): Promise<SessionRecord | null>;
+
+  /**
+   * Finds an active session record by its token.
+   * Alias for getSessionByToken.
+   */
+  findSessionByToken(sessionToken: string): Promise<SessionRecord | null>;
+
+  /**
+   * Retrieves the active session token for a player in a room.
+   * Returns null if no active session exists or if it has expired.
+   */
+  getSessionTokenForPlayer(
+    roomCode: string,
+    playerId: string,
+  ): Promise<string | null>;
+
+  /**
    * Updates the socket ID and lastSeenAt timestamp for an active session.
    * Extends the session expiration by extensionTtlMs or DEFAULT_TTL_MS (sliding TTL - MIN-023).
    */
@@ -66,6 +87,12 @@ export interface SessionRegistry {
    * Revokes and deletes a specific session token.
    */
   deleteSession(sessionToken: string): Promise<boolean>;
+
+  /**
+   * Deletes a player's session token from a specific room (e.g. when a guest leaves).
+   * Returns true if a session was found and deleted, false otherwise.
+   */
+  deleteSessionForPlayer(roomCode: string, playerId: string): Promise<boolean>;
 
   /**
    * Deletes all sessions associated with a specific room code (cascade delete on room destruction).

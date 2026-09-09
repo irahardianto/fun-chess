@@ -10,10 +10,15 @@ import {
 import { SocketErrorPayload } from "./errors.js";
 import {
   CreateRoomRequest,
+  CreateRoomSuccessResponse,
+  CreateRoomErrorResponse,
+  CreateRoomResponse,
   JoinRoomRequest,
   ReconnectRequest,
   LeaveRoomRequest,
   RoomLeavePayload,
+  PlayerLeftReason,
+  RoomPlayerLeftPayload,
   MakeMoveRequest,
   ResignRequest,
   OfferDrawRequest,
@@ -24,10 +29,15 @@ import {
 
 export type {
   CreateRoomRequest,
+  CreateRoomSuccessResponse,
+  CreateRoomErrorResponse,
+  CreateRoomResponse,
   JoinRoomRequest,
   ReconnectRequest,
   LeaveRoomRequest,
   RoomLeavePayload,
+  PlayerLeftReason,
+  RoomPlayerLeftPayload,
   MakeMoveRequest,
   ResignRequest,
   OfferDrawRequest,
@@ -35,6 +45,29 @@ export type {
   RequestRematchRequest,
   RespondRematchRequest,
 };
+
+/**
+ * Successful acknowledgement payload for room:create (MAJ-003).
+ */
+export interface CreateRoomSuccessAck {
+  readonly success: true;
+  readonly room: RoomState;
+  readonly player: Player;
+  readonly sessionToken: string;
+}
+
+/**
+ * Failure acknowledgement payload for room:create (MAJ-003).
+ */
+export interface CreateRoomErrorAck {
+  readonly success: false;
+  readonly error: SocketErrorPayload;
+}
+
+/**
+ * Union acknowledgement response for room:create (MAJ-003).
+ */
+export type CreateRoomAckResponse = CreateRoomSuccessAck | CreateRoomErrorAck;
 
 /**
  * Contract defining all events pushed from Server to Client via Socket.io.
@@ -50,7 +83,7 @@ export interface ServerToClientEvents {
   "room:player_left": (data: {
     playerId: string;
     playerName: string;
-    reason: string;
+    reason?: "player_left" | "host_left" | "kicked" | "room_closed";
   }) => void;
   /** Broadcast when a player disconnects, specifying the reconnection grace period and authoritative room status */
   "room:player_disconnected": (data: {

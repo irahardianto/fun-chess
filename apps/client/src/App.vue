@@ -371,7 +371,9 @@ function handleLeaveRoom(force = false) {
     cancelButtonText: 'Keep Playing',
     variant: 'danger',
     onConfirm: () => {
-      leaveRoom(currentRoom.value!.roomCode);
+      const activeRoom = currentRoom.value;
+      if (!activeRoom) return;
+      leaveRoom(activeRoom.roomCode);
       showGameOverModal.value = false;
       currentAppMode.value = 'lobby';
     },
@@ -391,7 +393,9 @@ function handleResign(force = false) {
     cancelButtonText: 'Keep Playing',
     variant: 'danger',
     onConfirm: () => {
-      resign(currentRoom.value!.roomCode);
+      const activeRoom = currentRoom.value;
+      if (!activeRoom) return;
+      resign(activeRoom.roomCode);
     },
   });
 }
@@ -511,6 +515,9 @@ defineExpose({
         @next-lesson="selectScenario($event)"
         @scenario-completed="playStarEarned(); celebrate();"
         @puzzle-exit="exitPuzzle"
+        @puzzle-rush-exit="exitPuzzle"
+        @puzzle-back="exitPuzzle"
+        @exit="exitPuzzle"
         @select-square="selectSquare($event, handleExecuteMove)"
         @square-click="selectSquare($event, handleExecuteMove)"
         @execute-move="handleExecuteMove"

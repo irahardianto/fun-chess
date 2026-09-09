@@ -1,10 +1,25 @@
-import type { InjectionKey } from 'vue';
+import type { InjectionKey, Ref } from 'vue';
 import type { IApiClient } from '../api/api_client.interface';
 import type { KeyValueStorage } from '../storage/key_value_storage';
 import type { IAudioService } from '../audio/audio.interface';
 import type { ILogger } from '../telemetry';
 import type { IFileDownloader, IHapticsService, IWebRtcDiscovery, IClipboardService, ICameraService } from '../hardware';
-import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
+import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage, IClock } from '@fun-chess/shared';
+
+export interface AudioContextValue {
+  isMuted: Ref<boolean>;
+  toggleMute: () => boolean;
+  setMuted: (muted: boolean) => void;
+  playMove: () => void;
+  playCapture: () => void;
+  playCheck: () => void;
+  playVictory: () => void;
+  playDraw: () => void;
+  playStart: () => void;
+  playError: () => void;
+  playStarEarned: () => void;
+  playClick: () => void;
+}
 
 export type {
   IApiClient,
@@ -16,13 +31,16 @@ export type {
   IWebRtcDiscovery,
   IClipboardService,
   ICameraService,
+  IClock,
 };
 
 export const API_CLIENT_KEY: InjectionKey<IApiClient> = Symbol('API_CLIENT');
 export const STORAGE_KEY: InjectionKey<KeyValueStorage> = Symbol('STORAGE');
 export const SESSION_STORAGE_KEY: InjectionKey<KeyValueStorage> = Symbol('SESSION_STORAGE');
 export const AUDIO_SERVICE_KEY: InjectionKey<IAudioService> = Symbol('AUDIO_SERVICE');
+export const AUDIO_CONTEXT_KEY: InjectionKey<AudioContextValue> = Symbol('AUDIO_CONTEXT');
 export const LOGGER_KEY: InjectionKey<ILogger> = Symbol('LOGGER');
+export const CLOCK_KEY: InjectionKey<IClock> = Symbol('CLOCK');
 export const SCENARIO_STORE_KEY: InjectionKey<ScenarioProgressStore> = Symbol('SCENARIO_STORE');
 export const PUZZLE_STORE_KEY: InjectionKey<PuzzleProgressStore> = Symbol('PUZZLE_STORE');
 export const PROGRESS_STORAGE_KEY: InjectionKey<ProgressStorage> = Symbol('PROGRESS_STORAGE');

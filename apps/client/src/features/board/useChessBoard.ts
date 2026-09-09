@@ -46,6 +46,22 @@ export interface UseChessBoardReturn {
 }
 
 /**
+ * Pure calculation function to get legal target squares for a piece on a square.
+ * Pure logic: no side effects, no framework dependencies, no I/O.
+ */
+export function getLegalTargetSquares(chess: Chess, square: Square): Square[] {
+  try {
+    const moves = chess.moves({
+      square: square as unknown as import('chess.js').Square,
+      verbose: true,
+    });
+    return moves.map((m) => m.to as Square);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Shared composable extracting common board signals and inspection methods.
  */
 export function useChessBoard(
@@ -121,22 +137,8 @@ export function useChessBoard(
       return null;
     }
   }
-
   function getLegalMoves(square: Square): Square[] {
-    try {
-      const moves = chess.moves({
-        square: square as unknown as import('chess.js').Square,
-        verbose: true,
-      });
-      return moves.map((m) => m.to as Square);
-    } catch (err) {
-      logger.warn('Failed to get legal moves for square', {
-        operation: 'get_legal_moves',
-        square,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return [];
-    }
+    return getLegalTargetSquares(chess, square);
   }
 
   const kingInCheckSquare = computed<Square | null>(() => {

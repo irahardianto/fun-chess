@@ -54,64 +54,65 @@ describe('scenario_validator', () => {
   describe('validateStepMove', () => {
     it('returns true when player move exactly matches an allowed constraint', () => {
       const result = validateStepMove(mockStepWithSpecificMoves, { from: 'e2', to: 'e4' });
-      expect(result).toBe(true);
+      expect(result.valid).toBe(true);
     });
 
     it('returns true when player move matches an alternative allowed constraint', () => {
       const result = validateStepMove(mockStepWithSpecificMoves, { from: 'd2', to: 'd4' });
-      expect(result).toBe(true);
+      expect(result.valid).toBe(true);
     });
 
     it('returns false when source square matches but destination square is incorrect', () => {
       const result = validateStepMove(mockStepWithSpecificMoves, { from: 'e2', to: 'e3' });
-      expect(result).toBe(false);
+      expect(result.valid).toBe(false);
+      expect(result.reason).toBeDefined();
     });
 
     it('returns false when destination square matches but source square is incorrect', () => {
       const result = validateStepMove(mockStepWithSpecificMoves, { from: 'a2', to: 'e4' });
-      expect(result).toBe(false);
+      expect(result.valid).toBe(false);
     });
 
     it('returns false when move is completely outside allowed moves', () => {
       const result = validateStepMove(mockStepWithSpecificMoves, { from: 'g1', to: 'f3' });
-      expect(result).toBe(false);
+      expect(result.valid).toBe(false);
     });
 
     it('validates promotion moves with required promotion piece (case-insensitive)', () => {
       // Correct promotion
       expect(
-        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8', promotion: 'q' })
+        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8', promotion: 'q' }).valid
       ).toBe(true);
       expect(
-        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8', promotion: 'Q' })
+        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8', promotion: 'Q' }).valid
       ).toBe(true);
 
       // Wrong promotion piece
       expect(
-        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8', promotion: 'r' })
+        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8', promotion: 'r' }).valid
       ).toBe(false);
       expect(
-        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8', promotion: 'n' })
+        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8', promotion: 'n' }).valid
       ).toBe(false);
 
       // Missing promotion piece when required
       expect(
-        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8' })
+        validateStepMove(mockStepWithPromotion, { from: 'e7', to: 'e8' }).valid
       ).toBe(false);
     });
 
     it('returns true when allowedMoves is empty (open-ended step)', () => {
-      expect(validateStepMove(mockStepOpenEnded, { from: 'e2', to: 'e4' })).toBe(true);
-      expect(validateStepMove(mockStepOpenEnded, { from: 'g1', to: 'f3' })).toBe(true);
+      expect(validateStepMove(mockStepOpenEnded, { from: 'e2', to: 'e4' }).valid).toBe(true);
+      expect(validateStepMove(mockStepOpenEnded, { from: 'g1', to: 'f3' }).valid).toBe(true);
     });
 
     it('returns true when allowedMoves is undefined', () => {
-      expect(validateStepMove(mockStepUndefinedMoves, { from: 'b1', to: 'c3' })).toBe(true);
+      expect(validateStepMove(mockStepUndefinedMoves, { from: 'b1', to: 'c3' }).valid).toBe(true);
     });
 
     it('returns false safely when step is null or undefined', () => {
-      expect(validateStepMove(null as unknown as TutorialStep, { from: 'e2', to: 'e4' })).toBe(false);
-      expect(validateStepMove(undefined as unknown as TutorialStep, { from: 'e2', to: 'e4' })).toBe(false);
+      expect(validateStepMove(null as unknown as TutorialStep, { from: 'e2', to: 'e4' }).valid).toBe(false);
+      expect(validateStepMove(undefined as unknown as TutorialStep, { from: 'e2', to: 'e4' }).valid).toBe(false);
     });
   });
 
@@ -180,10 +181,10 @@ describe('scenario_validator', () => {
 
     it('returns true when move is not in allowedMoves but delivers sound checkmate', () => {
       // Qh2# is sound checkmate, but not explicitly in allowedMoves
-      expect(validateStepMove(stepWithCheckmate, { from: 'g1', to: 'h2' })).toBe(true);
+      expect(validateStepMove(stepWithCheckmate, { from: 'g1', to: 'h2' }).valid).toBe(true);
 
       // Non-checkmating move is not accepted
-      expect(validateStepMove(stepWithCheckmate, { from: 'c1', to: 'c4' })).toBe(false);
+      expect(validateStepMove(stepWithCheckmate, { from: 'c1', to: 'c4' }).valid).toBe(false);
     });
 
     it('includes checkmating destination squares in getAllowedTargetsForSource', () => {

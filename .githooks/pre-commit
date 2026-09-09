@@ -49,9 +49,11 @@ if [[ -n "$SKIP_RAW" && "$RUN_ALL" != "1" ]]; then
 fi
 
 should_run() {
-  # $1 = gate id. Returns 0 (run) / 1 (skip). `secrets` and `gitleaks` ignore skip flags.
+  # $1 = gate id. Returns 0 (run) / 1 (skip). `secrets`, `gitleaks`, `empty-catch`, and `pinned-deps` ignore skip flags.
   [[ "$1" == "secrets" ]] && return 0
   [[ "$1" == "gitleaks" ]] && return 0
+  [[ "$1" == "empty-catch" ]] && return 0
+  [[ "$1" == "pinned-deps" ]] && return 0
   [[ "$RUN_ALL" == "1" ]] && return 0
   [[ -n "${SKIP_SET[$1]:-}" ]] && return 1
   return 0
@@ -339,6 +341,206 @@ gate_gitleaks() {
   fi
 }
 
+# --- Gate: empty catch blocks ------------------------------------------------
+# error-handling-principles.md Rule 1 (Swallowed errors strictly prohibited).
+# rugged-software-constitution.md #2 (No silent failures). NON-SKIPPABLE.
+gate_empty_catch() {
+  if ! staged_any '*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'; then
+    return 0
+  fi
+  if ! command -v node >/dev/null 2>&1; then
+    emit warn empty-catch "node not installed — cannot run AST empty-catch check"
+    return 0
+  fi
+
+  local scan=()
+  local f
+  for f in "${STAGED[@]:-}"; do
+    case "$f" in
+      *.ts|*.tsx|*.js|*.jsx|*.vue) scan+=("$f") ;;
+    esac
+  done
+
+  if [[ ${#scan[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  local out
+  if ! out="$(node - "${scan[@]}" 2>&1 <<'EOF'
+const { execSync } = require('child_process');
+const ts = require('typescript');
+
+const files = process.argv.slice(2);
+let hasViolations = false;
+
+function checkAst(code, filename, lineOffset) {
+  const sf = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
+  function visit(node) {
+    if (ts.isCatchClause(node)) {
+      const activeStatements = node.block.statements.filter(
+        (s) => s.kind !== ts.SyntaxKind.EmptyStatement
+      );
+      if (activeStatements.length === 0) {
+        const { line, character } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+        console.log(`${filename}:${line + 1 + lineOffset}:${character + 1}: empty catch block is prohibited (error-handling-principles.md Rule 1)`);
+        hasViolations = true;
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sf);
+}
+
+for (const file of files) {
+  let content = '';
+  try {
+    content = execSync('git show ":' + file.replace(/"/g, '\\"') + '"', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } catch {
+    continue;
+  }
+
+  if (file.endsWith('.vue')) {
+    const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    let match;
+    while ((match = scriptRegex.exec(content)) !== null) {
+      const scriptCode = match[1];
+      const preScript = content.substring(0, match.index);
+      const lineOffset = preScript.split('\n').length - 1;
+      checkAst(scriptCode, file, lineOffset);
+    }
+  } else {
+    checkAst(content, file, 0);
+  }
+}
+
+if (hasViolations) process.exit(1);
+EOF
+)"; then
+    while IFS= read -r l; do [[ -n "$l" ]] && emit fail empty-catch "$l"; done <<<"$out"
+    return 1
+  fi
+
+  pass empty-catch "no empty catch blocks in staged files"
+}
+
+# --- Gate: linter overrides --------------------------------------------------
+# code-idioms-and-conventions.md: "Never disable a lint rule or suppress a warning".
+gate_linter_override() {
+  local blocked=0
+
+  if staged_any 'eslint.config.*'; then
+    local bad_cfg
+    bad_cfg="$(git diff --cached -U0 -- 'eslint.config.*' 2>/dev/null | grep -E '^\+[[:space:]]*['\''"]?(@typescript-eslint/no-explicit-any|no-restricted-syntax|no-console)['\''"]?[[:space:]]*:[[:space:]]*(['\''"]off['\''"]|0)' || true)"
+    if [[ -n "$bad_cfg" ]]; then
+      while IFS= read -r l; do emit fail linter-override "disabling core linter rule prohibited in eslint.config: $l"; done <<<"$bad_cfg"
+      blocked=1
+    fi
+  fi
+
+  local prod_scan=()
+  local f
+  for f in "${STAGED[@]:-}"; do
+    case "$f" in
+      *.ts|*.tsx|*.vue|*.js|*.jsx)
+        case "$f" in
+          *__tests__*|*.spec.*|*.test.*|*mock*|tools/*|scripts/*) ;;
+          *) prod_scan+=("$f") ;;
+        esac
+        ;;
+    esac
+  done
+
+  if [[ ${#prod_scan[@]} -gt 0 ]]; then
+    local inline_hits
+    inline_hits="$(git grep -nE --cached -- '(eslint-disable|@ts-ignore)' -- "${prod_scan[@]}" 2>/dev/null || true)"
+    if [[ -n "$inline_hits" ]]; then
+      while IFS= read -r l; do emit fail linter-override "linter or compiler override in production code prohibited: $l"; done <<<"$inline_hits"
+      blocked=1
+    fi
+  fi
+
+  [[ $blocked -eq 1 ]] && return 1
+  pass linter-override "no prohibited linter overrides"
+}
+
+# --- Gate: pinned dependencies -----------------------------------------------
+# dependency-management-principles.md (strict pinning against supply-chain drift). NON-SKIPPABLE.
+gate_pinned_deps() {
+  if ! staged_any 'package.json' 'apps/*/package.json' 'shared/package.json'; then
+    return 0
+  fi
+  if ! command -v node >/dev/null 2>&1; then
+    emit warn pinned-deps "node not installed — cannot inspect package manifests"
+    return 0
+  fi
+
+  local scan=()
+  local f
+  for f in "${STAGED[@]:-}"; do
+    case "$f" in
+      package.json|apps/*/package.json|shared/package.json) scan+=("$f") ;;
+    esac
+  done
+
+  if [[ ${#scan[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  local out
+  if ! out="$(node - "${scan[@]}" 2>&1 <<'EOF'
+const { execSync } = require('child_process');
+const files = process.argv.slice(2);
+let failed = false;
+
+for (const f of files) {
+  let content = '';
+  try {
+    content = execSync('git show ":' + f.replace(/"/g, '\\"') + '"', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
+  } catch {
+    continue;
+  }
+
+  let pkg;
+  try {
+    pkg = JSON.parse(content);
+  } catch (err) {
+    console.log(`${f}: failed to parse JSON (${err.message})`);
+    failed = true;
+    continue;
+  }
+
+  const sections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+  for (const s of sections) {
+    const deps = pkg[s];
+    if (!deps || typeof deps !== 'object') continue;
+    for (const [name, ver] of Object.entries(deps)) {
+      if (typeof ver !== 'string') continue;
+      if (ver.startsWith('workspace:')) continue;
+      if (/^[\^~><*]/.test(ver) || ver === 'latest') {
+        console.log(`${f}: unpinned dependency in ${s}: "${name}": "${ver}" (pin to exact version)`);
+        failed = true;
+      }
+    }
+  }
+}
+
+if (failed) process.exit(1);
+EOF
+)"; then
+    while IFS= read -r l; do [[ -n "$l" ]] && emit fail pinned-deps "$l"; done <<<"$out"
+    return 1
+  fi
+
+  pass pinned-deps "all package manifests have strictly pinned dependencies"
+}
+
 # =============================================================================
 # RUN INDEX-NATIVE CHECKS FIRST (Zero filesystem dependency)
 # =============================================================================
@@ -349,6 +551,9 @@ gate_largefile            || true
 gate_lockfile             || true
 gate_agents               || true
 gate_gitleaks             || true
+gate_empty_catch          || true
+gate_linter_override      || true
+gate_pinned_deps          || true
 
 # Early exit if index-native checks failed (don't waste time on builds)
 if (( ${#FAILED_GATES[@]} > 0 )); then
@@ -450,6 +655,30 @@ gate_semgrep() {
   fi
 }
 
+# --- Gate: linter ------------------------------------------------------------
+# code-idioms-and-conventions.md (universal completion mandate).
+gate_lint() {
+  if ! command -v pnpm >/dev/null 2>&1; then
+    emit warn lint "pnpm not installed — cannot run linter"
+    return 0
+  fi
+  if ! should_run lint; then emit skip lint "FUN_CHESS_HOOK_SKIP"; return 0; fi
+
+  if staged_any '*.ts' '*.tsx' '*.vue' '*.js' 'eslint.config.*'; then
+    local out
+    if out="$(pnpm run lint 2>&1)"; then
+      pass lint "ESLint passed (eslint .)"
+    else
+      printf '%s\n' "$out" | grep -E '(error|warning|Error:)' | head -n 10 | while IFS= read -r l; do emit fail lint "$l"; done
+      emit fail lint "ESLint failed — fix lint errors before committing (code-idioms-and-conventions.md)"
+      return 1
+    fi
+  else
+    pass lint "no linter-relevant files staged"
+  fi
+  return 0
+}
+
 # --- Gate: typecheck / build -------------------------------------------------
 gate_typecheck() {
   if ! command -v pnpm >/dev/null 2>&1; then
@@ -499,6 +728,7 @@ gate_test() {
 # Run filesystem gates
 gate_typos      || true
 gate_semgrep    || true
+gate_lint       || true
 gate_typecheck  || true
 gate_test       || true
 

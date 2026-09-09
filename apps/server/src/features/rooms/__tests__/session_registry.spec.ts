@@ -251,6 +251,54 @@ describe("InMemorySessionRegistry", () => {
     });
   });
 
+  describe("deleteSessionForPlayer (CRIT-002)", () => {
+    it("deletes session for a specific player in a room without affecting other players", async () => {
+      const hostSession = await registry.createSession({
+        playerId: "host-1",
+        roomCode: "ROOM",
+        color: "w",
+        isHost: true,
+        socketId: "sock-host",
+      });
+
+      const guestSession = await registry.createSession({
+        playerId: "guest-1",
+        roomCode: "ROOM",
+        color: "b",
+        isHost: false,
+        socketId: "sock-guest",
+      });
+
+      // Delete guest session
+      const deleted = await registry.deleteSessionForPlayer("ROOM", "guest-1");
+      expect(deleted).toBe(true);
+
+      // Guest session should be gone
+      const guestVal = await registry.validateSession(
+        guestSession.sessionToken,
+        "ROOM",
+        "guest-1",
+      );
+      expect(guestVal).toBeNull();
+
+      // Host session must still be intact
+      const hostVal = await registry.validateSession(
+        hostSession.sessionToken,
+        "ROOM",
+        "host-1",
+      );
+      expect(hostVal).not.toBeNull();
+    });
+
+    it("returns false when deleting session for non-existent player or room", async () => {
+      const deleted = await registry.deleteSessionForPlayer(
+        "NOROOM",
+        "noplayer",
+      );
+      expect(deleted).toBe(false);
+    });
+  });
+
   describe("deleteSessionsForRoom (cascade deletion)", () => {
     it("removes all player sessions associated with the given room code", async () => {
       const p1Session = await registry.createSession({
@@ -432,6 +480,88 @@ describe("InMemorySessionRegistry", () => {
       expect(record.sessionToken).toBe("mocked-uuid-token");
       expect(record.createdAt).toBe(fixedTime);
       expect(record.lastSeenAt).toBe(fixedTime);
+    });
+  });
+
+  describe("getSessionByToken and findSessionByToken (SEC-002)", () => {
+    it("retrieves session record by sessionToken", async () => {
+      const created = await registry.createSession({
+        playerId: "p-lookup",
+        roomCode: "LOOK",
+        color: "w",
+        isHost: true,
+        socketId: "sock-look",
+      });
+
+      const session = await registry.getSessionByToken(created.sessionToken);
+      expect(session).not.toBeNull();
+      expect(session?.sessionToken).toBe(created.sessionToken);
+      expect(session?.playerId).toBe("p-lookup");
+      expect(session?.roomCode).toBe("LOOK");
+
+      const aliasSession = await registry.findSessionByToken(created.sessionToken);
+      expect(aliasSession).not.toBeNull();
+      expect(aliasSession?.sessionToken).toBe(created.sessionToken);
+    });
+
+    it("returns null for non-existent token", async () => {
+      const session = await registry.getSessionByToken("non-existent-token");
+      expect(session).toBeNull();
+
+      const aliasSession = await registry.findSessionByToken("non-existent-token");
+      expect(aliasSession).toBeNull();
+    });
+
+    it("returns null and deletes expired session", async () => {
+      const created = await registry.createSession({
+        playerId: "p-exp-lookup",
+        roomCode: "EXPK",
+        color: "b",
+        isHost: false,
+        socketId: "sock-expk",
+        ttlMs: -500, // already expired
+      });
+
+      const session = await registry.getSessionByToken(created.sessionToken);
+      expect(session).toBeNull();
+
+      // Ensure session is purged
+      const secondAttempt = await registry.findSessionByToken(created.sessionToken);
+      expect(secondAttempt).toBeNull();
+    });
+  });
+
+  describe("getSessionTokenForPlayer (SEC-002)", () => {
+    it("returns session token for existing player in room", async () => {
+      const created = await registry.createSession({
+        playerId: "p-player-tok",
+        roomCode: "PTOK",
+        color: "w",
+        isHost: true,
+        socketId: "sock-ptok",
+      });
+
+      const token = await registry.getSessionTokenForPlayer("ptok", "p-player-tok");
+      expect(token).toBe(created.sessionToken);
+    });
+
+    it("returns null when player or room does not exist", async () => {
+      const token = await registry.getSessionTokenForPlayer("NONE", "no-player");
+      expect(token).toBeNull();
+    });
+
+    it("returns null and deletes token if session has expired", async () => {
+      await registry.createSession({
+        playerId: "p-exp-player",
+        roomCode: "EXPP",
+        color: "w",
+        isHost: true,
+        socketId: "sock-expp",
+        ttlMs: -100, // already expired
+      });
+
+      const token = await registry.getSessionTokenForPlayer("EXPP", "p-exp-player");
+      expect(token).toBeNull();
     });
   });
 });

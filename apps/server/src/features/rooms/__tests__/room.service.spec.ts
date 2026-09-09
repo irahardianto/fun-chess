@@ -423,6 +423,41 @@ describe("RoomService", () => {
       expect(saved?.status).toBe("game_over");
     });
 
+    it("purges leaving player session from sessionRegistry when shouldDelete is false (CRIT-002)", async () => {
+      const {
+        room: created,
+        sessionToken: hostToken,
+        player: hostPlayer,
+      } = await service.createRoom(
+        { playerName: "WhiteHost", preferredColor: "w" },
+        "sock_w",
+      );
+      const { player: guestPlayer, sessionToken: guestToken } =
+        await service.joinRoom(
+          { roomCode: created.roomCode, playerName: "BlackJoiner" },
+          "sock_b",
+        );
+
+      const result = await service.leaveRoom(created.roomCode, "sock_b");
+      expect(result.shouldDelete).toBe(false);
+
+      // Guest session should be deleted from session registry
+      const guestSession = await sessionRegistry.validateSession(
+        guestToken,
+        created.roomCode,
+        guestPlayer.id,
+      );
+      expect(guestSession).toBeNull();
+
+      // Host session must still be valid
+      const hostSession = await sessionRegistry.validateSession(
+        hostToken,
+        created.roomCode,
+        hostPlayer.id,
+      );
+      expect(hostSession).not.toBeNull();
+    });
+
     it("awards abandonment victory to black when white host leaves active match", async () => {
       const { room: created } = await service.createRoom(
         { playerName: "WhiteHost", preferredColor: "w" },
@@ -902,14 +937,16 @@ describe("RoomService", () => {
     });
 
     it("handles sequential dual player disconnects without losing paused_disconnect status (CRIT-002)", async () => {
-      const { room: created, sessionToken: whiteToken } = await service.createRoom(
-        { playerName: "White", preferredColor: "w" },
-        "sock_w",
-      );
-      const { sessionToken: blackToken, player: blackPlayer } = await service.joinRoom(
-        { roomCode: created.roomCode, playerName: "Black" },
-        "sock_b",
-      );
+      const { room: created, sessionToken: whiteToken } =
+        await service.createRoom(
+          { playerName: "White", preferredColor: "w" },
+          "sock_w",
+        );
+      const { sessionToken: blackToken, player: blackPlayer } =
+        await service.joinRoom(
+          { roomCode: created.roomCode, playerName: "Black" },
+          "sock_b",
+        );
 
       // 1. Player 1 (White) disconnects
       const disc1 = await service.handleDisconnect("sock_w");
@@ -975,7 +1012,10 @@ describe("RoomService", () => {
       await store.save(lobbyRoom);
 
       // Guest leaves the room
-      const leaveResult = await service.leaveRoom(created.roomCode, "sock_guest");
+      const leaveResult = await service.leaveRoom(
+        created.roomCode,
+        "sock_guest",
+      );
 
       expect(leaveResult.player.id).toBe("guest-id");
       expect(leaveResult.shouldDelete).toBe(false);
@@ -1005,7 +1045,11 @@ describe("RoomService", () => {
         offeredAt: 1200,
       });
 
-      const nextGame = { ...createInitialGameState(), turn: "b" as const, moveCount: 1 };
+      const nextGame = {
+        ...createInitialGameState(),
+        turn: "b" as const,
+        moveCount: 1,
+      };
       const updated = await service.applyGameMove(created.roomCode, nextGame);
 
       expect(updated.game.turn).toBe("b");
@@ -1255,6 +1299,79 @@ describe("RoomService", () => {
         (l) => l.context?.operation === "disconnect_grace_period_abandonment",
       );
       expect(errorLogs.length).toBeGreaterThan(0);
+    });
+
+    it("ignores stale disconnect event when player has reconnected on a different socket (CRIT-001)", async () => {
+      const logger = new NullLogger();
+      const timerRegistry = new DisconnectTimerRegistry();
+      const loggedService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        timerRegistry,
+        logger,
+      );
+
+      const {
+        room: created,
+        player: whitePlayer,
+        sessionToken,
+      } = await loggedService.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w1",
+      );
+      await loggedService.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      // Simulate player reconnecting on a new socket 'sock_w2'
+      await loggedService.reconnect(
+        {
+          roomCode: created.roomCode,
+          playerId: whitePlayer.id,
+          sessionToken,
+        },
+        "sock_w2",
+      );
+
+      // Now simulate a delayed/stale disconnect event arrives for 'sock_w1'.
+      // We spy or mock findBySocketId to simulate the stale event lookup finding the room
+      vi.spyOn(store, "findBySocketId").mockResolvedValueOnce({
+        room: created,
+        playerId: whitePlayer.id,
+      });
+
+      const disconnectResult = await loggedService.handleDisconnect(
+        "sock_w1",
+        undefined,
+        60_000,
+        timerRegistry,
+      );
+
+      // Must abort immediately and return null
+      expect(disconnectResult).toBeNull();
+
+      // Verify room remains in playing status and whitePlayer is still connected on sock_w2
+      const currentRoom = await loggedService.getRoom(created.roomCode);
+      expect(currentRoom?.status).toBe("playing");
+      expect(currentRoom?.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom?.whitePlayer?.socketId).toBe("sock_w2");
+
+      // Verify debug log for stale disconnect was emitted
+      const debugLogs = logger.debugLogs.filter(
+        (l) =>
+          l.context?.operation === "handle_disconnect" &&
+          l.message === "Stale disconnect event ignored",
+      );
+      expect(debugLogs.length).toBe(1);
+      expect(debugLogs[0]?.context).toMatchObject({
+        roomCode: created.roomCode,
+        playerId: whitePlayer.id,
+        expectedSocketId: "sock_w2",
+        actualSocketId: "sock_w1",
+      });
     });
   });
 });

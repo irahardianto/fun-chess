@@ -478,5 +478,45 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     expect(mockIo.on).toHaveBeenCalledWith("connection", expect.any(Function));
     rateLimiter.destroy();
   });
+
+  it("wires sessionRegistry with clock and idGenerator into GameService and returns on ServerInstance (CRIT-002)", async () => {
+    instance = await startServer(createOptions());
+    expect(instance.sessionRegistry).toBeDefined();
+    expect(instance.gameService).toBeDefined();
+    expect(typeof instance.sessionRegistry.touchSession).toBe("function");
+    expect(typeof instance.sessionRegistry.createSession).toBe("function");
+  });
+
+  it("instantiates roomCreateRateLimiter and rateLimiter dynamically in startServer (CRIT-003)", async () => {
+    instance = await startServer(createOptions({
+      config: {
+        RATE_LIMIT_ROOM_CREATE_MAX: 5,
+      },
+    }));
+    expect(instance.rateLimiter).toBeDefined();
+    expect(instance.roomCreateRateLimiter).toBeDefined();
+    expect(instance.config.RATE_LIMIT_ROOM_CREATE_MAX).toBe(5);
+  });
+
+  it("logs structured error when server bootstrap fails (MAJ-014)", async () => {
+    const logger = new NullLogger();
+    await expect(
+      startServer({
+        port: 0,
+        host: "256.256.256.256",
+        logger,
+      }),
+    ).rejects.toThrow();
+
+    const failureLog = logger.errorLogs.find(
+      (l) => l.context?.operation === "server_bootstrap",
+    );
+    expect(failureLog).toBeDefined();
+    expect(failureLog?.message).toBe("Fun Chess server bootstrap failed");
+    expect(failureLog?.context?.status).toBe("failed");
+    expect(failureLog?.context?.correlationId).toBeDefined();
+    expect(typeof failureLog?.context?.duration).toBe("number");
+    expect(typeof failureLog?.context?.durationMs).toBe("number");
+  });
 });
 

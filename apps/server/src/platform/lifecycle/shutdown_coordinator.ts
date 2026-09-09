@@ -221,7 +221,7 @@ export class ShutdownCoordinator {
         correlationId,
         error: { name: err.name, message: err.message, stack: err.stack },
       });
-      void this.shutdown("uncaughtException");
+      void this.shutdown("uncaughtException", correlationId);
     };
 
     this.serverErrorHandler = (err: Error) => {
@@ -231,7 +231,7 @@ export class ShutdownCoordinator {
         correlationId,
         error: { name: err.name, message: err.message, stack: err.stack },
       });
-      void this.shutdown("serverError");
+      void this.shutdown("serverError", correlationId);
     };
 
     process.on("SIGINT", this.sigintHandler);

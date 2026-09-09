@@ -33,6 +33,11 @@ export class BrowserStorageAdapter implements KeyValueStorage {
         this.available = true;
         return true;
       }
+      logger.debug('Browser storage availability probe failed, falling back to memory', {
+        operation: 'browser_storage_probe',
+        storageType: this.storageType,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // SecurityError (Safari Private Browsing mode)
       this.available = false;
       return false;
@@ -47,7 +52,12 @@ export class BrowserStorageAdapter implements KeyValueStorage {
     if (!this.available) return null;
     try {
       return window[this.storageType];
-    } catch {
+    } catch (err) {
+      logger.debug('Failed to access window storage property, falling back to memory', {
+        operation: 'browser_storage_raw_access',
+        storageType: this.storageType,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
   }

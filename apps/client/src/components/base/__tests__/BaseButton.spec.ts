@@ -13,6 +13,7 @@ describe('BaseButton.vue', () => {
     expect(wrapper.text()).toContain('Click Me!');
     expect(wrapper.classes()).toContain('btn-tactile');
     expect(wrapper.classes()).toContain('btn-tactile--primary');
+    expect(wrapper.classes()).toContain('btn-primary');
     expect(wrapper.classes()).toContain('btn-tactile--md');
   });
 

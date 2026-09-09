@@ -1,10 +1,13 @@
-import { inject } from 'vue';
+import { inject, hasInjectionContext } from 'vue';
 import {
   API_CLIENT_KEY,
   STORAGE_KEY,
   SESSION_STORAGE_KEY,
   AUDIO_SERVICE_KEY,
+  AUDIO_CONTEXT_KEY,
+  type AudioContextValue,
   LOGGER_KEY,
+  CLOCK_KEY,
   SCENARIO_STORE_KEY,
   PUZZLE_STORE_KEY,
   PROGRESS_STORAGE_KEY,
@@ -25,11 +28,12 @@ import type {
   IClipboardService,
   ICameraService,
 } from '../hardware';
-import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
+import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage, IClock } from '@fun-chess/shared';
 import { apiClient as defaultApiClient } from '../api';
 import { safeLocalStorage, safeSessionStorage } from '../storage';
 import { audioSynthesizer as defaultAudioSynthesizer } from '../audio/audio_synthesizer';
 import { logger as defaultLogger } from '../telemetry';
+import { SystemClock } from '../time';
 import {
   defaultFileDownloader,
   defaultHapticsService,
@@ -41,6 +45,7 @@ import {
 export * from './tokens';
 export * from './helpers';
 
+const defaultClock: IClock = new SystemClock();
 let defaultScenarioStore: ScenarioProgressStore | null = null;
 let defaultPuzzleStore: PuzzleProgressStore | null = null;
 let defaultProgressStorage: ProgressStorage | null = null;
@@ -71,8 +76,27 @@ export function useInjectAudioService(fallback?: IAudioService): IAudioService {
   return inject(AUDIO_SERVICE_KEY, fallback ?? defaultAudioSynthesizer);
 }
 
+export function useAudioContext(fallback?: AudioContextValue | null): AudioContextValue | null {
+  if (hasInjectionContext()) {
+    return inject(AUDIO_CONTEXT_KEY, fallback ?? null);
+  }
+  return fallback ?? null;
+}
+
 export function useInjectLogger(fallback?: ILogger): ILogger {
   return inject(LOGGER_KEY, fallback ?? defaultLogger);
+}
+
+export function resolveLogger(custom?: ILogger | null): ILogger {
+  if (custom) return custom;
+  if (hasInjectionContext()) {
+    return useInjectLogger();
+  }
+  return defaultLogger;
+}
+
+export function useInjectClock(fallback?: IClock): IClock {
+  return inject(CLOCK_KEY, fallback ?? defaultClock);
 }
 
 export function useInjectScenarioStore(fallback?: ScenarioProgressStore): ScenarioProgressStore {
@@ -92,7 +116,9 @@ export function useInjectPuzzleStore(fallback?: PuzzleProgressStore): PuzzleProg
 }
 
 export function useInjectProgressStorage(fallback?: ProgressStorage): ProgressStorage {
-  const storage = inject(PROGRESS_STORAGE_KEY, fallback ?? defaultProgressStorage);
+  const storage = hasInjectionContext()
+    ? inject(PROGRESS_STORAGE_KEY, fallback ?? defaultProgressStorage)
+    : (fallback ?? defaultProgressStorage);
   if (!storage) {
     throw new Error('ProgressStorage not provided and no default registered');
   }

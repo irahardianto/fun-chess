@@ -66,8 +66,8 @@ variable "cors_origin" {
   default     = ""
 
   validation {
-    condition     = var.cors_origin == "" || can(regex("^(https?://[^,]+|\\*)(,\\s*https?://[^,]+)*$", var.cors_origin))
-    error_message = "cors_origin must be empty, '*', or a comma-separated list of valid HTTP/HTTPS origins."
+    condition     = var.cors_origin == "" || can(regex("^https?://[^,]+(,\\s*https?://[^,]+)*$", var.cors_origin))
+    error_message = "cors_origin must be empty or a comma-separated list of valid HTTP/HTTPS origins (wildcard '*' is disallowed in production)."
   }
 }
 

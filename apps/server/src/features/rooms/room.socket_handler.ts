@@ -13,7 +13,7 @@ import {
   Player,
   GameOverPayload,
 } from "@fun-chess/shared";
-import { type Logger, runLoggedJob } from "../../platform/logger/index.js";
+import { type Logger } from "../../platform/logger/index.js";
 import { env } from "../../platform/config/index.js";
 import {
   type SocketRateLimiter,
@@ -67,7 +67,10 @@ function createRoomHandler<TReq, TRes>(
     options,
     handler,
   );
-  return async (rawReq: unknown, callback?: (res: unknown) => void): Promise<void> => {
+  return async (
+    rawReq: unknown,
+    callback?: (res: unknown) => void,
+  ): Promise<void> => {
     return inner(
       rawReq,
       callback
@@ -76,8 +79,10 @@ function createRoomHandler<TReq, TRes>(
               typeof res === "object" &&
               res !== null &&
               "error" in res &&
-              typeof (res as { error?: { code?: string } }).error === "object" &&
-              (res as { error?: { code?: string } }).error?.code === "ERR_RATE_LIMITED"
+              typeof (res as { error?: { code?: string } }).error ===
+                "object" &&
+              (res as { error?: { code?: string } }).error?.code ===
+                "ERR_RATE_LIMITED"
             ) {
               const limitDesc = options.rateLimiter.getLimitDescription();
               const opDesc =
@@ -90,7 +95,9 @@ function createRoomHandler<TReq, TRes>(
                       : operationName === "room:leave"
                         ? "room leave"
                         : operationName;
-              (res as { error: { code: string; message: string } }).error.message =
+              (
+                res as { error: { code: string; message: string } }
+              ).error.message =
                 `Rate limit exceeded for ${opDesc}. ${limitDesc}`;
             }
             callback(res);
@@ -111,7 +118,12 @@ export function registerRoomSocketHandlers(
   rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
   createRateLimiter: SocketRateLimiter = roomCreateRateLimiter,
+  trustProxy: boolean = env.TRUST_PROXY,
 ): void {
+  const effectiveTrustProxy =
+    (socket.data as { trustProxy?: boolean } | undefined)?.trustProxy ??
+    trustProxy;
+
   // 1. room:create - differential rate limit (MAJ-006)
   const handleCreate = createRoomHandler<
     CreateRoomRequest,
@@ -123,12 +135,14 @@ export function registerRoomSocketHandlers(
     {
       schema: CreateRoomRequestSchema as z.ZodType<CreateRoomRequest>,
       rateLimiter: createRateLimiter,
+      trustProxy: effectiveTrustProxy,
     },
     async (req) => {
       const result = await roomService.createRoom(req, socket.id);
       if (socket.data) {
         socket.data.userId = result.player.id;
         socket.data.roomCode = result.room.roomCode;
+        socket.data.sessionToken = result.sessionToken;
       }
       await socket.join(result.room.roomCode);
 
@@ -155,12 +169,14 @@ export function registerRoomSocketHandlers(
     {
       schema: JoinRoomRequestSchema as z.ZodType<JoinRoomRequest>,
       rateLimiter,
+      trustProxy: effectiveTrustProxy,
     },
     async (req) => {
       const result = await roomService.joinRoom(req, socket.id);
       if (socket.data) {
         socket.data.userId = result.player.id;
         socket.data.roomCode = result.room.roomCode;
+        socket.data.sessionToken = result.sessionToken;
       }
       const roomCode = result.room.roomCode;
       await socket.join(roomCode);
@@ -197,12 +213,14 @@ export function registerRoomSocketHandlers(
     {
       schema: ReconnectRequestSchema as z.ZodType<ReconnectRequest>,
       rateLimiter,
+      trustProxy: effectiveTrustProxy,
     },
     async (req) => {
       const result = await roomService.reconnect(req, socket.id);
       if (socket.data) {
         socket.data.userId = result.player.id;
         socket.data.roomCode = result.room.roomCode;
+        socket.data.sessionToken = req.sessionToken;
       }
       const roomCode = result.room.roomCode;
       await socket.join(roomCode);
@@ -234,16 +252,14 @@ export function registerRoomSocketHandlers(
   socket.on("room:reconnect", handleReconnect);
 
   // 4. room:leave
-  const handleLeave = createRoomHandler<
-    LeaveRoomRequest,
-    { success: true }
-  >(
+  const handleLeave = createRoomHandler<LeaveRoomRequest, { success: true }>(
     logger,
     "room:leave",
     socket,
     {
       schema: LeaveRoomRequestSchema as z.ZodType<LeaveRoomRequest>,
       rateLimiter,
+      trustProxy: effectiveTrustProxy,
     },
     async (req) => {
       const result = await roomService.leaveRoom(req.roomCode, socket.id);
@@ -299,30 +315,24 @@ export async function handleSocketDisconnect(
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
   correlationId?: string,
 ): Promise<void> {
-  const onForfeit = async (room: RoomState, gameOverPayload: GameOverPayload) => {
+  const onForfeit = async (
+    room: RoomState,
+    gameOverPayload: GameOverPayload,
+  ) => {
     try {
-      await runLoggedJob(
-        logger,
-        "disconnect_grace_period_abandonment",
-        async (jobCorrelationId) => {
-          logger.info("Game forfeited by abandonment", {
-            operation: "game_abandoned",
-            correlationId: jobCorrelationId,
-            roomCode: room.roomCode,
-            playerId: gameOverPayload.winner,
-            winner: gameOverPayload.winner,
-          });
-          io.to(room.roomCode).emit("game:over", gameOverPayload);
-          return {
-            roomCode: room.roomCode,
-            forfeited: true,
-          };
-        },
-      );
+      logger.info("Game forfeited by abandonment", {
+        operation: "game_abandoned",
+        correlationId,
+        roomCode: room.roomCode,
+        playerId: gameOverPayload.winner,
+        winner: gameOverPayload.winner,
+      });
+      io.to(room.roomCode).emit("game:over", gameOverPayload);
     } catch (err) {
       logger.error("Failed to process disconnect grace period abandonment", {
         operation: "disconnect_grace_period_abandonment",
         roomCode: room.roomCode,
+        correlationId,
         error:
           err instanceof Error
             ? { name: err.name, message: err.message, stack: err.stack }

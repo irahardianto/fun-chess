@@ -10,6 +10,7 @@ import {
   calculateMaterialAndCaptures,
   getKingSquare,
 } from "@fun-chess/shared";
+import { type Logger, defaultLogger } from "../../platform/logger/index.js";
 
 export interface ValidationSuccess {
   success: true;
@@ -300,11 +301,24 @@ export class ChessEngine {
   /**
    * Locates the square of the king from a FEN string.
    */
-  public static findKingSquare(fen: string, color: PieceColor): Square | null {
+  public static findKingSquare(
+    fen: string,
+    color: PieceColor,
+    logger: Logger = defaultLogger,
+  ): Square | null {
     try {
       const chess = new Chess(fen);
       return this.getKingSquare(chess, color);
-    } catch {
+    } catch (err) {
+      logger.debug("FEN parsing failed during king square lookup", {
+        operation: "chess_engine_find_king_square",
+        fen,
+        color,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message }
+            : { raw: err },
+      });
       return null;
     }
   }

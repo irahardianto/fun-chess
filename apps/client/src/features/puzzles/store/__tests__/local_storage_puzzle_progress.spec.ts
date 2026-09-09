@@ -158,5 +158,97 @@ describe('LocalStoragePuzzleProgressStore', () => {
     expect(attemptResult.themeMastery['fork']?.lastPracticedAt).toBe(fixedTime);
     expect(mockClock.now).toHaveBeenCalled();
   });
+
+  it('handles failed attempts, star improvements, and master level progression', async () => {
+    await store.resetAll();
+    // 1. Failed attempt
+    const failedResult = await store.recordPuzzleAttempt('puz_001', 'fork', 'failed', 0 as any);
+    expect(failedResult.solvedPuzzles['puz_001']).toBeUndefined();
+    expect(failedResult.ratingProfile.totalAttempted).toBe(1);
+    expect(failedResult.ratingProfile.totalSolved).toBe(0);
+
+    // 2. Solved with 1 star, then solved again with 3 stars
+    await store.recordPuzzleAttempt('puz_001', 'fork', 'solved_with_hints', 1);
+    expect((await store.getProgress()).solvedPuzzles['puz_001']?.stars).toBe(1);
+
+    await store.recordPuzzleAttempt('puz_001', 'fork', 'solved_first_try', 3);
+    expect((await store.getProgress()).solvedPuzzles['puz_001']?.stars).toBe(3);
+
+    // 3. Solve 20 puzzles in a theme to achieve 'master' level
+    for (let i = 2; i <= 20; i++) {
+      await store.recordPuzzleAttempt(`puz_fork_${i}`, 'fork', 'solved_first_try', 3);
+    }
+    const finalProgress = await store.getProgress();
+    expect(finalProgress.themeMastery['fork']?.masteryLevel).toBe('master');
+  });
+
+  it('restores progress and rethrows on quota exceeded during restoreProgress', async () => {
+    const validProgress = await store.getProgress();
+    await store.restoreProgress(validProgress);
+
+    // Test quota error during restoreProgress (throwOnQuota = true)
+    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+      const err = new Error('QuotaExceededError');
+      err.name = 'QuotaExceededError';
+      throw err;
+    });
+
+    await expect(store.restoreProgress(validProgress)).rejects.toThrow('QuotaExceededError');
+  });
+
+  it('handles storage when storage is not available or throws generic error', async () => {
+    const unavailableStorage = {
+      isAvailable: () => false,
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    };
+
+    const memoryOnlyStore = new LocalStoragePuzzleProgressStore(
+      'mem_key',
+      unavailableStorage as any
+    );
+
+    const initial = await memoryOnlyStore.getProgress();
+    expect(initial.ratingProfile.rating).toBe(800);
+
+    await memoryOnlyStore.saveArcadeResult('streak_survivor', 10, 10);
+    const updated = await memoryOnlyStore.getProgress();
+    expect(updated.arcadeStats.streakSurvivorHighScore).toBe(10);
+
+    await memoryOnlyStore.resetAll();
+    expect((await memoryOnlyStore.getProgress()).arcadeStats.streakSurvivorHighScore).toBe(0);
+
+    // Generic setItem error (non-quota)
+    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('Disk IO error');
+    });
+    // Should log warning and update memoryCache without crashing
+    await store.saveArcadeResult('puzzle_rush', 5, 2);
+    expect((await store.getProgress()).arcadeStats.puzzleRushHighScore).toBe(5);
+
+    // removeItem throwing during resetAll
+    vi.spyOn(window.localStorage, 'removeItem').mockImplementation(() => {
+      throw new Error('Failed to remove');
+    });
+    await store.resetAll();
+  });
+
+  it('sanitizes null, array, and corrupted object structures gracefully', async () => {
+    const testCases = [null, undefined, 'string', 123, [], { invalid: true }];
+    for (const raw of testCases) {
+      window.localStorage.setItem(PUZZLE_PROGRESS_STORAGE_KEY, JSON.stringify(raw));
+      const p = await store.getProgress();
+      expect(p.ratingProfile.rating).toBe(800);
+    }
+  });
+
+  it('instantiates cleanly with default constructor arguments', async () => {
+    const defaultInstance = new LocalStoragePuzzleProgressStore();
+    expect(defaultInstance).toBeDefined();
+    const p = await defaultInstance.getProgress();
+    expect(p.ratingProfile.rating).toBe(800);
+  });
 });
 

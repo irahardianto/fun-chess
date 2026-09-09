@@ -1,24 +1,9 @@
 <script lang="ts">
-import type { Ref, InjectionKey } from 'vue';
 import { inject } from 'vue';
 import type { GameDomainEventSource } from '@/composables/useAudio';
+import { AUDIO_CONTEXT_KEY, type AudioContextValue } from '@/platform/di/tokens';
 
-export interface AudioContextValue {
-  isMuted: Ref<boolean>;
-  toggleMute: () => boolean;
-  setMuted: (muted: boolean) => void;
-  playMove: () => void;
-  playCapture: () => void;
-  playCheck: () => void;
-  playVictory: () => void;
-  playDraw: () => void;
-  playStart: () => void;
-  playError: () => void;
-  playStarEarned: () => void;
-  playClick: () => void;
-}
-
-export const AUDIO_CONTEXT_KEY: InjectionKey<AudioContextValue> = Symbol('AudioContext');
+export { AUDIO_CONTEXT_KEY, type AudioContextValue };
 
 export function useAudioContext(): AudioContextValue {
   const ctx = inject(AUDIO_CONTEXT_KEY);
@@ -137,8 +122,12 @@ function removeUnlockListeners() {
   unlockEvents.forEach((evt) => {
     try {
       window.removeEventListener(evt, handleUnlockGesture, true);
-    } catch {
-      // Ignore if listener removal fails in non-browser context
+    } catch (err) {
+      logger.debug('Failed to remove audio unlock gesture listener', {
+        operation: 'audio_remove_unlock',
+        event: evt,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   });
 }

@@ -2202,7 +2202,6 @@ describe('useSocket composable', () => {
 
   describe('Structured 3-Point Logging for Client Socket Actions (MAJ-019)', () => {
     it('emits start and success logs with correlationId and duration for createRoom', async () => {
-      const debugSpy = vi.spyOn(logger, 'debug');
       const infoSpy = vi.spyOn(logger, 'info');
 
       mockSocket.emit.mockImplementation((event: string, _payload: any, cb?: Function) => {
@@ -2229,7 +2228,7 @@ describe('useSocket composable', () => {
       expect(res.success).toBe(true);
 
       // Verify start log
-      expect(debugSpy).toHaveBeenCalledWith(
+      expect(infoSpy).toHaveBeenCalledWith(
         expect.stringContaining('room'),
         expect.objectContaining({
           operation: expect.stringMatching(/room_create|socket/),

@@ -127,6 +127,92 @@ describe('Hint Engine & Tactical Categorization', () => {
       expect(result.theme).toBe('escape_attack');
       expect(result.explanation).toContain('safety');
     });
+
+    it('identifies pawn advancing to 7th rank as pawn promotion theme', () => {
+      const chessBefore = new Chess('4k3/8/8/8/8/8/3P4/4K3 w - - 0 1');
+      const chessAfter = new Chess('4k3/3P4/8/8/8/8/8/4K3 b - - 0 1');
+      const advanceMove = {
+        from: 'd2',
+        to: 'd7',
+        piece: 'p' as const,
+        color: 'w' as const,
+        san: 'd7',
+        flags: 'n',
+      } as unknown as Move;
+
+      const result = identifyTacticalTheme(chessBefore, chessAfter, advanceMove);
+      expect(result.theme).toBe('pawn_promotion');
+      expect(result.explanation).toContain('Pawn towards');
+    });
+
+    it('identifies fork attacking enemy pawns', () => {
+      // White pawn on d4 attacking Black pawns on c5 and e5
+      const chessBefore = new Chess('4k3/8/8/2p1p3/8/8/3P4/4K3 w - - 0 1');
+      const chessAfter = new Chess('4k3/8/8/2p1p3/3P4/8/8/4K3 b - - 0 1');
+      const pawnMove = {
+        from: 'd2',
+        to: 'd4',
+        piece: 'p' as const,
+        color: 'w' as const,
+        san: 'd4',
+        flags: 'b',
+      } as unknown as Move;
+
+      const result = identifyTacticalTheme(chessBefore, chessAfter, pawnMove);
+      expect(result.theme).toBe('fork');
+      expect(result.explanation).toContain('Fork attack');
+    });
+
+    it('identifies Black piece development from rank 8', () => {
+      const chessBefore = new Chess('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1');
+      const chessAfter = new Chess('r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2');
+      const nc6Move = {
+        from: 'b8',
+        to: 'c6',
+        piece: 'n' as const,
+        color: 'b' as const,
+        san: 'Nc6',
+        flags: 'n',
+      } as unknown as Move;
+
+      const result = identifyTacticalTheme(chessBefore, chessAfter, nc6Move);
+      expect(result.theme).toBe('general_development');
+      expect(result.explanation).toContain('Develop');
+    });
+
+    it('falls back to default positional improvement theme when no other theme matches', () => {
+      const chessBefore = new Chess('4k3/8/8/8/8/8/8/R3K3 w - - 0 1');
+      const chessAfter = new Chess('4k3/8/8/8/8/8/R7/4K3 b - - 1 1');
+      const rookMove = {
+        from: 'a1',
+        to: 'a2',
+        piece: 'r' as const,
+        color: 'w' as const,
+        san: 'Ra2',
+        flags: 'n',
+      } as unknown as Move;
+
+      const result = identifyTacticalTheme(chessBefore, chessAfter, rookMove);
+      expect(result.theme).toBe('general_development');
+      expect(result.explanation).toContain('improve your position');
+    });
+
+    it('evaluates Rook and Queen ray attacks in getAttackedOpponentPieces', () => {
+      // Rook on d1 attacks Rook on d8 and Knight on a1 with Kings present
+      const chessBefore = new Chess('3r1k2/8/8/8/8/8/8/n2R1K2 w - - 0 1');
+      const chessAfter = new Chess('3r1k2/8/8/8/3R4/8/8/n4K2 b - - 1 1');
+      const rd4Move = {
+        from: 'd1',
+        to: 'd4',
+        piece: 'r' as const,
+        color: 'w' as const,
+        san: 'Rd4',
+        flags: 'n',
+      } as unknown as Move;
+
+      const result = identifyTacticalTheme(chessBefore, chessAfter, rd4Move);
+      expect(result).toBeDefined();
+    });
   });
 
   describe('Edge Cases & Validation', () => {
@@ -140,6 +226,33 @@ describe('Hint Engine & Tactical Categorization', () => {
       const checkmatedFen = 'r1bqkb1r/pppp1Qpp/2n5/4p3/2B1n3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4';
       const hint = await engine.calculateHint(checkmatedFen, 'b');
       expect(hint).toBeNull();
+    });
+
+    it('returns null when position has no legal moves available', async () => {
+      const stalemateFen = '8/8/8/8/8/1q6/2k5/K7 w - - 0 1';
+      const hint = await engine.calculateHint(stalemateFen, 'w');
+      expect(hint).toBeNull();
+    });
+
+    it('calculates hint for pawn promotion with promotion property', async () => {
+      const mockSearchEngine = {
+        evaluatePosition: () => 900,
+        findBestMove: async () => ({
+          move: { from: 'a7' as const, to: 'a8' as const, promotion: 'q' as const },
+          score: 900,
+          depth: 2,
+          nodesEvaluated: 10,
+          isBlunder: false,
+          searchDurationMs: 5,
+        }),
+      };
+      const customEngine = new HintEngine(mockSearchEngine as any);
+      // White pawn on a7 ready to promote to a8, Kings on e1 and e8
+      const promoFen = '4k3/P7/8/8/8/8/8/4K3 w - - 0 1';
+      const hint = await customEngine.calculateHint(promoFen, 'w');
+      expect(hint).not.toBeNull();
+      expect(hint?.theme).toBe('pawn_promotion');
+      expect(hint?.move.promotion).toBe('q');
     });
 
     it('singleton hintEngine instance is defined and operational', async () => {

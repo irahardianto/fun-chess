@@ -48,6 +48,82 @@ export interface UseRovingTabindexReturn<T extends string | number> {
 }
 
 /**
+ * Computes next index for linear (horizontal, vertical, or bidirectional) roving navigation.
+ * Pure function with cyclomatic complexity < 10.
+ */
+export function getLinearNextIndex(
+  currentIndex: number,
+  total: number,
+  key: string,
+  orientation: RovingOrientation = 'both',
+  loop = true,
+): number | null {
+  if (total <= 0) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return total - 1;
+
+  const isHorizontal = orientation === 'horizontal' || orientation === 'both';
+  const isVertical = orientation === 'vertical' || orientation === 'both';
+
+  const isNext = (isHorizontal && key === 'ArrowRight') || (isVertical && key === 'ArrowDown');
+  const isPrev = (isHorizontal && key === 'ArrowLeft') || (isVertical && key === 'ArrowUp');
+
+  if (isNext) {
+    return currentIndex + 1 < total ? currentIndex + 1 : (loop ? 0 : currentIndex);
+  }
+  if (isPrev) {
+    return currentIndex - 1 >= 0 ? currentIndex - 1 : (loop ? total - 1 : currentIndex);
+  }
+
+  return null;
+}
+
+/**
+ * Computes next index for 2D grid roving navigation.
+ * Pure function with cyclomatic complexity < 10.
+ */
+export function getGridNextIndex(
+  currentIndex: number,
+  total: number,
+  key: string,
+  gridColumns: number,
+  loop = true,
+): number | null {
+  if (total <= 0) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return total - 1;
+
+  const cols = Math.max(1, gridColumns);
+
+  switch (key) {
+    case 'ArrowRight':
+      return currentIndex + 1 < total ? currentIndex + 1 : (loop ? 0 : currentIndex);
+    case 'ArrowLeft':
+      return currentIndex - 1 >= 0 ? currentIndex - 1 : (loop ? total - 1 : currentIndex);
+    case 'ArrowDown': {
+      const next = currentIndex + cols;
+      if (next < total) return next;
+      if (!loop) return currentIndex;
+      const colIndex = currentIndex % cols;
+      return colIndex < total ? colIndex : currentIndex;
+    }
+    case 'ArrowUp': {
+      const prev = currentIndex - cols;
+      if (prev >= 0) return prev;
+      if (!loop) return currentIndex;
+      const colIndex = currentIndex % cols;
+      let candidate = colIndex;
+      while (candidate + cols < total) {
+        candidate += cols;
+      }
+      return candidate;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
  * WAI-ARIA compliant roving tabindex composable (MIN-019).
  * Manages roving focus and keyboard navigation across tablists, radiogroups, toolbars, and grids.
  */
@@ -131,89 +207,11 @@ export function useRovingTabindex<T extends string | number>(
     total: number,
     key: string,
   ): number | null {
-    if (total <= 0) return null;
-
-    if (key === 'Home') return 0;
-    if (key === 'End') return total - 1;
-
-    const isHorizontal = orientation === 'horizontal' || orientation === 'both';
-    const isVertical = orientation === 'vertical' || orientation === 'both';
-
     if (orientation === 'grid') {
       const cols = Math.max(1, toValue(options.gridColumns) ?? 1);
-      switch (key) {
-        case 'ArrowRight': {
-          if (currentIndex + 1 < total) {
-            return currentIndex + 1;
-          }
-          return loop ? 0 : currentIndex;
-        }
-        case 'ArrowLeft': {
-          if (currentIndex - 1 >= 0) {
-            return currentIndex - 1;
-          }
-          return loop ? total - 1 : currentIndex;
-        }
-        case 'ArrowDown': {
-          const next = currentIndex + cols;
-          if (next < total) {
-            return next;
-          }
-          if (!loop) return currentIndex;
-          // Wrap to top row in the same column
-          const colIndex = currentIndex % cols;
-          return colIndex < total ? colIndex : currentIndex;
-        }
-        case 'ArrowUp': {
-          const prev = currentIndex - cols;
-          if (prev >= 0) {
-            return prev;
-          }
-          if (!loop) return currentIndex;
-          // Wrap to bottom row in same column
-          const colIndex = currentIndex % cols;
-          let candidate = colIndex;
-          while (candidate + cols < total) {
-            candidate += cols;
-          }
-          return candidate;
-        }
-        default:
-          return null;
-      }
+      return getGridNextIndex(currentIndex, total, key, cols, loop);
     }
-
-    if (isHorizontal) {
-      if (key === 'ArrowRight') {
-        if (currentIndex + 1 < total) {
-          return currentIndex + 1;
-        }
-        return loop ? 0 : currentIndex;
-      }
-      if (key === 'ArrowLeft') {
-        if (currentIndex - 1 >= 0) {
-          return currentIndex - 1;
-        }
-        return loop ? total - 1 : currentIndex;
-      }
-    }
-
-    if (isVertical) {
-      if (key === 'ArrowDown') {
-        if (currentIndex + 1 < total) {
-          return currentIndex + 1;
-        }
-        return loop ? 0 : currentIndex;
-      }
-      if (key === 'ArrowUp') {
-        if (currentIndex - 1 >= 0) {
-          return currentIndex - 1;
-        }
-        return loop ? total - 1 : currentIndex;
-      }
-    }
-
-    return null;
+    return getLinearNextIndex(currentIndex, total, key, orientation, loop);
   }
 
   function handleKeyDown(event: KeyboardEvent, currentId?: T): void {

@@ -1,6 +1,7 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { Logger } from "../logger/logger.interface.js";
+import { defaultLogger } from "../logger/index.js";
 import { IFileStorage, NodeFileStorage } from "./file_storage.js";
 import { extractClientIp } from "./ip_utils.js";
 
@@ -53,11 +54,20 @@ export function checkPathTraversal(rootDir: string, urlPath: string): boolean {
     let decoded = decodeURIComponent(urlPath);
     try {
       decoded = decodeURIComponent(decoded);
-    } catch {
-      // Ignore secondary decoding failure
+    } catch (err) {
+      defaultLogger.debug("Secondary URI decoding failed during traversal check", {
+        operation: "check_path_traversal",
+        urlPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     decodedPath = decoded;
-  } catch {
+  } catch (err) {
+    defaultLogger.debug("Initial URI decoding failed during traversal check", {
+      operation: "check_path_traversal",
+      urlPath,
+      error: err instanceof Error ? err.message : String(err),
+    });
     decodedPath = urlPath;
   }
 
@@ -129,6 +139,220 @@ export function sendAssetResponse(
   }
 }
 
+function handleForbidden(
+  res: ServerResponse,
+  isHead: boolean,
+  message = "Forbidden",
+): boolean {
+  res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+  if (isHead) {
+    res.end();
+  } else {
+    res.end(message);
+  }
+  return true;
+}
+
+function handleServerError(
+  res: ServerResponse,
+  isHead: boolean,
+  message = "Internal Server Error",
+): boolean {
+  if (!res.headersSent) {
+    res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+    if (isHead) {
+      res.end();
+    } else {
+      res.end(message);
+    }
+  }
+  return true;
+}
+
+function handleNotFound(
+  res: ServerResponse,
+  isHead: boolean,
+  message = "Not Found",
+): boolean {
+  res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+  if (isHead) {
+    res.end();
+  } else {
+    res.end(message);
+  }
+  return true;
+}
+
+type TargetResolution =
+  | { status: "ready"; targetFilePath: string }
+  | { status: "not_found" }
+  | { status: "error"; error: unknown };
+
+async function resolveTargetFile(
+  fileStorage: IFileStorage,
+  initialTarget: string,
+  rootDir: string,
+  sanitizedPath: string,
+  acceptHeader: string,
+): Promise<TargetResolution> {
+  let targetFilePath = initialTarget;
+  const ext = path.extname(sanitizedPath).toLowerCase();
+
+  try {
+    const fileStat = await fileStorage.stat(targetFilePath);
+    if (fileStat.isDirectory) {
+      targetFilePath = path.join(targetFilePath, "index.html");
+      await fileStorage.stat(targetFilePath);
+    }
+    return { status: "ready", targetFilePath };
+  } catch (err: unknown) {
+    const errCode = (err as { code?: string })?.code;
+    if (errCode && errCode !== "ENOENT") {
+      return { status: "error", error: err };
+    }
+
+    if (ext) {
+      return { status: "not_found" };
+    }
+
+    if (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader) {
+      return { status: "ready", targetFilePath: path.join(rootDir, "index.html") };
+    }
+
+    return { status: "not_found" };
+  }
+}
+
+type CanonicalPathResult =
+  | { status: "ok" }
+  | { status: "traversal"; canonicalTarget: string }
+  | { status: "error"; error: unknown };
+
+async function verifyCanonicalPath(
+  fileStorage: IFileStorage,
+  rootDir: string,
+  targetFilePath: string,
+): Promise<CanonicalPathResult> {
+  if (!fileStorage.realpath) {
+    return { status: "ok" };
+  }
+
+  try {
+    const canonicalRoot = await fileStorage.realpath(rootDir);
+    const canonicalTarget = await fileStorage.realpath(targetFilePath);
+    const isInsideRoot =
+      canonicalTarget === canonicalRoot ||
+      canonicalTarget.startsWith(
+        canonicalRoot.endsWith(path.sep) ? canonicalRoot : canonicalRoot + path.sep,
+      );
+
+    if (!isInsideRoot) {
+      return { status: "traversal", canonicalTarget };
+    }
+    return { status: "ok" };
+  } catch (err: unknown) {
+    const errCode = (err as { code?: string })?.code;
+    if (errCode && errCode !== "ENOENT") {
+      return { status: "error", error: err };
+    }
+    return { status: "ok" };
+  }
+}
+
+function sendFallbackOrMiss(
+  res: ServerResponse,
+  options: StaticFileHandlerOptions,
+  context: { urlPath: string; isHead: boolean; correlationId?: string; acceptHeader: string },
+  targetFilePath: string,
+  readError: unknown,
+  logger?: Logger,
+): boolean {
+  const { urlPath, isHead, correlationId, acceptHeader } = context;
+  const ext = path.extname(urlPath).toLowerCase();
+
+  if (
+    options.fallbackHtml &&
+    !ext &&
+    (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader)
+  ) {
+    try {
+      sendAssetResponse(res, options.fallbackHtml, "text/html; charset=utf-8", true, isHead);
+      return true;
+    } catch (fallbackErr: unknown) {
+      logger?.error("Failed to send fallback HTML response", {
+        operation: "http_request",
+        correlationId,
+        path: urlPath,
+        error:
+          fallbackErr instanceof Error
+            ? { name: fallbackErr.name, message: fallbackErr.message }
+            : { raw: fallbackErr },
+      });
+      return handleServerError(res, isHead);
+    }
+  }
+
+  logger?.debug("Static file not found and no fallback provided", {
+    operation: "http_request",
+    targetFilePath,
+    correlationId,
+    error: readError instanceof Error ? readError.message : String(readError),
+  });
+
+  return false;
+}
+
+async function readAndSendStaticFile(
+  res: ServerResponse,
+  fileStorage: IFileStorage,
+  targetFilePath: string,
+  options: StaticFileHandlerOptions,
+  context: { urlPath: string; isHead: boolean; correlationId?: string; acceptHeader: string },
+  logger?: Logger,
+): Promise<boolean> {
+  const { urlPath, isHead, correlationId } = context;
+
+  try {
+    const content = await fileStorage.readFile(targetFilePath);
+    const resolvedExt = path.extname(targetFilePath).toLowerCase();
+    const contentType = MIME_TYPES[resolvedExt] || "application/octet-stream";
+    const isIndex = targetFilePath.endsWith("index.html");
+
+    try {
+      sendAssetResponse(res, content, contentType, isIndex, isHead);
+      return true;
+    } catch (sendErr: unknown) {
+      logger?.error("Failed to send static asset response", {
+        operation: "http_request",
+        correlationId,
+        path: urlPath,
+        error:
+          sendErr instanceof Error
+            ? { name: sendErr.name, message: sendErr.message, stack: sendErr.stack }
+            : { raw: sendErr },
+      });
+      return handleServerError(res, isHead);
+    }
+  } catch (err: unknown) {
+    const errCode = (err as { code?: string })?.code;
+    if (errCode && errCode !== "ENOENT") {
+      logger?.error("Failed to read static file", {
+        operation: "http_request",
+        correlationId,
+        path: urlPath,
+        targetFilePath,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message, stack: err.stack }
+            : { raw: err },
+      });
+      return handleServerError(res, isHead);
+    }
+
+    return sendFallbackOrMiss(res, options, context, targetFilePath, err, logger);
+  }
+}
+
 /**
  * Handles static asset serving and SPA HTML5 history mode fallback.
  * Uses injected IFileStorage abstraction (MAJ-016).
@@ -142,6 +366,7 @@ export async function serveStaticFile(
   options: StaticFileHandlerOptions,
   logger?: Logger,
 ): Promise<boolean> {
+  const startTime = performance.now();
   const fileStorage = options.fileStorage ?? new NodeFileStorage();
   const isHead = req.method?.toUpperCase() === "HEAD";
   const urlPath = req.url?.split("?")[0] || "/";
@@ -157,217 +382,88 @@ export async function serveStaticFile(
     resolveCandidatePath(rootDir, urlPath);
 
   if (isTraversal) {
+    const duration = Math.round(performance.now() - startTime);
     logger?.warn("Directory traversal attempt detected", {
       operation: "security_violation",
       correlationId,
       path: urlPath,
       clientIp,
+      duration,
+      durationMs: duration,
     });
-
-    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-    if (isHead) {
-      res.end();
-    } else {
-      res.end("Forbidden");
-    }
-    return true;
+    return handleForbidden(res, isHead);
   }
 
-  let targetFilePath = initialTarget;
-  const ext = path.extname(sanitizedPath).toLowerCase();
   const acceptHeader = (req.headers?.["accept"] as string) || "";
 
   // 2. Stat File or Directory
-  try {
-    const fileStat = await fileStorage.stat(targetFilePath);
-    if (fileStat.isDirectory) {
-      targetFilePath = path.join(targetFilePath, "index.html");
-      await fileStorage.stat(targetFilePath);
-    }
-  } catch (err: unknown) {
-    const errCode = (err as { code?: string })?.code;
-    if (errCode && errCode !== "ENOENT") {
-      logger?.error("Failed to stat static file", {
-        operation: "http_static",
-        correlationId,
-        path: urlPath,
-        targetFilePath,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
-      });
-      res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-      if (isHead) {
-        res.end();
-      } else {
-        res.end("Internal Server Error");
-      }
-      return true;
-    }
+  const statResult = await resolveTargetFile(
+    fileStorage,
+    initialTarget,
+    rootDir,
+    sanitizedPath,
+    acceptHeader,
+  );
 
-    // Missing asset handling (CRIT-008, MAJ-034):
-    // If request has a file extension (e.g. .js, .css, .png, .json), NEVER rewrite to index.html with 200!
-    if (ext) {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-      if (isHead) {
-        res.end();
-      } else {
-        res.end("Not Found");
-      }
-      return true;
-    }
-
-    // SPA History Mode Fallback: Only rewrite to index.html if caller accepts HTML navigation
-    if (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader) {
-      targetFilePath = path.join(rootDir, "index.html");
-    } else {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-      if (isHead) {
-        res.end();
-      } else {
-        res.end("Not Found");
-      }
-      return true;
-    }
+  if (statResult.status === "error") {
+    logger?.error("Failed to stat static file", {
+      operation: "http_request",
+      correlationId,
+      path: urlPath,
+      targetFilePath: initialTarget,
+      error:
+        statResult.error instanceof Error
+          ? { name: statResult.error.name, message: statResult.error.message, stack: statResult.error.stack }
+          : { raw: statResult.error },
+    });
+    return handleServerError(res, isHead);
   }
 
-  // 3. Symlink Canonicalization Guard (MAJ-001, CWE-59)
-  if (fileStorage.realpath) {
-    try {
-      const canonicalRoot = await fileStorage.realpath(rootDir);
-      const canonicalTarget = await fileStorage.realpath(targetFilePath);
-      const isInsideRoot =
-        canonicalTarget === canonicalRoot ||
-        canonicalTarget.startsWith(
-          canonicalRoot.endsWith(path.sep) ? canonicalRoot : canonicalRoot + path.sep,
-        );
+  if (statResult.status === "not_found") {
+    return handleNotFound(res, isHead);
+  }
 
-      if (!isInsideRoot) {
-        logger?.warn("Symlink directory traversal detected", {
-          operation: "security_violation",
-          correlationId,
-          path: urlPath,
-          targetFilePath,
-          canonicalTarget,
-          clientIp,
-        });
-        res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-        if (isHead) {
-          res.end();
-        } else {
-          res.end("Forbidden");
-        }
-        return true;
-      }
-    } catch (err: unknown) {
-      const errCode = (err as { code?: string })?.code;
-      if (errCode && errCode !== "ENOENT") {
-        logger?.error("Failed to resolve canonical path for static file", {
-          operation: "http_static",
-          correlationId,
-          path: urlPath,
-          targetFilePath,
-          error:
-            err instanceof Error
-              ? { name: err.name, message: err.message, stack: err.stack }
-              : { raw: err },
-        });
-        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-        if (isHead) {
-          res.end();
-        } else {
-          res.end("Internal Server Error");
-        }
-        return true;
-      }
-    }
+  const targetFilePath = statResult.targetFilePath;
+
+  // 3. Symlink Canonicalization Guard (MAJ-001, CWE-59)
+  const canonicalResult = await verifyCanonicalPath(fileStorage, rootDir, targetFilePath);
+
+  if (canonicalResult.status === "traversal") {
+    const duration = Math.round(performance.now() - startTime);
+    logger?.warn("Symlink directory traversal detected", {
+      operation: "security_violation",
+      correlationId,
+      path: urlPath,
+      targetFilePath,
+      canonicalTarget: canonicalResult.canonicalTarget,
+      clientIp,
+      duration,
+      durationMs: duration,
+    });
+    return handleForbidden(res, isHead);
+  }
+
+  if (canonicalResult.status === "error") {
+    logger?.error("Failed to resolve canonical path for static file", {
+      operation: "http_request",
+      correlationId,
+      path: urlPath,
+      targetFilePath,
+      error:
+        canonicalResult.error instanceof Error
+          ? { name: canonicalResult.error.name, message: canonicalResult.error.message, stack: canonicalResult.error.stack }
+          : { raw: canonicalResult.error },
+    });
+    return handleServerError(res, isHead);
   }
 
   // 4. Read and Send File Content
-  try {
-    const content = await fileStorage.readFile(targetFilePath);
-    const resolvedExt = path.extname(targetFilePath).toLowerCase();
-    const contentType = MIME_TYPES[resolvedExt] || "application/octet-stream";
-    const isIndex = targetFilePath.endsWith("index.html");
-
-    try {
-      sendAssetResponse(res, content, contentType, isIndex, isHead);
-      return true;
-    } catch (sendErr: unknown) {
-      logger?.error("Failed to send static asset response", {
-        operation: "http_static",
-        correlationId,
-        path: urlPath,
-        error:
-          sendErr instanceof Error
-            ? { name: sendErr.name, message: sendErr.message, stack: sendErr.stack }
-            : { raw: sendErr },
-      });
-      if (!res.headersSent) {
-        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("Internal Server Error");
-      }
-      return true;
-    }
-  } catch (err: unknown) {
-    const errCode = (err as { code?: string })?.code;
-    if (errCode && errCode !== "ENOENT") {
-      logger?.error("Failed to read static file", {
-        operation: "http_static",
-        correlationId,
-        path: urlPath,
-        targetFilePath,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
-      });
-      if (!res.headersSent) {
-        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-        if (isHead) {
-          res.end();
-        } else {
-          res.end("Internal Server Error");
-        }
-      }
-      return true;
-    }
-
-    // Fallback HTML if disk assets (index.html) don't exist in dev/container preview
-    if (
-      options.fallbackHtml &&
-      !ext &&
-      (acceptHeader.includes("text/html") || acceptHeader.includes("*/*") || !acceptHeader)
-    ) {
-      try {
-        sendAssetResponse(res, options.fallbackHtml, "text/html; charset=utf-8", true, isHead);
-        return true;
-      } catch (fallbackErr: unknown) {
-        logger?.error("Failed to send fallback HTML response", {
-          operation: "http_static",
-          correlationId,
-          path: urlPath,
-          error:
-            fallbackErr instanceof Error
-              ? { name: fallbackErr.name, message: fallbackErr.message }
-              : { raw: fallbackErr },
-        });
-        if (!res.headersSent) {
-          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-          res.end("Internal Server Error");
-        }
-        return true;
-      }
-    }
-
-    logger?.debug("Static file not found and no fallback provided", {
-      operation: "http_static",
-      targetFilePath,
-      correlationId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-
-    return false;
-  }
+  return readAndSendStaticFile(
+    res,
+    fileStorage,
+    targetFilePath,
+    options,
+    { urlPath, isHead, correlationId, acceptHeader },
+    logger,
+  );
 }

@@ -1,4 +1,4 @@
-import { ref, toRaw, getCurrentInstance, type Ref } from 'vue';
+import { ref, toRaw, getCurrentInstance, inject, type Ref } from 'vue';
 import type {
   UnifiedProgressPayload,
   ProgressDiffPreview,
@@ -15,13 +15,13 @@ import {
   FUN_CHESS_PAYLOAD_MAGIC_PREFIX,
 } from '@fun-chess/shared';
 import {
-  defaultLocalStorageUnifiedStore,
-} from '../store/local_storage_unified.store';
-import {
   type IProgressFileService,
   defaultProgressFileService,
 } from '../services/progress_file.service';
-import { useInjectLogger, useInjectProgressStorage } from '@/platform/di';
+import { LocalStorageUnifiedStore } from '../store/local_storage_unified.store';
+import { defaultLocalStorageProgressStore } from '@/features/scenarios/store/local_storage_progress.store';
+import { defaultLocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_progress.store';
+import { useInjectLogger, useInjectProgressStorage, PROGRESS_STORAGE_KEY } from '@/platform/di';
 import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
 export interface UseProgressSyncOptions {
@@ -74,7 +74,27 @@ function unwrapPayload(val: UnifiedProgressPayload, log: ILogger = defaultLogger
  */
 export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgressSyncReturn {
   const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
-  const storage = options.storage || (getCurrentInstance() ? useInjectProgressStorage(defaultLocalStorageUnifiedStore) : defaultLocalStorageUnifiedStore);
+
+  function resolveFallbackStorage(): ProgressStorage {
+    try {
+      return useInjectProgressStorage();
+    } catch {
+      return new LocalStorageUnifiedStore(
+        defaultLocalStorageProgressStore,
+        defaultLocalStoragePuzzleProgressStore,
+        logger
+      );
+    }
+  }
+
+  const storage: ProgressStorage =
+    options.storage ??
+    (getCurrentInstance() ? inject(PROGRESS_STORAGE_KEY, null) : null) ??
+    resolveFallbackStorage();
+
+  function getStorage(): ProgressStorage {
+    return storage;
+  }
   const codec = options.codec || defaultProgressCodec;
   const mergeEngine = options.mergeEngine || defaultProgressMergeEngine;
   const validator = options.schemaValidator || defaultSchemaValidator;
@@ -127,7 +147,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
     clearError();
 
     try {
-      const payload = await storage.getUnifiedProgress();
+      const payload = await getStorage().getUnifiedProgress();
       currentProgress.value = payload;
       const durationMs = Math.round(performance.now() - startTime);
       logger.info('Unified progress loaded successfully', {
@@ -166,7 +186,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
     try {
       let payload = currentProgress.value;
       if (!payload) {
-        payload = await storage.getUnifiedProgress();
+        payload = await getStorage().getUnifiedProgress();
         currentProgress.value = payload;
       }
 
@@ -212,7 +232,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
     try {
       let payload = currentProgress.value;
       if (!payload) {
-        payload = await storage.getUnifiedProgress();
+        payload = await getStorage().getUnifiedProgress();
         currentProgress.value = payload;
       }
 
@@ -286,7 +306,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
 
       let local = currentProgress.value;
       if (!local) {
-        local = await storage.getUnifiedProgress();
+        local = await getStorage().getUnifiedProgress();
         currentProgress.value = local;
       }
 
@@ -347,7 +367,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
     try {
       let local = currentProgress.value;
       if (!local) {
-        local = await storage.getUnifiedProgress();
+        local = await getStorage().getUnifiedProgress();
         currentProgress.value = local;
       }
 
@@ -370,7 +390,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
 
       const merged = mergeEngine.merge(rawLocal, rawIncoming, strategy);
 
-      await storage.saveUnifiedProgress(merged);
+      await getStorage().saveUnifiedProgress(merged);
       currentProgress.value = merged;
       incomingPayload.value = null;
       diffPreview.value = null;

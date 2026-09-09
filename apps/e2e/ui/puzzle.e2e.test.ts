@@ -225,4 +225,87 @@ test.describe('Tactical Puzzle Hub Journey', () => {
     await expect(puzzlesPage.rushGameOver).not.toBeVisible({ timeout: 5_000 });
     await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(0);
   });
+
+  test('launches Streak Survivor untimed mode, verifies survivor HUD without countdown timer, incurs 3 strikes, and verifies game over modal and exit [MIN-028]', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+    const puzzlesPage = new PuzzlesPage(page);
+
+    // 1. Navigate to Puzzle Hub
+    await lobbyPage.goto();
+    await lobbyPage.openPuzzles();
+    await puzzlesPage.waitForHub();
+
+    // 2. Launch Streak Survivor mode
+    await expect(puzzlesPage.rushCard).toBeVisible({ timeout: 10_000 });
+    await puzzlesPage.startRush('survivor');
+
+    // 3. Verify Puzzle Rush Arena mounts in Streak Survivor mode
+    await expect(puzzlesPage.puzzleRushArena).toBeVisible({ timeout: 15_000 });
+    await expect(puzzlesPage.rushHudBar).toBeVisible({ timeout: 10_000 });
+
+    // 4. Verify Mode Badge indicates Streak Survivor
+    const modeBadge = page.locator('.rush-mode-badge');
+    await expect(modeBadge).toBeVisible({ timeout: 10_000 });
+    await expect(modeBadge).toContainText(/streak survivor/i);
+
+    // 5. Verify countdown timer is NOT visible (Streak Survivor is untimed)
+    await expect(puzzlesPage.rushTimer).not.toBeVisible();
+
+    // 6. Verify initial score counter (0) and strikes life row (3 un-struck icons)
+    await expect(puzzlesPage.rushScore).toBeVisible({ timeout: 10_000 });
+    await expect(puzzlesPage.rushScore).toContainText('0');
+    await expect(puzzlesPage.rushStrikes).toBeVisible({ timeout: 10_000 });
+    await expect(puzzlesPage.rushStrikes.locator('.strike-icon')).toHaveCount(3);
+    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(0);
+
+    // 7. Incur strikes sequentially
+    interface PuzzleRushElement extends Element {
+      __vueParentComponent?: {
+        setupState?: {
+          rush?: {
+            handleStrike?: () => void;
+          };
+        };
+      };
+    }
+
+    // Incur Strike 1
+    await page.evaluate(() => {
+      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
+      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
+        arena.__vueParentComponent.setupState.rush.handleStrike();
+      }
+    });
+    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(1, { timeout: 5_000 });
+
+    // Incur Strike 2
+    await page.evaluate(() => {
+      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
+      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
+        arena.__vueParentComponent.setupState.rush.handleStrike();
+      }
+    });
+    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(2, { timeout: 5_000 });
+
+    // Incur Strike 3 (Triggers Game Over!)
+    await page.evaluate(() => {
+      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
+      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
+        arena.__vueParentComponent.setupState.rush.handleStrike();
+      }
+    });
+
+    // 8. Verify Game Over dialog appears on 3 strikes
+    await expect(puzzlesPage.rushGameOver).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="game-over-card"]')).toBeVisible();
+    await expect(page.locator('.game-over-title')).toContainText(/run finished|game over/i);
+    await expect(page.locator('[data-testid="final-score"]')).toBeVisible();
+    await expect(page.locator('[data-testid="highest-streak"]')).toBeVisible();
+
+    // 9. Verify exit button returns to Puzzle Hub
+    const exitBtn = page.locator('[data-testid="rush-game-over-exit-btn"]');
+    await expect(exitBtn).toBeVisible({ timeout: 5_000 });
+    await exitBtn.click();
+    await puzzlesPage.waitForHub();
+  });
 });

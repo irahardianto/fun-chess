@@ -369,7 +369,7 @@ const { handleKeyDown: handleTabKeyDown, getTabindex } = useRovingTabindex({
 
 .sync-tab-btn.is-active {
   background-color: var(--color-primary);
-  color: #ffffff;
+  color: var(--text-on-primary);
   box-shadow: 0 4px 14px var(--color-primary-subtle);
 }
 

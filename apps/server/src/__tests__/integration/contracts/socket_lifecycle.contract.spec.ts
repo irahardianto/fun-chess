@@ -69,7 +69,12 @@ describe("Socket.io Lifecycle Contracts", () => {
       const eventPromise = waitForEvent<RoomState>(hostClient, "room:created");
       const response = await emitAck<
         CreateRoomRequest,
-        | { success: true; room: RoomState; sessionToken: string }
+        | {
+            success: true;
+            room: RoomState;
+            player: Player;
+            sessionToken: string;
+          }
         | { success: false; error: SocketErrorPayload }
       >(hostClient, "room:create", createPayload);
       const emittedRoom = await eventPromise;
@@ -84,6 +89,14 @@ describe("Socket.io Lifecycle Contracts", () => {
       expect(room.hostId).toBeDefined();
       expect(typeof response.sessionToken).toBe("string");
       expect(response.sessionToken.length).toBeGreaterThan(0);
+
+      // Assert player object in full 4-field ack payload (MIN-024)
+      expect(response.player).toBeDefined();
+      expect(response.player.id).toBe(room.hostId);
+      expect(response.player.name).toBe("Alice");
+      expect(response.player.color).toBe("w");
+      expect(response.player.isHost).toBe(true);
+      expect(response.player.isConnected).toBe(true);
 
       // Assert white player configuration (since preferredColor was 'w')
       expect(room.whitePlayer).toBeDefined();
@@ -112,7 +125,12 @@ describe("Socket.io Lifecycle Contracts", () => {
       // Act
       const response = await emitAck<
         CreateRoomRequest,
-        | { success: true; room: RoomState; sessionToken: string }
+        | {
+            success: true;
+            room: RoomState;
+            player: Player;
+            sessionToken: string;
+          }
         | { success: false; error: SocketErrorPayload }
       >(hostClient, "room:create", invalidPayload);
 
@@ -128,7 +146,7 @@ describe("Socket.io Lifecycle Contracts", () => {
       // Arrange: Host creates room
       const createRes = await emitAck<
         CreateRoomRequest,
-        { success: true; room: RoomState; sessionToken: string }
+        { success: true; room: RoomState; player: Player; sessionToken: string }
       >(hostClient, "room:create", {
         playerName: "Alice",
         preferredColor: "w",
@@ -160,7 +178,11 @@ describe("Socket.io Lifecycle Contracts", () => {
             sessionToken: string;
           }
         | { success: false; error: SocketErrorPayload }
-      >(joinerClient, "room:join", { roomCode, playerName: "Bob", avatar: "🦁" });
+      >(joinerClient, "room:join", {
+        roomCode,
+        playerName: "Bob",
+        avatar: "🦁",
+      });
 
       const hostGameState = await hostGameStartPromise;
       const joinerGameState = await joinerGameStartPromise;
@@ -195,7 +217,11 @@ describe("Socket.io Lifecycle Contracts", () => {
             sessionToken: string;
           }
         | { success: false; error: SocketErrorPayload }
-      >(joinerClient, "room:join", { roomCode: "ZZZZ", playerName: "Bob", avatar: "🦁" });
+      >(joinerClient, "room:join", {
+        roomCode: "ZZZZ",
+        playerName: "Bob",
+        avatar: "🦁",
+      });
 
       // Assert
       expect(response.success).toBe(false);
@@ -210,7 +236,7 @@ describe("Socket.io Lifecycle Contracts", () => {
     beforeEach(async () => {
       const createRes = await emitAck<
         CreateRoomRequest,
-        { success: true; room: RoomState; sessionToken: string }
+        { success: true; room: RoomState; player: Player; sessionToken: string }
       >(hostClient, "room:create", {
         playerName: "Alice",
         preferredColor: "w",
@@ -315,7 +341,7 @@ describe("Socket.io Lifecycle Contracts", () => {
       // Arrange: Host creates room, Joiner joins (transitions to 'playing')
       const createRes = await emitAck<
         CreateRoomRequest,
-        { success: true; room: RoomState; sessionToken: string }
+        { success: true; room: RoomState; player: Player; sessionToken: string }
       >(hostClient, "room:create", {
         playerName: "Alice",
         preferredColor: "w",
@@ -342,8 +368,7 @@ describe("Socket.io Lifecycle Contracts", () => {
 
       const leaveRes = await emitAck<
         LeaveRoomRequest,
-        | { success: true }
-        | { success: false; error: SocketErrorPayload }
+        { success: true } | { success: false; error: SocketErrorPayload }
       >(joinerClient, "room:leave", { roomCode });
 
       // Assert: Acknowledgement callback returns { success: true }
@@ -361,7 +386,7 @@ describe("Socket.io Lifecycle Contracts", () => {
       // Arrange: Host creates room, Joiner joins
       const createRes = await emitAck<
         CreateRoomRequest,
-        { success: true; room: RoomState; sessionToken: string }
+        { success: true; room: RoomState; player: Player; sessionToken: string }
       >(hostClient, "room:create", {
         playerName: "Alice",
         preferredColor: "w",

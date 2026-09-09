@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
+import { ref } from 'vue';
 import SoloAiArena from '../SoloAiArena.vue';
+import { AUDIO_CONTEXT_KEY, type AudioContextValue } from '@/platform/di';
 
 // Mock confetti
 vi.mock('@/composables/useConfetti', () => ({
@@ -85,6 +87,55 @@ describe('SoloAiArena.vue', () => {
     await flushPromises();
 
     expect(muteBtn.attributes('aria-label')).not.toBe(initialLabel);
+  });
+
+  it('synchronizes mute state with global audio context when provided', async () => {
+    const isMutedRef = ref(false);
+    const mockAudioContext: AudioContextValue = {
+      isMuted: isMutedRef,
+      toggleMute: vi.fn(() => {
+        isMutedRef.value = !isMutedRef.value;
+        return isMutedRef.value;
+      }),
+      setMuted: vi.fn((muted: boolean) => {
+        isMutedRef.value = muted;
+      }),
+      playMove: vi.fn(),
+      playCapture: vi.fn(),
+      playCheck: vi.fn(),
+      playVictory: vi.fn(),
+      playDraw: vi.fn(),
+      playStart: vi.fn(),
+      playError: vi.fn(),
+      playStarEarned: vi.fn(),
+      playClick: vi.fn(),
+    };
+
+    const wrapper = mount(SoloAiArena, {
+      props: {
+        initialMascotId: 'peanut',
+      },
+      global: {
+        provide: {
+          [AUDIO_CONTEXT_KEY as symbol]: mockAudioContext,
+        },
+      },
+    });
+
+    const muteBtn = wrapper.find('[data-testid="arena-mute-btn"]');
+    expect(muteBtn.attributes('aria-label')).toBe('Mute audio');
+
+    await muteBtn.trigger('click');
+    await flushPromises();
+
+    expect(mockAudioContext.toggleMute).toHaveBeenCalled();
+    expect(isMutedRef.value).toBe(true);
+    expect(muteBtn.attributes('aria-label')).toBe('Unmute audio');
+
+    // External change (e.g. from AppNavbar) reflects in SoloAiArena
+    isMutedRef.value = false;
+    await flushPromises();
+    expect(muteBtn.attributes('aria-label')).toBe('Mute audio');
   });
 
   it('displays active hint banner when hint is requested and clears it on dismiss', async () => {

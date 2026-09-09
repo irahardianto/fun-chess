@@ -110,5 +110,57 @@ describe('usePuzzleRush Composable', () => {
       })
     );
   });
-});
 
+  it('propagates correlationId and records durationMs across start, solve, mistake, and end events (MIN-015)', async () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      fatal: vi.fn(),
+      child: vi.fn(),
+    };
+
+    const rush = usePuzzleRush({
+      customStore: memoryStore,
+      logger: mockLogger as any,
+    });
+
+    rush.startRun('streak_survivor');
+    const startCall = mockLogger.info.mock.calls.find(
+      (c) => c[0] === 'Starting puzzle rush run'
+    );
+    expect(startCall).toBeDefined();
+    const correlationId = startCall![1].correlationId;
+    expect(typeof correlationId).toBe('string');
+    expect(correlationId.length).toBeGreaterThan(0);
+    expect(startCall![1].durationMs).toBe(0);
+
+    // Solve event should have the SAME correlationId and a durationMs number
+    await rush.handleRunnerSolved();
+    const solveCall = mockLogger.info.mock.calls.find(
+      (c) => c[0] === 'Puzzle solved during survivor run'
+    );
+    expect(solveCall).toBeDefined();
+    expect(solveCall![1].correlationId).toBe(correlationId);
+    expect(typeof solveCall![1].durationMs).toBe('number');
+
+    // Mistake event should propagate the SAME correlationId and record durationMs
+    rush.handleRunnerFailed();
+    const mistakeCall = mockLogger.warn.mock.calls.find(
+      (c) => c[0] === 'Puzzle mistake during survivor run'
+    );
+    expect(mistakeCall).toBeDefined();
+    expect(mistakeCall![1].correlationId).toBe(correlationId);
+    expect(typeof mistakeCall![1].durationMs).toBe('number');
+
+    // End event should propagate the SAME correlationId and record durationMs
+    rush.endGame();
+    const endCall = mockLogger.info.mock.calls.find(
+      (c) => c[0] === 'Ending puzzle rush run'
+    );
+    expect(endCall).toBeDefined();
+    expect(endCall![1].correlationId).toBe(correlationId);
+    expect(typeof endCall![1].durationMs).toBe('number');
+  });
+});

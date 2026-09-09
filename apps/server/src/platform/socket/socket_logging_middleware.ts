@@ -266,16 +266,14 @@ export function wrapSocketHandler<TReq, TRes>(
   const socketId = typeof socket === "string" ? socket : socket.id;
   const socketObj = typeof socket === "object" ? socket : undefined;
 
-  const effectiveTrustProxy =
+  const defaultTrustProxy =
     trustProxy ??
     (socketObj?.data?.["trustProxy"] as boolean | undefined) ??
     false;
 
-  const effectiveRateLimiter =
+  const defaultRateLimiter =
     rateLimiter ??
     (socketObj?.data?.["rateLimiter"] as SocketRateLimiter | undefined);
-
-  const clientIp = socketObj ? extractClientIp(socketObj, effectiveTrustProxy) : undefined;
 
   return async (
     rawReq: unknown,
@@ -285,6 +283,18 @@ export function wrapSocketHandler<TReq, TRes>(
     const startTime = performance.now();
     const userId = extractUserId(rawReq, socketObj);
     const sanitizedPayload = sanitizePayload(rawReq);
+
+    const effectiveTrustProxy =
+      trustProxy ??
+      (socketObj?.data?.["trustProxy"] as boolean | undefined) ??
+      defaultTrustProxy;
+
+    const effectiveRateLimiter =
+      rateLimiter ??
+      (socketObj?.data?.["rateLimiter"] as SocketRateLimiter | undefined) ??
+      defaultRateLimiter;
+
+    const clientIp = socketObj ? extractClientIp(socketObj, effectiveTrustProxy) : undefined;
 
     const startContext: Record<string, unknown> = {
       operation: operationName,

@@ -151,12 +151,30 @@ describe("Safe Chess Factory & FEN Validator", () => {
       expect(chess.fen()).toBe(DEFAULT_CHESS_FEN);
       expect(mockLogger.warn).toHaveBeenCalledTimes(1);
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining("[createSafeChess] Invalid FEN"),
+        "[createSafeChess] Invalid FEN. Falling back to standard starting position.",
         expect.objectContaining({
           operation: "create_safe_chess",
           fen: badFen,
         }),
       );
+    });
+
+    it("ensures warning messages are static templates with dynamic data in metadata (MIN-013)", () => {
+      const mockLogger: ChessLogger = { warn: vi.fn() };
+      const badFen = "invalid-fen-12345";
+      createSafeChess(badFen, mockLogger);
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        "[createSafeChess] Invalid FEN. Falling back to standard starting position.",
+        {
+          operation: "create_safe_chess",
+          fen: badFen,
+          error: expect.any(String),
+        },
+      );
+      // Ensure the message string does not contain the dynamic FEN string
+      const firstArg = vi.mocked(mockLogger.warn).mock.calls[0]?.[0];
+      expect(firstArg).not.toContain(badFen);
     });
 
     it("safely operates without crashing when no logger is passed", () => {

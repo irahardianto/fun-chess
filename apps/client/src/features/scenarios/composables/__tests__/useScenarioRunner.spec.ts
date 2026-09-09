@@ -467,4 +467,86 @@ describe('useScenarioRunner', () => {
       expect(runner.isCompleted.value).toBe(false);
     });
   });
+
+  describe('Edge Cases and Branch Coverage', () => {
+    it('detects checkmate on player move and immediately completes step', () => {
+      const checkmateScenario: ChessScenario = {
+        id: 'mate-lesson',
+        title: 'Checkmate Finish',
+        subtitle: 'Deliver Mate',
+        category: 'tactical_patterns',
+        difficulty: 'beginner',
+        targetAgeGroup: 'all',
+        icon: '👑',
+        description: 'Deliver checkmate',
+        estimatedMinutes: 1,
+        steps: [
+          {
+            id: 'mate-step-1',
+            stepNumber: 1,
+            // Scholar mate position: Qh5 can play Qxf7#
+            setupFen: 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4',
+            instruction: 'Deliver checkmate on f7',
+            hint: 'Take on f7 with queen',
+            allowedMoves: [{ from: 'h5', to: 'f7' }],
+            explanationOnSuccess: 'Checkmate delivered!',
+          },
+        ],
+      };
+
+      const runner = useScenarioRunner(checkmateScenario);
+      const res = runner.applyPlayerMove({ from: 'h5', to: 'f7' });
+      expect(res).toBe(true);
+      expect(runner.feedbackMessage.value).toContain('Checkmate!');
+
+      // Step completion delay
+      vi.advanceTimersByTime(700);
+      expect(runner.isCompleted.value).toBe(true);
+    });
+
+    it('rejects moves and square selections while waiting for bot or when completed', () => {
+      const runner = useScenarioRunner(mockScenario);
+
+      // Advance to completed state
+      runner.applyPlayerMove({ from: 'd5', to: 'c7' });
+      vi.advanceTimersByTime(700);
+      runner.applyPlayerMove({ from: 'c7', to: 'a8' });
+      vi.advanceTimersByTime(300); // bot responds
+      vi.advanceTimersByTime(700); // step completes
+      expect(runner.isCompleted.value).toBe(true);
+
+      // Once completed, move and selection attempts should no-op
+      expect(runner.applyPlayerMove({ from: 'd1', to: 'd2' })).toBe(false);
+      runner.selectSquare('d1');
+      expect(runner.selectedSquare.value).toBeNull();
+    });
+
+    it('clears selection when clicking an empty or invalid non-player square', () => {
+      const runner = useScenarioRunner(mockScenario);
+
+      // Select d5
+      runner.selectSquare('d5');
+      expect(runner.selectedSquare.value).toBe('d5');
+
+      // Click empty square e5 (not a legal move, not allowed source)
+      runner.selectSquare('e5');
+      expect(runner.selectedSquare.value).toBeNull();
+    });
+
+    it('supports reloading with new scenario via loadScenario', () => {
+      const runner = useScenarioRunner(mockScenario);
+      expect(runner.scenario.value?.id).toBe('test-fork-lesson');
+
+      const secondScenario: ChessScenario = {
+        ...mockScenario,
+        id: 'reloaded-scenario',
+        title: 'Reloaded Scenario',
+      };
+
+      runner.loadScenario(secondScenario);
+      expect(runner.scenario.value?.id).toBe('reloaded-scenario');
+      expect(runner.currentStepIndex.value).toBe(0);
+      expect(runner.mistakesCurrentAttempt.value).toBe(0);
+    });
+  });
 });

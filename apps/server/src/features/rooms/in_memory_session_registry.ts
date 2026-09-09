@@ -91,6 +91,48 @@ export class InMemorySessionRegistry implements SessionRegistry {
     return structuredClone(record);
   }
 
+  public async getSessionByToken(
+    sessionToken: string,
+  ): Promise<SessionRecord | null> {
+    const record = this.sessions.get(sessionToken);
+    if (!record) return null;
+
+    if (this.clock.now() > record.expiresAt) {
+      await this.deleteSession(sessionToken);
+      return null;
+    }
+
+    return structuredClone(record);
+  }
+
+  public async findSessionByToken(
+    sessionToken: string,
+  ): Promise<SessionRecord | null> {
+    return this.getSessionByToken(sessionToken);
+  }
+
+  public async getSessionTokenForPlayer(
+    roomCode: string,
+    playerId: string,
+  ): Promise<string | null> {
+    const code = roomCode.toUpperCase();
+    const token = this.playerIndex.get(`${code}:${playerId}`);
+    if (!token) return null;
+
+    const record = this.sessions.get(token);
+    if (!record) {
+      this.playerIndex.delete(`${code}:${playerId}`);
+      return null;
+    }
+
+    if (this.clock.now() > record.expiresAt) {
+      await this.deleteSession(token);
+      return null;
+    }
+
+    return token;
+  }
+
   public async touchSession(
     sessionToken: string,
     newSocketId: string,
@@ -135,6 +177,16 @@ export class InMemorySessionRegistry implements SessionRegistry {
     }
     this.playerIndex.delete(`${record.roomCode}:${record.playerId}`);
     return true;
+  }
+
+  public async deleteSessionForPlayer(
+    roomCode: string,
+    playerId: string,
+  ): Promise<boolean> {
+    const code = roomCode.toUpperCase();
+    const token = this.playerIndex.get(`${code}:${playerId}`);
+    if (!token) return false;
+    return this.deleteSession(token);
   }
 
   public async deleteSessionsForRoom(roomCode: string): Promise<number> {

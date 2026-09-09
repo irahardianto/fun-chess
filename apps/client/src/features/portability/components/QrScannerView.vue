@@ -426,6 +426,10 @@ function handleManualSubmit() {
 }
 
 .manual-drawer-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   background: none;
   border: none;
   color: var(--text-muted);
@@ -433,8 +437,9 @@ function handleManualSubmit() {
   font-size: var(--text-caption, 12px);
   font-weight: var(--weight-semibold);
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 6px 16px;
   border-radius: var(--radius-pill, 9999px);
+  box-sizing: border-box;
   transition: color var(--duration-fast) ease, background-color var(--duration-fast) ease;
 }
 

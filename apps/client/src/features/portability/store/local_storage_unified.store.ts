@@ -7,8 +7,6 @@ import type {
   PuzzleProgress,
 } from '@fun-chess/shared';
 import { UNIFIED_PROGRESS_SCHEMA_VERSION, assertValidProgress } from '@fun-chess/shared';
-import { LocalStorageProgressStore } from '@/features/scenarios';
-import { LocalStoragePuzzleProgressStore } from '@/features/puzzles';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
 import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
@@ -172,13 +170,3 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
     }
   }
 }
-
-export function createDefaultLocalStorageUnifiedStore(logger: ILogger = defaultLogger): LocalStorageUnifiedStore {
-  return new LocalStorageUnifiedStore(
-    new LocalStorageProgressStore(),
-    new LocalStoragePuzzleProgressStore(),
-    logger
-  );
-}
-
-export const defaultLocalStorageUnifiedStore = createDefaultLocalStorageUnifiedStore();

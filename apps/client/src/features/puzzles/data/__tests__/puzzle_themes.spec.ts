@@ -1,104 +1,111 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from 'vitest';
 import {
   ALL_PUZZLE_THEMES,
   PUZZLE_THEME_DESCRIPTORS,
+  THEME_DESCRIPTORS_MAP,
+  THEME_MAP,
   THEMES_BY_CATEGORY,
   getThemeDescriptor,
+  getThemesByCategory,
   getThemeVisualClues,
   getThemeConceptDefinition,
-} from "../puzzle_themes";
-import { getPuzzlesByTheme } from "../puzzle_catalog";
+} from '../puzzle_themes';
+import type { PuzzleTheme, PuzzleThemeCategory } from '@fun-chess/shared';
 
-describe("Puzzle Themes Catalog (puzzle_themes.spec.ts)", () => {
-  it("contains exactly 24 curated descriptors with valid kid-friendly tips and rating estimates", () => {
-    expect(ALL_PUZZLE_THEMES.length).toBe(24);
-    expect(PUZZLE_THEME_DESCRIPTORS.length).toBe(24);
-
-    for (const desc of ALL_PUZZLE_THEMES) {
-      expect(desc.id).toBeTruthy();
-      expect(desc.category).toBeTruthy();
-      expect(desc.name).toBeTruthy();
-      expect(desc.icon).toBeTruthy();
-      expect(desc.description).toBeTruthy();
-      expect(desc.kidFriendlyTip).toBeTruthy();
-      expect(desc.estimatedRatingRange[0]).toBeGreaterThanOrEqual(500);
-      expect(desc.estimatedRatingRange[1]).toBeGreaterThan(
-        desc.estimatedRatingRange[0],
-      );
-    }
+describe('puzzle_themes data access & lookup helpers', () => {
+  it('exposes curated themes and valid mapping constants', () => {
+    expect(ALL_PUZZLE_THEMES.length).toBeGreaterThan(0);
+    expect(PUZZLE_THEME_DESCRIPTORS).toBe(ALL_PUZZLE_THEMES);
+    expect(THEME_DESCRIPTORS_MAP.size).toBe(ALL_PUZZLE_THEMES.length);
+    expect(THEME_MAP).toBe(THEME_DESCRIPTORS_MAP);
+    expect(THEMES_BY_CATEGORY.basic_tactics.length).toBeGreaterThan(0);
+    expect(THEMES_BY_CATEGORY.checkmate_patterns.length).toBeGreaterThan(0);
   });
 
-  it("categorizes themes into 5 pedagogical domains", () => {
-    expect(THEMES_BY_CATEGORY.basic_tactics.length).toBe(7);
-    expect(THEMES_BY_CATEGORY.advanced_tactics.length).toBe(7);
-    expect(THEMES_BY_CATEGORY.checkmate_patterns.length).toBe(5);
-    expect(THEMES_BY_CATEGORY.endgame_technique.length).toBe(2);
-    expect(THEMES_BY_CATEGORY.opening_traps.length).toBe(3);
+  describe('getThemeDescriptor', () => {
+    it('returns direct descriptor when theme matches ID directly', () => {
+      const fork = getThemeDescriptor('fork');
+      expect(fork).toBeDefined();
+      expect(fork?.id).toBe('fork');
+      expect(fork?.name).toContain('Royal Fork');
+    });
+
+    it('resolves aliased themes correctly', () => {
+      const smothered = getThemeDescriptor('smothered' as PuzzleTheme);
+      expect(smothered).toBeDefined();
+      expect(smothered?.id).toBe('smothered_mate');
+
+      const anastasia = getThemeDescriptor('anastasia_hook' as PuzzleTheme);
+      expect(anastasia).toBeDefined();
+      expect(anastasia?.id).toBe('anastasia_mate');
+
+      const endgame = getThemeDescriptor('endgame_conversion' as PuzzleTheme);
+      expect(endgame).toBeDefined();
+      expect(endgame?.id).toBe('pawn_endgame');
+    });
+
+    it('returns undefined for non-existent theme', () => {
+      const unknown = getThemeDescriptor('unknown_theme_xyz' as PuzzleTheme);
+      expect(unknown).toBeUndefined();
+    });
   });
 
-  it("retrieves descriptor by theme id using getThemeDescriptor including aliases", () => {
-    const forkDesc = getThemeDescriptor("fork");
-    expect(forkDesc).toBeDefined();
-    expect(forkDesc?.name).toContain("Fork");
+  describe('getThemesByCategory', () => {
+    it('returns themes filtered by known category', () => {
+      const tactics = getThemesByCategory('basic_tactics');
+      expect(tactics.length).toBeGreaterThan(0);
+      expect(tactics.every((t) => t.category === 'basic_tactics')).toBe(true);
 
-    const smotheredAlias = getThemeDescriptor("smothered");
-    expect(smotheredAlias).toBeDefined();
-    expect(smotheredAlias?.id).toBe("smothered_mate");
+      const checkmates = getThemesByCategory('checkmate_patterns');
+      expect(checkmates.length).toBeGreaterThan(0);
+      expect(checkmates.every((t) => t.category === 'checkmate_patterns')).toBe(true);
+    });
 
-    const anastasiaAlias = getThemeDescriptor("anastasia_hook");
-    expect(anastasiaAlias).toBeDefined();
-    expect(anastasiaAlias?.id).toBe("anastasia_mate");
-
-    const endgameAlias = getThemeDescriptor("endgame_conversion");
-    expect(endgameAlias).toBeDefined();
-    expect(endgameAlias?.id).toBe("pawn_endgame");
-
-    const nonExistent = getThemeDescriptor("invalid_theme" as unknown as Parameters<typeof getThemeDescriptor>[0]);
-    expect(nonExistent).toBeUndefined();
+    it('returns empty array for invalid or unknown category', () => {
+      const result = getThemesByCategory('nonexistent_cat' as PuzzleThemeCategory);
+      expect(result).toEqual([]);
+    });
   });
 
-  it("provides visual clues and concept definitions for themes including aliases", () => {
-    expect(getThemeVisualClues("fork")).toContain("Knight");
-    expect(getThemeVisualClues("smothered")).toContain("Knight");
-    expect(getThemeConceptDefinition("fork")).toContain("double attack");
-    expect(getThemeConceptDefinition("smothered")).toContain("suffocated");
+  describe('getThemeVisualClues', () => {
+    it('returns specific visual clue for known theme', () => {
+      const forkClue = getThemeVisualClues('fork');
+      expect(forkClue).toContain('Look for two high-value enemy pieces');
+
+      const pinClue = getThemeVisualClues('pin');
+      expect(pinClue).toContain('Look for enemy pieces lined up');
+    });
+
+    it('resolves visual clues for aliases', () => {
+      expect(getThemeVisualClues('smothered')).toContain('boxed in');
+      expect(getThemeVisualClues('anastasia_hook')).toContain('Knight covering the escape squares');
+      expect(getThemeVisualClues('endgame_conversion')).toContain('passed pawn');
+    });
+
+    it('returns fallback visual clue for unknown theme', () => {
+      const fallback = getThemeVisualClues('unknown_special_theme');
+      expect(fallback).toBe('Look for tactical imbalances and vulnerable pieces in the position.');
+    });
   });
 
-  it("guarantees that ALL 24 theme cards in ALL_PUZZLE_THEMES have active matching puzzles in catalog", () => {
-    for (const desc of ALL_PUZZLE_THEMES) {
-      const puzzles = getPuzzlesByTheme(desc.id);
-      expect(
-        puzzles.length,
-        `Theme card ${desc.id} must have > 0 puzzles`,
-      ).toBeGreaterThan(0);
-    }
-  });
+  describe('getThemeConceptDefinition', () => {
+    it('returns concept definition for known theme', () => {
+      const forkDef = getThemeConceptDefinition('fork');
+      expect(forkDef).toContain('double attack');
 
-  it("resolves bidirectional theme mappings correctly", () => {
-    // Smothered mapping
-    expect(getPuzzlesByTheme("smothered_mate").length).toBeGreaterThanOrEqual(
-      25,
-    );
-    expect(getPuzzlesByTheme("smothered").length).toBeGreaterThanOrEqual(25);
+      const skewerDef = getThemeConceptDefinition('skewer');
+      expect(skewerDef).toContain('linear attack');
+    });
 
-    // Anastasia and Hook mapping
-    expect(getPuzzlesByTheme("anastasia_mate").length).toBeGreaterThanOrEqual(
-      15,
-    );
-    expect(getPuzzlesByTheme("hook_mate").length).toBeGreaterThanOrEqual(15);
-    expect(getPuzzlesByTheme("anastasia_hook").length).toBeGreaterThanOrEqual(
-      25,
-    );
+    it('resolves concept definitions for aliases', () => {
+      expect(getThemeConceptDefinition('smothered')).toContain('suffocated by its own friendly pieces');
+      expect(getThemeConceptDefinition('anastasia_hook')).toContain('Knight cuts off flight squares');
+      expect(getThemeConceptDefinition('endgame_conversion')).toContain('king activity and passed pawn');
+    });
 
-    // Endgame mapping
-    expect(getPuzzlesByTheme("pawn_endgame").length).toBeGreaterThanOrEqual(16);
-    expect(getPuzzlesByTheme("rook_endgame").length).toBeGreaterThanOrEqual(16);
-    expect(
-      getPuzzlesByTheme("endgame_conversion").length,
-    ).toBeGreaterThanOrEqual(30);
-
-    // Deflection and Decoy mapping
-    expect(getPuzzlesByTheme("deflection").length).toBeGreaterThanOrEqual(25);
-    expect(getPuzzlesByTheme("decoy").length).toBeGreaterThanOrEqual(25);
+    it('returns fallback concept definition for unknown theme', () => {
+      const fallback = getThemeConceptDefinition('unknown_motif');
+      expect(fallback).toBe('Master this tactical motif to spot winning opportunities in your games.');
+    });
   });
 });

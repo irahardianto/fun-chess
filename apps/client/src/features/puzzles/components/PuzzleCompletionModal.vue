@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue';
 import type { StarRating, Puzzle, PuzzleAttemptResult, PuzzleAnalysisResult } from '@fun-chess/shared';
-import BaseModal from '../../../components/base/BaseModal.vue';
-import BaseButton from '../../../components/base/BaseButton.vue';
-import { useConfetti } from '../../../composables/useConfetti';
+import { BaseModal, BaseButton } from '@/components/base';
+import { useConfetti } from '@/composables';
 import {
   PuzzleCelebrationHeader,
   PuzzleCoachBreakdown,

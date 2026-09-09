@@ -168,5 +168,120 @@ describe('Minimax Search Engine (Alpha-Beta Search & Tactics)', () => {
       expect(evalResult.move).toBeDefined();
       expect(elapsed).toBeLessThan(400);
     });
+
+    it('handles search abortion via maxNodes limit', async () => {
+      const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const result = await engine.findBestMove(startFen, {
+        ...fastConfig,
+        depth: 3,
+        maxNodes: 5,
+      });
+      expect(result.move).toBeDefined();
+      expect(result.nodesEvaluated).toBeGreaterThanOrEqual(5);
+    });
+
+    it('handles search abortion via expired deadlineMs', async () => {
+      const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const result = await engine.findBestMove(startFen, {
+        ...fastConfig,
+        depth: 3,
+        deadlineMs: performance.now() - 100,
+      });
+      expect(result.move).toBeDefined();
+    });
+
+    it('handles search abortion via timeoutMs', async () => {
+      const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const result = await engine.findBestMove(startFen, {
+        ...fastConfig,
+        depth: 4,
+        timeoutMs: 0,
+      });
+      expect(result.move).toBeDefined();
+    });
+
+    it('searches without quiescence search when useQuiescence is false', async () => {
+      const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const result = await engine.findBestMove(startFen, {
+        ...fastConfig,
+        depth: 1,
+        useQuiescence: false,
+      });
+      expect(result.move).toBeDefined();
+    });
+
+    it('evaluates draw and stalemate positions correctly', async () => {
+      // Stalemate position: White King trapped on a1, Black Queen on b3 defended by Black King on c2
+      const stalemateFen = '8/8/8/8/8/1q6/2k5/K7 w - - 0 1';
+      await expect(engine.findBestMove(stalemateFen, fastConfig)).rejects.toThrow(
+        'No legal moves available',
+      );
+
+      // Draw by insufficient material (King vs King)
+      const drawPositionFen = '7k/8/8/8/8/8/8/K7 w - - 0 1';
+      const drawResult = await engine.findBestMove(drawPositionFen, {
+        ...fastConfig,
+        depth: 1,
+      });
+      expect(drawResult.move).toBeDefined();
+      expect(drawResult.score).toBe(0);
+    });
+
+    it('scores checking moves with bonus in scoreMoveForOrdering', () => {
+      const checkMove = {
+        piece: 'r' as const,
+        san: 'Ra8+',
+        from: 'a1',
+        to: 'a8',
+        color: 'w' as const,
+        flags: 'n',
+      } as unknown as Move;
+
+      const quietMove = {
+        piece: 'r' as const,
+        san: 'Rb1',
+        from: 'a1',
+        to: 'b1',
+        color: 'w' as const,
+        flags: 'n',
+      } as unknown as Move;
+
+      expect(scoreMoveForOrdering(checkMove)).toBeGreaterThan(scoreMoveForOrdering(quietMove));
+    });
+
+    it('orders empty or single move array without error', () => {
+      expect(orderMoves([])).toEqual([]);
+      const singleMove = {
+        piece: 'p' as const,
+        san: 'e4',
+        from: 'e2',
+        to: 'e4',
+        color: 'w' as const,
+        flags: 'b',
+      } as unknown as Move;
+      expect(orderMoves([singleMove])).toEqual([singleMove]);
+    });
+
+    it('searches tactical positions for Black side minimizing perspective', async () => {
+      // Black turn with tactical capture available
+      const fen = 'rnbqkb1r/pppp1ppp/5n2/4p3/3P4/5N2/PPP1PPPP/RNBQKB1R b KQkq - 1 3';
+      const result = await engine.findBestMove(fen, {
+        ...fastConfig,
+        depth: 2,
+      });
+      expect(result.move).toBeDefined();
+    });
+
+    it('exercises transposition table and deeper search depths on endgame positions', async () => {
+      // Endgame position with few pieces
+      const fen = '8/8/4k3/8/8/4K3/4P3/8 w - - 0 1';
+      const result = await engine.findBestMove(fen, {
+        ...fastConfig,
+        depth: 3,
+        useQuiescence: true,
+      });
+      expect(result.move).toBeDefined();
+      expect(result.nodesEvaluated).toBeGreaterThan(5);
+    });
   });
 });

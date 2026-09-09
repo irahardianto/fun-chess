@@ -1,4 +1,5 @@
 import type { LanInfoResponse } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 
 export interface WindowLocationContext {
   protocol?: string;
@@ -83,8 +84,12 @@ export function resolveEffectiveHost(
         info.publicUrl.startsWith('http') ? info.publicUrl : `https://${info.publicUrl}`
       );
       return urlObj.hostname;
-    } catch {
-      // fallback
+    } catch (err) {
+      logger.debug('Failed to parse Cloud Relay publicUrl for QR host resolution', {
+        operation: 'determine_host_for_qr',
+        publicUrl: info.publicUrl,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

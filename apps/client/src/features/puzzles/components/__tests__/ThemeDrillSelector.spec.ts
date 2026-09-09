@@ -127,4 +127,80 @@ describe('ThemeDrillSelector.vue', () => {
       }
     });
   });
+
+  describe('Theme Aliases, Keyboard Navigation & Mastery Mapping', () => {
+    it('resolves mastery progress through theme aliases and alternative themeMastery prop', () => {
+      const wrapper = mount(ThemeDrillSelector, {
+        props: {
+          selectedTheme: 'pin',
+          themeMastery: {
+            smothered: {
+              theme: 'smothered_mate',
+              attempted: 2,
+              solved: 2,
+              starsEarned: 6,
+              masteryLevel: 'apprentice',
+              lastPracticedAt: Date.now(),
+            },
+            endgame_conversion: {
+              theme: 'pawn_endgame',
+              attempted: 3,
+              solved: 3,
+              starsEarned: 9,
+              masteryLevel: 'master',
+              lastPracticedAt: Date.now(),
+            },
+          },
+        },
+      });
+
+      // pin is selected
+      const pinCard = wrapper.find('[data-testid="theme-card-pin"]');
+      expect(pinCard.classes()).toContain('is-selected');
+
+      // smothered_mate resolved via smothered alias
+      const smotheredCard = wrapper.find('[data-testid="theme-card-smothered_mate"]');
+      expect(smotheredCard.text()).toContain('Apprentice');
+
+      // pawn_endgame resolved via endgame_conversion alias
+      const pawnCard = wrapper.find('[data-testid="theme-card-pawn_endgame"]');
+      expect(pawnCard.text()).toContain('Master');
+    });
+
+    it('navigates category tabs using keyboard arrows, Home, and End keys', async () => {
+      const wrapper = mount(ThemeDrillSelector);
+      const allTab = wrapper.find('[data-testid="filter-tab-all"]');
+
+      // ArrowRight advances to basic_tactics
+      await allTab.trigger('keydown', { key: 'ArrowRight' });
+      expect(wrapper.find('[data-testid="filter-tab-basic_tactics"]').classes()).toContain('is-active');
+
+      // ArrowDown advances to advanced_tactics
+      const basicTab = wrapper.find('[data-testid="filter-tab-basic_tactics"]');
+      await basicTab.trigger('keydown', { key: 'ArrowDown' });
+      expect(wrapper.find('[data-testid="filter-tab-advanced_tactics"]').classes()).toContain('is-active');
+
+      // ArrowLeft retreats to basic_tactics
+      const advTab = wrapper.find('[data-testid="filter-tab-advanced_tactics"]');
+      await advTab.trigger('keydown', { key: 'ArrowLeft' });
+      expect(wrapper.find('[data-testid="filter-tab-basic_tactics"]').classes()).toContain('is-active');
+
+      // ArrowUp retreats to all
+      await basicTab.trigger('keydown', { key: 'ArrowUp' });
+      expect(wrapper.find('[data-testid="filter-tab-all"]').classes()).toContain('is-active');
+
+      // End jumps to last category
+      await allTab.trigger('keydown', { key: 'End' });
+      expect(wrapper.find('[data-testid="filter-tab-opening_traps"]').classes()).toContain('is-active');
+
+      // Home jumps back to all
+      const trapTab = wrapper.find('[data-testid="filter-tab-opening_traps"]');
+      await trapTab.trigger('keydown', { key: 'Home' });
+      expect(wrapper.find('[data-testid="filter-tab-all"]').classes()).toContain('is-active');
+
+      // Ignored keys
+      await allTab.trigger('keydown', { key: 'Tab' });
+      expect(wrapper.find('[data-testid="filter-tab-all"]').classes()).toContain('is-active');
+    });
+  });
 });

@@ -462,7 +462,7 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
 .quick-install-btn:hover {
   transform: translateY(-2px);
   background-color: var(--color-primary, #6c5ce7);
-  color: #ffffff;
+  color: var(--text-on-primary);
   box-shadow: 0 4px 12px var(--color-primary-subtle, rgba(108, 92, 231, 0.25));
 }
 

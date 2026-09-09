@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Chess } from 'chess.js';
-import { useChessBoard } from '../useChessBoard';
+import { useChessBoard, getLegalTargetSquares } from '../useChessBoard';
 
 describe('useChessBoard composable', () => {
   it('initializes with default starting position', () => {
@@ -129,5 +129,27 @@ describe('useChessBoard composable', () => {
     expect(board.materialAdvantage.value.white).toBeGreaterThan(0);
     expect(board.capturedBlack.value).toContain('q');
     expect(board.capturedBlack.value).toContain('n');
+  });
+
+  describe('getLegalTargetSquares pure function', () => {
+    it('returns valid destination squares for a piece', () => {
+      const chess = new Chess();
+      const moves = getLegalTargetSquares(chess, 'e2');
+      expect(moves).toContain('e3');
+      expect(moves).toContain('e4');
+      expect(moves).toHaveLength(2);
+    });
+
+    it('returns empty array for an empty square', () => {
+      const chess = new Chess();
+      const moves = getLegalTargetSquares(chess, 'e4');
+      expect(moves).toEqual([]);
+    });
+
+    it('returns empty array when square is invalid or throws', () => {
+      const chess = new Chess();
+      const moves = getLegalTargetSquares(chess, 'invalid' as unknown as import('@fun-chess/shared').Square);
+      expect(moves).toEqual([]);
+    });
   });
 });

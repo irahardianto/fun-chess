@@ -90,5 +90,55 @@ describe('Puzzle Rush & Survivor Engine', () => {
       expect(strike3.livesRemaining).toBe(0);
       expect(strike3.isGameOver).toBe(true);
     });
+
+    it('does not set isNewBestStreak when current streak is less than or equal to best streak', () => {
+      const res = applySurvivorSolve(2, 2, 10);
+      expect(res.newScore).toBe(3);
+      expect(res.newStreak).toBe(3);
+      expect(res.bestStreak).toBe(10);
+      expect(res.isNewBestStreak).toBe(false);
+    });
+  });
+
+  describe('Flame stages and labels', () => {
+    it('evaluates flame stages and labels for various streaks', async () => {
+      const { getFlameStage, getFlameLabel, getComboMultiplier, calculateRushTimeTick } = await import('../rush_engine');
+
+      expect(getFlameStage(0)).toBe('none');
+      expect(getFlameLabel(0)).toBe('');
+
+      expect(getFlameStage(1)).toBe('none');
+      expect(getFlameLabel(1)).toBe('');
+
+      expect(getFlameStage(2)).toBe('spark');
+      expect(getFlameLabel(2)).toBe('✨ Streak Active');
+
+      expect(getFlameStage(3)).toBe('spark');
+      expect(getFlameLabel(3)).toBe('✨ Streak Active');
+
+      expect(getFlameStage(4)).toBe('blaze');
+      expect(getFlameLabel(4)).toBe('⚡ On Fire (2x)');
+
+      expect(getFlameStage(5)).toBe('blaze');
+      expect(getFlameLabel(5)).toBe('⚡ On Fire (2x)');
+
+      expect(getFlameStage(6)).toBe('inferno');
+      expect(getFlameLabel(6)).toBe('🔥 Inferno Streak (3x)');
+
+      expect(getFlameStage(10)).toBe('inferno');
+      expect(getFlameLabel(10)).toBe('🔥 Inferno Streak (3x)');
+
+      expect(getComboMultiplier(0)).toBe(1);
+      expect(getComboMultiplier(1)).toBe(1);
+      expect(getComboMultiplier(2)).toBe(2);
+      expect(getComboMultiplier(4)).toBe(2);
+      expect(getComboMultiplier(5)).toBe(3);
+      expect(getComboMultiplier(10)).toBe(3);
+
+      expect(calculateRushTimeTick(10, 2)).toEqual({
+        timeRemainingSeconds: 8,
+        isExpired: false,
+      });
+    });
   });
 });

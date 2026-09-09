@@ -14,14 +14,15 @@ import type {
   IClipboardService,
   ICameraService,
 } from '../hardware';
-import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
+import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage, IClock } from '@fun-chess/shared';
 
 import {
   useInjectApiClient,
   useInjectStorage,
   useInjectSessionStorage,
   useInjectAudioService,
-  useInjectLogger,
+  resolveLogger,
+  useInjectClock,
   useInjectScenarioStore,
   useInjectPuzzleStore,
   useInjectProgressStorage,
@@ -48,8 +49,12 @@ export function useAudioService(custom?: IAudioService): IAudioService {
   return custom ?? useInjectAudioService();
 }
 
-export function useLogger(custom?: ILogger): ILogger {
-  return custom ?? useInjectLogger();
+export function useLogger(custom?: ILogger | null): ILogger {
+  return resolveLogger(custom);
+}
+
+export function useClock(custom?: IClock): IClock {
+  return custom ?? useInjectClock();
 }
 
 export function useScenarioStore(custom?: ScenarioProgressStore): ScenarioProgressStore {

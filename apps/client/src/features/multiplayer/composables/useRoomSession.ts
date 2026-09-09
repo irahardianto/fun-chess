@@ -25,9 +25,9 @@ import {
   LeaveRoomRequestSchema,
   ReconnectRequestSchema,
 } from '@fun-chess/shared';
-import { useInjectLogger, useInjectSessionStorage } from '@/platform/di';
+import { useInjectSessionStorage, resolveLogger } from '@/platform/di';
 import { safeSessionStorage, type KeyValueStorage, STORAGE_KEYS } from '@/platform/storage';
-import { generateCorrelationId, logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+import { generateCorrelationId, type ILogger } from '@/platform/telemetry';
 import {
   useSocketTransport,
   registerSocketEventListener,
@@ -62,7 +62,7 @@ function getSessionStorage(custom?: KeyValueStorage): KeyValueStorage {
 }
 
 function getActiveLogger(): ILogger {
-  return customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+  return resolveLogger(customLogger);
 }
 
 const logger: ILogger = {
@@ -177,23 +177,38 @@ const isSpectator: ComputedRef<boolean> = computed(() => {
 // ----------------------------------------------------------------------------
 // Internal Event Listeners Registration
 // ----------------------------------------------------------------------------
-registerSocketEventListener('connect', () => {
+function handleConnect() {
   checkAndAutoReconnect();
-});
+}
 
-registerSocketEventListener('room:created', (room: RoomState) => {
+function handleRoomCreated(room: RoomState) {
   currentRoom.value = room;
-});
+}
 
-registerSocketEventListener('room:joined', (room: RoomState) => {
+function handleRoomJoined(room: RoomState) {
   currentRoom.value = room;
-});
+}
 
-registerSocketEventListener('room:player_joined', (data: { player: Player; room: RoomState }) => {
+function handleRoomPlayerJoined(data: { player: Player; room: RoomState }) {
   currentRoom.value = data.room;
-});
+}
 
-registerSocketEventListener('room:player_left', (data?: { playerId?: string; playerName?: string; reason?: string }) => {
+function handleRoomPlayerLeft(data?: { playerId?: string; playerName?: string; reason?: string }) {
+  if (data?.reason === 'host_left' || data?.reason === 'room_closed') {
+    currentRoom.value = null;
+    currentPlayer.value = null;
+    sessionToken.value = null;
+    clearSession();
+    if (typeof window !== 'undefined') {
+      if (typeof window.location?.assign === 'function') {
+        window.location.assign('/multiplayer');
+      } else if (window.location) {
+        window.location.href = '/multiplayer';
+      }
+    }
+    return;
+  }
+
   if (currentRoom.value && data?.playerId) {
     if (currentRoom.value.whitePlayer?.id === data.playerId) {
       currentRoom.value.whitePlayer = null;
@@ -210,15 +225,15 @@ registerSocketEventListener('room:player_left', (data?: { playerId?: string; pla
       currentPlayer.value = null;
     }
   }
-});
+}
 
-registerSocketEventListener('room:player_disconnected', (data: {
+function handleRoomPlayerDisconnected(data: {
   playerId?: string;
   player?: Player;
   gracePeriodMs?: number;
   roomStatus?: string;
   disconnectedAt?: number;
-}) => {
+}) {
   if (!currentRoom.value) return;
 
   const disconnectedId = data?.playerId ?? data?.player?.id;
@@ -253,13 +268,13 @@ registerSocketEventListener('room:player_disconnected', (data: {
   if (currentPlayer.value?.id === disconnectedId) {
     currentPlayer.value.isConnected = false;
   }
-});
+}
 
-registerSocketEventListener('room:player_reconnected', (data: {
+function handleRoomPlayerReconnected(data: {
   playerId: string;
   playerName: string;
   roomStatus?: string;
-}) => {
+}) {
   if (!currentRoom.value) return;
 
   if (currentRoom.value.whitePlayer?.id === data.playerId) {
@@ -291,13 +306,13 @@ registerSocketEventListener('room:player_reconnected', (data: {
       status: 'playing',
     };
   }
-});
+}
 
-registerSocketEventListener('room:reconnected', (data: {
+function handleRoomReconnected(data: {
   room: RoomState;
   player: Player;
   roomStatus?: string;
-}) => {
+}) {
   if (data?.room) {
     currentRoom.value = data.room;
     if (data.roomStatus) {
@@ -310,9 +325,9 @@ registerSocketEventListener('room:reconnected', (data: {
   if (data?.player) {
     currentPlayer.value = data.player;
   }
-});
+}
 
-registerSocketEventListener('game:started', (gameState: GameState) => {
+function handleGameStarted(gameState: GameState) {
   if (currentRoom.value) {
     currentRoom.value = {
       ...currentRoom.value,
@@ -320,16 +335,32 @@ registerSocketEventListener('game:started', (gameState: GameState) => {
       game: gameState,
     };
   }
-});
+}
 
-registerSocketEventListener('game:over', () => {
+function handleGameOver() {
   if (currentRoom.value) {
     currentRoom.value = {
       ...currentRoom.value,
       status: 'game_over',
     };
   }
-});
+}
+
+export function initRoomSessionListeners(): void {
+  registerSocketEventListener('connect', handleConnect);
+  registerSocketEventListener('room:created', handleRoomCreated);
+  registerSocketEventListener('room:joined', handleRoomJoined);
+  registerSocketEventListener('room:player_joined', handleRoomPlayerJoined);
+  registerSocketEventListener('room:player_left', handleRoomPlayerLeft);
+  registerSocketEventListener('room:player_disconnected', handleRoomPlayerDisconnected);
+  registerSocketEventListener('room:player_reconnected', handleRoomPlayerReconnected);
+  registerSocketEventListener('room:reconnected', handleRoomReconnected);
+  registerSocketEventListener('game:started', handleGameStarted);
+  registerSocketEventListener('game:over', handleGameOver);
+}
+
+// Initial registration on module load
+initRoomSessionListeners();
 
 // ----------------------------------------------------------------------------
 // Public Room Operations
@@ -371,12 +402,12 @@ export async function createRoom(
   playerName: string,
   preferredColor: 'w' | 'b' | 'random' = 'random',
   avatar: string = DEFAULT_PLAYER_AVATAR
-): Promise<{ success: true; room: RoomState; sessionToken: string } | { success: false; error: SocketErrorPayload }> {
+): Promise<{ success: true; room: RoomState; player: Player; sessionToken: string } | { success: false; error: SocketErrorPayload }> {
   const startTime = Date.now();
   const correlationId = generateCorrelationId();
   const transport = useSocketTransport();
 
-  logger.debug('Creating room', {
+  logger.info('Creating room', {
     operation: 'socket_room_create',
     correlationId,
     playerName,
@@ -405,7 +436,7 @@ export async function createRoom(
 
   return transport.emitWithTimeout<
     CreateRoomRequest,
-    | { success: true; room: RoomState; sessionToken: string }
+    | { success: true; room: RoomState; player: Player; sessionToken: string }
     | { success: false; error: SocketErrorPayload }
   >(s, 'room:create', validationResult.data, {
     timeoutMs: 8000,
@@ -415,12 +446,19 @@ export async function createRoom(
     onSuccess: (res) => {
       currentRoom.value = res.room;
       sessionToken.value = res.sessionToken;
-      if (res.room.whitePlayer?.socketId === s.id) {
+      if (res.player) {
+        currentPlayer.value = res.player;
+      } else if (res.room.whitePlayer?.socketId === s.id) {
         currentPlayer.value = res.room.whitePlayer;
       } else if (res.room.blackPlayer?.socketId === s.id) {
         currentPlayer.value = res.room.blackPlayer;
+      } else if (res.room.hostId) {
+        currentPlayer.value =
+          res.room.whitePlayer?.id === res.room.hostId
+            ? res.room.whitePlayer
+            : res.room.blackPlayer;
       }
-      const playerId = currentPlayer.value?.id || res.room.hostId;
+      const playerId = currentPlayer.value?.id || res.player?.id || res.room.hostId;
       saveSession({
         roomCode: res.room.roomCode,
         playerId,
@@ -442,7 +480,7 @@ export async function joinRoom(
   const correlationId = generateCorrelationId();
   const transport = useSocketTransport();
 
-  logger.debug('Joining room', {
+  logger.info('Joining room', {
     operation: 'socket_room_join',
     correlationId,
     roomCode,
@@ -504,7 +542,7 @@ export async function reconnect(
   const correlationId = generateCorrelationId();
   const transport = useSocketTransport();
 
-  logger.debug('Reconnecting room', {
+  logger.info('Reconnecting room', {
     operation: 'socket_room_reconnect',
     correlationId,
     roomCode,
@@ -573,7 +611,7 @@ export async function leaveRoom(
   const correlationId = generateCorrelationId();
   const transport = useSocketTransport();
 
-  logger.debug('Leaving room', {
+  logger.info('Leaving room', {
     operation: 'socket_room_leave',
     correlationId,
     roomCode,
@@ -661,12 +699,14 @@ export function resetRoomSessionState(clearStorage = true): void {
   }
   customSessionStorage = null;
   customLogger = null;
+  initRoomSessionListeners();
 }
 
 /**
  * Primary composable exposing room session state and lifecycle controls.
  */
 export function useRoomSession(options?: { storage?: KeyValueStorage; logger?: ILogger }) {
+  initRoomSessionListeners();
   if (options?.storage) {
     customSessionStorage = options.storage;
   }
@@ -688,5 +728,6 @@ export function useRoomSession(options?: { storage?: KeyValueStorage; logger?: I
     saveSession,
     clearSession,
     resetRoomSessionState,
+    initRoomSessionListeners,
   };
 }
