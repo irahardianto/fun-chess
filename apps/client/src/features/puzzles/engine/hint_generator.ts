@@ -1,3 +1,4 @@
+import { getCurrentInstance } from 'vue';
 import type {
   Puzzle,
   HintLevel,
@@ -7,6 +8,9 @@ import type {
 import { createSafeChess } from '@fun-chess/shared';
 import { parseUciMove } from './puzzle_validator';
 import { PIECE_DISPLAY_NAMES } from './puzzle_analysis_engine';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+
 
 export const THEME_ICONS: Record<string, string> = {
   fork: '🍴',
@@ -45,14 +49,17 @@ export type { ExtendedHintData };
  * @param currentMoveIndex - Current ply index in puzzle.moves
  * @param currentFen - Current FEN position
  * @param requestedLevel - Desired hint level (0, 1, 2, or 3)
+ * @param customLogger - Optional logger instance
  * @returns Structured ExtendedHintData payload
  */
 export function generateProgressiveHint(
   puzzle: Puzzle,
   currentMoveIndex: number,
   currentFen: string,
-  requestedLevel: HintLevel
+  requestedLevel: HintLevel,
+  customLogger?: ILogger
 ): ExtendedHintData {
+  const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   if (requestedLevel === 0 || !puzzle || !puzzle.moves || currentMoveIndex >= puzzle.moves.length) {
     return {
       level: 0,
@@ -96,9 +103,15 @@ export function generateProgressiveHint(
     if (moveRes) {
       san = moveRes.san;
     }
-  } catch {
-    // Fallback if chess fails
+  } catch (err) {
+    logger.debug('Failed to evaluate move with chess engine for hint generation', {
+      operation: 'generate_progressive_hint',
+      currentFen,
+      expectedUci,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
+
 
   if (requestedLevel === 1) {
     const conceptualMsg = (currentMoveIndex > 0 && stepExp?.explanation)

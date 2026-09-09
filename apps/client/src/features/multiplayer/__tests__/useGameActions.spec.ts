@@ -373,6 +373,44 @@ describe('useGameActions composable', () => {
       expect(game.drawOfferedBy.value).toBeNull();
     });
 
+    it('accepts draw via acceptDraw convenience method', () => {
+      const game = useGameActions();
+      game.drawOfferedBy.value = { fromPlayerId: UUID_P2, fromPlayerName: 'Bob' };
+
+      mockSocket.emit.mockImplementation((event: string, payload: any, ack: Function) => {
+        if (event === 'game:respond_draw') {
+          expect(payload.roomCode).toBe('GAME');
+          expect(payload.accept).toBe(true);
+          ack({ success: true });
+        }
+      });
+
+      const cb = vi.fn();
+      game.acceptDraw('GAME', cb);
+
+      expect(cb).toHaveBeenCalledWith({ success: true });
+      expect(game.drawOfferedBy.value).toBeNull();
+    });
+
+    it('declines draw via declineDraw convenience method', () => {
+      const game = useGameActions();
+      game.drawOfferedBy.value = { fromPlayerId: UUID_P2, fromPlayerName: 'Bob' };
+
+      mockSocket.emit.mockImplementation((event: string, payload: any, ack: Function) => {
+        if (event === 'game:respond_draw') {
+          expect(payload.roomCode).toBe('GAME');
+          expect(payload.accept).toBe(false);
+          ack({ success: true });
+        }
+      });
+
+      const cb = vi.fn();
+      game.declineDraw('GAME', cb);
+
+      expect(cb).toHaveBeenCalledWith({ success: true });
+      expect(game.drawOfferedBy.value).toBeNull();
+    });
+
     it('updates reactive drawOfferedBy when game:draw_offered event arrives', () => {
       const game = useGameActions();
 
@@ -431,6 +469,44 @@ describe('useGameActions composable', () => {
 
       const cb = vi.fn();
       game.respondRematch('GAME', false, cb);
+
+      expect(cb).toHaveBeenCalledWith({ success: true });
+      expect(game.rematchRequestedBy.value).toBeNull();
+    });
+
+    it('accepts rematch via acceptRematch convenience method', () => {
+      const game = useGameActions();
+      game.rematchRequestedBy.value = { requestedBy: UUID_P2, requesterName: 'Bob' };
+
+      mockSocket.emit.mockImplementation((event: string, payload: any, ack: Function) => {
+        if (event === 'game:respond_rematch') {
+          expect(payload.roomCode).toBe('GAME');
+          expect(payload.accept).toBe(true);
+          ack({ success: true });
+        }
+      });
+
+      const cb = vi.fn();
+      game.acceptRematch('GAME', cb);
+
+      expect(cb).toHaveBeenCalledWith({ success: true });
+      expect(game.rematchRequestedBy.value).toBeNull();
+    });
+
+    it('declines rematch via declineRematch convenience method', () => {
+      const game = useGameActions();
+      game.rematchRequestedBy.value = { requestedBy: UUID_P2, requesterName: 'Bob' };
+
+      mockSocket.emit.mockImplementation((event: string, payload: any, ack: Function) => {
+        if (event === 'game:respond_rematch') {
+          expect(payload.roomCode).toBe('GAME');
+          expect(payload.accept).toBe(false);
+          ack({ success: true });
+        }
+      });
+
+      const cb = vi.fn();
+      game.declineRematch('GAME', cb);
 
       expect(cb).toHaveBeenCalledWith({ success: true });
       expect(game.rematchRequestedBy.value).toBeNull();
@@ -612,6 +688,58 @@ describe('useGameActions composable', () => {
           error: 'Audio play failed',
         })
       );
+    });
+  });
+
+  // ==========================================================================
+  // 7b. Room Departure & Action Execution Validation (MAJ-033)
+  // ==========================================================================
+  describe('Room Departure & Action Execution Validation (MAJ-033)', () => {
+    it('leaves room and emits room:leave with callback', async () => {
+      const game = useGameActions();
+
+      mockSocket.emit.mockImplementation((event: string, payload: any, ack: Function) => {
+        if (event === 'room:leave') {
+          expect(payload.roomCode).toBe('GAME');
+          ack({ success: true });
+        }
+      });
+
+      const cb = vi.fn();
+      const success = await game.leaveRoom('GAME', cb);
+
+      expect(success).toBe(true);
+      expect(cb).toHaveBeenCalledWith({ success: true });
+    });
+
+    it('rejects leaveRoom with invalid room code without emitting', async () => {
+      const game = useGameActions();
+      const cb = vi.fn();
+
+      const success = await game.leaveRoom('INVALID_LONG_CODE', cb);
+
+      expect(success).toBe(false);
+      expect(cb).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+      expect(mockSocket.emit).not.toHaveBeenCalled();
+    });
+
+    it('returns error and does not emit when socket is disconnected for any action', () => {
+      mockSocket.connected = false;
+      const game = useGameActions();
+      const cb = vi.fn();
+
+      game.offerDraw('GAME', cb);
+
+      expect(cb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: expect.objectContaining({
+            code: 'ERR_INTERNAL_SERVER',
+            message: 'Socket not connected',
+          }),
+        })
+      );
+      expect(mockSocket.emit).not.toHaveBeenCalled();
     });
   });
 

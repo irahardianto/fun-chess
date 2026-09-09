@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FetchApiClient } from '../fetch_api_client';
 import { MockApiClient } from '../mock_api_client';
 import { apiClient } from '../index';
+import type { ILogger } from '../../telemetry';
 
 describe('FetchApiClient', () => {
   let originalFetch: typeof globalThis.fetch;
@@ -283,7 +284,7 @@ describe('FetchApiClient', () => {
 
     globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
 
-    const client = new FetchApiClient('http://localhost:3000', mockLogger as any);
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as unknown as ILogger);
     const result = await client.get<string>('/api/bad-json');
 
     expect(result.data).toBe(malformedBody);
@@ -315,7 +316,7 @@ describe('FetchApiClient', () => {
       json: async () => ({ success: true }),
     });
 
-    const client = new FetchApiClient('http://localhost:3000', mockLogger as any);
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as unknown as ILogger);
     await client.get('/api/rooms?status=waiting&token=superSecret123');
 
     expect(mockLogger.info).toHaveBeenCalledWith(
@@ -354,7 +355,7 @@ describe('FetchApiClient', () => {
 
     globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network failure'));
 
-    const client = new FetchApiClient('http://localhost:3000', mockLogger as any);
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as unknown as ILogger);
     await expect(client.get('/api/users?apiKey=xyz789&filter=active')).rejects.toThrow();
 
     expect(mockLogger.error).toHaveBeenCalledWith(
@@ -392,7 +393,7 @@ describe('FetchApiClient', () => {
       json: async () => ({ created: true }),
     });
 
-    const client = new FetchApiClient('http://localhost:3000', mockLogger as any);
+    const client = new FetchApiClient('http://localhost:3000', mockLogger as unknown as ILogger);
     await client.post('/api/action?sensitiveToken=abc456', { test: true });
 
     expect(mockLogger.info).toHaveBeenCalledWith(

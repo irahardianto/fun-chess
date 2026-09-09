@@ -45,8 +45,7 @@ describe("IFileStorage & Adapters (MAJ-016)", () => {
 
       storage.setErrorSimulator((filePath, op) => {
         if (filePath === "/virtual/locked.txt" && op === "stat") {
-          const err = new Error("Permission denied") as any;
-          err.code = "EACCES";
+          const err = Object.assign(new Error("Permission denied"), { code: "EACCES" });
           return err;
         }
         return undefined;
@@ -54,6 +53,19 @@ describe("IFileStorage & Adapters (MAJ-016)", () => {
 
       await expect(storage.stat("/virtual/locked.txt")).rejects.toMatchObject({
         code: "EACCES",
+      });
+    });
+
+    it("resolves realpath for existing files and directories", async () => {
+      const storage = new MemoryFileStorage({
+        "/virtual/app.js": "console.log('hi')",
+      });
+      storage.addDirectory("/virtual/assets");
+
+      await expect(storage.realpath("/virtual/app.js")).resolves.toBe("/virtual/app.js");
+      await expect(storage.realpath("/virtual/assets")).resolves.toBe("/virtual/assets");
+      await expect(storage.realpath("/virtual/missing.js")).rejects.toMatchObject({
+        code: "ENOENT",
       });
     });
   });
@@ -73,6 +85,66 @@ describe("IFileStorage & Adapters (MAJ-016)", () => {
         expect(content.toString("utf-8")).toBe("node-storage-test");
       } finally {
         await fs.unlink(tmpFile).catch(() => {});
+      }
+    });
+
+    it("correctly identifies directories via stat (MAJ-044)", async () => {
+      const storage = new NodeFileStorage();
+      const tmpDir = path.join(os.tmpdir(), `fc-dir-${Date.now()}`);
+      await fs.mkdir(tmpDir, { recursive: true });
+
+      try {
+        const stat = await storage.stat(tmpDir);
+        expect(stat.isDirectory).toBe(true);
+      } finally {
+        await fs.rmdir(tmpDir).catch(() => {});
+      }
+    });
+
+    it("throws ENOENT for missing files on stat and readFile (MAJ-044)", async () => {
+      const storage = new NodeFileStorage();
+      const missingPath = path.join(os.tmpdir(), `fc-missing-${Date.now()}-${Math.random()}.txt`);
+
+      await expect(storage.stat(missingPath)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+      await expect(storage.readFile(missingPath)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+    });
+
+    it("throws EISDIR when calling readFile on a directory (MAJ-044)", async () => {
+      const storage = new NodeFileStorage();
+      const tmpDir = path.join(os.tmpdir(), `fc-eisdir-${Date.now()}`);
+      await fs.mkdir(tmpDir, { recursive: true });
+
+      try {
+        await expect(storage.readFile(tmpDir)).rejects.toMatchObject({
+          code: "EISDIR",
+        });
+      } finally {
+        await fs.rmdir(tmpDir).catch(() => {});
+      }
+    });
+
+    it("resolves canonical realpath on real filesystem and resolves symlinks (MAJ-001, MAJ-044)", async () => {
+      const storage = new NodeFileStorage();
+      const tmpDir = path.join(os.tmpdir(), `fc-symlink-test-${Date.now()}`);
+      await fs.mkdir(tmpDir, { recursive: true });
+
+      const realFile = path.join(tmpDir, "real.txt");
+      const symlinkFile = path.join(tmpDir, "symlink.txt");
+      await fs.writeFile(realFile, "target content");
+      await fs.symlink(realFile, symlinkFile);
+
+      try {
+        const canonicalTarget = await storage.realpath(realFile);
+        const canonicalSymlink = await storage.realpath(symlinkFile);
+        expect(canonicalSymlink).toBe(canonicalTarget);
+      } finally {
+        await fs.unlink(symlinkFile).catch(() => {});
+        await fs.unlink(realFile).catch(() => {});
+        await fs.rmdir(tmpDir).catch(() => {});
       }
     });
   });

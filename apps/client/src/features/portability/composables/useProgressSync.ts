@@ -1,4 +1,4 @@
-import { ref, toRaw, type Ref } from 'vue';
+import { ref, toRaw, getCurrentInstance, type Ref } from 'vue';
 import type {
   UnifiedProgressPayload,
   ProgressDiffPreview,
@@ -18,19 +18,21 @@ import {
   defaultLocalStorageUnifiedStore,
 } from '../store/local_storage_unified.store';
 import {
-  ProgressFileService,
+  type IProgressFileService,
   defaultProgressFileService,
 } from '../services/progress_file.service';
-import { logger, generateCorrelationId } from '@/platform/telemetry';
+import { useInjectLogger, useInjectProgressStorage } from '@/platform/di';
+import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
 export interface UseProgressSyncOptions {
   storage?: ProgressStorage;
   codec?: ProgressCodec;
   mergeEngine?: ProgressMergeEngine;
   schemaValidator?: SchemaValidator;
-  fileService?: ProgressFileService;
+  fileService?: IProgressFileService;
   onMergeCelebration?: () => void;
   confetti?: { celebrateVictory: () => void };
+  logger?: ILogger;
 }
 
 export interface UseProgressSyncReturn {
@@ -53,11 +55,11 @@ export interface UseProgressSyncReturn {
   clearError: () => void;
 }
 
-function unwrapPayload(val: UnifiedProgressPayload): UnifiedProgressPayload {
+function unwrapPayload(val: UnifiedProgressPayload, log: ILogger = defaultLogger): UnifiedProgressPayload {
   try {
     return JSON.parse(JSON.stringify(toRaw(val)));
   } catch (err: unknown) {
-    logger.warn('Failed to deep-clone payload', {
+    log.warn('Failed to deep-clone payload', {
       operation: 'progress_sync_unwrap',
       error: err instanceof Error ? err.message : String(err),
     });
@@ -71,7 +73,8 @@ function unwrapPayload(val: UnifiedProgressPayload): UnifiedProgressPayload {
  * and smart conflict resolution.
  */
 export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgressSyncReturn {
-  const storage = options.storage || defaultLocalStorageUnifiedStore;
+  const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+  const storage = options.storage || (getCurrentInstance() ? useInjectProgressStorage(defaultLocalStorageUnifiedStore) : defaultLocalStorageUnifiedStore);
   const codec = options.codec || defaultProgressCodec;
   const mergeEngine = options.mergeEngine || defaultProgressMergeEngine;
   const validator = options.schemaValidator || defaultSchemaValidator;
@@ -167,7 +170,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
         currentProgress.value = payload;
       }
 
-      const rawPayload = unwrapPayload(payload);
+      const rawPayload = unwrapPayload(payload, logger);
       const envelopeJson = codec.encodeToEnvelopeJson(rawPayload);
       fileService.downloadProgressFile(envelopeJson, filename);
 
@@ -213,7 +216,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
         currentProgress.value = payload;
       }
 
-      const rawPayload = unwrapPayload(payload);
+      const rawPayload = unwrapPayload(payload, logger);
       const qrString = await codec.encodeToQrString(rawPayload);
 
       const durationMs = Math.round(performance.now() - startTime);
@@ -287,8 +290,8 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
         currentProgress.value = local;
       }
 
-      const rawLocal = unwrapPayload(local);
-      const rawDecoded = unwrapPayload(decoded);
+      const rawLocal = unwrapPayload(local, logger);
+      const rawDecoded = unwrapPayload(decoded, logger);
 
       const diff = mergeEngine.calculateDiff(rawLocal, rawDecoded);
       incomingPayload.value = rawDecoded;
@@ -362,8 +365,8 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       }
 
       const resolvedIncoming = incoming || local;
-      const rawLocal = unwrapPayload(local);
-      const rawIncoming = unwrapPayload(resolvedIncoming);
+      const rawLocal = unwrapPayload(local, logger);
+      const rawIncoming = unwrapPayload(resolvedIncoming, logger);
 
       const merged = mergeEngine.merge(rawLocal, rawIncoming, strategy);
 

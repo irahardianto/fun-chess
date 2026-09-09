@@ -200,8 +200,13 @@ export class RateLimitExceededError extends AppError {
 
 /**
  * Error thrown when an optimistic concurrency control version check fails during a room mutation.
+ * Single source of truth for prototype identity across all monorepo packages (MAJ-005).
  */
 export class OptimisticLockConflictError extends AppError {
+  public readonly roomCode: string;
+  public readonly expectedVersion: number;
+  public readonly actualVersion: number;
+
   constructor(roomCode: string, expectedVersion: number, actualVersion: number) {
     super(
       "ERR_CONFLICT",
@@ -209,5 +214,12 @@ export class OptimisticLockConflictError extends AppError {
       409,
       { roomCode, expectedVersion, actualVersion },
     );
+    this.name = "OptimisticLockConflictError";
+    this.roomCode = roomCode;
+    this.expectedVersion = expectedVersion;
+    this.actualVersion = actualVersion;
+
+    Object.setPrototypeOf(this, OptimisticLockConflictError.prototype);
   }
 }
+

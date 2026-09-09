@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import net from "node:net";
 
 export interface SocketLikeWithHandshake {
   handshake?: {
@@ -15,6 +16,7 @@ export interface SocketLikeWithHandshake {
  * - Strips IPv4-mapped IPv6 prefix `::ffff:` (ENH-001)
  * - Normalizes `::1` or localhost fallbacks
  * - Trims whitespace
+ * - Validates IP syntax via net.isIP() (MIN-002)
  */
 export function normalizeIp(rawIp: string | undefined): string {
   if (!rawIp || typeof rawIp !== "string") return "127.0.0.1";
@@ -22,7 +24,11 @@ export function normalizeIp(rawIp: string | undefined): string {
   if (trimmed.startsWith("::ffff:")) {
     trimmed = trimmed.slice(7);
   }
-  return trimmed || "127.0.0.1";
+  if (!trimmed) return "127.0.0.1";
+  if (net.isIP(trimmed) === 0) {
+    return "127.0.0.1";
+  }
+  return trimmed;
 }
 
 /**

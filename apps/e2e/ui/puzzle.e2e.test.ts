@@ -2,6 +2,16 @@ import { test, expect } from '@playwright/test';
 import { LobbyPage, PuzzlesPage } from '../src/index.js';
 
 test.describe('Tactical Puzzle Hub Journey', () => {
+  test.beforeEach(async ({ page }) => {
+    // Suppress PWA install banner from intercepting pointer interactions
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        'fun_chess_pwa_install_snoozed_until',
+        String(Date.now() + 86400000),
+      );
+    });
+  });
+
   test('navigates to Puzzle Hub, browses tactical themes including phantom motifs, opens primer modal, executes checkmate, and interacts with docked inspect bar', async ({ page }) => {
     const lobbyPage = new LobbyPage(page);
     const puzzlesPage = new PuzzlesPage(page);
@@ -161,9 +171,19 @@ test.describe('Tactical Puzzle Hub Journey', () => {
     await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(0);
 
     // 6. Trigger strikes through the active rush runner
+    interface PuzzleRushElement extends Element {
+      __vueParentComponent?: {
+        setupState?: {
+          rush?: {
+            handleStrike?: () => void;
+          };
+        };
+      };
+    }
+
     // Incur Strike 1
     await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as any;
+      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
       if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
         arena.__vueParentComponent.setupState.rush.handleStrike();
       }
@@ -172,7 +192,7 @@ test.describe('Tactical Puzzle Hub Journey', () => {
 
     // Incur Strike 2
     await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as any;
+      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
       if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
         arena.__vueParentComponent.setupState.rush.handleStrike();
       }
@@ -181,7 +201,7 @@ test.describe('Tactical Puzzle Hub Journey', () => {
 
     // Incur Strike 3 (Triggers Game Over!)
     await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as any;
+      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
       if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
         arena.__vueParentComponent.setupState.rush.handleStrike();
       }

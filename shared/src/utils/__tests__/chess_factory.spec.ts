@@ -281,6 +281,40 @@ describe("Safe Chess Factory & FEN Validator", () => {
       expect(result).toBe(false);
       expect(resetSpy).toHaveBeenCalled();
     });
+
+    it("logs error via logger.error when chess.reset() also throws in safeLoadFen restore fallback (ENH-011)", () => {
+      const chess = new Chess();
+      const mockLogger: ChessLogger = {
+        warn: vi.fn(),
+        error: vi.fn(),
+      };
+
+      vi.spyOn(chess, "load").mockImplementation(() => {
+        throw new Error("Load failed");
+      });
+      vi.spyOn(chess, "reset").mockImplementation(() => {
+        throw new Error("Reset crashed");
+      });
+
+      const validFen = "8/5k2/8/8/8/8/4K3/8 w - - 0 1";
+      const result = safeLoadFen(chess, validFen, mockLogger);
+
+      expect(result).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[safeLoadFen] Failed to restore previous FEN"),
+        expect.objectContaining({
+          operation: "safe_load_fen_restore_previous",
+          error: "Load failed",
+        }),
+      );
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("[safeLoadFen] Failed to reset chess instance after load failure"),
+        expect.objectContaining({
+          operation: "safe_load_fen_reset_fallback",
+          error: "Reset crashed",
+        }),
+      );
+    });
   });
 
   describe("DEFAULT_CHESS_LOGGER & SILENT_CHESS_LOGGER (MIN-004)", () => {

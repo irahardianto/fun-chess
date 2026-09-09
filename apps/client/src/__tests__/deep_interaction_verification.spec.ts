@@ -176,7 +176,7 @@ describe('Deep Interaction & State Machine Verification', () => {
       const store = new LocalStorageProgressStore('__test_scenario_progress__');
       await store.resetAllProgress();
 
-      let initialMap = await store.getProgressMap();
+      const initialMap = await store.getProgressMap();
       expect(Object.keys(initialMap).length).toBe(0);
 
       // Save progress with 2 stars and 1 hint

@@ -54,18 +54,28 @@ describe("wrapSocketHandler", () => {
 
     const wrapped = wrapSocketHandler(logger, "test:fail", "sock_1", handler);
 
-    let callbackResult: any;
+    let callbackResult:
+      | {
+          success?: boolean;
+          error?: {
+            code?: string;
+            message?: string;
+            correlationId?: string;
+            details?: Record<string, unknown>;
+          };
+        }
+      | undefined;
     const result = await wrapped({}, (res) => {
-      callbackResult = res;
+      callbackResult = res as typeof callbackResult;
     });
 
     expect(result).toBeUndefined();
     expect(callbackResult).toBeDefined();
-    expect(callbackResult.success).toBe(false);
-    expect(callbackResult.error.code).toBe("ERR_INVALID_MOVE");
-    expect(callbackResult.error.message).toBe("Test move error");
-    expect(callbackResult.error.correlationId).toBeDefined();
-    expect(callbackResult.error.details).toEqual({ square: "e4" });
+    expect(callbackResult?.success).toBe(false);
+    expect(callbackResult?.error?.code).toBe("ERR_INVALID_MOVE");
+    expect(callbackResult?.error?.message).toBe("Test move error");
+    expect(callbackResult?.error?.correlationId).toBeDefined();
+    expect(callbackResult?.error?.details).toEqual({ square: "e4" });
 
     expect(logger.warnLogs).toHaveLength(1);
     expect(logger.warnLogs[0]?.message).toBe("Operation rejected");
@@ -80,15 +90,23 @@ describe("wrapSocketHandler", () => {
 
     const wrapped = wrapSocketHandler(logger, "test:crash", "sock_1", handler);
 
-    let callbackResult: any;
+    let callbackResult:
+      | {
+          success?: boolean;
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        }
+      | undefined;
     await wrapped({}, (res) => {
-      callbackResult = res;
+      callbackResult = res as typeof callbackResult;
     });
 
     expect(callbackResult).toBeDefined();
-    expect(callbackResult.success).toBe(false);
-    expect(callbackResult.error.code).toBe("ERR_INTERNAL_SERVER");
-    expect(callbackResult.error.message).toBe("An internal server error occurred");
+    expect(callbackResult?.success).toBe(false);
+    expect(callbackResult?.error?.code).toBe("ERR_INTERNAL_SERVER");
+    expect(callbackResult?.error?.message).toBe("An internal server error occurred");
 
     expect(logger.errorLogs).toHaveLength(1);
     expect(logger.errorLogs[0]?.message).toBe("Operation failed");
@@ -103,19 +121,19 @@ describe("wrapSocketHandler", () => {
     };
 
     let emittedEvent = "";
-    let emittedPayload: any;
+    let emittedPayload: { code?: string; message?: string } | undefined;
     const mockSocket = {
       id: "sock_test",
-      emit: (event: string, payload: any) => {
+      emit: (event: string, payload: unknown) => {
         emittedEvent = event;
-        emittedPayload = payload;
+        emittedPayload = payload as typeof emittedPayload;
       },
     };
 
     const wrapped = wrapSocketHandler(
       logger,
       "test:unacked",
-      mockSocket as any,
+      mockSocket as unknown as Parameters<typeof wrapSocketHandler>[2],
       handler,
     );
 
@@ -124,13 +142,13 @@ describe("wrapSocketHandler", () => {
 
     expect(emittedEvent).toBe("error");
     expect(emittedPayload).toBeDefined();
-    expect(emittedPayload.code).toBe("ERR_INVALID_MOVE");
-    expect(emittedPayload.message).toBe("Test move error");
+    expect(emittedPayload?.code).toBe("ERR_INVALID_MOVE");
+    expect(emittedPayload?.message).toBe("Test move error");
   });
 
   it("completes redaction rules for sessionToken, password, token, secret, authorization, cookie, key (MIN-012)", async () => {
     const logger = new NullLogger();
-    const handler = async (req: any) => {
+    const handler = async (_req: unknown) => {
       return { success: true };
     };
 
@@ -204,22 +222,22 @@ describe("wrapSocketHandler", () => {
   });
 
   it("handles circular object references without crashing and replaces with [CIRCULAR] (MIN-040)", () => {
-    const circularObj: any = {
+    const circularObj: Record<string, unknown> = {
       name: "test-node",
       data: {
         val: 123,
       },
     };
-    circularObj.self = circularObj;
-    circularObj.data.parent = circularObj;
+    circularObj["self"] = circularObj;
+    (circularObj["data"] as Record<string, unknown>)["parent"] = circularObj;
 
-    const sanitized = sanitizePayload(circularObj);
+    const sanitized = sanitizePayload(circularObj) as Record<string, unknown>;
 
     expect(sanitized).toBeDefined();
-    expect(sanitized.name).toBe("test-node");
-    expect(sanitized.self).toBe("[CIRCULAR]");
-    expect(sanitized.data.val).toBe(123);
-    expect(sanitized.data.parent).toBe("[CIRCULAR]");
+    expect(sanitized["name"]).toBe("test-node");
+    expect(sanitized["self"]).toBe("[CIRCULAR]");
+    expect((sanitized["data"] as Record<string, unknown>)["val"]).toBe(123);
+    expect((sanitized["data"] as Record<string, unknown>)["parent"]).toBe("[CIRCULAR]");
   });
 
   it("handles rate limit drops with structured logger.warn and ERR_RATE_LIMITED (CRIT-001)", async () => {
@@ -247,23 +265,23 @@ describe("wrapSocketHandler", () => {
     const wrapped = wrapSocketHandler(
       logger,
       "room:create",
-      mockSocket as any,
+      mockSocket as unknown as Parameters<typeof wrapSocketHandler>[2],
       { rateLimiter },
       handler,
     );
 
     // First two succeed
-    let cb1: any;
-    await wrapped({}, (res) => (cb1 = res));
+    let cb1: { success?: boolean; error?: { code?: string } } | undefined;
+    await wrapped({}, (res) => (cb1 = res as typeof cb1));
     expect(cb1?.success).toBe(true);
 
-    let cb2: any;
-    await wrapped({}, (res) => (cb2 = res));
+    let cb2: { success?: boolean; error?: { code?: string } } | undefined;
+    await wrapped({}, (res) => (cb2 = res as typeof cb2));
     expect(cb2?.success).toBe(true);
 
     // Third request exceeded
-    let cb3: any;
-    await wrapped({}, (res) => (cb3 = res));
+    let cb3: { success?: boolean; error?: { code?: string } } | undefined;
+    await wrapped({}, (res) => (cb3 = res as typeof cb3));
     expect(cb3?.success).toBe(false);
     expect(cb3?.error?.code).toBe("ERR_RATE_LIMITED");
 
@@ -297,13 +315,13 @@ describe("wrapSocketHandler", () => {
     const wrapped = wrapSocketHandler(
       logger,
       "room:join",
-      mockSocket as any,
+      mockSocket as unknown as Parameters<typeof wrapSocketHandler>[2],
       { trustProxy: true },
       handler,
     );
 
-    let cb: any;
-    await wrapped({}, (res) => (cb = res));
+    let cb: { success?: boolean; error?: { code?: string } } | undefined;
+    await wrapped({}, (res) => (cb = res as typeof cb));
     expect(cb?.success).toBe(false);
     expect(cb?.error?.code).toBe("ERR_RATE_LIMITED");
 
@@ -315,4 +333,28 @@ describe("wrapSocketHandler", () => {
     expect(rateLimitWarn?.context?.["socketId"]).toBe("sock_thrown_limit");
     expect(rateLimitWarn?.context?.["correlationId"]).toBeDefined();
   });
+
+  it("omits payload from info-level start log when logPayload is false (ENH-007)", async () => {
+    const logger = new NullLogger();
+    const handler = async () => ({ success: true });
+    const wrapped = wrapSocketHandler(
+      logger,
+      "test:quiet_event",
+      "sock_quiet",
+      { logPayload: false },
+      handler,
+    );
+
+    await wrapped({ largePayload: "data_here" });
+
+    const startLog = logger.infoLogs.find((l) => l.context?.["operation"] === "test:quiet_event");
+    expect(startLog).toBeDefined();
+    expect(startLog?.context?.["payload"]).toBeUndefined();
+
+    // Payload should still be present in debug log
+    const debugLog = logger.debugLogs.find((l) => l.context?.["operation"] === "test:quiet_event");
+    expect(debugLog).toBeDefined();
+    expect(debugLog?.context?.["payload"]).toEqual({ largePayload: "data_here" });
+  });
 });
+

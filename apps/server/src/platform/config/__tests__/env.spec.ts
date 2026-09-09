@@ -43,7 +43,7 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
     it("returns undefined for invalid or empty inputs without throwing", () => {
       expect(safeParseUrl("")).toBeUndefined();
       expect(safeParseUrl("   ")).toBeUndefined();
-      expect(safeParseUrl(undefined as any)).toBeUndefined();
+      expect(safeParseUrl(undefined as unknown as string)).toBeUndefined();
       expect(safeParseUrl("http://:invalid")).toBeUndefined();
     });
   });
@@ -59,6 +59,7 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       expect(config.CORS_ORIGIN).toBeUndefined();
       expect(config.PUBLIC_URL).toBeUndefined();
       expect(config.TRUST_PROXY).toBe(false);
+      expect(config.RATE_LIMIT_ROOM_CREATE_MAX).toBe(3);
     });
 
     it("parses TRUST_PROXY truthy and falsy values", () => {
@@ -111,6 +112,7 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
         RATE_LIMIT_WINDOW_MS: "15000",
         RATE_LIMIT_MAX_REQUESTS: "10",
         RATE_LIMIT_MAX_KEYS: "25000",
+        RATE_LIMIT_ROOM_CREATE_MAX: "5",
       });
 
       expect(config.CLIENT_URL).toBe("https://chess.fun.app");
@@ -118,6 +120,19 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       expect(config.RATE_LIMIT_WINDOW_MS).toBe(15000);
       expect(config.RATE_LIMIT_MAX_REQUESTS).toBe(10);
       expect(config.RATE_LIMIT_MAX_KEYS).toBe(25000);
+      expect(config.RATE_LIMIT_ROOM_CREATE_MAX).toBe(5);
+    });
+
+    it("parses and validates RATE_LIMIT_ROOM_CREATE_MAX", () => {
+      expect(loadServerConfig({}).RATE_LIMIT_ROOM_CREATE_MAX).toBe(3);
+      expect(loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: "" }).RATE_LIMIT_ROOM_CREATE_MAX).toBe(3);
+      expect(loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: "7" }).RATE_LIMIT_ROOM_CREATE_MAX).toBe(7);
+      expect(loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: 12 }).RATE_LIMIT_ROOM_CREATE_MAX).toBe(12);
+
+      expect(() => loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: "0" })).toThrow();
+      expect(() => loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: "-1" })).toThrow();
+      expect(() => loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: "3.14" })).toThrow();
+      expect(() => loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: "invalid" })).toThrow();
     });
 
     it("validateServerConfig validates and returns configuration identically to loadServerConfig", () => {
@@ -307,6 +322,23 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
 
       const origins = resolveAllowedOrigins(env);
       expect(origins).toEqual(["http://localhost:5173"]);
+    });
+
+    it("merges origins from both CLIENT_URL and PUBLIC_URL without duplicates (MIN-001)", () => {
+      const env: ServerEnv = {
+        NODE_ENV: "development",
+        PORT: 3000,
+        HOST: "0.0.0.0",
+        LOG_LEVEL: "info",
+        CLIENT_URL: "https://app.fun-chess.io",
+        PUBLIC_URL: "https://api.fun-chess.io",
+      };
+
+      const origins = resolveAllowedOrigins(env);
+      expect(origins).toEqual([
+        "https://app.fun-chess.io",
+        "https://api.fun-chess.io",
+      ]);
     });
 
     it("strictly relies on passed env and does not fallback to process.env (ENH-003)", () => {

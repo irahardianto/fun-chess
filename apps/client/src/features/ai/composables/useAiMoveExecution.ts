@@ -1,14 +1,16 @@
-import { ref, type Ref } from 'vue';
+import { ref, getCurrentInstance, type Ref } from 'vue';
 import type {
   Square,
   PieceColor,
   PieceType,
+  PromotionPiece,
   MascotPersona,
   GameOverPayload,
   MoveResult,
 } from '@fun-chess/shared';
 import type { Move } from 'chess.js';
-import { logger } from '@/platform/telemetry/index.js';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry/index.js';
 import type { UseAiBoardStateReturn } from './useAiBoardState.js';
 import type { useAiWorker } from './useAiWorker.js';
 import type { useTakebackHistory } from './useTakebackHistory.js';
@@ -41,6 +43,7 @@ export interface UseAiMoveExecutionOptions {
   onGameCompletion?: (event: GameCompletionOutcomeEvent) => void;
   onClearSelection?: () => void;
   onClearHint?: () => void;
+  logger?: ILogger;
 }
 
 /**
@@ -49,6 +52,7 @@ export interface UseAiMoveExecutionOptions {
  * and resignation.
  */
 export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
+  const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   const {
     boardState,
     aiWorker,
@@ -148,7 +152,7 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
       piece: result.piece as PieceType,
       color: result.color as PieceColor,
       captured: result.captured as PieceType | undefined,
-      promotion: result.promotion as PieceType | undefined,
+      promotion: result.promotion as PromotionPiece | undefined,
       flags: result.flags,
       fen: chess.fen(),
       moveNumber: chess.history().length,
@@ -254,7 +258,7 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
         piece: result.piece as PieceType,
         color: result.color as PieceColor,
         captured: result.captured as PieceType | undefined,
-        promotion: result.promotion as PieceType | undefined,
+        promotion: result.promotion as PromotionPiece | undefined,
         flags: result.flags,
         fen: chess.fen(),
         moveNumber: chess.history().length,

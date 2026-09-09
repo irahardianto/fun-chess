@@ -20,12 +20,14 @@ import {
   createSocketRateLimiter,
   TypedSocketServer,
 } from "../../platform/socket/index.js";
-import { createFeatureSocketHandler } from "../common/socket_handler.utils.js";
+import { createFeatureSocketHandler } from "../../platform/socket/socket_handler.utils.js";
 import type { IGameService } from "./game.interface.js";
 import {
   type IDisconnectTimerRegistry,
   defaultDisconnectTimerRegistry,
 } from "../rooms/index.js";
+
+export const defaultSocketRateLimiter = createSocketRateLimiter();
 
 /**
  * Registers gameplay Socket.io event listeners.
@@ -35,7 +37,7 @@ export function registerGameSocketHandlers(
   socket: Socket,
   gameService: IGameService,
   logger: Logger,
-  rateLimiter: SocketRateLimiter = createSocketRateLimiter(),
+  rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
 ): void {
   // 1. game:move

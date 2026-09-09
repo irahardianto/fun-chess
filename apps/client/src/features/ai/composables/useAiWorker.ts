@@ -1,7 +1,8 @@
 import { ref, computed, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope } from 'vue';
 import type { MascotId, ChessAiEngine } from '@fun-chess/shared';
 import type { Move } from 'chess.js';
-import { logger, generateCorrelationId, type ILogger } from '@/platform/telemetry/index.js';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry/index.js';
 import { getAiConfigForMascot } from '../data/index.js';
 import { minimaxEngine } from '../engine/index.js';
 
@@ -19,7 +20,7 @@ export interface UseAiWorkerOptions {
  * isAiThinking state, blunder evaluation, 3-point structured logging, and operation cancellation.
  */
 export function useAiWorker(options: UseAiWorkerOptions = {}) {
-  const log = options.logger ?? logger;
+  const log = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   const engine = options.aiEngine ?? minimaxEngine;
   const isAiThinking = ref<boolean>(false);
   let activeOperationId = 0;
@@ -56,6 +57,11 @@ export function useAiWorker(options: UseAiWorkerOptions = {}) {
     clearThinkTimeout();
     isAiThinking.value = true;
 
+    log.info('Starting AI move calculation', {
+      operation: 'request_ai_move',
+      correlationId,
+      mascotId,
+    });
     log.debug('Starting AI move calculation', {
       operation: 'request_ai_move',
       correlationId,

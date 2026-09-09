@@ -11,3 +11,4 @@ export { default as MoveIndicator } from './MoveIndicator.vue';
 export * from './MoveIndicator.vue';
 
 export * from './composables/index.js';
+export * from './useChessBoard';

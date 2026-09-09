@@ -85,33 +85,35 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  'update:currentAppMode': [mode: AppGameMode]; 'update:currentMode': [mode: AppGameMode];
-  'mode-change': [mode: AppGameMode]; modeChange: [mode: AppGameMode];
+  'update:currentAppMode': [mode: AppGameMode];
+  'update:currentMode': [mode: AppGameMode];
+  'mode-change': [mode: AppGameMode];
   host: [payload: { playerName: string; preferredColor: 'w' | 'b' | 'random'; avatar?: string }];
   join: [payload: { roomCode: string; playerName: string; avatar?: string }];
   'create-room': [payload: { playerName: string; avatar: string; preferredColor: 'w' | 'b' | 'random' }];
-  createRoom: [payload: { playerName: string; avatar: string; preferredColor: 'w' | 'b' | 'random' }];
   'join-room': [payload: { roomCode: string; playerName: string; avatar: string }];
-  joinRoom: [payload: { roomCode: string; playerName: string; avatar: string }];
-  'start-solo-ai': [config: SoloAiLaunchConfig]; startSoloAi: [config: SoloAiLaunchConfig];
-  'select-scenario': [scenario: ChessScenario]; selectScenario: [scenario: ChessScenario];
-  'launch-drills': [theme?: PuzzleTheme]; launchDrills: [theme?: PuzzleTheme];
-  'launch-ladder': []; launchLadder: [];
-  'launch-rush': [subMode?: 'puzzle_rush' | 'streak_survivor']; launchRush: [subMode?: 'puzzle_rush' | 'streak_survivor'];
-  'open-sync': []; openSync: [];
-  'solo-ai-exit': []; 'exit-solo-ai': []; exit: [];
-  'solo-ai-change-opponent': []; 'change-opponent': [];
-  'academy-back': []; back: [];
-  'academy-next-lesson': [scenario: ChessScenario]; 'next-lesson': [scenario: ChessScenario];
-  'academy-completed': [stars: number]; completed: [stars: number];
-  'puzzle-back': []; 'puzzle-exit': []; 'puzzle-completed': [stars: number]; 'puzzle-rush-exit': [];
-  'select-square': [sq: Square]; selectSquare: [sq: Square];
+  'start-solo-ai': [config: SoloAiLaunchConfig];
+  'select-scenario': [scenario: ChessScenario];
+  'launch-drills': [theme?: PuzzleTheme];
+  'launch-ladder': [];
+  'launch-rush': [subMode?: 'puzzle_rush' | 'streak_survivor'];
+  'open-sync': [];
+  'solo-ai-exit': [];
+  'solo-ai-change-opponent': [];
+  'academy-back': [];
+  'academy-next-lesson': [scenario: ChessScenario];
+  'academy-completed': [stars: number];
+  'puzzle-back': [];
+  'puzzle-rush-exit': [];
+  'puzzle-completed': [stars: number];
+  'select-square': [sq: Square];
   'execute-move': [move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }];
-  executeMove: [move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }];
   'promotion-required': [payload: { from: Square; to: Square }];
-  promotionRequired: [payload: { from: Square; to: Square }];
-  'offer-draw': []; offerDraw: []; 'accept-draw': []; acceptDraw: [];
-  'decline-draw': []; declineDraw: []; resign: []; 'flip-board': []; flipBoard: [];
+  'offer-draw': [];
+  'accept-draw': [];
+  'decline-draw': [];
+  resign: [];
+  'flip-board': [];
   notify: [payload: { message: string; type: 'error' | 'info' | 'success'; durationMs?: number }];
 }>();
 
@@ -131,25 +133,25 @@ const resolvedPuzzleRushSubMode = computed<'puzzle_rush' | 'streak_survivor'>(()
   return 'puzzle_rush';
 });
 
-function handleModeChange(mode: AppGameMode) { emit('mode-change', mode); emit('modeChange', mode); }
+function handleModeChange(mode: AppGameMode) { emit('mode-change', mode); }
 function handleHost(payload: { playerName: string; preferredColor: 'w' | 'b' | 'random'; avatar?: string }) { emit('host', payload); }
 function handleJoin(payload: { roomCode: string; playerName: string; avatar?: string }) { emit('join', payload); }
-function handleCreateRoom(payload: { playerName: string; avatar: string; preferredColor: 'w' | 'b' | 'random' }) { emit('create-room', payload); emit('createRoom', payload); }
-function handleJoinRoom(payload: { roomCode: string; playerName: string; avatar: string }) { emit('join-room', payload); emit('joinRoom', payload); }
-function handleStartSoloAi(config: SoloAiLaunchConfig) { emit('start-solo-ai', config); emit('startSoloAi', config); }
-function handleSelectScenario(scenario: ChessScenario) { emit('select-scenario', scenario); emit('selectScenario', scenario); }
-function handleLaunchDrills(theme?: PuzzleTheme) { emit('launch-drills', theme); emit('launchDrills', theme); }
-function handleLaunchLadder() { emit('launch-ladder'); emit('launchLadder'); }
-function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') { emit('launch-rush', subMode); emit('launchRush', subMode); }
-function handleOpenSync() { emit('open-sync'); emit('openSync'); }
-function handleSoloAiExit() { emit('solo-ai-exit'); emit('exit-solo-ai'); emit('exit'); }
-function handleSoloAiChangeOpponent() { emit('solo-ai-change-opponent'); emit('change-opponent'); }
-function handleAcademyBack() { emit('academy-back'); emit('back'); }
-function handleAcademyNextLesson(scenario: ChessScenario) { emit('academy-next-lesson', scenario); emit('next-lesson', scenario); }
-function handleAcademyCompleted(stars: number) { emit('academy-completed', stars); emit('completed', stars); }
-function handlePuzzleBack() { emit('puzzle-back'); emit('puzzle-exit'); emit('back'); emit('exit'); }
-function handlePuzzleRushExit() { emit('puzzle-rush-exit'); emit('exit'); }
-function handlePuzzleCompleted(stars: number) { emit('puzzle-completed', stars); emit('completed', stars); emit('academy-completed', stars); }
+function handleCreateRoom(payload: { playerName: string; avatar: string; preferredColor: 'w' | 'b' | 'random' }) { emit('create-room', payload); }
+function handleJoinRoom(payload: { roomCode: string; playerName: string; avatar: string }) { emit('join-room', payload); }
+function handleStartSoloAi(config: SoloAiLaunchConfig) { emit('start-solo-ai', config); }
+function handleSelectScenario(scenario: ChessScenario) { emit('select-scenario', scenario); }
+function handleLaunchDrills(theme?: PuzzleTheme) { emit('launch-drills', theme); }
+function handleLaunchLadder() { emit('launch-ladder'); }
+function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') { emit('launch-rush', subMode); }
+function handleOpenSync() { emit('open-sync'); }
+function handleSoloAiExit() { emit('solo-ai-exit'); }
+function handleSoloAiChangeOpponent() { emit('solo-ai-change-opponent'); }
+function handleAcademyBack() { emit('academy-back'); }
+function handleAcademyNextLesson(scenario: ChessScenario) { emit('academy-next-lesson', scenario); }
+function handleAcademyCompleted(stars: number) { emit('academy-completed', stars); }
+function handlePuzzleBack() { emit('puzzle-back'); }
+function handlePuzzleRushExit() { emit('puzzle-rush-exit'); }
+function handlePuzzleCompleted(stars: number) { emit('puzzle-completed', stars); }
 function handleSelectSquare(sq: Square) { emit('select-square', sq); }
 function handleExecuteMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }) { emit('execute-move', move); }
 function handlePromotionRequired(payload: { from: Square; to: Square }) { emit('promotion-required', payload); }
@@ -250,16 +252,13 @@ function handleFlipBoard() { emit('flip-board'); }
       @host="handleHost"
       @join="handleJoin"
       @create-room="handleCreateRoom"
-      @createRoom="handleCreateRoom"
       @join-room="handleJoinRoom"
-      @joinRoom="handleJoinRoom"
       @start-solo-ai="handleStartSoloAi"
       @select-scenario="handleSelectScenario"
       @launch-drills="handleLaunchDrills"
       @launch-ladder="handleLaunchLadder"
       @launch-rush="handleLaunchRush"
       @open-sync="handleOpenSync"
-      @openSync="handleOpenSync"
     />
   </div>
 </template>

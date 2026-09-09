@@ -1,10 +1,21 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Browser, type BrowserContext } from '@playwright/test';
 import { LobbyPage, GamePage } from '../src/index.js';
+
+let clientIpCounter = 1;
+function newIsolatedContext(browser: Browser): Promise<BrowserContext> {
+  const ip = `10.42.${Math.floor(clientIpCounter / 250)}.${(clientIpCounter % 250) + 1}`;
+  clientIpCounter++;
+  return browser.newContext({
+    extraHTTPHeaders: {
+      'x-forwarded-for': ip,
+    },
+  });
+}
 
 test.describe('Multiplayer LAN / Online Journey', () => {
   test('creates room, joins via 4-character code, executes moves, and completes via resignation', async ({ browser }) => {
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -71,8 +82,8 @@ test.describe('Multiplayer LAN / Online Journey', () => {
   });
 
   test('executes complete Fool\'s Mate checkmate flow between Host and Guest', async ({ browser }) => {
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -139,8 +150,8 @@ test.describe('Multiplayer LAN / Online Journey', () => {
   });
 
   test('executes peaceful draw offer and acceptance flow', async ({ browser }) => {
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -199,8 +210,8 @@ test.describe('Multiplayer LAN / Online Journey', () => {
   });
 
   test('negotiates rematch flow with inverted colors and starts next match', async ({ browser }) => {
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -269,9 +280,9 @@ test.describe('Multiplayer LAN / Online Journey', () => {
   });
 
   test('enforces room capacity and prevents spectator/third-party disruption of active game', async ({ browser }) => {
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
-    const spectatorContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
+    const spectatorContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -323,8 +334,8 @@ test.describe('Multiplayer LAN / Online Journey', () => {
   });
 
   test('restores player session and active board state on network reconnect / page refresh', async ({ browser }) => {
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -379,8 +390,8 @@ test.describe('Multiplayer LAN / Online Journey', () => {
   });
 
   test('handles pawn promotion flow synchronized across Host and Guest', async ({ browser }) => {
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -462,8 +473,8 @@ test.describe('Multiplayer LAN / Online Journey', () => {
   });
 
   test('handles rematch decline flow with dialog dismissal and exit to lobby', async ({ browser }) => {
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -532,8 +543,8 @@ test.describe('Multiplayer LAN / Online Journey', () => {
   test('handles player disconnect with countdown banner and forfeiture on grace period expiry', async ({ browser }) => {
     test.setTimeout(90_000);
 
-    const hostContext = await browser.newContext();
-    const guestContext = await browser.newContext();
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
 
     const hostPage = await hostContext.newPage();
     const guestPage = await guestContext.newPage();
@@ -581,4 +592,111 @@ test.describe('Multiplayer LAN / Online Journey', () => {
       await hostContext.close();
     }
   });
+
+  test('rejects room join with invalid room code format and displays client-side validation error', async ({ browser }) => {
+    const guestContext = await newIsolatedContext(browser);
+    const guestPage = await guestContext.newPage();
+
+    try {
+      const guestLobby = new LobbyPage(guestPage);
+
+      // 1. Guest opens lobby
+      await guestLobby.goto();
+
+      // 2. Guest fills nickname and enters invalid 3-character room code
+      await guestLobby.joinGame('InvalidCodeGuest', 'ABC');
+
+      // 3. Asserts client-side error appears on join room code input
+      const codeInputError = guestPage.locator('[data-testid="join-room-code-input"] .base-input-error');
+      await expect(codeInputError).toBeVisible({ timeout: 5_000 });
+      await expect(codeInputError).toContainText('Room code must be 4 characters.');
+
+      // 4. Asserts no transition to arena occurs and user remains on lobby
+      await expect(guestPage.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 5_000 });
+      await expect(guestPage.locator('[data-testid="game-arena-container"]')).not.toBeVisible();
+    } finally {
+      await guestContext.close();
+    }
+  });
+
+  test('rejects room join with non-existent room code and displays error notification while remaining on lobby', async ({ browser }) => {
+    const guestContext = await newIsolatedContext(browser);
+    const guestPage = await guestContext.newPage();
+
+    try {
+      const guestLobby = new LobbyPage(guestPage);
+
+      // 1. Guest opens lobby
+      await guestLobby.goto();
+
+      // 2. Guest enters a non-existent 4-character room code and submits
+      await guestLobby.joinGame('GhostGuest', 'ZZZZ');
+
+      // 3. Asserts error notification banner appears
+      const errorBanner = guestPage.locator('[data-testid="app-notification-banner"].is-error');
+      await expect(errorBanner).toBeVisible({ timeout: 10_000 });
+      await expect(errorBanner).toContainText(/does not exist|Unable to join room/i);
+
+      // 4. Asserts user remains on lobby and can edit the code
+      await expect(guestPage.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 5_000 });
+      await expect(guestPage.locator('[data-testid="game-arena-container"]')).not.toBeVisible();
+      await expect(guestLobby.joinRoomCodeInput).toBeEnabled();
+      await guestLobby.joinRoomCodeInput.fill('YYYY');
+      await expect(guestLobby.joinRoomCodeInput).toHaveValue('YYYY');
+    } finally {
+      await guestContext.close();
+    }
+  });
+
+  test('rejects third player attempting to join full room with capacity error notification and remains on lobby', async ({ browser }) => {
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
+    const thirdContext = await newIsolatedContext(browser);
+
+    const hostPage = await hostContext.newPage();
+    const guestPage = await guestContext.newPage();
+    const thirdPage = await thirdContext.newPage();
+
+    try {
+      const hostLobby = new LobbyPage(hostPage);
+      const guestLobby = new LobbyPage(guestPage);
+      const hostGame = new GamePage(hostPage);
+      const guestGame = new GamePage(guestPage);
+      const thirdLobby = new LobbyPage(thirdPage);
+
+      // 1. Host creates a room (Player 1)
+      await hostLobby.goto();
+      await hostLobby.hostGame('PlayerOne', 'w');
+      const roomCode = await hostLobby.getRoomCode();
+
+      // 2. Guest joins room (Player 2), room enters playing/ready state
+      await guestLobby.goto();
+      await guestLobby.joinGame('PlayerTwo', roomCode);
+
+      await Promise.all([
+        hostGame.waitForArena(),
+        guestGame.waitForArena(),
+      ]);
+
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 15_000 });
+
+      // 3. Third player (Player 3) in a 3rd browser context opens lobby and attempts to join the same room code
+      await thirdLobby.goto();
+      await thirdLobby.joinGame('PlayerThree', roomCode);
+
+      // 4. Asserts Player 3 receives full room rejection error
+      const errorBanner = thirdPage.locator('[data-testid="app-notification-banner"].is-error');
+      await expect(errorBanner).toBeVisible({ timeout: 10_000 });
+      await expect(errorBanner).toContainText(/already has 2|full/i);
+
+      // 5. Asserts Player 3 remains on lobby and does not enter game arena
+      await expect(thirdPage.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 5_000 });
+      await expect(thirdPage.locator('[data-testid="game-arena-container"]')).not.toBeVisible();
+    } finally {
+      await hostContext.close();
+      await guestContext.close();
+      await thirdContext.close();
+    }
+  });
 });
+

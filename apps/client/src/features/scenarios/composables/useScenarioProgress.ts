@@ -1,4 +1,4 @@
-import { ref, computed, readonly } from 'vue';
+import { ref, computed, readonly, getCurrentInstance } from 'vue';
 import type {
   ScenarioProgress,
   ScenarioProgressMap,
@@ -8,10 +8,33 @@ import type {
 } from '@fun-chess/shared';
 import { defaultLocalStorageProgressStore } from '../store/local_storage_progress.store';
 import { ALL_SCENARIOS, CURRICULUM_SECTIONS } from '../data';
-import { logger } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
-export function useScenarioProgress(customStore?: ScenarioProgressStore) {
-  const store = customStore || defaultLocalStorageProgressStore;
+export interface UseScenarioProgressOptions {
+  store?: ScenarioProgressStore;
+  logger?: ILogger;
+}
+
+export function useScenarioProgress(
+  optionsOrStore?: ScenarioProgressStore | UseScenarioProgressOptions,
+  customLogger?: ILogger
+) {
+  let store: ScenarioProgressStore;
+  let loggerParam: ILogger | undefined;
+
+  if (optionsOrStore && 'getProgressMap' in optionsOrStore) {
+    store = optionsOrStore;
+    loggerParam = customLogger;
+  } else if (optionsOrStore) {
+    store = optionsOrStore.store || defaultLocalStorageProgressStore;
+    loggerParam = optionsOrStore.logger ?? customLogger;
+  } else {
+    store = defaultLocalStorageProgressStore;
+    loggerParam = customLogger;
+  }
+
+  const logger = loggerParam ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
 
   const progressMap = ref<ScenarioProgressMap>({});
   const isLoading = ref<boolean>(false);

@@ -17,7 +17,7 @@ export interface IRoomService {
   createRoom(
     req: CreateRoomRequest,
     socketId: string,
-  ): Promise<{ room: RoomState; sessionToken: string }>;
+  ): Promise<{ room: RoomState; player: Player; sessionToken: string }>;
 
   joinRoom(
     req: JoinRoomRequest,

@@ -1,4 +1,4 @@
-import { ref, computed, readonly, type Ref } from 'vue';
+import { ref, computed, readonly, getCurrentInstance, type Ref } from 'vue';
 import { Chess, type Move } from 'chess.js';
 import type {
   Puzzle,
@@ -8,7 +8,8 @@ import type {
 } from '@fun-chess/shared';
 import { createSafeChess } from '@fun-chess/shared';
 import { parseUciMove } from '../engine/puzzle_validator';
-import { logger } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
 export interface ReplayStep {
   readonly stepIndex: number;
@@ -34,6 +35,7 @@ export interface UsePuzzleReplayOptions {
     playPickup: () => void;
     playMove: () => void;
   };
+  logger?: ILogger;
 }
 
 /**
@@ -43,6 +45,7 @@ export interface UsePuzzleReplayOptions {
  * educational review once a puzzle is completed or during debriefs.
  */
 export function usePuzzleReplay(options: UsePuzzleReplayOptions = {}) {
+  const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   const isReplaying = ref<boolean>(false);
   const isInspectingBoard = ref<boolean>(false);
   const replayStepIndex = ref<number>(0);
@@ -85,7 +88,7 @@ export function usePuzzleReplay(options: UsePuzzleReplayOptions = {}) {
       const { from, to, promotion } = parseUciMove(uci);
       const actor: PieceColor = sim.turn();
 
-      let moveRes: Move | null = null;
+      let moveRes: Move | null;
       try {
         moveRes = sim.move({
           from: from as unknown as import('chess.js').Square,

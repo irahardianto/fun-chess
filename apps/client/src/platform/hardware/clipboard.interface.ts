@@ -63,8 +63,9 @@ export class BrowserClipboardService implements IClipboardService {
 
     // 2. Legacy fallback using temporary textarea and document.execCommand('copy')
     if (typeof document !== 'undefined') {
+      let textarea: HTMLTextAreaElement | null = null;
       try {
-        const textarea = document.createElement('textarea');
+        textarea = document.createElement('textarea');
         textarea.value = text;
         textarea.style.position = 'fixed';
         textarea.style.left = '-9999px';
@@ -75,7 +76,6 @@ export class BrowserClipboardService implements IClipboardService {
         textarea.setSelectionRange(0, text.length);
 
         const successful = document.execCommand('copy');
-        document.body.removeChild(textarea);
         return successful;
       } catch (err) {
         this.logger.warn('Legacy document.execCommand copy failed', {
@@ -83,6 +83,10 @@ export class BrowserClipboardService implements IClipboardService {
           error: err instanceof Error ? err.message : String(err),
         });
         return false;
+      } finally {
+        if (textarea && textarea.parentNode) {
+          textarea.parentNode.removeChild(textarea);
+        }
       }
     }
 

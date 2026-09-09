@@ -63,7 +63,12 @@ export class BrowserStorageAdapter implements KeyValueStorage {
     }
     try {
       return storage.getItem(key) ?? this.fallback.get(key) ?? null;
-    } catch {
+    } catch (err) {
+      logger.warn('Failed to read item from browser storage, using fallback cache', {
+        operation: 'browser_storage_get_item',
+        key,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return this.fallback.get(key) ?? null;
     }
   }
@@ -118,6 +123,13 @@ export class BrowserStorageAdapter implements KeyValueStorage {
             message: 'Storage quota exceeded while removing item.',
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
           });
+        } else {
+          logger.warn('Failed to remove item from browser storage', {
+            operation: 'browser_storage_remove_item',
+            storageType: this.storageType,
+            key,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     }
@@ -138,6 +150,12 @@ export class BrowserStorageAdapter implements KeyValueStorage {
             timestamp: Date.now(),
             message: 'Storage quota exceeded while clearing storage.',
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
+          });
+        } else {
+          logger.warn('Failed to clear browser storage', {
+            operation: 'browser_storage_clear',
+            storageType: this.storageType,
+            error: err instanceof Error ? err.message : String(err),
           });
         }
       }

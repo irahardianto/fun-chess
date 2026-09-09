@@ -35,28 +35,37 @@ export async function createConnectedSocketClient(
   return socket;
 }
 
-export function waitForEvent<T = any>(
+interface GenericSocketClient {
+  on(event: string, listener: (data: unknown) => void): void;
+  off(event: string, listener: (data: unknown) => void): void;
+  emit(event: string, payload: unknown, callback?: (res: unknown) => void): void;
+}
+
+export function waitForEvent<T = unknown>(
   socket: TypedSocketClient,
   event: keyof ServerToClientEvents | string,
   timeoutMs = 4000,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
+    const rawSocket = socket as unknown as GenericSocketClient;
+    const eventName = String(event);
+
+    const listener = (data: unknown) => {
+      clearTimeout(timer);
+      rawSocket.off(eventName, listener);
+      resolve(data as T);
+    };
+
     const timer = setTimeout(() => {
-      socket.off(event as any, listener);
+      rawSocket.off(eventName, listener);
       reject(
         new Error(
-          `Timed out waiting for event '${String(event)}' after ${timeoutMs}ms`,
+          `Timed out waiting for event '${eventName}' after ${timeoutMs}ms`,
         ),
       );
     }, timeoutMs);
 
-    const listener = (data: any) => {
-      clearTimeout(timer);
-      socket.off(event as any, listener);
-      resolve(data);
-    };
-
-    socket.on(event as any, listener);
+    rawSocket.on(eventName, listener);
   });
 }
 
@@ -66,22 +75,25 @@ export function expectNoEvent(
   durationMs = 300,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const listener = (data: any) => {
-      socket.off(event as any, listener);
+    const rawSocket = socket as unknown as GenericSocketClient;
+    const eventName = String(event);
+
+    const listener = (data: unknown) => {
+      rawSocket.off(eventName, listener);
       clearTimeout(timer);
       reject(
         new Error(
-          `Unexpected event '${String(event)}' received: ${JSON.stringify(data)}`,
+          `Unexpected event '${eventName}' received: ${JSON.stringify(data)}`,
         ),
       );
     };
 
     const timer = setTimeout(() => {
-      socket.off(event as any, listener);
+      rawSocket.off(eventName, listener);
       resolve();
     }, durationMs);
 
-    socket.on(event as any, listener);
+    rawSocket.on(eventName, listener);
   });
 }
 
@@ -92,17 +104,20 @@ export function emitAck<TReq, TRes>(
   timeoutMs = 4000,
 ): Promise<TRes> {
   return new Promise((resolve, reject) => {
+    const rawSocket = socket as unknown as GenericSocketClient;
+    const eventName = String(event);
+
     const timer = setTimeout(() => {
       reject(
         new Error(
-          `Timed out waiting for ack on '${String(event)}' after ${timeoutMs}ms`,
+          `Timed out waiting for ack on '${eventName}' after ${timeoutMs}ms`,
         ),
       );
     }, timeoutMs);
 
-    (socket.emit as any)(event, payload, (res: TRes) => {
+    rawSocket.emit(eventName, payload, (res: unknown) => {
       clearTimeout(timer);
-      resolve(res);
+      resolve(res as TRes);
     });
   });
 }

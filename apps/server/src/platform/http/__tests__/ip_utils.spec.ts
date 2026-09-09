@@ -23,6 +23,13 @@ describe("ip_utils", () => {
       expect(normalizeIp("127.0.0.1")).toBe("127.0.0.1");
       expect(normalizeIp("2001:db8::1")).toBe("2001:db8::1");
     });
+
+    it("falls back to 127.0.0.1 for invalid IP syntax via net.isIP (MIN-002)", () => {
+      expect(normalizeIp("invalid.ip.string")).toBe("127.0.0.1");
+      expect(normalizeIp("999.999.999.999")).toBe("127.0.0.1");
+      expect(normalizeIp("1.2.3.4.5")).toBe("127.0.0.1");
+      expect(normalizeIp("hello world")).toBe("127.0.0.1");
+    });
   });
 
   describe("extractClientIp", () => {

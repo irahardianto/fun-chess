@@ -1,26 +1,32 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
+import type { Socket } from "socket.io";
 import { createFeatureSocketHandler } from "../socket_handler.utils.js";
-import { SocketRateLimiter } from "../../../platform/socket/socket_rate_limiter.js";
-import type { Logger } from "../../../platform/logger/index.js";
+import { SocketRateLimiter } from "../socket_rate_limiter.js";
+import type { Logger } from "../../logger/index.js";
 
 describe("createFeatureSocketHandler", () => {
-  function createMockLogger(): Logger {
+  function createMockLogger(): Logger & { warnCalls: [string, Record<string, unknown>?][] } {
+    const warnCalls: [string, Record<string, unknown>?][] = [];
     return {
+      warnCalls,
       info: vi.fn(),
-      warn: vi.fn(),
+      warn: vi.fn((msg: string, meta?: Record<string, unknown>) => {
+        warnCalls.push([msg, meta]);
+      }),
       error: vi.fn(),
       debug: vi.fn(),
-    } as unknown as Logger;
+    } as unknown as Logger & { warnCalls: [string, Record<string, unknown>?][] };
   }
 
-  function createMockSocket(overrides: Record<string, unknown> = {}) {
+  function createMockSocket(overrides: Partial<Socket> = {}): Socket {
     return {
       id: "test_sock_1",
       handshake: { address: "127.0.0.1", headers: {} },
       emit: vi.fn(),
+      data: {},
       ...overrides,
-    } as any;
+    } as unknown as Socket;
   }
 
   it("handles successful request with schema validation and callback", async () => {
@@ -58,7 +64,7 @@ describe("createFeatureSocketHandler", () => {
     });
   });
 
-  it("validates schema and rejects invalid payload with ERR_VALIDATION_FAILED", async () => {
+  it("validates schema and rejects invalid payload with ERR_INVALID_PAYLOAD", async () => {
     const logger = createMockLogger();
     const socket = createMockSocket();
     const rateLimiter = new SocketRateLimiter({ maxRequests: 10, windowMs: 1000 });
@@ -126,12 +132,11 @@ describe("createFeatureSocketHandler", () => {
     );
 
     // Assert that logger.warn was called exactly once for the rate limit event (no duplicate logs)
-    const warnCalls = (logger.warn as any).mock.calls;
-    const rateLimitWarns = warnCalls.filter((call: any[]) =>
-      call[0]?.includes("Rate limit exceeded"),
+    const rateLimitWarns = logger.warnCalls.filter((call) =>
+      call[0]?.includes("Operation rate limit exceeded"),
     );
     expect(rateLimitWarns.length).toBe(1);
-    expect(rateLimitWarns[0][0]).toBe("Rate limit exceeded for room:create");
+    expect(rateLimitWarns[0][0]).toBe("Operation rate limit exceeded");
   });
 
   it("customizes message for socket.emit on rate limit", async () => {

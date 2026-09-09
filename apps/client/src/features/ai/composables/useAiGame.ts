@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref, computed, getCurrentInstance } from 'vue';
 import type {
   Square,
   PieceColor,
@@ -7,7 +7,8 @@ import type {
   HintRecommendation,
 } from '@fun-chess/shared';
 import { safeLoadFen } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry/index.js';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry/index.js';
 import { getMascotPersona } from '../data/index.js';
 import { hintEngine } from '../engine/index.js';
 import { useMascotBanter } from './useMascotBanter.js';
@@ -30,6 +31,7 @@ export interface UseAiGameOptions {
   autoStart?: boolean;
   onMoveOutcome?: (event: MoveOutcomeEvent) => void;
   onGameCompletion?: (event: GameCompletionOutcomeEvent) => void;
+  logger?: ILogger;
 }
 
 /**
@@ -38,6 +40,7 @@ export interface UseAiGameOptions {
  * board selection state machine, board state, move execution, and mascot dialogue banter.
  */
 export function useAiGame(options: UseAiGameOptions = {}) {
+  const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   const {
     mascotId: initialMascotId = 'peanut',
     playerColor: initialPlayerColor = 'w',
@@ -65,7 +68,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
   } = boardState;
 
   // 3. Sub-composable: AI Worker Execution (MAJ-041)
-  const aiWorker = useAiWorker();
+  const aiWorker = useAiWorker({ logger });
   const { isAiThinking, cancelCalculation } = aiWorker;
 
   // 4. Sub-composable: Move History & Takeback Stack (MAJ-041)
@@ -102,6 +105,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     onClearHint: () => {
       activeHint.value = null;
     },
+    logger,
   });
 
   // 7. Unified Board Selection State Machine (MIN-010 via useBoardSelection)
@@ -124,14 +128,33 @@ export function useAiGame(options: UseAiGameOptions = {}) {
    * Instant unlimited takeback / undo.
    * Reverts board state back to before the player's last move.
    */
-  function takeback(): boolean {
+  function handleTakeback(): boolean {
     if (takebackStack.value.length === 0) return false;
+
+    const correlationId = generateCorrelationId();
+    const startTime = performance.now();
+
+    logger.info('Starting takeback', {
+      operation: 'takeback',
+      correlationId,
+    });
 
     // Abort pending AI search
     cancelCalculation();
 
     const snapshot = history.popSnapshot();
-    if (!snapshot) return false;
+    if (!snapshot) {
+      const durationMs = Math.round(performance.now() - startTime);
+      logger.error('Takeback failed', {
+        operation: 'takeback',
+        correlationId,
+        status: 'failed',
+        duration: durationMs,
+        durationMs,
+        error: 'No takeback snapshot available',
+      });
+      return false;
+    }
 
     try {
       safeLoadFen(chess, snapshot.fen);
@@ -144,15 +167,31 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       boardState.lastGameOver.value = null;
 
       banter.triggerBanter('takeback_used');
+
+      const durationMs = Math.round(performance.now() - startTime);
+      logger.info('Takeback completed successfully', {
+        operation: 'takeback',
+        correlationId,
+        status: 'success',
+        duration: durationMs,
+        durationMs,
+      });
       return true;
     } catch (err) {
-      logger.warn('Takeback failed', {
+      const durationMs = Math.round(performance.now() - startTime);
+      logger.error('Takeback failed', {
         operation: 'takeback',
+        correlationId,
+        status: 'failed',
+        duration: durationMs,
+        durationMs,
         error: err instanceof Error ? err.message : String(err),
       });
       return false;
     }
   }
+
+  const takeback = handleTakeback;
 
   /**
    * Computes a smart contextual hint with highlighted squares and explanation.
@@ -162,6 +201,14 @@ export function useAiGame(options: UseAiGameOptions = {}) {
       return null;
     }
 
+    const correlationId = generateCorrelationId();
+    const startTime = performance.now();
+
+    logger.info('Starting askForHint', {
+      operation: 'ask_for_hint',
+      correlationId,
+    });
+
     try {
       const hint = await hintEngine.calculateHint(chess.fen(), playerColor.value);
       if (hint) {
@@ -169,10 +216,24 @@ export function useAiGame(options: UseAiGameOptions = {}) {
         hintsCount.value++;
         banter.triggerBanter('hint_requested', hint.explanation);
       }
+
+      const durationMs = Math.round(performance.now() - startTime);
+      logger.info('askForHint completed successfully', {
+        operation: 'ask_for_hint',
+        correlationId,
+        status: 'success',
+        duration: durationMs,
+        durationMs,
+      });
       return hint;
     } catch (err) {
-      logger.warn('askForHint failed', {
+      const durationMs = Math.round(performance.now() - startTime);
+      logger.error('askForHint failed', {
         operation: 'ask_for_hint',
+        correlationId,
+        status: 'failed',
+        duration: durationMs,
+        durationMs,
         error: err instanceof Error ? err.message : String(err),
       });
       return null;

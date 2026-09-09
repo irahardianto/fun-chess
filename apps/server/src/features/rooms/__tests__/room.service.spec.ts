@@ -11,7 +11,8 @@ import {
   InvalidPayloadError,
 } from "../room.errors.js";
 import { DisconnectTimerRegistry } from "../disconnect_timer_registry.js";
-import { IClock, IIdGenerator } from "../clock.js";
+import { NullLogger } from "../../../platform/logger/null_logger.js";
+import type { IClock, IIdGenerator } from "@fun-chess/shared";
 import {
   createInitialGameState,
   createGameOverPayload,
@@ -46,8 +47,12 @@ describe("RoomService", () => {
 
       // Invariant: sessionToken returned in result, NEVER stored on Player in room
       expect(sessionToken).toBeDefined();
-      expect((room.whitePlayer as any)?.sessionToken).toBeUndefined();
-      expect((room.blackPlayer as any)?.sessionToken).toBeUndefined();
+      expect(
+        (room.whitePlayer as unknown as Record<string, unknown>)?.sessionToken,
+      ).toBeUndefined();
+      expect(
+        (room.blackPlayer as unknown as Record<string, unknown>)?.sessionToken,
+      ).toBeUndefined();
 
       // Invariant: session registered in SessionRegistry
       const session = await sessionRegistry.validateSession(
@@ -69,7 +74,9 @@ describe("RoomService", () => {
 
       expect(room.blackPlayer?.name).toBe("Maya");
       expect(room.whitePlayer).toBeNull();
-      expect((room.blackPlayer as any)?.sessionToken).toBeUndefined();
+      expect(
+        (room.blackPlayer as unknown as Record<string, unknown>)?.sessionToken,
+      ).toBeUndefined();
       expect(sessionToken).toBeDefined();
     });
 
@@ -123,9 +130,17 @@ describe("RoomService", () => {
 
       // Invariant: sessionToken returned in result, NOT on Player model
       expect(sessionToken).toBeDefined();
-      expect((player as any)?.sessionToken).toBeUndefined();
-      expect((joined.blackPlayer as any)?.sessionToken).toBeUndefined();
-      expect((joined.whitePlayer as any)?.sessionToken).toBeUndefined();
+      expect(
+        (player as unknown as Record<string, unknown>)?.sessionToken,
+      ).toBeUndefined();
+      expect(
+        (joined.blackPlayer as unknown as Record<string, unknown>)
+          ?.sessionToken,
+      ).toBeUndefined();
+      expect(
+        (joined.whitePlayer as unknown as Record<string, unknown>)
+          ?.sessionToken,
+      ).toBeUndefined();
 
       // Invariant: session registered in SessionRegistry
       const session = await sessionRegistry.validateSession(
@@ -281,21 +296,33 @@ describe("RoomService", () => {
     it("rejects reconnect with missing roomCode, playerId, or sessionToken", async () => {
       await expect(
         service.reconnect(
-          { roomCode: "", playerId: "p1", sessionToken: "token" } as any,
+          {
+            roomCode: "",
+            playerId: "p1",
+            sessionToken: "token",
+          } as unknown as ReconnectRequest,
           "sock_new",
         ),
       ).rejects.toThrow(InvalidPayloadError);
 
       await expect(
         service.reconnect(
-          { roomCode: "ABCD", playerId: "", sessionToken: "token" } as any,
+          {
+            roomCode: "ABCD",
+            playerId: "",
+            sessionToken: "token",
+          } as unknown as ReconnectRequest,
           "sock_new",
         ),
       ).rejects.toThrow(InvalidPayloadError);
 
       await expect(
         service.reconnect(
-          { roomCode: "ABCD", playerId: "p1", sessionToken: "" } as any,
+          {
+            roomCode: "ABCD",
+            playerId: "p1",
+            sessionToken: "",
+          } as unknown as ReconnectRequest,
           "sock_new",
         ),
       ).rejects.toThrow(InvalidPayloadError);
@@ -517,7 +544,11 @@ describe("RoomService", () => {
       ).not.toBeNull();
 
       // Fast forward expiry: set session expiresAt to past
-      const sessionRecord = (sessionRegistry as any).sessions.get(sessionToken);
+      const sessionRecord = (
+        sessionRegistry as unknown as {
+          sessions: Map<string, { expiresAt: number }>;
+        }
+      ).sessions.get(sessionToken);
       if (sessionRecord) {
         sessionRecord.expiresAt = Date.now() - 1000;
       }
@@ -542,7 +573,7 @@ describe("RoomService", () => {
         { playerName: "WhiteHost", preferredColor: "w" },
         "sock_w",
       );
-      const { player: blackPlayer } = await service.joinRoom(
+      const { player: _blackPlayer } = await service.joinRoom(
         { roomCode: created.roomCode, playerName: "BlackJoiner" },
         "sock_b",
       );
@@ -638,7 +669,7 @@ describe("RoomService", () => {
         { playerName: "WhiteHost", preferredColor: "w" },
         "sock_w",
       );
-      const { player: blackPlayer } = await service.joinRoom(
+      const { player: _blackPlayer } = await service.joinRoom(
         { roomCode: created.roomCode, playerName: "BlackJoiner" },
         "sock_b",
       );
@@ -748,14 +779,14 @@ describe("RoomService", () => {
 
     it("retries room code generation upon collision and succeeds with unique code (MAJ-033)", async () => {
       // Seed store with existing room 'AAAA'
-      const existingRoom: any = {
+      const existingRoom: RoomState = {
         roomCode: "AAAA",
         version: 1,
         status: "lobby",
         hostId: "h1",
         createdAt: 1000,
         lastActivityAt: 1000,
-        game: {} as any,
+        game: createInitialGameState(1000),
         rematch: null,
         drawOffer: null,
         whitePlayer: null,
@@ -794,14 +825,14 @@ describe("RoomService", () => {
 
     it("falls back to timestamp-based room code if collision persists 100 times (MAJ-033)", async () => {
       // Seed store with room 'AAAA'
-      const existingRoom: any = {
+      const existingRoom: RoomState = {
         roomCode: "AAAA",
         version: 1,
         status: "lobby",
         hostId: "h1",
         createdAt: 1000,
         lastActivityAt: 1000,
-        game: {} as any,
+        game: createInitialGameState(1000),
         rematch: null,
         drawOffer: null,
         whitePlayer: null,
@@ -1095,6 +1126,135 @@ describe("RoomService", () => {
       expect(accepted.status).toBe("playing");
       expect(accepted.whitePlayer?.id).toBe(blackPlayer.id);
       expect(accepted.blackPlayer?.id).toBe(created.hostId);
+    });
+  });
+
+  describe("SC-4 Reliability, Observability & Concurrency Enhancements", () => {
+    it("returns player alongside room and sessionToken from createRoom (MIN-024)", async () => {
+      const result = await service.createRoom(
+        { playerName: "Magnus", preferredColor: "w" },
+        "sock_magnus",
+      );
+
+      expect(result.player).toBeDefined();
+      expect(result.player.id).toBe(result.room.hostId);
+      expect(result.player.name).toBe("Magnus");
+      expect(result.player.isHost).toBe(true);
+      expect(result.player.socketId).toBe("sock_magnus");
+      expect(result.sessionToken).toBeDefined();
+    });
+
+    it("invokes generateRandomInt from IIdGenerator directly without crypto fallback (MAJ-020)", async () => {
+      let randomIntCalls = 0;
+      const customIdGen: IIdGenerator = {
+        generateId: () => "id-123",
+        generateRandomInt: (min: number, _max: number) => {
+          randomIntCalls++;
+          return min;
+        },
+      };
+
+      const customService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        customIdGen,
+      );
+
+      await customService.createRoom(
+        { playerName: "Vishy", preferredColor: "random" },
+        "sock_vishy",
+      );
+
+      // Should have called generateRandomInt for player color and room code generation
+      expect(randomIntCalls).toBeGreaterThan(0);
+    });
+
+    it("executes abandonment forfeit timer via runLoggedJob with injected logger (CRIT-001)", async () => {
+      const logger = new NullLogger();
+      const timerRegistry = new DisconnectTimerRegistry();
+      const loggedService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        timerRegistry,
+        logger,
+      );
+
+      const { room: created } = await loggedService.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+      await loggedService.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      let forfeitCalled = false;
+      const onForfeit = () => {
+        forfeitCalled = true;
+      };
+
+      // Disconnect White with very short grace period
+      await loggedService.handleDisconnect(
+        "sock_w",
+        onForfeit,
+        10,
+        timerRegistry,
+      );
+
+      // Wait for timer to fire
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(forfeitCalled).toBe(true);
+      // Verify runLoggedJob logged start and finish
+      const jobLogs = logger.logs.filter(
+        (l) => l.context?.operation === "disconnect_grace_period_abandonment",
+      );
+      expect(jobLogs.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("handles failure in abandonment forfeit without unhandled rejection (CRIT-001)", async () => {
+      const logger = new NullLogger();
+      const timerRegistry = new DisconnectTimerRegistry();
+      const loggedService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        timerRegistry,
+        logger,
+      );
+
+      const { room: created } = await loggedService.createRoom(
+        { playerName: "White", preferredColor: "w" },
+        "sock_w",
+      );
+      await loggedService.joinRoom(
+        { roomCode: created.roomCode, playerName: "Black" },
+        "sock_b",
+      );
+
+      const onForfeitThrowing = () => {
+        throw new Error("Simulated onForfeit error");
+      };
+
+      await loggedService.handleDisconnect(
+        "sock_w",
+        onForfeitThrowing,
+        10,
+        timerRegistry,
+      );
+
+      // Wait for timer to fire
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Error should be logged at error level
+      const errorLogs = logger.errorLogs.filter(
+        (l) => l.context?.operation === "disconnect_grace_period_abandonment",
+      );
+      expect(errorLogs.length).toBeGreaterThan(0);
     });
   });
 });

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { PieceColor, MascotId, MascotPersona } from '@fun-chess/shared';
 import { PLAYER_AVATARS, DEFAULT_PLAYER_AVATAR } from '@fun-chess/shared';
 import { ALL_MASCOTS } from '../data/index.js';
-import { safeLocalStorage } from '@/platform/storage';
+import { useInjectStorage } from '@/platform/di';
+import { useRovingTabindex } from '@/platform/ui';
 import BaseCard from '../../../components/base/BaseCard.vue';
 import BaseButton from '../../../components/base/BaseButton.vue';
 
@@ -25,9 +26,10 @@ const emit = defineEmits<{
 }>();
 
 const STORAGE_KEY = 'fun_chess_player_avatar';
+const storage = useInjectStorage();
 
 function getSavedAvatar(): string {
-  const saved = safeLocalStorage.getItem(STORAGE_KEY);
+  const saved = storage.getItem(STORAGE_KEY);
   if (saved && (PLAYER_AVATARS as readonly string[]).includes(saved)) {
     return saved;
   }
@@ -47,7 +49,7 @@ watch(
 
 function selectAvatar(avatar: string) {
   selectedAvatar.value = avatar;
-  safeLocalStorage.safeSetItem(STORAGE_KEY, avatar);
+  storage.safeSetItem(STORAGE_KEY, avatar);
 }
 
 const chosenColor = ref<PieceColor | 'random'>(props.initialPlayerColor);
@@ -59,62 +61,24 @@ const colorOptions: Array<{ id: PieceColor | 'random'; label: string; icon: stri
   { id: 'b', label: 'Play Black', icon: '⚫' },
 ];
 
-function handleAvatarKeyDown(event: KeyboardEvent, currentEmoji: string) {
-  const avatars = PLAYER_AVATARS as readonly string[];
-  const currentIndex = avatars.indexOf(currentEmoji);
-  let nextIndex = currentIndex;
+const { handleKeyDown: handleAvatarKeyDown, getTabindex: getAvatarTabindex } = useRovingTabindex({
+  items: PLAYER_AVATARS,
+  modelValue: selectedAvatar,
+  orientation: 'horizontal',
+  idPrefix: 'avatar-option-',
+  onSelect: selectAvatar,
+});
 
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    event.preventDefault();
-    nextIndex = (currentIndex + 1) % avatars.length;
-  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    nextIndex = (currentIndex - 1 + avatars.length) % avatars.length;
-  } else if (event.key === 'Home') {
-    event.preventDefault();
-    nextIndex = 0;
-  } else if (event.key === 'End') {
-    event.preventDefault();
-    nextIndex = avatars.length - 1;
-  } else {
-    return;
-  }
-
-  const nextEmoji = avatars[nextIndex];
-  if (nextEmoji) {
-    selectAvatar(nextEmoji);
-    const el = document.querySelector<HTMLButtonElement>(`[data-testid="avatar-option-${nextEmoji}"]`);
-    el?.focus();
-  }
-}
-
-function handleColorKeyDown(event: KeyboardEvent, currentColorId: PieceColor | 'random') {
-  const currentIndex = colorOptions.findIndex((opt) => opt.id === currentColorId);
-  let nextIndex = currentIndex;
-
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    event.preventDefault();
-    nextIndex = (currentIndex + 1) % colorOptions.length;
-  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    nextIndex = (currentIndex - 1 + colorOptions.length) % colorOptions.length;
-  } else if (event.key === 'Home') {
-    event.preventDefault();
-    nextIndex = 0;
-  } else if (event.key === 'End') {
-    event.preventDefault();
-    nextIndex = colorOptions.length - 1;
-  } else {
-    return;
-  }
-
-  const nextOpt = colorOptions[nextIndex];
-  if (nextOpt) {
-    chosenColor.value = nextOpt.id;
-    const el = document.querySelector<HTMLButtonElement>(`[data-testid="color-option-${nextOpt.id}"]`);
-    el?.focus();
-  }
-}
+const colorOptionIds = computed(() => colorOptions.map((opt) => opt.id));
+const { handleKeyDown: handleColorKeyDown, getTabindex: getColorTabindex } = useRovingTabindex({
+  items: colorOptionIds,
+  modelValue: chosenColor,
+  orientation: 'horizontal',
+  idPrefix: 'color-option-',
+  onSelect: (val) => {
+    chosenColor.value = val;
+  },
+});
 
 function handleSelectMascot(mascot: MascotPersona) {
   emit('select', mascot.id);
@@ -147,11 +111,12 @@ function getMascotColorClass(id: MascotId): string {
           <button
             v-for="emoji in PLAYER_AVATARS"
             :key="emoji"
+            :id="`avatar-option-${emoji}`"
             type="button"
             class="avatar-option-btn"
             :class="{ 'is-selected': selectedAvatar === emoji }"
             :aria-checked="selectedAvatar === emoji"
-            :tabindex="selectedAvatar === emoji ? 0 : -1"
+            :tabindex="getAvatarTabindex(emoji)"
             :aria-label="`Select ${emoji} avatar`"
             :data-testid="`avatar-option-${emoji}`"
             role="radio"
@@ -168,11 +133,12 @@ function getMascotColorClass(id: MascotId): string {
         <button
           v-for="opt in colorOptions"
           :key="opt.id"
+          :id="`color-option-${opt.id}`"
           type="button"
           class="color-option-btn"
           :class="{ 'is-selected': chosenColor === opt.id }"
           :aria-checked="chosenColor === opt.id"
-          :tabindex="chosenColor === opt.id ? 0 : -1"
+          :tabindex="getColorTabindex(opt.id)"
           :aria-label="opt.label"
           :data-testid="`color-option-${opt.id}`"
           role="radio"

@@ -186,7 +186,7 @@ describe('Pack Pedagogy & Tactical Resolution Test Suite (SC-4)', () => {
           const to = moveUci.slice(2, 4);
           const promotion = moveUci.slice(4) || undefined;
 
-          let moveRes: Move | null = null;
+          let moveRes: Move | null;
           try {
             moveRes = chess.move({
               from: from as unknown as import('chess.js').Square,

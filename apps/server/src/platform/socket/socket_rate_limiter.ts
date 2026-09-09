@@ -1,4 +1,5 @@
-import { Logger } from "../logger/logger.interface.js";
+import { randomUUID } from "node:crypto";
+import { Logger, defaultLogger } from "../logger/index.js";
 import { runLoggedJob } from "../logger/job_runner.js";
 
 export interface SocketRateLimiterOptions {
@@ -23,7 +24,8 @@ export interface SocketRateLimiterOptions {
    */
   maxKeys?: number;
   /**
-   * Optional logger instance for logging background pruning operations (MAJ-015).
+   * Optional logger instance for logging background pruning operations (MAJ-015, MAJ-022).
+   * Defaults to defaultLogger.
    */
   logger?: Logger;
 }
@@ -53,7 +55,7 @@ export class SocketRateLimiter {
   private readonly maxRequests: number;
   private readonly windowMs: number;
   private readonly maxKeys: number;
-  private readonly logger?: Logger;
+  private readonly logger: Logger;
   private readonly timestamps = new Map<string, number[]>();
   private pruneTimer?: NodeJS.Timeout;
 
@@ -61,23 +63,20 @@ export class SocketRateLimiter {
     this.maxRequests = options?.maxRequests ?? 60;
     this.windowMs = options?.windowMs ?? 10_000;
     this.maxKeys = options?.maxKeys ?? 10_000;
-    this.logger = options?.logger;
+    this.logger = options?.logger ?? defaultLogger;
     const pruneIntervalMs = options?.pruneIntervalMs ?? 60_000;
 
     if (pruneIntervalMs > 0) {
       this.pruneTimer = setInterval(() => {
-        if (this.logger) {
-          void runLoggedJob(this.logger, "rate_limiter_prune", async () => {
-            return this.prune();
-          }).catch((err: unknown) => {
-            this.logger?.error("Unhandled failure in rate limiter prune job", {
-              operation: "rate_limiter_prune_error",
-              error: err instanceof Error ? err.message : String(err),
-            });
+        void runLoggedJob(this.logger, "rate_limiter_prune", async () => {
+          return this.prune();
+        }).catch((err: unknown) => {
+          this.logger.error("Unhandled failure in rate limiter prune job", {
+            correlationId: randomUUID(),
+            operation: "rate_limiter_prune_error",
+            error: err instanceof Error ? err.message : String(err),
           });
-        } else {
-          this.prune();
-        }
+        });
       }, pruneIntervalMs);
       if (typeof this.pruneTimer.unref === "function") {
         this.pruneTimer.unref();
@@ -191,7 +190,8 @@ export class SocketRateLimiter {
 
       return deletedCount;
     } catch (err) {
-      this.logger?.error("Failed to prune socket rate limiter cache", {
+      this.logger.error("Failed to prune socket rate limiter cache", {
+        correlationId: randomUUID(),
         operation: "rate_limiter_prune_error",
         error:
           err instanceof Error

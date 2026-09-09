@@ -35,35 +35,40 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
    * @param payload - Full domain progress payload
    * @returns Minified compact progress transfer object
    */
-  public toCompact(
-    payload: UnifiedProgressPayload,
-    now: number = payload.exportedAt || Date.now(),
-  ): CompactProgressDto {
-    const referenceNow = now;
-    const exportedSec = Math.floor((payload.exportedAt || referenceNow) / 1000);
-
-    // Map scenarios sorted deterministically by scenarioId
-    const scenarioEntries = Object.entries(payload.scenarios || {}).sort(
+  /**
+   * Maps scenario progress dictionary to compact scenario tuples sorted by scenario ID.
+   *
+   * @param scenarios - Scenario progress records
+   * @param fallbackMs - Reference timestamp in milliseconds for completion dates
+   * @returns List of compact scenario tuples
+   */
+  private mapScenariosToCompact(
+    scenarios: ScenarioProgressMap | undefined,
+    fallbackMs: number,
+  ): CompactScenarioTuple[] {
+    const scenarioEntries = Object.entries(scenarios || {}).sort(
       ([a], [b]) => a.localeCompare(b),
     );
-    const compactScenarios: CompactScenarioTuple[] = scenarioEntries.map(
-      ([id, sc]) => [
-        id,
-        sc.starsEarned === 3 ? 3 : sc.starsEarned === 2 ? 2 : 1,
-        Math.max(0, Math.floor(sc.attemptsCount || 0)),
-        Math.max(0, Math.floor(sc.hintsUsedTotal || 0)),
-        Math.floor(
-          (sc.firstCompletedAt || payload.exportedAt || referenceNow) / 1000,
-        ),
-        Math.floor(
-          (sc.lastCompletedAt || payload.exportedAt || referenceNow) / 1000,
-        ),
-      ],
-    );
+    return scenarioEntries.map(([id, sc]) => [
+      id,
+      sc.starsEarned === 3 ? 3 : sc.starsEarned === 2 ? 2 : 1,
+      Math.max(0, Math.floor(sc.attemptsCount || 0)),
+      Math.max(0, Math.floor(sc.hintsUsedTotal || 0)),
+      Math.floor((sc.firstCompletedAt || fallbackMs) / 1000),
+      Math.floor((sc.lastCompletedAt || fallbackMs) / 1000),
+    ]);
+  }
 
-    // Rating Profile tuple
-    const rp = payload.puzzles?.ratingProfile;
-    const compactRating: CompactRatingProfileTuple = [
+  /**
+   * Maps adaptive rating state to compact rating profile tuple.
+   *
+   * @param rp - Adaptive rating state
+   * @returns Compact rating profile tuple
+   */
+  private mapRatingToCompact(
+    rp: AdaptiveRatingState | undefined,
+  ): CompactRatingProfileTuple {
+    return [
       Math.round(rp?.rating ?? 800),
       Math.round(rp?.ratingDeviation ?? 350),
       Math.round(rp?.peakRating ?? rp?.rating ?? 800),
@@ -71,52 +76,110 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
       Math.max(0, Math.floor(rp?.totalSolved ?? 0)),
       Math.max(0, Math.floor(rp?.bestStreak ?? 0)),
     ];
+  }
 
-    // Theme Mastery tuples sorted by theme key
-    const themeEntries = Object.entries(
-      payload.puzzles?.themeMastery || {},
-    ).sort(([a], [b]) => a.localeCompare(b));
-    const compactThemes: CompactThemeMasteryTuple[] = themeEntries.map(
-      ([theme, tm]) => [
-        theme,
-        Math.max(0, Math.floor(tm.attempted || 0)),
-        Math.max(0, Math.floor(tm.solved || 0)),
-        Math.max(0, Math.floor(tm.starsEarned || 0)),
-        Math.floor(
-          (tm.lastPracticedAt || payload.exportedAt || referenceNow) / 1000,
-        ),
-      ],
+  /**
+   * Maps theme mastery dictionary to compact theme mastery tuples sorted by theme key.
+   *
+   * @param tm - Theme mastery progress dictionary
+   * @param fallbackMs - Reference timestamp in milliseconds
+   * @returns List of compact theme mastery tuples
+   */
+  private mapThemeMasteryToCompact(
+    tm: Record<string, ThemeMasteryProgress> | undefined,
+    fallbackMs: number,
+  ): CompactThemeMasteryTuple[] {
+    const themeEntries = Object.entries(tm || {}).sort(([a], [b]) =>
+      a.localeCompare(b),
     );
+    return themeEntries.map(([theme, progress]) => [
+      theme,
+      Math.max(0, Math.floor(progress.attempted || 0)),
+      Math.max(0, Math.floor(progress.solved || 0)),
+      Math.max(0, Math.floor(progress.starsEarned || 0)),
+      Math.floor((progress.lastPracticedAt || fallbackMs) / 1000),
+    ]);
+  }
 
-    // Arcade Stats tuple
-    const ac = payload.puzzles?.arcadeStats;
-    const compactArcade: CompactArcadeStatsTuple = [
+  /**
+   * Maps puzzle arcade statistics to compact arcade stats tuple.
+   *
+   * @param ac - Puzzle arcade stats
+   * @returns Compact arcade stats tuple
+   */
+  private mapArcadeStatsToCompact(
+    ac: PuzzleArcadeStats | undefined,
+  ): CompactArcadeStatsTuple {
+    return [
       Math.max(0, Math.floor(ac?.puzzleRushHighScore ?? 0)),
       Math.max(0, Math.floor(ac?.puzzleRushBestStreak ?? 0)),
       Math.max(0, Math.floor(ac?.streakSurvivorHighScore ?? 0)),
       Math.max(0, Math.floor(ac?.totalRushRuns ?? 0)),
     ];
+  }
 
-    // Solved Puzzles tuples sorted by puzzleId
-    const solvedEntries = Object.entries(
-      payload.puzzles?.solvedPuzzles || {},
-    ).sort(([a], [b]) => a.localeCompare(b));
-    const compactSolved: CompactSolvedPuzzleTuple[] = solvedEntries.map(
-      ([id, sp]) => [
-        id,
-        sp.stars === 3 ? 3 : sp.stars === 2 ? 2 : 1,
-        Math.floor(
-          (sp.solvedAt || payload.exportedAt || referenceNow) / 1000,
-        ),
-      ],
+  /**
+   * Maps solved puzzle records to compact solved puzzle tuples sorted by puzzle ID.
+   *
+   * @param sp - Solved puzzle records dictionary
+   * @param fallbackMs - Reference timestamp in milliseconds
+   * @returns List of compact solved puzzle tuples
+   */
+  private mapSolvedPuzzlesToCompact(
+    sp: Record<string, SolvedPuzzleRecord> | undefined,
+    fallbackMs: number,
+  ): CompactSolvedPuzzleTuple[] {
+    const solvedEntries = Object.entries(sp || {}).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
+    return solvedEntries.map(([id, record]) => [
+      id,
+      record.stars === 3 ? 3 : record.stars === 2 ? 2 : 1,
+      Math.floor((record.solvedAt || fallbackMs) / 1000),
+    ]);
+  }
+
+  /**
+   * Compresses full domain UnifiedProgressPayload into compact tuple DTO.
+   * Converts millisecond timestamps to second granularity to minimize JSON byte length.
+   * Pure and deterministic: does not call Date.now() (MAJ-019).
+   *
+   * @param payload - Full domain progress payload
+   * @param now - Optional reference epoch millisecond timestamp (defaults to payload.exportedAt ?? 0)
+   * @returns Minified compact progress transfer object
+   */
+  public toCompact(
+    payload: UnifiedProgressPayload,
+    now?: number,
+  ): CompactProgressDto {
+    const referenceNow = now !== undefined ? now : (payload.exportedAt ?? 0);
+    const fallbackMs = payload.exportedAt || referenceNow;
+    const exportedSec = Math.floor(fallbackMs / 1000);
+
+    const compactScenarios = this.mapScenariosToCompact(
+      payload.scenarios,
+      fallbackMs,
+    );
+    const compactRating = this.mapRatingToCompact(
+      payload.puzzles?.ratingProfile,
+    );
+    const compactThemes = this.mapThemeMasteryToCompact(
+      payload.puzzles?.themeMastery,
+      fallbackMs,
+    );
+    const compactArcade = this.mapArcadeStatsToCompact(
+      payload.puzzles?.arcadeStats,
+    );
+    const compactSolved = this.mapSolvedPuzzlesToCompact(
+      payload.puzzles?.solvedPuzzles,
+      fallbackMs,
     );
 
     const createdSec = Math.floor(
-      (payload.puzzles?.createdAt || payload.exportedAt || referenceNow) / 1000,
+      (payload.puzzles?.createdAt || fallbackMs) / 1000,
     );
     const lastActiveSec = Math.floor(
-      (payload.puzzles?.lastActiveAt || payload.exportedAt || referenceNow) /
-        1000,
+      (payload.puzzles?.lastActiveAt || fallbackMs) / 1000,
     );
 
     const dto: CompactProgressDto = {
@@ -291,14 +354,18 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
    * Expands compact tokenized CompactProgressDto into full domain UnifiedProgressPayload.
    * Multiplies second timestamps back to millisecond scale and restores model structures.
    *
+   * Pure and deterministic: does not call Date.now() (MAJ-019).
+   *
    * @param compact - Minified compact progress transfer object
+   * @param now - Optional reference epoch millisecond timestamp (defaults to compact.t * 1000 ?? 0)
    * @returns Restored full domain progress payload
    */
   public fromCompact(
     compact: CompactProgressDto,
-    now: number = Date.now(),
+    now?: number,
   ): UnifiedProgressPayload {
-    const referenceNowSec = Math.floor(now / 1000);
+    const referenceNowSec =
+      now !== undefined ? Math.floor(now / 1000) : (compact.t ?? 0);
     const version = compact.v || 1;
     const exportedAt = (compact.t || referenceNowSec) * 1000;
     const clientVersion = compact.c;

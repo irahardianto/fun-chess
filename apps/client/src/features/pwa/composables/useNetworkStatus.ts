@@ -1,6 +1,7 @@
-import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
-import { apiClient, type IApiClient } from '@/platform/api';
-import { logger } from '@/platform/telemetry';
+import { ref, computed, getCurrentScope, onScopeDispose, getCurrentInstance } from 'vue';
+import { apiClient as defaultApiClient, type IApiClient } from '@/platform/api';
+import { useInjectLogger, useInjectApiClient } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
 const isOnlineState = ref<boolean>(
   typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -8,10 +9,19 @@ const isOnlineState = ref<boolean>(
 
 let listenerCount = 0;
 let initialized = false;
+let customLogger: ILogger | null = null;
+
+export function setNetworkStatusLogger(logger: ILogger | null): void {
+  customLogger = logger;
+}
+
+function getEffectiveLogger(custom?: ILogger): ILogger {
+  return custom ?? customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+}
 
 function handleOnline(): void {
   isOnlineState.value = true;
-  logger.info('Network status changed to online', {
+  getEffectiveLogger().info('Network status changed to online', {
     operation: 'network_status_change',
     isOnline: true,
   });
@@ -19,7 +29,7 @@ function handleOnline(): void {
 
 function handleOffline(): void {
   isOnlineState.value = false;
-  logger.info('Network status changed to offline', {
+  getEffectiveLogger().info('Network status changed to offline', {
     operation: 'network_status_change',
     isOnline: false,
   });
@@ -48,13 +58,19 @@ export function resetNetworkStatusState(): void {
   isOnlineState.value = typeof navigator !== 'undefined' ? navigator.onLine : true;
   listenerCount = 0;
   initialized = false;
+  customLogger = null;
 }
 
 /**
  * Composable to observe network status with kid-friendly reassurance messages.
  * Uses centralized IApiClient for connectivity probing per MAJ-007.
  */
-export function useNetworkStatus(client: IApiClient = apiClient) {
+export function useNetworkStatus(client?: IApiClient, customLoggerInstance?: ILogger) {
+  if (customLoggerInstance) {
+    customLogger = customLoggerInstance;
+  }
+  const resolvedClient = client ?? (getCurrentInstance() ? useInjectApiClient() : defaultApiClient);
+  const logger = getEffectiveLogger(customLoggerInstance);
   if (!initialized && typeof navigator !== 'undefined') {
     isOnlineState.value = navigator.onLine;
   }
@@ -90,7 +106,7 @@ export function useNetworkStatus(client: IApiClient = apiClient) {
     }
 
     try {
-      const online = await client.checkConnectivity(probeUrl);
+      const online = await resolvedClient.checkConnectivity(probeUrl);
       isOnlineState.value = online;
       return online;
     } catch (err) {

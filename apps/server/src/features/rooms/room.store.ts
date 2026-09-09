@@ -1,5 +1,4 @@
 import { RoomState } from "@fun-chess/shared";
-import { IRoomGameAdapter } from "./room.interface.js";
 
 /**
  * Mutation function callback executed inside the room's exclusive lock.
@@ -13,7 +12,7 @@ export type RoomMutator<T> = (
  * Storage boundary abstraction for room persistence.
  * Adheres to Architectural Patterns Rule 1: I/O Isolation.
  */
-export interface RoomStore extends IRoomGameAdapter {
+export interface RoomStore {
   /**
    * Retrieves a deep-cloned snapshot of the room state.
    */

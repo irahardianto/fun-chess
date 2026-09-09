@@ -171,7 +171,7 @@ export function reconnectPlayerTransition(
   let unpaused = false;
   let nextWhite = room.whitePlayer;
   let nextBlack = room.blackPlayer;
-  let reconnectedPlayer: Player | null = null;
+  let reconnectedPlayer: Player;
   let spectators = room.spectators;
 
   if (nextWhite?.id === playerId) {

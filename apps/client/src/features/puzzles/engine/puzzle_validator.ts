@@ -132,7 +132,7 @@ export function validatePuzzleMove(
     };
   }
 
-  let playerResult: Move | null = null;
+  let playerResult: Move | null;
   try {
     playerResult = chess.move({
       from: playerMove.from as unknown as import('chess.js').Square,
@@ -301,7 +301,7 @@ export function handleOpponentCounterReply(
   }
 
   const oppParsed = parseUciMove(opponentUci);
-  let oppResult: Move | null = null;
+  let oppResult: Move | null;
   try {
     oppResult = chess.move({
       from: oppParsed.from as unknown as import('chess.js').Square,

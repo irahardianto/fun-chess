@@ -1,12 +1,13 @@
 import { IncomingMessage, ServerResponse, RequestListener } from "node:http";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
+import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Logger } from "../logger/logger.interface.js";
 import { extractClientIp } from "./ip_utils.js";
-import { IFileStorage } from "./file_storage.js";
-import { LanInfoResponse, AppError } from "@fun-chess/shared";
-import { isOriginAllowed, resolveAllowedOrigins, type ServerEnv } from "../config/index.js";
+import { AppError } from "@fun-chess/shared";
+import { isOriginAllowed, resolveAllowedOrigins } from "../config/index.js";
 import { HttpRateLimiter } from "./http_rate_limiter.js";
 import {
   HealthController,
@@ -92,7 +93,43 @@ export function formatHttpErrorFromException(
   };
 }
 
-function applySecurityHeaders(
+/**
+ * Resolves the client dist path by checking configuration and candidate locations (CRIT-003).
+ */
+export function resolveDistPath(config: HttpServerConfig): string {
+  if (config.distPath) {
+    return config.distPath;
+  }
+  if (config.env?.CLIENT_DIST_PATH) {
+    return config.env.CLIENT_DIST_PATH;
+  }
+  if (process.env["CLIENT_DIST_PATH"]) {
+    return process.env["CLIENT_DIST_PATH"];
+  }
+
+  // Candidate locations in development, monorepo, and production containers
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.resolve(process.cwd(), "apps/client/dist"),
+    path.resolve(process.cwd(), "../client/dist"),
+    "/app/apps/client/dist",
+    path.resolve(currentDir, "../../../../client/dist"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    } catch {
+      // Ignore filesystem access check errors and continue
+    }
+  }
+
+  return path.resolve(process.cwd(), "../client/dist");
+}
+
+export function applySecurityHeaders(
   res: ServerResponse,
   correlationId: string,
   req?: IncomingMessage,
@@ -116,7 +153,7 @@ function applySecurityHeaders(
  * Applies CORS headers to incoming requests.
  * Only emits Access-Control-Allow-Origin when Origin header is present and validated (MAJ-005).
  */
-function applyCorsHeaders(
+export function applyCorsHeaders(
   req: IncomingMessage,
   res: ServerResponse,
   allowedOrigins: string[],
@@ -145,6 +182,206 @@ function applyCorsHeaders(
   );
 
   return { origin, isOriginPermitted };
+}
+
+export function handleCorsPreflight(
+  res: ServerResponse,
+  method: string,
+  pathname: string,
+  correlationId: string,
+  clientIp: string,
+  startTime: number,
+  effectiveAllowedOrigins: string[],
+  isOriginPermitted: boolean,
+  origin: string | undefined,
+  logger: Logger,
+): boolean {
+  if (method !== "OPTIONS") {
+    return false;
+  }
+
+  logger.info("HTTP OPTIONS preflight started", {
+    operation: "http_options_preflight",
+    correlationId,
+    clientIp,
+    origin,
+    path: pathname,
+  });
+
+  if (origin && !isOriginPermitted && !effectiveAllowedOrigins.includes("*")) {
+    const duration = Math.round(performance.now() - startTime);
+    logger.warn("HTTP OPTIONS preflight rejected", {
+      operation: "http_options_preflight",
+      correlationId,
+      clientIp,
+      duration,
+      durationMs: duration,
+      origin,
+      path: pathname,
+      status: "rejected",
+    });
+
+    const errorBody = JSON.stringify(
+      formatHttpError(
+        403,
+        "ERR_CORS_FORBIDDEN",
+        "CORS origin not allowed",
+        correlationId,
+      ),
+    );
+    res.writeHead(403, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": Buffer.byteLength(errorBody),
+    });
+    res.end(errorBody);
+    return true;
+  }
+
+  const duration = Math.round(performance.now() - startTime);
+  logger.info("HTTP OPTIONS preflight allowed", {
+    operation: "http_options_preflight",
+    correlationId,
+    clientIp,
+    duration,
+    durationMs: duration,
+    origin,
+    path: pathname,
+    status: "success",
+  });
+
+  res.writeHead(204);
+  res.end();
+  return true;
+}
+
+export async function handleHealthRoutes(
+  method: string,
+  pathname: string,
+  healthController: HealthController,
+  sendJsonResponse: (statusCode: number, data: unknown) => void,
+  sendTextResponse: (statusCode: number, text: string) => void,
+): Promise<boolean> {
+  if (method !== "GET" && method !== "HEAD") {
+    return false;
+  }
+
+  if (pathname === "/healthz") {
+    sendTextResponse(200, "OK");
+    return true;
+  }
+
+  if (pathname === "/health" || pathname === "/api/health") {
+    const liveness = healthController.getLiveness();
+    sendJsonResponse(200, liveness);
+    return true;
+  }
+
+  if (pathname === "/metrics" || pathname === "/health/detail") {
+    const detailed = await healthController.getDetailedHealth();
+    sendJsonResponse(200, detailed);
+    return true;
+  }
+
+  return false;
+}
+
+export async function handleStaticRoutes(
+  req: IncomingMessage,
+  res: ServerResponse,
+  method: string,
+  pathname: string,
+  staticController: StaticController,
+  logger: Logger,
+  correlationId: string,
+  clientIp: string,
+  startTime: number,
+): Promise<boolean> {
+  if ((method === "GET" || method === "HEAD") && !pathname.startsWith("/api/")) {
+    const served = await staticController.serve(req, res, logger, correlationId);
+
+    if (served) {
+      const duration = Math.round(performance.now() - startTime);
+      const statusCode = res.statusCode || 200;
+      const logContext = {
+        operation: "http_static",
+        correlationId,
+        clientIp,
+        path: pathname,
+        statusCode,
+        duration,
+        durationMs: duration,
+      };
+      if (statusCode >= 500) {
+        logger.error("HTTP Static error", logContext);
+      } else if (statusCode >= 400) {
+        logger.warn("HTTP Static rejected", logContext);
+      } else {
+        logger.info("HTTP Static served", logContext);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+export function handleRateLimitCheck(
+  clientIp: string,
+  pathname: string,
+  method: string,
+  correlationId: string,
+  rateLimiter: HttpRateLimiter | undefined,
+  config: HttpServerConfig,
+  logger: Logger,
+  sendJsonResponse: (statusCode: number, data: unknown) => void,
+): boolean {
+  if (rateLimiter && !rateLimiter.consume(clientIp)) {
+    logger.warn("HTTP rate limit exceeded", {
+      operation: "http_rate_limited",
+      correlationId,
+      clientIp,
+      path: pathname,
+      method,
+    });
+
+    const maxReq = config.env?.RATE_LIMIT_MAX_REQUESTS ?? 100;
+    const windowSec = Math.round(
+      (config.env?.RATE_LIMIT_WINDOW_MS ?? 10_000) / 1000,
+    );
+    const rawDesc =
+      rateLimiter.getLimitDescription?.() ||
+      `Maximum ${maxReq} requests per ${windowSec} seconds allowed.`;
+    const limitDesc = rawDesc.includes("Rate limit exceeded")
+      ? rawDesc
+      : `Rate limit exceeded. ${rawDesc}`;
+    sendJsonResponse(
+      429,
+      formatHttpError(
+        429,
+        "ERR_RATE_LIMITED",
+        limitDesc,
+        correlationId,
+      ),
+    );
+    return true;
+  }
+  return false;
+}
+
+export function handleLanInfoRoute(
+  req: IncomingMessage,
+  method: string,
+  pathname: string,
+  port: number,
+  lanInfoController: LanInfoController,
+  sendJsonResponse: (statusCode: number, data: unknown) => void,
+): boolean {
+  if ((method === "GET" || method === "HEAD") && pathname === "/api/lan-info") {
+    const requestPort = port || req.socket?.localPort || 3000;
+    const lanInfo = lanInfoController.getLanInfo(requestPort);
+    sendJsonResponse(200, lanInfo);
+    return true;
+  }
+  return false;
 }
 
 function createFallbackHtml(port: number): string {
@@ -181,14 +418,14 @@ function createFallbackHtml(port: number): string {
  * Extracts client IP in entry logs (ENH-008).
  * Provides IP-based rate limiting on native HTTP API endpoints (MIN-002).
  * Formats standardized JSON error envelopes (MAJ-033).
- * Decomposed into modular route controllers (MIN-029).
+ * Decomposed into modular route controllers and middleware helpers (MAJ-032, MIN-029).
  */
 export function createHttpServer(config: HttpServerConfig): RequestListener {
   const {
     roomStore,
     logger,
     port = config.env?.PORT ?? 3000,
-    distPath = config.distPath ?? config.env?.CLIENT_DIST_PATH ?? path.resolve(process.cwd(), "../client/dist"),
+    distPath = resolveDistPath(config),
     fileStorage,
     env = config.env,
     allowedOrigins: configuredAllowedOrigins,
@@ -268,58 +505,20 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     );
 
     // 3. Preflight OPTIONS Request Logging & Dispatch (MAJ-014, MAJ-033)
-    if (method === "OPTIONS") {
-      logger.info("HTTP OPTIONS preflight started", {
-        operation: "http_options_preflight",
+    if (
+      handleCorsPreflight(
+        res,
+        method,
+        pathname,
         correlationId,
         clientIp,
+        startTime,
+        effectiveAllowedOrigins,
+        isOriginPermitted,
         origin,
-        path: pathname,
-      });
-
-      if (origin && !isOriginPermitted && !effectiveAllowedOrigins.includes("*")) {
-        const duration = Math.round(performance.now() - startTime);
-        logger.warn("HTTP OPTIONS preflight rejected", {
-          operation: "http_options_preflight",
-          correlationId,
-          clientIp,
-          duration,
-          durationMs: duration,
-          origin,
-          path: pathname,
-          status: "rejected",
-        });
-
-        const errorBody = JSON.stringify(
-          formatHttpError(
-            403,
-            "ERR_CORS_FORBIDDEN",
-            "CORS origin not allowed",
-            correlationId,
-          ),
-        );
-        res.writeHead(403, {
-          "Content-Type": "application/json; charset=utf-8",
-          "Content-Length": Buffer.byteLength(errorBody),
-        });
-        res.end(errorBody);
-        return;
-      }
-
-      const duration = Math.round(performance.now() - startTime);
-      logger.info("HTTP OPTIONS preflight allowed", {
-        operation: "http_options_preflight",
-        correlationId,
-        clientIp,
-        duration,
-        durationMs: duration,
-        origin,
-        path: pathname,
-        status: "success",
-      });
-
-      res.writeHead(204);
-      res.end();
+        logger,
+      )
+    ) {
       return;
     }
 
@@ -397,88 +596,63 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     };
 
     try {
-      // 5. GET / HEAD /healthz - Container Liveness & Readiness Probe
-      if ((method === "GET" || method === "HEAD") && pathname === "/healthz") {
-        sendTextResponse(200, "OK");
-        return;
-      }
-
-      // 6. GET / HEAD /health & /api/health - Public lightweight LivenessHealthResponse (ENH-003, CRIT-001)
+      // 5, 6, 7. Health & Telemetry Routes
       if (
-        (method === "GET" || method === "HEAD") &&
-        (pathname === "/health" || pathname === "/api/health")
+        await handleHealthRoutes(
+          method,
+          pathname,
+          healthController,
+          sendJsonResponse,
+          sendTextResponse,
+        )
       ) {
-        const liveness = healthController.getLiveness();
-        sendJsonResponse(200, liveness);
         return;
       }
 
-      // 7. GET / HEAD /metrics & /health/detail - Operational DetailedHealthResponse (ENH-003, CRIT-001)
+      // 8. Static Assets / SPA Fallback (non-API routes) (ENH-003, MIN-016)
       if (
-        (method === "GET" || method === "HEAD") &&
-        (pathname === "/metrics" || pathname === "/health/detail")
+        await handleStaticRoutes(
+          req,
+          res,
+          method,
+          pathname,
+          staticController,
+          logger,
+          correlationId,
+          clientIp,
+          startTime,
+        )
       ) {
-        const detailed = await healthController.getDetailedHealth();
-        sendJsonResponse(200, detailed);
         return;
-      }
-
-      // 8. Static Assets / SPA Fallback (non-API routes) (ENH-003)
-      // Excluded from API rate limiter quota to prevent static asset navigation starvation
-      if ((method === "GET" || method === "HEAD") && !pathname.startsWith("/api/")) {
-        const served = await staticController.serve(req, res, logger, correlationId);
-
-        if (served) {
-          const duration = Math.round(performance.now() - startTime);
-          logger.info("HTTP Static served", {
-            operation: "http_static",
-            correlationId,
-            clientIp,
-            path: pathname,
-            duration,
-            durationMs: duration,
-          });
-          return;
-        }
       }
 
       // 9. Rate Limiting Check on API & Dynamic Endpoints (MIN-002, ENH-003)
-      if (rateLimiter && !rateLimiter.consume(clientIp)) {
-        logger.warn("HTTP rate limit exceeded", {
-          operation: "http_rate_limited",
-          correlationId,
+      if (
+        handleRateLimitCheck(
           clientIp,
-          path: pathname,
+          pathname,
           method,
-        });
-
-        const maxReq = config.env?.RATE_LIMIT_MAX_REQUESTS ?? 100;
-        const windowSec = Math.round(
-          (config.env?.RATE_LIMIT_WINDOW_MS ?? 10_000) / 1000,
-        );
-        const rawDesc =
-          rateLimiter?.getLimitDescription?.() ||
-          `Maximum ${maxReq} requests per ${windowSec} seconds allowed.`;
-        const limitDesc = rawDesc.includes("Rate limit exceeded")
-          ? rawDesc
-          : `Rate limit exceeded. ${rawDesc}`;
-        sendJsonResponse(
-          429,
-          formatHttpError(
-            429,
-            "ERR_RATE_LIMITED",
-            limitDesc,
-            correlationId,
-          ),
-        );
+          correlationId,
+          rateLimiter,
+          config,
+          logger,
+          sendJsonResponse,
+        )
+      ) {
         return;
       }
 
-      // 10. GET / HEAD /api/lan-info - Host Addressing & QR Discovery
-      if ((method === "GET" || method === "HEAD") && pathname === "/api/lan-info") {
-        const requestPort = port || req.socket?.localPort || 3000;
-        const lanInfo = lanInfoController.getLanInfo(requestPort);
-        sendJsonResponse(200, lanInfo);
+      // 10. Host Addressing & QR Discovery
+      if (
+        handleLanInfoRoute(
+          req,
+          method,
+          pathname,
+          port,
+          lanInfoController,
+          sendJsonResponse,
+        )
+      ) {
         return;
       }
 

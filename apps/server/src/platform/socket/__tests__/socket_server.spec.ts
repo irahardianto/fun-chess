@@ -73,7 +73,7 @@ describe("createSocketServer (MAJ-002, MAJ-017)", () => {
 
     let upgradeAllowed = false;
     allowRequest(
-      { headers: { origin: "https://fun-chess.example.com" } } as any,
+      { headers: { origin: "https://fun-chess.example.com" } } as unknown as http.IncomingMessage,
       (err, success) => {
         if (!err && success) upgradeAllowed = true;
       },
@@ -82,7 +82,7 @@ describe("createSocketServer (MAJ-002, MAJ-017)", () => {
 
     let upgradeRejected = false;
     allowRequest(
-      { headers: { origin: "https://evil.com" } } as any,
+      { headers: { origin: "https://evil.com" } } as unknown as http.IncomingMessage,
       (err, success) => {
         if (err === 3 && !success) upgradeRejected = true;
       },

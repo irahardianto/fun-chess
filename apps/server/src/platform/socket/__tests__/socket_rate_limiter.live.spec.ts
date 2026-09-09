@@ -7,6 +7,17 @@ import { createSocketRateLimiter } from "../socket_rate_limiter.js";
 import { wrapSocketHandler } from "../socket_logging_middleware.js";
 import { NullLogger } from "../../logger/null_logger.js";
 
+interface PingResult {
+  reply?: string;
+  timestamp?: number;
+  success?: boolean;
+  error?: {
+    code?: string;
+    message?: string;
+    correlationId?: string;
+  };
+}
+
 describe("Live Socket Rate Limiting (MAJ-038, MAJ-001)", () => {
   let server: http.Server;
   let port: number;
@@ -32,7 +43,7 @@ describe("Live Socket Rate Limiting (MAJ-038, MAJ-001)", () => {
       const pingHandler = wrapSocketHandler(
         logger,
         "test:ping",
-        socket as any,
+        socket as unknown as Parameters<typeof wrapSocketHandler>[2],
         { rateLimiter },
         async (req: { msg: string }) => {
           return { reply: req.msg, timestamp: Date.now() };
@@ -68,25 +79,25 @@ describe("Live Socket Rate Limiting (MAJ-038, MAJ-001)", () => {
     });
 
     // 1st request succeeds
-    const res1 = await new Promise<any>((resolve) => {
+    const res1 = await new Promise<PingResult>((resolve) => {
       client1.emit("test:ping", { msg: "ping-1" }, resolve);
     });
     expect(res1.reply).toBe("ping-1");
 
     // 2nd request succeeds
-    const res2 = await new Promise<any>((resolve) => {
+    const res2 = await new Promise<PingResult>((resolve) => {
       client1.emit("test:ping", { msg: "ping-2" }, resolve);
     });
     expect(res2.reply).toBe("ping-2");
 
     // 3rd request rate limited (exceeds 2 requests per 10s)
-    const res3 = await new Promise<any>((resolve) => {
+    const res3 = await new Promise<PingResult>((resolve) => {
       client1.emit("test:ping", { msg: "ping-3" }, resolve);
     });
     expect(res3.success).toBe(false);
-    expect(res3.error.code).toBe("ERR_RATE_LIMITED");
-    expect(res3.error.message).toContain("Maximum 2 requests");
-    expect(res3.error.correlationId).toBeDefined();
+    expect(res3.error?.code).toBe("ERR_RATE_LIMITED");
+    expect(res3.error?.message).toContain("Maximum 2 requests");
+    expect(res3.error?.correlationId).toBeDefined();
   });
 
   it("prevents disconnect evasion by enforcing rate limit across new socket connections from the same IP (MAJ-001)", async () => {
@@ -101,11 +112,11 @@ describe("Live Socket Rate Limiting (MAJ-038, MAJ-001)", () => {
     });
 
     // Rate limit must still apply because the IP already consumed all quota
-    const res = await new Promise<any>((resolve) => {
+    const res = await new Promise<PingResult>((resolve) => {
       client2.emit("test:ping", { msg: "evasion-attempt" }, resolve);
     });
 
     expect(res.success).toBe(false);
-    expect(res.error.code).toBe("ERR_RATE_LIMITED");
+    expect(res.error?.code).toBe("ERR_RATE_LIMITED");
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { UnifiedProgressPayload } from "../../types/progress_sync.js";
+import type { PuzzleTheme } from "../../contracts/puzzle.js";
 import {
   DefaultProgressMergeEngine,
   defaultProgressMergeEngine,
@@ -581,7 +582,7 @@ describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => 
           ...createLocalPayload().puzzles,
           themeMastery: {
             toString: {
-              theme: "fork" as any,
+              theme: "fork" as PuzzleTheme,
               attempted: 5,
               solved: 3,
               starsEarned: 5,
@@ -614,7 +615,7 @@ describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => 
           ...createIncomingPayload().puzzles,
           themeMastery: {
             toString: {
-              theme: "fork" as any,
+              theme: "fork" as PuzzleTheme,
               attempted: 10,
               solved: 8,
               starsEarned: 15,

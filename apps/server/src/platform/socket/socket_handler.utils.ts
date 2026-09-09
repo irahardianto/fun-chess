@@ -1,11 +1,8 @@
 import { Socket } from "socket.io";
 import type { z } from "zod";
-import type { Logger } from "../../platform/logger/index.js";
-import {
-  wrapSocketHandler,
-  type SocketRateLimiter,
-  type SocketOperationContext,
-} from "../../platform/socket/index.js";
+import type { Logger } from "../logger/index.js";
+import { wrapSocketHandler, type SocketOperationContext } from "./socket_logging_middleware.js";
+import type { SocketRateLimiter } from "./socket_rate_limiter.js";
 
 const OPERATION_RATE_LIMIT_DESCRIPTIONS: Record<string, string> = {
   "room:create": "room creation",
@@ -27,7 +24,7 @@ export interface FeatureSocketHandlerOptions<TReq> {
 }
 
 /**
- * Reusable strictly typed wrapper for feature socket handlers (MAJ-023, MAJ-027, MIN-025).
+ * Reusable strictly typed wrapper for feature socket handlers (MAJ-021).
  * Consolidates rate-limit proxy logging, operation-specific error description customization,
  * and delegates to the platform wrapSocketHandler.
  */
@@ -70,7 +67,7 @@ export function createFeatureSocketHandler<TReq, TRes>(
       if (prop === "warn") {
         return (msg: string, meta?: Record<string, unknown>) => {
           if (msg === "Operation rate limit exceeded" && meta?.operation) {
-            target.warn(`Rate limit exceeded for ${meta.operation}`, meta);
+            target.warn("Operation rate limit exceeded", meta);
           } else {
             target.warn(msg, meta);
           }

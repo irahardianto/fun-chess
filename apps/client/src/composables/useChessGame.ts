@@ -10,12 +10,13 @@ import type {
   Square,
   GameState,
   MoveResult,
+  PromotionPiece,
 } from '@fun-chess/shared';
 import {
   safeLoadFen,
   isPawnPromotion,
 } from '@fun-chess/shared';
-import { useChessBoard } from './useChessBoard';
+import { useChessBoard } from '../features/board';
 import { useBoardSelection } from '../features/board/index';
 import { logger } from '@/platform/telemetry/index.js';
 
@@ -101,7 +102,7 @@ export function useChessGame(initialFen?: string) {
         piece: result.piece as PieceType,
         color: result.color as PieceColor,
         captured: result.captured as PieceType | undefined,
-        promotion: result.promotion as PieceType | undefined,
+        promotion: result.promotion as PromotionPiece | undefined,
         flags: result.flags,
         fen: chess.fen(),
         moveNumber: chess.history().length,

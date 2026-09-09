@@ -2114,8 +2114,11 @@ describe('useSocket composable', () => {
 
       expect(errorListener).toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[useSocket] Error in onOpponentMove listener:'),
-        expect.any(Error)
+        '[FC_WARN]',
+        expect.stringContaining('Error in onOpponentMove listener'),
+        expect.objectContaining({
+          operation: 'socket_opponent_move_listener',
+        })
       );
 
       unsubscribe();
@@ -2135,8 +2138,11 @@ describe('useSocket composable', () => {
       }).not.toThrow();
 
       expect(warnSpy).toHaveBeenCalledWith(
+        '[FC_WARN]',
         expect.stringMatching(/Failed to parse saved session from storage/),
-        expect.anything()
+        expect.objectContaining({
+          operation: 'socket_get_saved_session',
+        })
       );
 
       warnSpy.mockRestore();

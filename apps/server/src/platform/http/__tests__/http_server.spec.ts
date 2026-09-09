@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import http, { Server } from "node:http";
-import { createHttpServer } from "../http_server.js";
+import net from "node:net";
+import { createHttpServer, resolveDistPath } from "../http_server.js";
 import { MockRoomStore } from "../../../features/rooms/mock_room.store.js";
 import {
   RelayAddressService,
@@ -9,9 +10,9 @@ import {
 import { NullLogger } from "../../logger/null_logger.js";
 import {
   LanInfoResponse,
-  HealthCheckResponse,
   LivenessHealthResponse,
   DetailedHealthResponse,
+  HttpErrorEnvelope,
 } from "@fun-chess/shared";
 
 describe("createHttpServer", () => {
@@ -72,9 +73,10 @@ describe("createHttpServer", () => {
     expect(data.status).toBe("ok");
     expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(data.timestamp).toBeDefined();
-    expect((data as any).activeRooms).toBeUndefined();
-    expect((data as any).activeSockets).toBeUndefined();
-    expect((data as any).memoryUsageMb).toBeUndefined();
+    const rawData1 = data as Record<string, unknown>;
+    expect(rawData1["activeRooms"]).toBeUndefined();
+    expect(rawData1["activeSockets"]).toBeUndefined();
+    expect(rawData1["memoryUsageMb"]).toBeUndefined();
   });
 
   it("responds to GET /api/health with lightweight liveness JSON (alias)", async () => {
@@ -85,9 +87,10 @@ describe("createHttpServer", () => {
     expect(data.status).toBe("ok");
     expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(data.timestamp).toBeDefined();
-    expect((data as any).activeRooms).toBeUndefined();
-    expect((data as any).activeSockets).toBeUndefined();
-    expect((data as any).memoryUsageMb).toBeUndefined();
+    const rawData2 = data as Record<string, unknown>;
+    expect(rawData2["activeRooms"]).toBeUndefined();
+    expect(rawData2["activeSockets"]).toBeUndefined();
+    expect(rawData2["memoryUsageMb"]).toBeUndefined();
   });
 
   it("responds to GET /health/detail and /metrics with full operational telemetry (ENH-003)", async () => {
@@ -153,7 +156,7 @@ describe("createHttpServer", () => {
       headers: { Origin: "https://evil-hacker.com" },
     });
     expect(res.status).toBe(403);
-    const errBody = (await res.json()) as any;
+    const errBody = (await res.json()) as HttpErrorEnvelope;
     expect(errBody.status).toBe("error");
     expect(errBody.code).toBe(403);
     expect(errBody.error.code).toBe("ERR_CORS_FORBIDDEN");
@@ -181,7 +184,7 @@ describe("createHttpServer", () => {
     let p = 0;
     await new Promise<void>((resolve) =>
       s.listen(0, "127.0.0.1", () => {
-        p = (s.address() as any).port;
+        p = (s.address() as net.AddressInfo).port;
         resolve();
       }),
     );
@@ -320,7 +323,7 @@ describe("createHttpServer", () => {
       },
     );
     expect(res.status).toBe(404);
-    const json = (await res.json()) as any;
+    const json = (await res.json()) as HttpErrorEnvelope;
     expect(json.status).toBe("error");
     expect(json.code).toBe(404);
     expect(json.error.code).toBe("ERR_NOT_FOUND");
@@ -344,7 +347,7 @@ describe("createHttpServer", () => {
     let rlPort = 0;
     await new Promise<void>((resolve) =>
       rlServer.listen(0, "127.0.0.1", () => {
-        rlPort = (rlServer.address() as any).port;
+        rlPort = (rlServer.address() as net.AddressInfo).port;
         resolve();
       }),
     );
@@ -361,7 +364,7 @@ describe("createHttpServer", () => {
       // 3rd request rate limited (429)
       const res3 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
       expect(res3.status).toBe(429);
-      const data = (await res3.json()) as any;
+      const data = (await res3.json()) as HttpErrorEnvelope;
       expect(data.status).toBe("error");
       expect(data.code).toBe(429);
       expect(data.error.code).toBe("ERR_RATE_LIMITED");
@@ -388,7 +391,7 @@ describe("createHttpServer", () => {
     let prodPort = 0;
     await new Promise<void>((resolve) =>
       prodServer.listen(0, "127.0.0.1", () => {
-        prodPort = (prodServer.address() as any).port;
+        prodPort = (prodServer.address() as net.AddressInfo).port;
         resolve();
       }),
     );
@@ -467,4 +470,66 @@ describe("createHttpServer", () => {
       expect(data.joinUrl).toBe("https://fun-chess-prod.a.run.app");
     });
   });
+
+  describe("resolveDistPath (CRIT-003)", () => {
+    it("prefers explicit distPath if configured", () => {
+      const pathResolved = resolveDistPath({
+        roomStore: store,
+        logger,
+        distPath: "/custom/client/dist",
+      });
+      expect(pathResolved).toBe("/custom/client/dist");
+    });
+
+    it("prefers env.CLIENT_DIST_PATH if configured", () => {
+      const pathResolved = resolveDistPath({
+        roomStore: store,
+        logger,
+        env: { CLIENT_DIST_PATH: "/env/client/dist" } as unknown as HttpServerConfig["env"],
+      });
+      expect(pathResolved).toBe("/env/client/dist");
+    });
+
+    it("resolves to valid candidate path or sensible fallback when not configured", () => {
+      const pathResolved = resolveDistPath({
+        roomStore: store,
+        logger,
+      });
+      expect(typeof pathResolved).toBe("string");
+      expect(pathResolved.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("static logging with status code (MIN-016)", () => {
+    it("includes statusCode in static served logs", async () => {
+      const staticLogger = new NullLogger();
+      const handler = createHttpServer({
+        roomStore: store,
+        relayAddressService: new RelayAddressService({ lanIp: "127.0.0.1", port: 3000 }),
+        logger: staticLogger,
+        port: 3000,
+        distPath: "/non/existent/dist/to/fallback",
+      });
+
+      const localServer = http.createServer(handler);
+      await new Promise<void>((resolve) => {
+        localServer.listen(0, "127.0.0.1", resolve);
+      });
+      const localAddr = localServer.address() as { port: number };
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${localAddr.port}/`);
+        expect(res.status).toBe(200);
+
+        const staticLog = staticLogger.infoLogs.find((l) => l.operation === "http_static" || l.message === "HTTP Static served");
+        expect(staticLog).toBeDefined();
+        expect(staticLog?.context?.["statusCode"]).toBe(200);
+      } finally {
+        await new Promise<void>((resolve) => {
+          localServer.close(() => resolve());
+        });
+      }
+    });
+  });
 });
+

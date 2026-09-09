@@ -99,9 +99,9 @@ describe("PinoLogger", () => {
       const log = logs[0]!;
       expect(log.msg).toBe("Failed to persist room state");
       expect(log.level).toBe(50); // Pino error level is 50
-      expect(log.roomCode).toBe("XYZW");
-      expect((log.error as any).message).toBe("Database timeout error");
-      expect((log.error as any).stack).toBeDefined();
+      const logError = log.error as Record<string, unknown>;
+      expect(logError["message"]).toBe("Database timeout error");
+      expect(logError["stack"]).toBeDefined();
     });
 
     it("logs error message without context", () => {

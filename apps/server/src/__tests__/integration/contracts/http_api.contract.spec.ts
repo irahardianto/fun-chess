@@ -7,11 +7,21 @@ import {
   fetchHealthDetail,
 } from "../helpers/http_client_helper.js";
 import type {
-  LanInfoResponse,
   LivenessHealthResponse,
   DetailedHealthResponse,
 } from "@fun-chess/shared";
 import { HttpRateLimiter } from "../../../platform/http/http_rate_limiter.js";
+import type { ServerEnv } from "../../../platform/config/index.js";
+
+interface ErrorResponseBody {
+  status: string;
+  code: number;
+  error: {
+    code: string;
+    message: string;
+    correlationId?: string;
+  };
+}
 
 describe("HTTP API Contracts", () => {
   let serverInstance: TestServerInstance;
@@ -69,9 +79,10 @@ describe("HTTP API Contracts", () => {
       expect(new Date(data.timestamp).getTime()).not.toBeNaN();
 
       // Operational metrics must NOT be leaked on public liveness endpoint (ENH-003)
-      expect((data as any).activeRooms).toBeUndefined();
-      expect((data as any).activeSockets).toBeUndefined();
-      expect((data as any).memoryUsageMb).toBeUndefined();
+      const untypedData = data as unknown as Record<string, unknown>;
+      expect(untypedData.activeRooms).toBeUndefined();
+      expect(untypedData.activeSockets).toBeUndefined();
+      expect(untypedData.memoryUsageMb).toBeUndefined();
     });
 
     it("should return 200 OK with valid LivenessHealthResponse via fetchHealth helper", async () => {
@@ -80,9 +91,10 @@ describe("HTTP API Contracts", () => {
       expect(data.status).toBe("ok");
       expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
       expect(data.timestamp).toBeDefined();
-      expect((data as any).activeRooms).toBeUndefined();
-      expect((data as any).activeSockets).toBeUndefined();
-      expect((data as any).memoryUsageMb).toBeUndefined();
+      const untypedData = data as unknown as Record<string, unknown>;
+      expect(untypedData.activeRooms).toBeUndefined();
+      expect(untypedData.activeSockets).toBeUndefined();
+      expect(untypedData.memoryUsageMb).toBeUndefined();
     });
   });
 
@@ -171,7 +183,7 @@ describe("HTTP API Contracts", () => {
           NODE_ENV: "production",
           CORS_ORIGIN: "https://fun-chess.example.com",
           TRUST_PROXY: true,
-        } as any,
+        } as Partial<ServerEnv>,
       });
 
       try {
@@ -195,7 +207,7 @@ describe("HTTP API Contracts", () => {
       const untrustedServer = await createTestServer({
         env: {
           TRUST_PROXY: false,
-        } as any,
+        } as Partial<ServerEnv>,
       });
 
       try {
@@ -256,7 +268,7 @@ describe("HTTP API Contracts", () => {
     it("should return 404 for unknown API endpoints with standardized error envelope (MIN-032, MAJ-028, MAJ-033)", async () => {
       const res = await fetch(`${serverInstance.url}/api/nonexistent-route`);
       expect(res.status).toBe(404);
-      const data = (await res.json()) as any;
+      const data = (await res.json()) as ErrorResponseBody;
       expect(data.status).toBe("error");
       expect(data.code).toBe(404);
       expect(data.error.code).toBe("ERR_NOT_FOUND");
@@ -375,7 +387,7 @@ describe("HTTP API Contracts", () => {
       });
 
       expect(res.status).toBe(403);
-      const data = (await res.json()) as any;
+      const data = (await res.json()) as ErrorResponseBody;
       expect(data.status).toBe("error");
       expect(data.code).toBe(403);
       expect(data.error.code).toBe("ERR_CORS_FORBIDDEN");
@@ -424,7 +436,7 @@ describe("HTTP API Contracts", () => {
       expect(res.status).toBe(429);
       expect(res.headers.get("content-type")).toContain("application/json");
 
-      const body = (await res.json()) as any;
+      const body = (await res.json()) as ErrorResponseBody;
       expect(body.status).toBe("error");
       expect(body.code).toBe(429);
       expect(body.error.code).toBe("ERR_RATE_LIMITED");

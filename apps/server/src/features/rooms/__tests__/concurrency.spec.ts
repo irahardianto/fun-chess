@@ -17,6 +17,14 @@ import {
 import { createInitialRoomState } from "../room.logic.js";
 import type { Player } from "@fun-chess/shared";
 
+interface TestableStore {
+  lockQueues: Map<string, unknown>;
+}
+
+function testStore(s: InMemoryRoomStore): TestableStore {
+  return s as unknown as TestableStore;
+}
+
 describe("Room & Game Concurrency Control", () => {
   let store: InMemoryRoomStore;
   let sessionRegistry: InMemorySessionRegistry;
@@ -27,7 +35,7 @@ describe("Room & Game Concurrency Control", () => {
     store = new InMemoryRoomStore();
     sessionRegistry = new InMemorySessionRegistry();
     roomService = new RoomService(store, sessionRegistry);
-    gameService = new GameService(store);
+    gameService = new GameService(roomService);
   });
 
   describe("Concurrent Room Joins", () => {
@@ -65,7 +73,7 @@ describe("Room & Game Concurrency Control", () => {
       expect(finalRoom?.status).toBe("playing");
 
       // Memory leak verification: lock queue cleaned up
-      expect((store as any).lockQueues.size).toBe(0);
+      expect(testStore(store).lockQueues.size).toBe(0);
     });
   });
 
@@ -110,7 +118,7 @@ describe("Room & Game Concurrency Control", () => {
       expect(updated?.game.moveCount).toBe(1);
 
       // Lock queue evicted
-      expect((store as any).lockQueues.size).toBe(0);
+      expect(testStore(store).lockQueues.size).toBe(0);
     });
 
     it("rejects black move when executed simultaneously with white opening move on turn 'w'", async () => {
@@ -145,7 +153,7 @@ describe("Room & Game Concurrency Control", () => {
       expect(updated?.game.fen).toBeDefined();
 
       // Lock queue evicted
-      expect((store as any).lockQueues.size).toBe(0);
+      expect(testStore(store).lockQueues.size).toBe(0);
     });
   });
 
@@ -193,7 +201,7 @@ describe("Room & Game Concurrency Control", () => {
         ),
       ).rejects.toBeInstanceOf(GameNotActiveError);
 
-      expect((store as any).lockQueues.size).toBe(0);
+      expect(testStore(store).lockQueues.size).toBe(0);
     });
   });
 
@@ -237,7 +245,7 @@ describe("Room & Game Concurrency Control", () => {
       expect(rejectionReason).toBeInstanceOf(GameNotActiveError);
 
       // Lock queues cleanly evicted
-      expect((store as any).lockQueues.size).toBe(0);
+      expect(testStore(store).lockQueues.size).toBe(0);
     });
   });
 
@@ -268,7 +276,7 @@ describe("Room & Game Concurrency Control", () => {
       expect(results).toHaveLength(30);
 
       // Zero active lock queues lingering in memory
-      expect((store as any).lockQueues.size).toBe(0);
+      expect(testStore(store).lockQueues.size).toBe(0);
     });
   });
 

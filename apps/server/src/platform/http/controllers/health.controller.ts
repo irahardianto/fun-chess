@@ -1,5 +1,4 @@
 import {
-  HealthCheckResponse,
   LivenessHealthResponse,
   DetailedHealthResponse,
 } from "@fun-chess/shared";

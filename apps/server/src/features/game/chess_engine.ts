@@ -5,6 +5,7 @@ import {
   MoveResult,
   PieceColor,
   PieceType,
+  PromotionPiece,
   Square,
   calculateMaterialAndCaptures,
   getKingSquare,
@@ -94,8 +95,8 @@ export class ChessEngine {
   public static applyMove(
     chess: Chess,
     moveResultObj: Move,
-    currentHistory: MoveResult[] = [],
-    timestamp: number = Date.now(),
+    currentHistory: MoveResult[],
+    timestamp: number,
     initialFen?: string,
   ): MoveApplicationOutcome {
     const moveResult: MoveResult = {
@@ -108,7 +109,7 @@ export class ChessEngine {
         ? (moveResultObj.captured as PieceType)
         : undefined,
       promotion: moveResultObj.promotion
-        ? (moveResultObj.promotion as PieceType)
+        ? (moveResultObj.promotion as PromotionPiece)
         : undefined,
       flags: moveResultObj.flags,
       fen: chess.fen(),
@@ -121,7 +122,8 @@ export class ChessEngine {
       chess,
       { from: moveResultObj.from, to: moveResultObj.to },
       updatedHistory,
-      initialFen ?? (currentHistory.length === 0 ? moveResultObj.before : undefined),
+      initialFen ??
+        (currentHistory.length === 0 ? moveResultObj.before : undefined),
     );
 
     return { nextState, moveResult };

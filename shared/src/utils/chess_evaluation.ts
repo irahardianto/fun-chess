@@ -2,6 +2,10 @@ import { Chess } from "chess.js";
 import type { PieceType, PieceColor, GameState, Square } from "../contracts/models.js";
 import { createSafeChess } from "./chess_factory.js";
 
+/**
+ * Standard chess piece point values:
+ * Pawn: 1, Knight: 3, Bishop: 3, Rook: 5, Queen: 9, King: 0.
+ */
 export const STANDARD_PIECE_POINTS: Record<PieceType, number> = {
   p: 1,
   n: 3,
@@ -10,6 +14,34 @@ export const STANDARD_PIECE_POINTS: Record<PieceType, number> = {
   q: 9,
   k: 0,
 };
+
+/**
+ * Alias for STANDARD_PIECE_POINTS (MAJ-035).
+ */
+export const STANDARD_PIECE_VALUES = STANDARD_PIECE_POINTS;
+
+/**
+ * Alias for STANDARD_PIECE_POINTS (MAJ-035).
+ */
+export const PIECE_STANDARD_POINTS = STANDARD_PIECE_POINTS;
+
+/**
+ * Centipawn piece valuations for heuristic chess evaluation:
+ * Pawn: 100, Knight: 320, Bishop: 330, Rook: 500, Queen: 900, King: 0 (MAJ-035).
+ */
+export const PIECE_CENTIPAWN_VALUES: Record<PieceType, number> = {
+  p: 100,
+  n: 320,
+  b: 330,
+  r: 500,
+  q: 900,
+  k: 0,
+};
+
+/**
+ * Alias for PIECE_CENTIPAWN_VALUES (MAJ-035).
+ */
+export const PIECE_VALUES = PIECE_CENTIPAWN_VALUES;
 
 const STARTING_PIECES: Record<PieceType, number> = {
   p: 8,

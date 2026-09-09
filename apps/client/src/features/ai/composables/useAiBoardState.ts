@@ -4,7 +4,7 @@ import type {
   GameOverPayload,
 } from '@fun-chess/shared';
 import { safeLoadFen } from '@fun-chess/shared';
-import { useChessBoard } from '@/composables/useChessBoard';
+import { useChessBoard } from '@/features/board';
 
 export interface UseAiBoardStateOptions {
   initialFen?: string;

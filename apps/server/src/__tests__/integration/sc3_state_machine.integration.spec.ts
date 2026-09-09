@@ -7,7 +7,11 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
-import { createTestServer, TestServerInstance } from "./helpers/test_server.js";
+import {
+  createTestServer,
+  TestServerInstance,
+  resetTestRateLimiters,
+} from "./helpers/test_server.js";
 import {
   createConnectedSocketClient,
   disconnectSockets,
@@ -55,6 +59,7 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
   });
 
   beforeEach(async () => {
+    resetTestRateLimiters();
     clearAllDisconnectTimers();
     client1 = await createConnectedSocketClient(serverInstance.url);
     client2 = await createConnectedSocketClient(serverInstance.url);
@@ -634,6 +639,7 @@ describe("SC-3: Server Multiplayer Rooms, Sessions & Concurrency State Machine I
 
       // 6. Verify room state reflects inverted colors and reset board
       expect(p1RematchData.room.status).toBe("playing");
+      expect(p2RematchData.room.status).toBe("playing");
       expect(p1RematchData.room.whitePlayer?.id).toBe(p2Id);
       expect(p1RematchData.room.whitePlayer?.name).toBe("PlayerTwoBlack");
       expect(p1RematchData.room.whitePlayer?.color).toBe("w");

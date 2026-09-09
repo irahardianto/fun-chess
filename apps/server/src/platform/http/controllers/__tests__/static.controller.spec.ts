@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { StaticController } from "../static.controller.js";
 import { MemoryFileStorage } from "../../file_storage.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { NullLogger } from "../../../logger/null_logger.js";
 
 describe("StaticController", () => {
   it("serves static assets from injected file storage (MAJ-035)", async () => {
@@ -33,8 +32,8 @@ describe("StaticController", () => {
         writtenHeaders = headers;
         return this;
       },
-      end(chunk?: any) {
-        if (chunk) writtenBody += chunk.toString();
+      end(chunk?: unknown) {
+        if (chunk) writtenBody += String(chunk);
         return this;
       },
     } as unknown as ServerResponse;
@@ -64,7 +63,9 @@ describe("StaticController", () => {
     const req = {
       method: "GET",
       url: "/room/ABCDEF",
-      headers: {},
+      headers: {
+        accept: "text/html",
+      },
     } as unknown as IncomingMessage;
 
     const res = {
@@ -73,8 +74,8 @@ describe("StaticController", () => {
         writtenHeaders = headers;
         return this;
       },
-      end(chunk?: any) {
-        if (chunk) writtenBody += chunk.toString();
+      end(chunk?: unknown) {
+        if (chunk) writtenBody += String(chunk);
         return this;
       },
     } as unknown as ServerResponse;
@@ -86,7 +87,7 @@ describe("StaticController", () => {
     expect(writtenBody).toBe("<!DOCTYPE html><html><body>SPA Root</body></html>");
   });
 
-  it("returns 404 for unknown asset path with file extension (MAJ-035)", async () => {
+  it("returns 404 for unknown asset path with file extension (MIN-031)", async () => {
     const fileStorage = new MemoryFileStorage({});
 
     const controller = new StaticController({
@@ -100,9 +101,9 @@ describe("StaticController", () => {
 
     const req = {
       method: "GET",
-      url: "/play",
+      url: "/assets/missing.js",
       headers: {
-        accept: "text/html",
+        accept: "*/*",
       },
     } as unknown as IncomingMessage;
 
@@ -110,15 +111,90 @@ describe("StaticController", () => {
       writeHead: (status: number) => {
         writtenStatus = status;
       },
-      end: (data?: any) => {
-        if (data) writtenBody = data.toString();
+      end: (data?: unknown) => {
+        if (data) writtenBody = String(data);
       },
       headersSent: false,
     } as unknown as ServerResponse;
 
     const served = await controller.serve(req, res);
     expect(served).toBe(true);
-    expect(writtenStatus).toBe(200);
-    expect(writtenBody).toContain("Fallback Page");
+    expect(writtenStatus).toBe(404);
+    expect(writtenBody).toContain("Not Found");
+  });
+
+  it("returns 404 when request path lacks extension and accept header does not accept HTML (ENH-014)", async () => {
+    const fileStorage = new MemoryFileStorage({});
+
+    const controller = new StaticController({
+      distPath: "/mock/dist",
+      fileStorage,
+      fallbackHtml: "<html><body>Fallback Page</body></html>",
+    });
+
+    let writtenStatus = 0;
+    let writtenBody = "";
+
+    const req = {
+      method: "GET",
+      url: "/unknown-api-endpoint",
+      headers: {
+        accept: "application/json",
+      },
+    } as unknown as IncomingMessage;
+
+    const res = {
+      writeHead: (status: number) => {
+        writtenStatus = status;
+      },
+      end: (data?: unknown) => {
+        if (data) writtenBody = String(data);
+      },
+      headersSent: false,
+    } as unknown as ServerResponse;
+
+    const served = await controller.serve(req, res);
+    expect(served).toBe(true);
+    expect(writtenStatus).toBe(404);
+    expect(writtenBody).toContain("Not Found");
+  });
+
+  it("returns 500 when fileStorage throws unexpected system error (ENH-014)", async () => {
+    const fileStorage = new MemoryFileStorage({});
+    fileStorage.setErrorSimulator((_path, _op) => {
+      const err = new Error("EIO: i/o error") as Error & { code?: string };
+      err.code = "EIO";
+      return err;
+    });
+
+    const controller = new StaticController({
+      distPath: "/mock/dist",
+      fileStorage,
+      fallbackHtml: "<html><body>Fallback Page</body></html>",
+    });
+
+    let writtenStatus = 0;
+    let writtenBody = "";
+
+    const req = {
+      method: "GET",
+      url: "/app.js",
+      headers: {},
+    } as unknown as IncomingMessage;
+
+    const res = {
+      writeHead: (status: number) => {
+        writtenStatus = status;
+      },
+      end: (data?: unknown) => {
+        if (data) writtenBody = String(data);
+      },
+      headersSent: false,
+    } as unknown as ServerResponse;
+
+    const served = await controller.serve(req, res);
+    expect(served).toBe(true);
+    expect(writtenStatus).toBe(500);
+    expect(writtenBody).toContain("Internal Server Error");
   });
 });

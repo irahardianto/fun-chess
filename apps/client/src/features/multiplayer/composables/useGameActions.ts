@@ -6,7 +6,8 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Findings MAJ-009, MAJ-031, MIN-030.
  */
 
-import { ref, shallowRef, computed, type ComputedRef } from 'vue';
+import { ref, shallowRef, computed, getCurrentInstance, type ComputedRef } from 'vue';
+import type { z } from 'zod';
 import type {
   GameOverPayload,
   GameState,
@@ -31,7 +32,27 @@ import {
   RequestRematchRequestSchema,
   RespondRematchRequestSchema,
 } from '@fun-chess/shared';
-import { generateCorrelationId, logger } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
+import { generateCorrelationId, logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+
+let customLogger: ILogger | null = null;
+export function setGameActionsLogger(logger: ILogger | null): void {
+  customLogger = logger;
+}
+
+function getActiveLogger(): ILogger {
+  return customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+}
+
+const logger: ILogger = {
+  debug: (msg, meta) => getActiveLogger().debug(msg, meta),
+  info: (msg, meta) => getActiveLogger().info(msg, meta),
+  warn: (msg, meta) => getActiveLogger().warn(msg, meta),
+  error: (msg, meta) => getActiveLogger().error(msg, meta),
+  fatal: (msg, meta) => getActiveLogger().fatal(msg, meta),
+  child: (context) => getActiveLogger().child(context),
+};
+
 import {
   useSocketTransport,
   registerSocketEventListener,
@@ -118,7 +139,6 @@ registerSocketEventListener('game:moved', (data: { move: MoveResult; gameState: 
           operation: 'socket_opponent_move_listener',
           error: err instanceof Error ? err.message : String(err),
         });
-        console.warn('[useSocket] Error in onOpponentMove listener:', err);
       }
     });
   }
@@ -237,67 +257,77 @@ export function onOpponentMove(cb: OpponentMoveCallback): () => void {
   };
 }
 
+export interface ExecuteSocketActionOptions<
+  TReq,
+  TRes extends { success: boolean; error?: SocketErrorPayload } = { success: boolean; error?: SocketErrorPayload }
+> {
+  operation: string;
+  event: string;
+  schema: z.ZodType<TReq>;
+  rawPayload: unknown;
+  timeoutMs?: number;
+  timeoutMessage: string;
+  startLogMessage: string;
+  startLogContext?: Record<string, unknown>;
+  validationErrorMessage: string;
+  notConnectedErrorMessage?: string;
+  dispatchedLogMessage?: string;
+  alwaysAwaitAck?: boolean;
+  callback?: (res: TRes) => void;
+  onSuccess?: (res: Extract<TRes, { success: true }>) => void;
+  onError?: (err: SocketErrorPayload) => void;
+  onSettled?: () => void;
+}
+
 /**
- * Executes a chess move with optional monotonic sequence validation and idempotency tokens.
+ * Higher-order helper to eliminate duplicated action boilerplate across multiplayer actions (MAJ-033).
  */
-export async function makeMove(
-  roomCode: string,
-  move: MovePayload,
-  expectedMoveNumber?: number,
-  idempotencyKey?: string,
-  callback?: (res: { success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }) => void
-): Promise<{ success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }> {
+export async function executeSocketAction<
+  TReq,
+  TRes extends { success: boolean; error?: SocketErrorPayload } = { success: boolean; error?: SocketErrorPayload }
+>(options: ExecuteSocketActionOptions<TReq, TRes>): Promise<TRes> {
   const startTime = Date.now();
   const correlationId = generateCorrelationId();
   const transport = useSocketTransport();
+  const {
+    operation,
+    event,
+    schema,
+    rawPayload,
+    timeoutMs = 8000,
+    timeoutMessage,
+    startLogMessage,
+    startLogContext,
+    validationErrorMessage,
+    notConnectedErrorMessage = 'Socket action failed: socket not connected',
+    dispatchedLogMessage = 'Socket action dispatched',
+    alwaysAwaitAck = false,
+    callback,
+    onSuccess,
+    onError,
+    onSettled,
+  } = options;
 
-  logger.debug('Making move', {
-    operation: 'socket_game_move',
+  logger.debug(startLogMessage, {
+    operation,
     correlationId,
-    roomCode,
-    move,
-    expectedMoveNumber,
-    idempotencyKey,
+    ...(startLogContext ?? (typeof rawPayload === 'object' && rawPayload !== null ? (rawPayload as Record<string, unknown>) : {})),
   });
 
-  // Zod validation before transmission (MIN-030, MAJ-031)
-  const validationPayload: Record<string, unknown> = { roomCode, move };
-  if (expectedMoveNumber !== undefined) {
-    validationPayload.expectedMoveNumber = expectedMoveNumber;
-  }
-  if (idempotencyKey !== undefined) {
-    validationPayload.idempotencyKey = idempotencyKey;
-  }
-
-  let validationResult = MakeMoveRequestSchema.safeParse(validationPayload);
-  if (!validationResult.success && typeof idempotencyKey === 'string') {
-    const baseResult = MakeMoveRequestSchema.safeParse({
-      roomCode,
-      move,
-      expectedMoveNumber,
-    });
-    if (baseResult.success) {
-      validationResult = {
-        success: true,
-        data: {
-          ...baseResult.data,
-          idempotencyKey,
-        },
-      } as any;
-    }
-  }
-
+  const validationResult = schema.safeParse(rawPayload);
   if (!validationResult.success) {
     const err = createValidationError(validationResult.error);
     transport.lastError.value = err;
-    logger.warn('Make move validation failed', {
-      operation: 'socket_game_move',
+    logger.warn(validationErrorMessage, {
+      operation,
       correlationId,
       duration: Date.now() - startTime,
       error: err,
     });
-    const failRes = { success: false as const, error: err };
+    const failRes = { success: false as const, error: err } as unknown as TRes;
     if (callback) callback(failRes);
+    onError?.(err);
+    onSettled?.();
     return failRes;
   }
 
@@ -309,25 +339,76 @@ export async function makeMove(
       correlationId,
     };
     transport.lastError.value = err;
-    logger.warn('Make move failed: socket not connected', {
-      operation: 'socket_game_move',
+    logger.warn(notConnectedErrorMessage, {
+      operation,
       correlationId,
       duration: Date.now() - startTime,
       error: err,
     });
-    const failRes = { success: false as const, error: err };
+    const failRes = { success: false as const, error: err } as unknown as TRes;
     if (callback) callback(failRes);
+    onError?.(err);
+    onSettled?.();
     return failRes;
   }
 
-  return transport.emitWithTimeout<
+  if (alwaysAwaitAck || callback) {
+    const res = await transport.emitWithTimeout<TReq, TRes>(s, event, validationResult.data, {
+      timeoutMs,
+      timeoutMessage,
+      operation,
+      correlationId,
+      callback,
+      onSuccess,
+      onError,
+    });
+    onSettled?.();
+    return res;
+  }
+
+  (s as unknown as { emit: (event: string, data: unknown) => void }).emit(event, validationResult.data);
+  logger.info(dispatchedLogMessage, {
+    operation,
+    correlationId,
+    duration: Date.now() - startTime,
+  });
+  onSettled?.();
+  return { success: true } as unknown as TRes;
+}
+
+/**
+ * Executes a chess move with optional monotonic sequence validation and idempotency tokens.
+ */
+export async function makeMove(
+  roomCode: string,
+  move: MovePayload,
+  expectedMoveNumber?: number,
+  idempotencyKey?: string,
+  callback?: (res: { success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }) => void
+): Promise<{ success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }> {
+  const payload: Record<string, unknown> = { roomCode, move };
+  if (expectedMoveNumber !== undefined) {
+    payload.expectedMoveNumber = expectedMoveNumber;
+  }
+  if (idempotencyKey !== undefined) {
+    payload.idempotencyKey = idempotencyKey;
+  }
+
+  return executeSocketAction<
     MakeMoveRequest,
     { success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }
-  >(s, 'game:move', validationResult.data, {
+  >({
+    operation: 'socket_game_move',
+    event: 'game:move',
+    schema: MakeMoveRequestSchema,
+    rawPayload: payload,
     timeoutMs: 8000,
     timeoutMessage: 'Move submission timed out.',
-    operation: 'socket_game_move',
-    correlationId,
+    startLogMessage: 'Making move',
+    startLogContext: { roomCode, move, expectedMoveNumber, idempotencyKey },
+    validationErrorMessage: 'Make move validation failed',
+    notConnectedErrorMessage: 'Make move failed: socket not connected',
+    alwaysAwaitAck: true,
     callback,
   });
 }
@@ -339,52 +420,19 @@ export function resign(
   roomCode: string,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
-  const startTime = Date.now();
-  const correlationId = generateCorrelationId();
-  const transport = useSocketTransport();
-
-  logger.debug('Resigning game', {
+  void executeSocketAction<ResignRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_resign',
-    correlationId,
-    roomCode,
+    event: 'game:resign',
+    schema: ResignRequestSchema,
+    rawPayload: { roomCode },
+    timeoutMs: 8000,
+    timeoutMessage: 'Resign timed out.',
+    startLogMessage: 'Resigning game',
+    startLogContext: { roomCode },
+    validationErrorMessage: 'Resign validation failed',
+    dispatchedLogMessage: 'Resign dispatched',
+    callback,
   });
-
-  // Zod validation before transmission (MIN-030)
-  const validationResult = ResignRequestSchema.safeParse({ roomCode });
-  if (!validationResult.success) {
-    const err = createValidationError(validationResult.error);
-    transport.lastError.value = err;
-    logger.warn('Resign validation failed', {
-      operation: 'socket_game_resign',
-      correlationId,
-      duration: Date.now() - startTime,
-      error: err,
-    });
-    if (callback) callback({ success: false, error: err });
-    return;
-  }
-
-  if (transport.socket.value) {
-    if (callback) {
-      transport.emitWithTimeout<
-        ResignRequest,
-        { success: true } | { success: false; error: SocketErrorPayload }
-      >(transport.socket.value, 'game:resign', validationResult.data, {
-        timeoutMs: 8000,
-        timeoutMessage: 'Resign timed out.',
-        operation: 'socket_game_resign',
-        correlationId,
-        callback,
-      });
-    } else {
-      transport.socket.value.emit('game:resign', validationResult.data);
-      logger.info('Resign dispatched', {
-        operation: 'socket_game_resign',
-        correlationId,
-        duration: Date.now() - startTime,
-      });
-    }
-  }
 }
 
 /**
@@ -394,52 +442,19 @@ export function offerDraw(
   roomCode: string,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
-  const startTime = Date.now();
-  const correlationId = generateCorrelationId();
-  const transport = useSocketTransport();
-
-  logger.debug('Offering draw', {
+  void executeSocketAction<OfferDrawRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_offer_draw',
-    correlationId,
-    roomCode,
+    event: 'game:offer_draw',
+    schema: OfferDrawRequestSchema,
+    rawPayload: { roomCode },
+    timeoutMs: 8000,
+    timeoutMessage: 'Draw offer timed out.',
+    startLogMessage: 'Offering draw',
+    startLogContext: { roomCode },
+    validationErrorMessage: 'Offer draw validation failed',
+    dispatchedLogMessage: 'Offer draw dispatched',
+    callback,
   });
-
-  // Zod validation before transmission (MIN-030)
-  const validationResult = OfferDrawRequestSchema.safeParse({ roomCode });
-  if (!validationResult.success) {
-    const err = createValidationError(validationResult.error);
-    transport.lastError.value = err;
-    logger.warn('Offer draw validation failed', {
-      operation: 'socket_game_offer_draw',
-      correlationId,
-      duration: Date.now() - startTime,
-      error: err,
-    });
-    if (callback) callback({ success: false, error: err });
-    return;
-  }
-
-  if (transport.socket.value) {
-    if (callback) {
-      transport.emitWithTimeout<
-        OfferDrawRequest,
-        { success: true } | { success: false; error: SocketErrorPayload }
-      >(transport.socket.value, 'game:offer_draw', validationResult.data, {
-        timeoutMs: 8000,
-        timeoutMessage: 'Draw offer timed out.',
-        operation: 'socket_game_offer_draw',
-        correlationId,
-        callback,
-      });
-    } else {
-      transport.socket.value.emit('game:offer_draw', validationResult.data);
-      logger.info('Offer draw dispatched', {
-        operation: 'socket_game_offer_draw',
-        correlationId,
-        duration: Date.now() - startTime,
-      });
-    }
-  }
 }
 
 /**
@@ -450,54 +465,43 @@ export function respondDraw(
   accept: boolean,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
-  const startTime = Date.now();
-  const correlationId = generateCorrelationId();
-  const transport = useSocketTransport();
-
-  logger.debug('Responding to draw offer', {
+  drawOfferedBy.value = null;
+  void executeSocketAction<RespondDrawRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_respond_draw',
-    correlationId,
-    roomCode,
-    accept,
+    event: 'game:respond_draw',
+    schema: RespondDrawRequestSchema,
+    rawPayload: { roomCode, accept },
+    timeoutMs: 8000,
+    timeoutMessage: 'Draw response timed out.',
+    startLogMessage: 'Responding to draw offer',
+    startLogContext: { roomCode, accept },
+    validationErrorMessage: 'Respond draw validation failed',
+    dispatchedLogMessage: 'Respond draw dispatched',
+    callback,
+    onSettled: () => {
+      drawOfferedBy.value = null;
+    },
   });
+}
 
-  // Zod validation before transmission (MIN-030)
-  const validationResult = RespondDrawRequestSchema.safeParse({ roomCode, accept });
-  if (!validationResult.success) {
-    const err = createValidationError(validationResult.error);
-    transport.lastError.value = err;
-    logger.warn('Respond draw validation failed', {
-      operation: 'socket_game_respond_draw',
-      correlationId,
-      duration: Date.now() - startTime,
-      error: err,
-    });
-    if (callback) callback({ success: false, error: err });
-    return;
-  }
+/**
+ * Accepts an incoming draw offer.
+ */
+export function acceptDraw(
+  roomCode: string,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
+  respondDraw(roomCode, true, callback);
+}
 
-  if (transport.socket.value) {
-    if (callback) {
-      transport.emitWithTimeout<
-        RespondDrawRequest,
-        { success: true } | { success: false; error: SocketErrorPayload }
-      >(transport.socket.value, 'game:respond_draw', validationResult.data, {
-        timeoutMs: 8000,
-        timeoutMessage: 'Draw response timed out.',
-        operation: 'socket_game_respond_draw',
-        correlationId,
-        callback,
-      });
-    } else {
-      transport.socket.value.emit('game:respond_draw', validationResult.data);
-      logger.info('Respond draw dispatched', {
-        operation: 'socket_game_respond_draw',
-        correlationId,
-        duration: Date.now() - startTime,
-      });
-    }
-    drawOfferedBy.value = null;
-  }
+/**
+ * Declines an incoming draw offer.
+ */
+export function declineDraw(
+  roomCode: string,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
+  respondDraw(roomCode, false, callback);
 }
 
 /**
@@ -507,52 +511,19 @@ export function requestRematch(
   roomCode: string,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
-  const startTime = Date.now();
-  const correlationId = generateCorrelationId();
-  const transport = useSocketTransport();
-
-  logger.debug('Requesting rematch', {
+  void executeSocketAction<RequestRematchRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_request_rematch',
-    correlationId,
-    roomCode,
+    event: 'game:request_rematch',
+    schema: RequestRematchRequestSchema,
+    rawPayload: { roomCode },
+    timeoutMs: 8000,
+    timeoutMessage: 'Rematch request timed out.',
+    startLogMessage: 'Requesting rematch',
+    startLogContext: { roomCode },
+    validationErrorMessage: 'Request rematch validation failed',
+    dispatchedLogMessage: 'Request rematch dispatched',
+    callback,
   });
-
-  // Zod validation before transmission (MIN-030)
-  const validationResult = RequestRematchRequestSchema.safeParse({ roomCode });
-  if (!validationResult.success) {
-    const err = createValidationError(validationResult.error);
-    transport.lastError.value = err;
-    logger.warn('Request rematch validation failed', {
-      operation: 'socket_game_request_rematch',
-      correlationId,
-      duration: Date.now() - startTime,
-      error: err,
-    });
-    if (callback) callback({ success: false, error: err });
-    return;
-  }
-
-  if (transport.socket.value) {
-    if (callback) {
-      transport.emitWithTimeout<
-        RequestRematchRequest,
-        { success: true } | { success: false; error: SocketErrorPayload }
-      >(transport.socket.value, 'game:request_rematch', validationResult.data, {
-        timeoutMs: 8000,
-        timeoutMessage: 'Rematch request timed out.',
-        operation: 'socket_game_request_rematch',
-        correlationId,
-        callback,
-      });
-    } else {
-      transport.socket.value.emit('game:request_rematch', validationResult.data);
-      logger.info('Request rematch dispatched', {
-        operation: 'socket_game_request_rematch',
-        correlationId,
-        duration: Date.now() - startTime,
-      });
-    }
-  }
 }
 
 /**
@@ -563,54 +534,54 @@ export function respondRematch(
   accept: boolean,
   callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
 ): void {
-  const startTime = Date.now();
-  const correlationId = generateCorrelationId();
-  const transport = useSocketTransport();
-
-  logger.debug('Responding to rematch request', {
+  rematchRequestedBy.value = null;
+  void executeSocketAction<RespondRematchRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_respond_rematch',
-    correlationId,
-    roomCode,
-    accept,
+    event: 'game:respond_rematch',
+    schema: RespondRematchRequestSchema,
+    rawPayload: { roomCode, accept },
+    timeoutMs: 8000,
+    timeoutMessage: 'Rematch response timed out.',
+    startLogMessage: 'Responding to rematch request',
+    startLogContext: { roomCode, accept },
+    validationErrorMessage: 'Respond rematch validation failed',
+    dispatchedLogMessage: 'Respond rematch dispatched',
+    callback,
+    onSettled: () => {
+      rematchRequestedBy.value = null;
+    },
   });
+}
 
-  // Zod validation before transmission (MIN-030)
-  const validationResult = RespondRematchRequestSchema.safeParse({ roomCode, accept });
-  if (!validationResult.success) {
-    const err = createValidationError(validationResult.error);
-    transport.lastError.value = err;
-    logger.warn('Respond rematch validation failed', {
-      operation: 'socket_game_respond_rematch',
-      correlationId,
-      duration: Date.now() - startTime,
-      error: err,
-    });
-    if (callback) callback({ success: false, error: err });
-    return;
-  }
+/**
+ * Accepts an incoming rematch request.
+ */
+export function acceptRematch(
+  roomCode: string,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
+  respondRematch(roomCode, true, callback);
+}
 
-  if (transport.socket.value) {
-    if (callback) {
-      transport.emitWithTimeout<
-        RespondRematchRequest,
-        { success: true } | { success: false; error: SocketErrorPayload }
-      >(transport.socket.value, 'game:respond_rematch', validationResult.data, {
-        timeoutMs: 8000,
-        timeoutMessage: 'Rematch response timed out.',
-        operation: 'socket_game_respond_rematch',
-        correlationId,
-        callback,
-      });
-    } else {
-      transport.socket.value.emit('game:respond_rematch', validationResult.data);
-      logger.info('Respond rematch dispatched', {
-        operation: 'socket_game_respond_rematch',
-        correlationId,
-        duration: Date.now() - startTime,
-      });
-    }
-    rematchRequestedBy.value = null;
-  }
+/**
+ * Declines an incoming rematch request.
+ */
+export function declineRematch(
+  roomCode: string,
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+): void {
+  respondRematch(roomCode, false, callback);
+}
+
+/**
+ * Leaves the active multiplayer room, delegating to useRoomSession.
+ */
+export async function leaveRoom(
+  roomCode: string,
+  callback?: (res: { success: boolean }) => void
+): Promise<boolean> {
+  const { leaveRoom: sessionLeaveRoom } = useRoomSession();
+  return sessionLeaveRoom(roomCode, callback);
 }
 
 /**
@@ -623,12 +594,16 @@ export function resetGameActionsState(): void {
   kingInCheck.value = null;
   lastMoveEvent.value = null;
   opponentMoveListeners.clear();
+  customLogger = null;
 }
 
 /**
  * Primary composable exposing game action controls and in-game state.
  */
-export function useGameActions() {
+export function useGameActions(options?: { logger?: ILogger }) {
+  if (options?.logger) {
+    customLogger = options.logger;
+  }
   return {
     gameState,
     turn,
@@ -644,8 +619,13 @@ export function useGameActions() {
     resign,
     offerDraw,
     respondDraw,
+    acceptDraw,
+    declineDraw,
     requestRematch,
     respondRematch,
+    acceptRematch,
+    declineRematch,
+    leaveRoom,
     resetGameActionsState,
   };
 }

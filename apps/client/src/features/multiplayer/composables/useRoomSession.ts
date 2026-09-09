@@ -6,9 +6,10 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Findings CRIT-005, MIN-030.
  */
 
-import { ref, computed, type ComputedRef } from 'vue';
+import { ref, computed, getCurrentInstance, type ComputedRef } from 'vue';
 import type {
   CreateRoomRequest,
+  GameState,
   JoinRoomRequest,
   Player,
   ReconnectRequest,
@@ -24,8 +25,9 @@ import {
   LeaveRoomRequestSchema,
   ReconnectRequestSchema,
 } from '@fun-chess/shared';
-import { safeSessionStorage, createSafeStorage, type KeyValueStorage, STORAGE_KEYS } from '@/platform/storage';
-import { generateCorrelationId, logger } from '@/platform/telemetry';
+import { useInjectLogger, useInjectSessionStorage } from '@/platform/di';
+import { safeSessionStorage, type KeyValueStorage, STORAGE_KEYS } from '@/platform/storage';
+import { generateCorrelationId, logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 import {
   useSocketTransport,
   registerSocketEventListener,
@@ -36,19 +38,41 @@ export const SESSION_STORAGE_KEY = STORAGE_KEYS.SESSION_TOKEN;
 
 export type { SavedSession };
 
+let customSessionStorage: KeyValueStorage | null = null;
+let customLogger: ILogger | null = null;
+
+export function setRoomSessionStorage(storage: KeyValueStorage | null): void {
+  customSessionStorage = storage;
+}
+
+export function setRoomSessionLogger(logger: ILogger | null): void {
+  customLogger = logger;
+}
+
 /**
  * Dynamically resolves session storage adapter (safe in browser & test environments).
  */
-function getSessionStorage(): KeyValueStorage {
-  if (safeSessionStorage.isAvailable()) {
-    return safeSessionStorage;
-  }
-  const fresh = createSafeStorage('sessionStorage');
-  if (fresh.isAvailable()) {
-    return fresh;
+function getSessionStorage(custom?: KeyValueStorage): KeyValueStorage {
+  if (custom) return custom;
+  if (customSessionStorage) return customSessionStorage;
+  if (getCurrentInstance()) {
+    return useInjectSessionStorage();
   }
   return safeSessionStorage;
 }
+
+function getActiveLogger(): ILogger {
+  return customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+}
+
+const logger: ILogger = {
+  debug: (msg, meta) => getActiveLogger().debug(msg, meta),
+  info: (msg, meta) => getActiveLogger().info(msg, meta),
+  warn: (msg, meta) => getActiveLogger().warn(msg, meta),
+  error: (msg, meta) => getActiveLogger().error(msg, meta),
+  fatal: (msg, meta) => getActiveLogger().fatal(msg, meta),
+  child: (context) => getActiveLogger().child(context),
+};
 
 interface ZodValidationErrorLike {
   errors?: Array<{ path: Array<string | number>; message: string }>;
@@ -81,9 +105,7 @@ export function createValidationError(error: unknown): SocketErrorPayload {
 export function getSavedSession(): SavedSession | null {
   const storage = getSessionStorage();
   try {
-    const raw = typeof window !== 'undefined' && window.sessionStorage
-      ? window.sessionStorage.getItem(SESSION_STORAGE_KEY)
-      : storage.getItem(SESSION_STORAGE_KEY);
+    const raw = storage.getItem(SESSION_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (
@@ -101,7 +123,6 @@ export function getSavedSession(): SavedSession | null {
       operation: 'socket_get_saved_session',
       error: err instanceof Error ? err.message : String(err),
     });
-    console.warn('[useSocket] Failed to parse saved session from storage:', err);
     return null;
   }
 }
@@ -291,7 +312,7 @@ registerSocketEventListener('room:reconnected', (data: {
   }
 });
 
-registerSocketEventListener('game:started', (gameState: any) => {
+registerSocketEventListener('game:started', (gameState: GameState) => {
   if (currentRoom.value) {
     currentRoom.value = {
       ...currentRoom.value,
@@ -638,12 +659,20 @@ export function resetRoomSessionState(clearStorage = true): void {
   if (clearStorage) {
     clearSession();
   }
+  customSessionStorage = null;
+  customLogger = null;
 }
 
 /**
  * Primary composable exposing room session state and lifecycle controls.
  */
-export function useRoomSession() {
+export function useRoomSession(options?: { storage?: KeyValueStorage; logger?: ILogger }) {
+  if (options?.storage) {
+    customSessionStorage = options.storage;
+  }
+  if (options?.logger) {
+    customLogger = options.logger;
+  }
   return {
     currentRoom,
     currentPlayer,

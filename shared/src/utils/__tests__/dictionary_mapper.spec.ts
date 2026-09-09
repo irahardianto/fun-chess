@@ -490,7 +490,7 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
       const restored = mapper.fromCompact(emptyDto);
 
       expect(restored.version).toBe(1);
-      expect(restored.exportedAt).toBeGreaterThan(0);
+      expect(restored.exportedAt).toBe(0);
       expect(restored.scenarios).toEqual({});
       expect(restored.puzzles.ratingProfile.rating).toBe(800);
       expect(restored.puzzles.ratingProfile.ratingDeviation).toBe(350);
@@ -503,6 +503,10 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
         totalRushRuns: 0,
       });
       expect(restored.puzzles.solvedPuzzles).toEqual({});
+
+      // With explicit now provided, exportedAt uses provided now (MAJ-019)
+      const restoredWithNow = mapper.fromCompact(emptyDto, 1700000000000);
+      expect(restoredWithNow.exportedAt).toBe(1700000000000);
     });
 
     it("defensively discards malformed and truncated tuples within sub-mappers", () => {
@@ -539,7 +543,7 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
     });
   });
 
-  describe("Deterministic Time Parameter (MAJ-013)", () => {
+  describe("Deterministic Time Parameter & No Date.now() (MAJ-019)", () => {
     it("produces strictly identical compact outputs across repeated calls when given explicit now: number", () => {
       const payload = createFullPayload({ exportedAt: 0 });
       const fixedNow = 1750000000000;
@@ -552,6 +556,42 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
       expect(run1.t).toBe(1750000000);
     });
 
+    it("defaults referenceNow to payload.exportedAt ?? 0 when now is omitted, completely pure without Date.now()", () => {
+      const payloadWithExported = createFullPayload({ exportedAt: 1700000000000 });
+      const compact1 = mapper.toCompact(payloadWithExported);
+      expect(compact1.t).toBe(1700000000);
+
+      const payloadZero = createFullPayload({ exportedAt: 0 });
+      const compact2 = mapper.toCompact(payloadZero);
+      expect(compact2.t).toBe(0);
+    });
+
+    it("defaults referenceNowSec to compact.t ?? 0 when now is omitted in fromCompact", () => {
+      const compactWithT: CompactProgressDto = {
+        v: 1,
+        t: 1700000000,
+        sc: [],
+        pz: {
+          r: [800, 350, 800, 0, 0, 0],
+          tm: [],
+          ac: [0, 0, 0, 0],
+          sp: [],
+          ca: 1700000000,
+          la: 1700000000,
+        },
+      };
+
+      const restored = mapper.fromCompact(compactWithT);
+      expect(restored.exportedAt).toBe(1700000000000);
+
+      const compactZeroT: CompactProgressDto = {
+        ...compactWithT,
+        t: 0,
+      };
+      const restoredZero = mapper.fromCompact(compactZeroT);
+      expect(restoredZero.exportedAt).toBe(0);
+    });
+
     it("propagates explicit now: number via toCompactProgress and fromCompactProgress helpers", () => {
       const payload = createFullPayload({ exportedAt: 0 });
       const fixedNow = 1800000000000;
@@ -562,6 +602,102 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
       const compactWithoutT = { ...compact, t: 0 };
       const restored = fromCompactProgress(compactWithoutT, fixedNow);
       expect(restored.exportedAt).toBe(1800000000000);
+    });
+  });
+
+  describe("Decomposed toCompact Sub-Mappers (ENH-010)", () => {
+    it("handles undefined scenarios, themeMastery, arcadeStats, and solvedPuzzles in toCompact", () => {
+      const sparsePayload = {
+        version: 1,
+        exportedAt: 1700000000000,
+        scenarios: undefined as unknown as UnifiedProgressPayload["scenarios"],
+        puzzles: {
+          ratingProfile: undefined as unknown as UnifiedProgressPayload["puzzles"]["ratingProfile"],
+          themeMastery: undefined as unknown as UnifiedProgressPayload["puzzles"]["themeMastery"],
+          arcadeStats: undefined as unknown as UnifiedProgressPayload["puzzles"]["arcadeStats"],
+          solvedPuzzles: undefined as unknown as UnifiedProgressPayload["puzzles"]["solvedPuzzles"],
+          createdAt: 1700000000000,
+          lastActiveAt: 1700000000000,
+        },
+      } as UnifiedProgressPayload;
+
+      const compact = mapper.toCompact(sparsePayload);
+      expect(compact.sc).toEqual([]);
+      expect(compact.pz.r).toEqual([800, 350, 800, 0, 0, 0]);
+      expect(compact.pz.tm).toEqual([]);
+      expect(compact.pz.ac).toEqual([0, 0, 0, 0]);
+      expect(compact.pz.sp).toEqual([]);
+    });
+
+    it("sorts scenario, theme, and solved puzzle keys deterministically in toCompact", () => {
+      const unsortedPayload: UnifiedProgressPayload = {
+        version: 1,
+        exportedAt: 1700000000000,
+        scenarios: {
+          "zebra-lesson": {
+            scenarioId: "zebra-lesson",
+            starsEarned: 3,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 1700000000000,
+            lastCompletedAt: 1700000000000,
+          },
+          "alpha-lesson": {
+            scenarioId: "alpha-lesson",
+            starsEarned: 2,
+            attemptsCount: 1,
+            hintsUsedTotal: 0,
+            firstCompletedAt: 1700000000000,
+            lastCompletedAt: 1700000000000,
+          },
+        },
+        puzzles: {
+          ratingProfile: {
+            rating: 1000,
+            ratingDeviation: 200,
+            peakRating: 1000,
+            totalAttempted: 10,
+            totalSolved: 8,
+            bestStreak: 4,
+            ratingHistory: [],
+          },
+          themeMastery: {
+            skewer: {
+              theme: "skewer",
+              attempted: 5,
+              solved: 3,
+              starsEarned: 6,
+              masteryLevel: "novice",
+              lastPracticedAt: 1700000000000,
+            },
+            fork: {
+              theme: "fork",
+              attempted: 10,
+              solved: 8,
+              starsEarned: 15,
+              masteryLevel: "apprentice",
+              lastPracticedAt: 1700000000000,
+            },
+          },
+          arcadeStats: {
+            puzzleRushHighScore: 15,
+            puzzleRushBestStreak: 5,
+            streakSurvivorHighScore: 10,
+            totalRushRuns: 8,
+          },
+          solvedPuzzles: {
+            "puz-z": { stars: 3, solvedAt: 1700000000000 },
+            "puz-a": { stars: 2, solvedAt: 1700000000000 },
+          },
+          createdAt: 1700000000000,
+          lastActiveAt: 1700000000000,
+        },
+      };
+
+      const compact = mapper.toCompact(unsortedPayload);
+      expect(compact.sc.map(([id]) => id)).toEqual(["alpha-lesson", "zebra-lesson"]);
+      expect(compact.pz.tm.map(([theme]) => theme)).toEqual(["fork", "skewer"]);
+      expect(compact.pz.sp.map(([id]) => id)).toEqual(["puz-a", "puz-z"]);
     });
   });
 });

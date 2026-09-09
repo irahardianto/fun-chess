@@ -1,448 +1,257 @@
-# Frozen API & Network Contracts: Fun Chess Audit Remediation
+---
+spec_id: tsd-fun-chess-remediation-contracts
+doc_type: tsd
+version: 1.0.0
+status: frozen
+title: "Fun-Chess Monorepo API & WebSocket Contracts Specification"
+created_at: "2026-09-09T07:00:00Z"
+updated_at: "2026-09-09T07:00:00Z"
+authors:
+  - "@architect"
+reviewers:
+  - "@conductor"
+  - "@tech-lead[shared-contracts]"
+  - "@tech-lead[server-platform]"
+  - "@tech-lead[server-gameplay]"
+  - "@tech-lead[client-features]"
+dependencies:
+  specs:
+    - ".agentwork/brief.md"
+  audit_findings:
+    - "MIN-024"
+    - "MAJ-002"
+    - "MAJ-003"
+    - "MIN-025"
+    - "MAJ-005"
+    - "MAJ-006"
+    - "MIN-023"
+---
 
-**Status**: FROZEN CONTRACT
-**Author**: System Architect (`@architect`)
-**Date**: 2026-09-08
-**Scope**: Remediation of 97 Audit Findings (CRIT-001, CRIT-002, CRIT-003, MAJ-011, MAJ-012, MAJ-015, MAJ-029, MAJ-031, MAJ-033)
-**Target Packages**: `@fun-chess/shared`, `@fun-chess/server`, `@fun-chess/client`
+# Fun-Chess Monorepo API & WebSocket Contracts Specification
+
+## 1. Overview and Executive Summary
+
+<!-- requirement: REQ-CONTRACT-001 -->
+This document serves as the **authoritative, frozen integration contract** for all inter-package communication, WebSocket event exchanges, concurrency control semantics, and serialization schemas across the Fun-Chess monorepo (`@fun-chess/shared`, `@fun-chess/server`, and `@fun-chess/client`).
+
+All Tech-Leads and Builders executing Waves 1 through 4 MUST conform strictly to the interfaces, payloads, schemas, error codes, and lifecycle invariants documented herein. Any deviation is considered a breaking change and will fail the independent `@reviewer` verification gate.
+<!-- end requirement -->
 
 ---
 
-## 1. Executive Summary & Design Scope
+## 2. WebSocket Event Interfaces and Payloads
 
-This document defines the authoritative, frozen network and interface contracts for the remediation of all audit findings across `@fun-chess/shared`, `@fun-chess/server`, and `@fun-chess/client`. All builders (`@backend-engineer`, `@frontend-engineer`, `@test-automation-engineer`, `@devops-engineer`, and `Tech-Lead`s) implementing Scope Cards **SC-01** through **SC-09** must strictly adhere to the schemas, interfaces, type signatures, and lifecycle invariants specified herein.
+### 2.1 `room:create` Ack Response Contract (MIN-024)
 
-### Architectural Invariants:
-1. **Strict Validation at System Boundaries**: Every external HTTP request, incoming WebSocket packet, and outgoing WebSocket broadcast must validate against explicit runtime Zod schemas. Compile-time `as any` type assertions are strictly prohibited (`MAJ-027`, `MAJ-029`).
-2. **Unified Error Response Envelope**: All HTTP error responses adhere to the standard envelope `{ status: "error", code, error: { code, message, details, correlationId } }` (`MAJ-033`).
-3. **Partitioned Health & Observability**: Public lightweight container probes (`/health`) return strictly redacted liveness data (`LivenessHealthResponse`). Deep operational metrics (`/health/detail`, `/metrics`) return comprehensive resource counters (`DetailedHealthResponse`) (`CRIT-001`).
-4. **Linearizable Store Concurrency**: Store state mutations are serialized through exclusive monotonic tickets. Overdue lock acquisitions and timed-out executions are invalidated to prevent background state clobbering (`CRIT-002`). Room creation is guaranteed atomic (`CRIT-003`).
-5. **Decoupled Vertical Slices**: Domain services interact only via explicit feature interface contracts (`IRoomGameAdapter`, `IRoomCountProvider`, `IAddressingInfoProvider`) (`MAJ-011`, `MAJ-012`).
-6. **I/O & Hardware Isolation**: All client hardware APIs (`navigator.clipboard`, `navigator.mediaDevices`) are abstracted behind mockable interfaces (`IClipboardService`, `ICameraService`) (`MAJ-015`).
+<!-- requirement: REQ-CONTRACT-MIN-024 -->
+#### 2.1.1 Problem Statement & Asymmetry Analysis
+Prior to remediation, the Socket.IO acknowledgement callback for `room:create` returned only `{ success: true, room: RoomState, sessionToken: string }`, whereas `room:join` and `room:reconnect` returned `{ success: true, room: RoomState, player: Player, sessionToken: string }`. 
 
----
+This asymmetry forced client transport composables to either invent placeholder `Player` objects or parse `room.players` to locate the creator's identity, violating the single source of truth and leading to potential race conditions during initial lobby mount.
+<!-- end requirement -->
 
-## 2. Health Check Contract Alignment (`GET /health` vs `GET /health/detail`) [CRIT-001]
+<!-- contract: CONTRACT-ROOM-CREATE-EVENT -->
+#### 2.1.2 Interface Contract Definition
 
-### 2.1 Problem Statement
-`FetchApiClient.checkHealth()` previously parsed `GET /health` with `HealthCheckResponseSchema` (which was aliased to `DetailedHealthResponseSchema`). However, `GET /health` on the server returns `LivenessHealthResponse` (`{ status, uptimeSeconds, timestamp }`) to prevent telemetry leakage on unauthenticated endpoints (`ENH-003`). This caused every client health probe to throw a Zod validation error (`activeRooms is required`), crashing client health monitoring routines.
+In `shared/src/contracts/events.ts`:
 
-### 2.2 Wire Specifications
+```typescript
+export interface ClientToServerEvents {
+  /**
+   * Creates a new game room; returns private session credentials and authoritative player profile in ack callback.
+   * Conforms to MIN-024 contract symmetry with room:join and room:reconnect.
+   */
+  "room:create": (
+    req: CreateRoomRequest,
+    callback?: (
+      res:
+        | {
+            success: true;
+            room: RoomState;
+            player: Player;
+            sessionToken: string;
+          }
+        | {
+            success: false;
+            error: SocketErrorPayload;
+          },
+    ) => void,
+  ) => void;
+  
+  // ... other client-to-server events
+}
+```
 
-#### 2.2.1 Lightweight Liveness Probe: `GET /health` & `GET /api/health`
-- **Target Audience**: Kubernetes/Docker container liveness and readiness probes, public client network connectivity checks.
-- **HTTP Status Codes**:
-  - `200 OK`: Server operational (`status: "ok"`).
-  - `503 Service Unavailable`: Server degraded or terminating (`status: "degraded"`).
-- **Zod Schema (`shared/src/contracts/schemas.ts`)**:
-  ```typescript
-  export const LivenessHealthResponseSchema = z.object({
-    status: z.enum(["ok", "degraded"]),
-    uptimeSeconds: z.number().nonnegative(),
-    timestamp: z.string().datetime(),
-  });
-  export type LivenessHealthResponse = z.infer<typeof LivenessHealthResponseSchema>;
-  ```
-- **Example Wire Response**:
-  ```json
+#### 2.1.3 Server Execution & Ack Emission Contract
+
+In `apps/server/src/features/rooms/room.socket_handler.ts`:
+
+```typescript
+// Operation: room:create
+const handleCreate = createRoomHandler<
+  CreateRoomRequest,
+  { success: true; room: RoomState; player: Player; sessionToken: string }
+>(
+  logger,
+  "room:create",
+  socket,
   {
-    "status": "ok",
-    "uptimeSeconds": 142.5,
-    "timestamp": "2026-09-08T15:30:00.000Z"
-  }
-  ```
+    schema: CreateRoomRequestSchema as any,
+    rateLimiter: roomCreateRateLimiter, // MAJ-006 differential limiter
+  },
+  async (req, context) => {
+    const result = await roomService.createRoom(
+      {
+        playerName: req.playerName,
+        avatar: req.avatar,
+        preferredColor: req.preferredColor,
+      },
+      socket.id,
+    );
 
-#### 2.2.2 Detailed Telemetry Probe: `GET /health/detail` & `GET /metrics`
-- **Target Audience**: Internal monitoring dashboards, diagnostic tools, and admin health checks.
-- **HTTP Status Codes**: `200 OK`.
-- **Zod Schema (`shared/src/contracts/schemas.ts`)**:
-  ```typescript
-  export const DetailedHealthResponseSchema = z.object({
-    status: z.enum(["ok", "degraded"]),
-    uptimeSeconds: z.number().nonnegative(),
-    timestamp: z.string().datetime(),
-    activeRooms: z.number().int().nonnegative(),
-    activeSockets: z.number().int().nonnegative(),
-    memoryUsageMb: z.object({
-      rss: z.number().nonnegative(),
-      heapTotal: z.number().nonnegative(),
-      heapUsed: z.number().nonnegative(),
-    }),
-    relay: z
-      .object({
-        mode: z.enum(["cloud", "lan"]),
-        publicUrl: z.string().url().optional(),
-      })
-      .optional(),
-  });
-  export type DetailedHealthResponse = z.infer<typeof DetailedHealthResponseSchema>;
-  ```
-- **Example Wire Response**:
-  ```json
-  {
-    "status": "ok",
-    "uptimeSeconds": 142.5,
-    "timestamp": "2026-09-08T15:30:00.000Z",
-    "activeRooms": 3,
-    "activeSockets": 6,
-    "memoryUsageMb": {
-      "rss": 42.1,
-      "heapTotal": 24.5,
-      "heapUsed": 18.2
-    },
-    "relay": {
-      "mode": "lan",
-      "publicUrl": "http://192.168.1.100:3000"
-    }
-  }
-  ```
+    // Bind authenticated userId to socket session context for subsequent telemetry (MAJ-023)
+    socket.data.userId = result.player.id;
+    socket.data.roomCode = result.room.code;
 
-### 2.3 Shared Contract Aliasing (`shared/src/contracts/schemas.ts`)
-To prevent future client schema mismatch crashes while preserving backward compatibility:
-```typescript
-/**
- * Canonical alias for standard health checks (/health, /api/health).
- * Aligned strictly with LivenessHealthResponse to resolve CRIT-001.
- */
-export const HealthCheckResponseSchema = LivenessHealthResponseSchema;
-export type HealthCheckResponse = LivenessHealthResponse;
-```
+    // Join Socket.io room channel
+    await socket.join(result.room.code);
 
-### 2.4 Client API Client Contract (`apps/client/src/platform/api/fetch_api_client.ts`)
-```typescript
-export interface IApiClient {
-  // Lightweight health probe targeting /health
-  checkHealth(options?: ApiRequestOptions): Promise<LivenessHealthResponse>;
-  // Deep telemetry probe targeting /health/detail
-  getDetailedHealth(options?: ApiRequestOptions): Promise<DetailedHealthResponse>;
-  getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse>;
-  checkConnectivity(probeUrl?: string, options?: ApiRequestOptions): Promise<boolean>;
-}
-
-export class FetchApiClient implements IApiClient {
-  async checkHealth(options?: ApiRequestOptions): Promise<LivenessHealthResponse> {
-    const res = await this.get<unknown>('/health', options);
-    if (!res.ok) throw new Error(`Health check failed: HTTP ${res.status}`);
-    return LivenessHealthResponseSchema.parse(res.data);
-  }
-
-  async getDetailedHealth(options?: ApiRequestOptions): Promise<DetailedHealthResponse> {
-    const res = await this.get<unknown>('/health/detail', options);
-    if (!res.ok) throw new Error(`Detailed health check failed: HTTP ${res.status}`);
-    return DetailedHealthResponseSchema.parse(res.data);
-  }
-  // ...
-}
-```
-
----
-
-## 3. Standard HTTP Error Response Envelope Format [MAJ-033]
-
-### 3.1 Specification & Envelope Schema
-All error responses emitted by native HTTP server endpoints, route controllers, and middleware must follow the standardized envelope structure conforming to `.agents/rules/api-design-principles.md`. Transport status and domain error reasons are strictly segregated.
-
-```typescript
-export interface HttpErrorBody {
-  /** Machine-readable business error code in UPPER_SNAKE_CASE */
-  code: string;
-  /** Human-readable explanatory message */
-  message: string;
-  /** Optional structured context payload */
-  details?: Record<string, unknown>;
-  /** Optional tracing correlation UUID */
-  correlationId?: string;
-}
-
-export interface HttpErrorEnvelope {
-  /** Always "error" */
-  status: "error";
-  /** Redundant HTTP status code (400-599) matching the HTTP status header */
-  code: number;
-  /** Domain error details */
-  error: HttpErrorBody;
-}
-```
-
-**Zod Schema (`shared/src/contracts/schemas.ts`)**:
-```typescript
-export const HttpErrorBodySchema = z.object({
-  code: z.string(),
-  message: z.string(),
-  details: z.record(z.unknown()).optional(),
-  correlationId: z.string().optional(),
-});
-
-export const HttpErrorEnvelopeSchema = z.object({
-  status: z.literal("error"),
-  code: z.number().int().min(400).max(599),
-  error: HttpErrorBodySchema,
-});
-```
-
-### 3.2 Standard Machine-Readable Error Codes
-| HTTP Status | Error Code (`error.code`) | Description |
-|---|---|---|
-| `400` | `ERR_BAD_REQUEST` | Malformed URL, unparsable payload |
-| `400` | `ERR_VALIDATION_FAILED` | Request parameters violated Zod schema |
-| `403` | `ERR_CORS_FORBIDDEN` | Request origin not allowed by server CORS configuration |
-| `404` | `ERR_NOT_FOUND` | Route or requested static asset does not exist |
-| `405` | `ERR_METHOD_NOT_ALLOWED` | HTTP method not supported for route |
-| `429` | `ERR_RATE_LIMITED` | Client IP exceeded request rate limits |
-| `500` | `ERR_INTERNAL_SERVER_ERROR` | Unhandled exception during request dispatch |
-
-### 3.3 Server Formatting Helpers (`apps/server/src/platform/http/http_server.ts`)
-```typescript
-export function formatHttpError(
-  statusCode: number,
-  errorCode: string,
-  message: string,
-  correlationId?: string,
-  details?: Record<string, unknown>,
-): HttpErrorEnvelope {
-  return {
-    status: "error",
-    code: statusCode,
-    error: {
-      code: errorCode,
-      message,
-      ...(details ? { details } : {}),
-      ...(correlationId ? { correlationId } : {}),
-    },
-  };
-}
-
-export function formatHttpErrorFromException(
-  err: unknown,
-  correlationId?: string,
-): { statusCode: number; payload: HttpErrorEnvelope } {
-  if (err instanceof AppError) {
     return {
-      statusCode: err.statusCode,
-      payload: formatHttpError(
-        err.statusCode,
-        err.code,
-        err.message,
-        correlationId,
-        err.details,
-      ),
+      success: true,
+      room: result.room,
+      player: result.player,
+      sessionToken: result.sessionToken,
     };
-  }
-
-  const message = err instanceof Error ? err.message : "Internal Server Error";
-  return {
-    statusCode: 500,
-    payload: formatHttpError(
-      500,
-      "ERR_INTERNAL_SERVER_ERROR",
-      message,
-      correlationId,
-    ),
-  };
-}
+  },
+);
 ```
 
-### 3.4 Wire Examples
+#### 2.1.4 Client Handling Contract
 
-#### 3.4.1 CORS Preflight Rejection (403 Forbidden)
-```json
-{
-  "status": "error",
-  "code": 403,
-  "error": {
-    "code": "ERR_CORS_FORBIDDEN",
-    "message": "CORS origin not allowed",
-    "correlationId": "48b6c00d-9b55-46f9-bf7b-f4581df10134"
-  }
-}
-```
+In `apps/client/src/features/multiplayer/composables/useRoomSession.ts` and `useSocketTransport.ts`:
 
-#### 3.4.2 Rate Limiting (429 Too Many Requests)
-```json
-{
-  "status": "error",
-  "code": 429,
-  "error": {
-    "code": "ERR_RATE_LIMITED",
-    "message": "Rate limit exceeded. Maximum 100 requests per 10 seconds allowed.",
-    "correlationId": "f90b9b32-cd20-4107-b2eb-d1e920ad51cb"
-  }
-}
-```
+1. Upon receiving `{ success: true, room, player, sessionToken }`, client MUST:
+   - Store `player` in reactive state `currentLocalPlayer.value = res.player`.
+   - Store session token via `storage.setItem(SESSION_STORAGE_KEY, { roomCode: room.code, playerId: player.id, sessionToken })`.
+   - Mount local lobby view with player identity confirmed without querying room arrays.
+<!-- end contract -->
 
 ---
 
-## 4. Core WebSocket Event Runtime Zod Schemas [MAJ-029]
+### 2.2 `room:player_left` Broadcast on Host Lobby Departure (MAJ-002)
 
-### 4.1 Schema Definitions (`shared/src/contracts/schemas.ts`)
-Zero runtime schemas previously existed for core domain models (`RoomState`, `GameState`, `Player`, `MoveResult`, `GameOverPayload`), allowing corrupted or out-of-spec payloads to crash clients and servers. The following runtime Zod schemas are authoritative:
+<!-- requirement: REQ-CONTRACT-MAJ-002 -->
+#### 2.2.1 Problem Statement & Ghost Room Deadlock
+When a room host voluntarily leaves during the `lobby` phase (prior to game start), `room.logic.ts` evaluates `result.shouldDelete === true`. In `room.socket_handler.ts`, the handler correctly purged timers and deleted the room from `roomStore` and `sessionRegistry`, but **skipped emitting any notification to the guest player sitting in the room**.
+
+As a consequence, the guest remained trapped in a dead lobby view. Subsequent interactions by the guest triggered `ERR_ROOM_NOT_FOUND` (404), producing a stranded, broken UX.
+<!-- end requirement -->
+
+<!-- contract: CONTRACT-ROOM-PLAYER-LEFT-BROADCAST -->
+#### 2.2.2 Event Contract Specification
+
+In `shared/src/contracts/events.ts`:
 
 ```typescript
-/**
- * Piece type notation schema.
- */
-export const PieceTypeSchema = z.enum(["p", "n", "b", "r", "q", "k"]);
-export type PieceType = z.infer<typeof PieceTypeSchema>;
-
-/**
- * Public player representation schema.
- * All Player objects are strictly free of private credentials (CRIT-001).
- */
-export const PlayerSchema = z.object({
-  id: z.string().uuid("Player ID must be a valid UUID"),
-  socketId: z.string().min(1, "Socket ID must not be empty"),
-  name: PlayerNameSchema,
-  avatar: AvatarEmojiSchema,
-  color: PieceColorSchema,
-  isHost: z.boolean(),
-  isConnected: z.boolean(),
-  connectedAt: z.number().nonnegative(),
-});
-export type Player = z.infer<typeof PlayerSchema>;
-
-/**
- * Executed move result schema.
- */
-export const MoveResultSchema = z.object({
-  from: ChessSquareSchema,
-  to: ChessSquareSchema,
-  san: z.string().min(1),
-  piece: PieceTypeSchema,
-  color: PieceColorSchema,
-  captured: PieceTypeSchema.optional(),
-  promotion: PromotionPieceSchema.optional(),
-  flags: z.string(),
-  fen: z.string().min(1),
-  moveNumber: z.number().int().nonnegative(),
-  timestamp: z.number().nonnegative(),
-});
-export type MoveResult = z.infer<typeof MoveResultSchema>;
-
-/**
- * Authoritative game state schema.
- */
-export const GameStateSchema = z.object({
-  fen: z.string().min(1),
-  turn: PieceColorSchema,
-  isCheck: z.boolean(),
-  isCheckmate: z.boolean(),
-  isDraw: z.boolean(),
-  isStalemate: z.boolean(),
-  isThreefoldRepetition: z.boolean(),
-  isInsufficientMaterial: z.boolean(),
-  isFiftyMoveRule: z.boolean(),
-  moveHistory: z.array(MoveResultSchema),
-  capturedWhite: z.array(PieceTypeSchema),
-  capturedBlack: z.array(PieceTypeSchema),
-  materialAdvantage: z.object({
-    white: z.number(),
-    black: z.number(),
-  }),
-  lastMove: z
-    .object({
-      from: z.string(),
-      to: z.string(),
-    })
-    .nullable(),
-  moveCount: z.number().int().nonnegative(),
-});
-export type GameState = z.infer<typeof GameStateSchema>;
-
-/**
- * Rematch proposal state schema.
- */
-export const RematchStateSchema = z.object({
-  requestedBy: z.string().uuid(),
-  requestedAt: z.number().nonnegative(),
-  status: z.enum(["pending", "accepted", "declined"]),
-});
-export type RematchState = z.infer<typeof RematchStateSchema>;
-
-/**
- * Draw offer state schema.
- */
-export const DrawOfferSchema = z.object({
-  offeredBy: z.string().uuid(),
-  offeredAt: z.number().nonnegative(),
-});
-export type DrawOffer = z.infer<typeof DrawOfferSchema>;
-
-/**
- * Room lifecycle status schema.
- */
-export const RoomStatusSchema = z.enum([
-  "lobby",
-  "playing",
-  "paused_disconnect",
-  "game_over",
-  "rematch_pending",
-  "abandoned",
-]);
-export type RoomStatus = z.infer<typeof RoomStatusSchema>;
-
-/**
- * Authoritative room state schema.
- */
-export const RoomStateSchema = z.object({
-  roomCode: RoomCodeSchema,
-  version: z.number().int().positive().optional(),
-  status: RoomStatusSchema,
-  hostId: z.string().uuid(),
-  whitePlayer: PlayerSchema.nullable(),
-  blackPlayer: PlayerSchema.nullable(),
-  spectators: z.array(PlayerSchema),
-  game: GameStateSchema,
-  rematch: RematchStateSchema.nullable(),
-  drawOffer: DrawOfferSchema.nullable().optional(),
-  createdAt: z.number().nonnegative(),
-  lastActivityAt: z.number().nonnegative(),
-});
-export type RoomState = z.infer<typeof RoomStateSchema>;
-
-/**
- * Game termination reason schema.
- */
-export const GameOverReasonSchema = z.enum([
-  "checkmate",
-  "stalemate",
-  "threefold_repetition",
-  "insufficient_material",
-  "fifty_move_rule",
-  "resignation",
-  "draw_agreement",
-  "abandonment",
-]);
-export type GameOverReason = z.infer<typeof GameOverReasonSchema>;
-
-/**
- * Match conclusion broadcast payload schema.
- */
-export const GameOverPayloadSchema = z.object({
-  winner: z.union([PieceColorSchema, z.literal("draw")]),
-  winnerName: z.string().optional(),
-  reason: GameOverReasonSchema,
-  message: z.string().min(1),
-  finalFen: z.string().min(1),
-  totalMoves: z.number().int().nonnegative(),
-  durationSeconds: z.number().nonnegative(),
-});
-export type GameOverPayload = z.infer<typeof GameOverPayloadSchema>;
+export interface ServerToClientEvents {
+  /**
+   * Broadcast to room members when a player leaves the room.
+   * When a host leaves in the lobby phase, this event is dispatched to all remaining occupants
+   * before the room channel is torn down (MAJ-002).
+   */
+  "room:player_left": (data: {
+    playerId: string;
+    playerName: string;
+    reason: "player_left" | "host_left" | "kicked" | "room_closed";
+  }) => void;
+  
+  // ... other server-to-client events
+}
 ```
 
-### 4.2 Inbound & Outbound Validation Policy
-1. **Server Ingress**: All event payloads are parsed with `Schema.parse()` inside `wrapSocketHandler` or feature handlers. If validation fails, server emits `{ code: "ERR_INVALID_PAYLOAD", message, correlationId }` and does not mutate domain state.
-2. **Server Egress**: Payloads emitted on `room:state`, `game:moved`, and `game:over` are validated with `Schema.parse()` in non-production environments to detect schema drift early.
-3. **Client Ingress**: The client transport layer validates incoming packets before passing to reactive state refs, logging any schema violations via structured telemetry.
+#### 2.2.3 Server Emission Sequence Contract
+
+In `apps/server/src/features/rooms/room.socket_handler.ts`:
+
+When `roomService.leaveRoom` completes:
+1. Extract `roomCode = req.roomCode.toUpperCase()`.
+2. Inspect `result.shouldDelete`:
+   - If `result.shouldDelete === true`:
+     - **MANDATORY BROADCAST**: Server MUST broadcast `room:player_left` to all other sockets in the room channel *before* clearing room state:
+       ```typescript
+       socket.to(roomCode).emit("room:player_left", {
+         playerId: result.player.id,
+         playerName: result.player.name,
+         reason: result.player.isHost ? "host_left" : "player_left",
+       });
+       ```
+     - Cancel all disconnect timers for `roomCode`: `timerRegistry.cancelAllForRoom(roomCode)`.
+     - Force remaining sockets in `roomCode` to leave the Socket.io room channel:
+       ```typescript
+       const socketsInRoom = await io.in(roomCode).fetchSockets();
+       for (const s of socketsInRoom) {
+         await s.leave(roomCode);
+       }
+       ```
+   - If `result.gameOverPayload` is present (in-game resignation / forfeit):
+     - Broadcast `game:over` to `io.to(roomCode).emit("game:over", result.gameOverPayload)`.
+   - Otherwise (guest leaves lobby, match continues or returns to waiting):
+     - Broadcast `room:player_left` to `socket.to(roomCode)`.
+
+3. Finally, execute `await socket.leave(roomCode)` for the leaving player and return `{ success: true }`.
+
+#### 2.2.4 Client Reaction & State Cleanup Contract
+
+In `apps/client/src/features/multiplayer/composables/useSocketTransport.ts` / `LobbyView.vue`:
+
+```typescript
+// Registered via createInboundHandler("room:player_left", ...)
+onPlayerLeft((payload) => {
+  logger.info("Room player left notification received", {
+    operation: "socket_player_left",
+    playerId: payload.playerId,
+    reason: payload.reason,
+  });
+
+  if (payload.reason === "host_left") {
+    // Notify user host has disbanded the room
+    showNotification({
+      type: "warning",
+      message: "The host has left and closed this game room.",
+    });
+    // Teardown local session and transition to lobby browser/home
+    resetRoomSession();
+    router.push({ name: "lobby" });
+  } else {
+    // Standard guest departure in active room: update player slot in state
+    removePlayerFromRoom(payload.playerId);
+  }
+});
+```
+<!-- end contract -->
 
 ---
 
-## 5. Idempotent Move Submission Schema [MAJ-031]
+### 2.3 Move Submission & Idempotency Key Ingress Contract (MAJ-003)
 
-### 5.1 Problem Statement
-In fast-paced play or network retries, clients re-submitting an in-flight move received `NotYourTurnError` because the first attempt succeeded on the server. Furthermore, out-of-order `game:moved` socket packets caused the client board to rewind to previous positions.
+<!-- requirement: REQ-CONTRACT-MAJ-003 -->
+#### 2.3.1 Problem Statement & Client Validation Bypass
+`MakeMoveRequestSchema` in `shared/src/contracts/schemas.ts` previously defined `idempotencyKey: z.string().uuid().optional()`. 
 
-### 5.2 Updated Move Request Schema (`shared/src/contracts/schemas.ts`)
+In `apps/client/src/features/multiplayer/composables/useGameActions.ts`, client-side code generated or accepted non-UUID tokens, caught the schema validation error, and forcibly bypassed validation via `as any`. When the raw payload reached the server, `MakeMoveRequestSchema.safeParse` strictly enforced `.uuid()`, dropping moves with `ERR_INVALID_PAYLOAD`.
+<!-- end requirement -->
+
+<!-- contract: CONTRACT-MAKE-MOVE-SCHEMA -->
+#### 2.3.2 Shared Schema Specification
+
+In `shared/src/contracts/schemas.ts`:
+
 ```typescript
+/**
+ * Socket request schema for submitting a move in an active game room.
+ * Accepts RFC 4122 UUID or any safe unique client string token (1-64 chars)
+ * to support UUID, nanoid, or cryptographic hex digests without client bypass (MAJ-003).
+ */
 export const MakeMoveRequestSchema = z.object({
   roomCode: RoomCodeSchema,
   move: MovePayloadSchema,
@@ -452,346 +261,344 @@ export const MakeMoveRequestSchema = z.object({
    */
   expectedMoveNumber: z.number().int().nonnegative().optional(),
   /**
-   * Client-generated UUID idempotency token.
-   * If a move with this idempotency key was already applied, the server returns
-   * the existing move result without throwing NotYourTurnError.
+   * Client-generated idempotency token.
+   * Can be a standard UUIDv4 or any alphanumeric/hyphenated token (1 to 64 chars).
    */
-  idempotencyKey: z.string().uuid().optional(),
+  idempotencyKey: z
+    .string()
+    .min(1, "Idempotency key must not be empty")
+    .max(64, "Idempotency key cannot exceed 64 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Idempotency key must be alphanumeric, hyphen, or underscore")
+    .optional(),
 });
 export type MakeMoveRequest = z.infer<typeof MakeMoveRequestSchema>;
 ```
 
-### 5.3 Server Validation & Idempotency Rules (`GameService.makeMove`)
-1. **Expected Move Number Verification**:
-   - If `expectedMoveNumber` is provided and `expectedMoveNumber !== room.game.moveCount`:
-     - If `expectedMoveNumber < room.game.moveCount`:
-       - Check if the last move applied (`room.game.lastMove`) matches `move.from` and `move.to`.
-       - If matching: Return current `room.game` and `moveResult` as an idempotent success.
-       - If not matching: Throw `OptimisticLockConflictError(roomCode, expectedMoveNumber, room.game.moveCount)`.
-     - If `expectedMoveNumber > room.game.moveCount`:
-       - Throw `InvalidMoveError("Move out of sequence: expectedMoveNumber is in the future")`.
-2. **Client Monotonic Sequence Guard (`useGameActions`)**:
-   - When receiving `game:moved` or `room:updated`:
-     - Compare packet `moveResult.moveNumber` against local `gameState.moveCount`.
-     - If `moveResult.moveNumber < localGameState.moveCount`: Discard packet and log debug warning (`"Stale out-of-order move packet ignored"`).
+#### 2.3.3 Client Ingress Remediation Contract
 
----
+In `apps/client/src/features/multiplayer/composables/useGameActions.ts`:
 
-## 6. Atomic Room Creation Contract: `IRoomStore.createIfAbsent` [CRIT-003]
-
-### 6.1 Problem Statement
-`RoomService.createRoom` previously generated a room code, performed an un-locked `findByCode(code)`, and if null, called `save(room)`. Two concurrent requests generating the same room code simultaneously both saw `null` and both called `save()`. Because `save()` did not verify versions on initial creation, the second write clobbered the first room, dropping existing players.
-
-### 6.2 Updated `IRoomStore` Interface (`apps/server/src/features/rooms/room.store.ts`)
-```typescript
-export interface IRoomStore {
-  findByCode(roomCode: string): Promise<RoomState | null>;
-  findBySocketId(socketId: string): Promise<{ room: RoomState; playerId: string } | null>;
-  mutate<T>(roomCode: string, mutator: RoomMutator<T>): Promise<T>;
-  withLock<T>(roomCode: string, action: () => Promise<T>): Promise<T>;
-  save(room: RoomState, expectedVersion?: number): Promise<void>;
-
-  /**
-   * Atomically creates and persists a room if and only if no room with this roomCode currently exists.
-   * Guaranteed atomic under the room code's exclusive lock.
-   *
-   * @param room - The initial room state to persist
-   * @throws RoomAlreadyExistsError if a room with this code already exists
-   */
-  createIfAbsent(room: RoomState): Promise<void>;
-
-  delete(roomCode: string): Promise<boolean>;
-  listActiveRooms(): Promise<RoomState[]>;
-  count(): Promise<number>;
-  clear(): Promise<void>;
-}
-```
-
-### 6.3 Implementation Semantics (`InMemoryRoomStore.createIfAbsent`)
-```typescript
-public async createIfAbsent(room: RoomState): Promise<void> {
-  const code = room.roomCode.toUpperCase();
-  await this.withLock(code, async () => {
-    if (this.rooms.has(code)) {
-      throw new RoomAlreadyExistsError(code);
-    }
-    const roomToSave: RoomState = {
-      ...structuredClone(room),
-      version: room.version || 1,
-      lastActivityAt: room.lastActivityAt ?? this.clock.now(),
-    };
-    this.rooms.set(code, roomToSave);
-    this.indexSockets(roomToSave);
-  });
-}
-```
-
-### 6.4 `RoomService.createRoom` Orchestration
-```typescript
-// Retry loop with atomic createIfAbsent
-for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
-  const code = this.generateRoomCode();
-  const roomState = createInitialRoomState(code, ...);
-  try {
-    await this.store.createIfAbsent(roomState);
-    return { room: roomState, sessionToken };
-  } catch (err) {
-    if (err instanceof RoomAlreadyExistsError) {
-      continue; // Collision detected under lock; regenerate
-    }
-    throw err;
-  }
-}
-```
-
----
-
-## 7. Lock Acquisition Monotonic Ticket Model for `InMemoryRoomStore` [CRIT-002]
-
-### 7.1 Problem Statement
-When an operation in `withLock` exceeds `EXECUTION_TIMEOUT_MS` (5,000ms), `Promise.race` rejects with `LockExecutionTimeoutError`. In the `finally` block, `releaseLock()` runs and unblocks the next queued operation in the lock chain. In JavaScript, async functions cannot be cancelled; the timed-out `action()` continues executing in the background. When it eventually settles, it writes to `this.rooms.set(code, ...)`, overwriting state written by subsequent lock holders.
-
-### 7.2 The Monotonic Ticket Architecture
-
-```mermaid
-sequenceDiagram
-    participant LockQueue as LockQueue (code)
-    participant Op1 as Operation 1 (Slow)
-    participant Op2 as Operation 2 (Queued)
-    participant Store as InMemoryRoomStore
-
-    Note over LockQueue: Ticket Sequence = 100
-    LockQueue->>Op1: Acquire Lock -> Ticket #101 (active)
-    Note over Op1: Action takes 6,000ms...
-    Op1--xLockQueue: Timeout at 5,000ms!
-    Note over LockQueue: Ticket #101 CANCELLED!
-    LockQueue->>Op2: Release Lock -> Ticket #102 (active)
-    Op2->>Store: save(room) [Validates Ticket #102] -> Persisted!
-    Note over Op1: Action finishes at 6,000ms
-    Op1->>Store: save(room) [Validates Ticket #101]
-    Store--xOp1: StaleLockExecutionError (Write Rejected!)
-```
-
-### 7.3 Store Ticket Invariants & Methods
-1. **Ticket Counter**: Monotonically increasing 64-bit integer: `private ticketSequence = 0;`.
-2. **Active Tickets Map**: Maps `roomCode -> activeTicketId` (`Map<string, number>`).
-3. **Cancelled Tickets Set**: Stores invalidated ticket IDs (`Set<number>`).
-4. **Ticket Context Association**: `withLock` creates an execution context:
+1. **REMOVE COMPLETELY** the bypass block:
    ```typescript
-   export interface LockContext {
-     roomCode: string;
-     ticket: number;
-     isCancelled: () => boolean;
+   // DELETED:
+   // if (!validationResult.success && typeof idempotencyKey === 'string') { ... as any }
+   ```
+2. Parse payload directly and strictly with `MakeMoveRequestSchema`:
+   ```typescript
+   const validationPayload: MakeMoveRequest = {
+     roomCode,
+     move,
+     expectedMoveNumber,
+     idempotencyKey,
+   };
+
+   const validationResult = MakeMoveRequestSchema.safeParse(validationPayload);
+   if (!validationResult.success) {
+     const err = createValidationError(validationResult.error);
+     transport.lastError.value = err;
+     logger.warn("Make move validation failed", {
+       operation: "socket_game_move",
+       correlationId,
+       issues: validationResult.error.issues,
+     });
+     return { success: false, error: err };
    }
    ```
-5. **State Guard Enforcement**:
-   - `mutate` and internal store writers assert:
-     ```typescript
-     if (this.cancelledTickets.has(ticket) || this.activeTickets.get(code) !== ticket) {
-       throw new StaleLockExecutionError(code, ticket);
-     }
-     ```
-   - If ticket is cancelled, the write is aborted, preserving store linearizability.
+<!-- end contract -->
 
 ---
 
-## 8. Interface Contract `IRoomGameAdapter` Decoupling `GameService` [MAJ-012]
+### 2.4 Promotion Piece Model & Schema Reconciliation (MIN-025)
 
-### 8.1 Problem Statement
-`GameService` directly imported internal `RoomStore`, `room.logic.ts`, and `session_registry.ts` from `../rooms/`, violating vertical slice boundaries (`MAJ-012`).
+<!-- requirement: REQ-CONTRACT-MIN-025 -->
+#### 2.4.1 Type Drift Analysis
+In standard chess (FIDE laws), a pawn can only promote to Queen (`q`), Rook (`r`), Bishop (`b`), or Knight (`n`).
+- `shared/src/contracts/schemas.ts` defined:
+  `PromotionPieceSchema = z.enum(["q", "r", "b", "n"])`
+- But `shared/src/contracts/models.ts` defined:
+  `MoveResult.promotion?: PieceType` where `PieceType = "p" | "n" | "b" | "r" | "q" | "k"`
 
-### 8.2 The Contract (`apps/server/src/features/rooms/room.interface.ts`)
+This allowed `p` (pawn) and `k` (king) as promotion targets at the TypeScript interface layer, causing type drift, unsafe type assertions (`as PieceType` in `chess_engine.ts`), and discrepancies in piece valuation engines.
+<!-- end requirement -->
+
+<!-- contract: CONTRACT-PROMOTION-TYPES -->
+#### 2.4.2 Canonical Type Definition
+
+In `shared/src/contracts/models.ts`:
+
 ```typescript
-export interface IRoomGameAdapter {
-  /**
-   * Retrieves a read-only snapshot of current room state.
-   */
-  getRoom(roomCode: string): Promise<RoomState | null>;
+/**
+ * Pawn promotion piece target symbol strictly limited to legal chess promotion targets ('q', 'r', 'b', 'n').
+ * Conforms to FIDE laws and reconciles with PromotionPieceSchema (MIN-025).
+ */
+export type PromotionPiece = "q" | "r" | "b" | "n";
 
-  /**
-   * Applies an executed chess move and state update to the room under exclusive lock.
-   */
-  applyGameMove(
-    roomCode: string,
-    nextGameState: GameState,
-    gameOverPayload?: GameOverPayload,
-  ): Promise<RoomState>;
-
-  /**
-   * Finalizes a match with an explicit game-over payload (resignation, timeout, draw).
-   */
-  finalizeGame(
-    roomCode: string,
-    gameOverPayload: GameOverPayload,
-  ): Promise<RoomState>;
-
-  /**
-   * Records a proposed draw offer or response in the room state.
-   */
-  updateDrawOffer(
-    roomCode: string,
-    drawOffer: RoomState["drawOffer"],
-  ): Promise<RoomState>;
-
-  /**
-   * Records a rematch proposal or acceptance in the room state.
-   */
-  updateRematch(
-    roomCode: string,
-    rematch: RoomState["rematch"],
-    newGameState?: GameState,
-    players?: { whitePlayer: Player | null; blackPlayer: Player | null },
-  ): Promise<RoomState>;
+/**
+ * Result of an executed chess move.
+ */
+export interface MoveResult {
+  from: string;
+  to: string;
+  san: string;
+  piece: PieceType;
+  color: PieceColor;
+  captured?: PieceType;
+  /** Promoted piece type, if this move was a legal pawn promotion */
+  promotion?: PromotionPiece;
+  flags: string;
+  fen: string;
+  moveNumber: number;
+  timestamp: number;
 }
 ```
 
-### 8.3 Feature Public API Export (`apps/server/src/features/rooms/index.ts`)
+In `shared/src/contracts/schemas.ts`:
+
 ```typescript
-export type { IRoomService, IRoomGameAdapter } from "./room.interface.js";
-export { RoomService } from "./room.service.js";
-export { InMemoryRoomStore } from "./in_memory_room.store.js";
-// Never export room.logic.ts or internal store mutators
+export const PromotionPieceSchema = z.enum(["q", "r", "b", "n"]);
+export type PromotionPieceDto = z.infer<typeof PromotionPieceSchema>;
 ```
 
-### 8.4 `GameService` Constructor Dependency Injection (`apps/server/src/features/game/game.service.ts`)
-```typescript
-export class GameService implements IGameService {
-  private readonly roomAdapter: IRoomGameAdapter;
-  private readonly clock: IClock;
-  private readonly idGenerator: IIdGenerator;
+In `apps/server/src/features/game/chess_engine.ts`:
 
-  constructor(
-    roomAdapter: IRoomGameAdapter,
-    clock?: IClock,
-    idGenerator?: IIdGenerator,
-  ) {
-    this.roomAdapter = roomAdapter;
-    this.clock = clock ?? new SystemClock();
-    this.idGenerator = idGenerator ?? new UuidGenerator();
+```typescript
+// Casting promotion piece strictly to PromotionPiece instead of PieceType
+promotion: moveResultObj.promotion
+  ? (moveResultObj.promotion as PromotionPiece)
+  : undefined,
+```
+<!-- end contract -->
+
+---
+
+## 3. Concurrency & Error Prototype Contracts
+
+### 3.1 Single Source of Truth `OptimisticLockConflictError` (MAJ-005)
+
+<!-- requirement: REQ-CONTRACT-MAJ-005 -->
+#### 3.1.1 Root Cause & Prototype Pollution
+Two independent definitions of `OptimisticLockConflictError` existed:
+1. `shared/src/contracts/errors.ts`
+2. `apps/server/src/features/rooms/room.errors.ts`
+
+Because JavaScript `instanceof` verifies prototype identity across the inheritance chain, an error thrown by `InMemoryRoomStore` or `RoomStore` failed `instanceof OptimisticLockConflictError` checks inside `GameService` or socket controllers, treating transient 409 concurrency conflicts as unhandled 500 crashes.
+<!-- end requirement -->
+
+<!-- contract: CONTRACT-OPTIMISTIC-LOCK-ERROR -->
+#### 3.1.2 Canonical Error Contract
+
+In `shared/src/contracts/errors.ts`:
+
+```typescript
+/**
+ * Error thrown when an optimistic concurrency control version check fails during a room mutation.
+ * Single source of truth for prototype identity across all monorepo packages (MAJ-005).
+ */
+export class OptimisticLockConflictError extends AppError {
+  public readonly roomCode: string;
+  public readonly expectedVersion: number;
+  public readonly actualVersion: number;
+
+  constructor(roomCode: string, expectedVersion: number, actualVersion: number) {
+    super(
+      "ERR_CONFLICT",
+      `State conflict for room '${roomCode}': expected version ${expectedVersion}, found ${actualVersion}. The room was updated concurrently.`,
+      409,
+      { roomCode, expectedVersion, actualVersion },
+    );
+    this.name = "OptimisticLockConflictError";
+    this.roomCode = roomCode;
+    this.expectedVersion = expectedVersion;
+    this.actualVersion = actualVersion;
+
+    // Explicitly restore prototype chain for transpiled ES5/CommonJS/ESM interop
+    Object.setPrototypeOf(this, OptimisticLockConflictError.prototype);
   }
-  // All room interactions delegate through this.roomAdapter
 }
 ```
 
+#### 3.1.3 Package Re-export Contract
+
+In `apps/server/src/features/rooms/room.errors.ts`:
+
+```typescript
+// DELETE the duplicate class declaration!
+// RE-EXPORT directly from shared contracts:
+export { OptimisticLockConflictError } from "@fun-chess/shared";
+```
+
+Any code handling CAS concurrency failures MUST import `OptimisticLockConflictError` directly from `@fun-chess/shared` or through `apps/server/src/features/rooms/index.ts`.
+<!-- end contract -->
+
 ---
 
-## 9. Extracted HTTP Controller Interfaces [MAJ-011]
+## 4. Differential Rate Limiting & DoS Protection Contracts (MAJ-006, MAJ-011)
 
-### 9.1 Problem Statement
-`http_server.ts` imported controllers from `controllers/index.js`, while `health.controller.ts` and `lan_info.controller.ts` imported interfaces (`IRoomCountProvider`, `IAddressingInfoProvider`) back from `../http_server.js`, creating an ESM circular dependency.
+<!-- requirement: REQ-CONTRACT-MAJ-006 -->
+#### 4.1 Threat Model & Capacity Analysis
+The Fun-Chess server maintains an in-memory limit of 10,000 concurrent rooms (`MAX_ROOMS = 10_000` in `InMemoryRoomStore`). 
 
-### 9.2 Interface Contract File (`apps/server/src/platform/http/http.interface.ts`)
+Prior to remediation, a single rate limiter configured with 60 requests / 10 seconds was applied across all operations. An attacker sending 6 `room:create` requests per second could allocate all 10,000 rooms in ~27 minutes, exhausting server heap memory and locking out all legitimate players until the 10-minute idle cleanup job ran.
+<!-- end requirement -->
+
+<!-- contract: CONTRACT-RATE-LIMITING -->
+### 4.2 Differential Rate Limiter Specifications
+
+The system enforces **two distinct rate limit tiers**:
+
+| Limiter Scope | Target Operations | Max Requests | Sliding Window | Prune Interval | Max Keys (LRU) |
+|---|---|---|---|---|---|
+| **Room Creation Tier** | `room:create` | **3 requests** | **60,000 ms (1 min)** | 60,000 ms | 10,000 |
+| **Gameplay & Socket Tier** | `game:move`, `room:join`, `room:reconnect`, `room:leave` | **60 requests** | **10,000 ms (10 sec)** | 60,000 ms | 10,000 |
+
+#### 4.3 Architecture & Singleton Lifecycle Contract (MAJ-011)
+
+To prevent resource leaks caused by default argument instantiation (`rateLimiter = createSocketRateLimiter()` in function signatures), rate limiters MUST be instantiated as **shared singletons** or constructor-injected instances:
+
+In `apps/server/src/platform/socket/socket_rate_limiter.ts`:
+
 ```typescript
-import type { IncomingMessage, ServerResponse } from "node:http";
-import type { LanInfoResponse, ServerEnv } from "@fun-chess/shared";
-import type { Logger } from "../logger/logger.interface.js";
-import type { IFileStorage } from "./file_storage.js";
-import type { HttpRateLimiter } from "./http_rate_limiter.js";
+/**
+ * Dedicated rate limiter for room creation (expensive resource allocation).
+ * Limit: 3 rooms per minute per IP address (MAJ-006).
+ */
+export const roomCreateRateLimiter = new SocketRateLimiter({
+  maxRequests: 3,
+  windowMs: 60_000,
+  maxKeys: 10_000,
+  pruneIntervalMs: 60_000,
+});
 
 /**
- * Storage count provider contract for health checks (MAJ-011).
+ * Shared rate limiter for gameplay actions and general socket interactions.
+ * Limit: 60 operations per 10 seconds per IP address.
  */
-export interface IRoomCountProvider {
-  count(): Promise<number>;
-}
-
-/**
- * Addressing provider contract for network info and relay status (MAJ-011).
- */
-export interface IAddressingInfoProvider {
-  getAddressingInfo(port: number): LanInfoResponse;
-  isCloudRelay?(): boolean;
-}
-
-export interface HttpServerConfig {
-  roomStore: IRoomCountProvider;
-  relayAddressService?: IAddressingInfoProvider;
-  /** @deprecated Use relayAddressService */
-  lanService?: IAddressingInfoProvider;
-  logger: Logger;
-  port?: number;
-  distPath?: string;
-  allowedOrigins?: string[];
-  env?: ServerEnv;
-  fileStorage?: IFileStorage;
-  getActiveSocketCount?: () => number;
-  rateLimiter?: HttpRateLimiter;
-}
+export const defaultSocketRateLimiter = new SocketRateLimiter({
+  maxRequests: 60,
+  windowMs: 10_000,
+  maxKeys: 10_000,
+  pruneIntervalMs: 60_000,
+});
 ```
 
-Both `http_server.ts` and all route controllers in `controllers/` import strictly from `http.interface.js`, eliminating module evaluation cycles completely.
+#### 4.4 Rate Limit Error Wire Format
+
+When rate limit is exceeded, the server returns a standardized `SocketErrorPayload`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ERR_RATE_LIMITED",
+    "message": "Rate limit exceeded for room creation. Maximum 3 requests per 60 seconds allowed.",
+    "statusCode": 429,
+    "details": {
+      "retryAfterMs": 18450
+    }
+  }
+}
+```
+<!-- end contract -->
 
 ---
 
-## 10. Client Hardware Abstraction Interfaces [MAJ-015]
+## 5. Sliding TTL Session Registry Contract (MIN-023)
 
-### 10.1 Clipboard Abstraction (`apps/client/src/platform/hardware/clipboard.interface.ts`)
+<!-- requirement: REQ-CONTRACT-MIN-023 -->
+#### 5.1 Root Cause Analysis
+`InMemorySessionRegistry` allocated a hard expiration timestamp upon session creation: `expiresAt = now + DEFAULT_TTL_MS` (2 hours). 
+
+In `touchSession(sessionToken, newSocketId)`, the registry updated `socketId` and `lastSeenAt`, but **never extended `expiresAt`**. In matches exceeding 2 hours or games with reconnection intervals, valid active sessions were prematurely expired by `validateSession` and purged, disconnecting ongoing players.
+<!-- end requirement -->
+
+<!-- contract: CONTRACT-SLIDING-TTL -->
+### 5.2 Session Registry Method Contract
+
+In `apps/server/src/features/rooms/session_registry.ts` & `in_memory_session_registry.ts`:
+
 ```typescript
-export interface IClipboardService {
-  /**
-   * Copies text string to system clipboard.
-   * Returns true on success, false on rejection.
-   */
-  copyText(text: string): Promise<boolean>;
+export interface SessionRegistry {
+  createSession(params: {
+    playerId: string;
+    roomCode: string;
+    color: PieceColor;
+    isHost: boolean;
+    socketId: string;
+    ttlMs?: number;
+  }): Promise<SessionRecord>;
+
+  validateSession(
+    sessionToken: string,
+    roomCode: string,
+    playerId: string,
+  ): Promise<SessionRecord | null>;
 
   /**
-   * Reads current plain text content from clipboard.
+   * Refreshes socket binding and slides the expiration window forward by ttlMs (MIN-023).
+   * Guarantees active players in long matches are never purged.
+   *
+   * @param sessionToken - Private session token
+   * @param newSocketId - Current active socket connection ID
+   * @param extensionTtlMs - Duration to extend expiration from current time (defaults to 2 hours)
    */
-  readText(): Promise<string>;
+  touchSession(
+    sessionToken: string,
+    newSocketId: string,
+    extensionTtlMs?: number,
+  ): Promise<void>;
 
-  /**
-   * Checks if clipboard write is supported in the current browser context.
-   */
-  isSupported(): boolean;
+  updateSessionColor(
+    roomCode: string,
+    playerId: string,
+    newColor: PieceColor,
+  ): Promise<void>;
+
+  deleteSession(sessionToken: string): Promise<boolean>;
+  deleteSessionsByRoom(roomCode: string): Promise<number>;
+  cleanupExpiredSessions(): Promise<number>;
 }
 ```
 
-#### Adapters:
-- `BrowserClipboardService`: Production adapter using `navigator.clipboard.writeText` with legacy fallback to `document.execCommand('copy')`.
-- `MockClipboardService`: In-memory test double for unit and component tests.
+#### 5.3 Implementation Invariants
 
-### 10.2 Camera Abstraction (`apps/client/src/platform/hardware/camera.interface.ts`)
+In `apps/server/src/features/rooms/in_memory_session_registry.ts`:
+
 ```typescript
-export interface ICameraService {
-  /**
-   * Requests user media video stream matching constraints.
-   */
-  getUserMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
+public async touchSession(
+  sessionToken: string,
+  newSocketId: string,
+  extensionTtlMs?: number,
+): Promise<void> {
+  const record = this.sessions.get(sessionToken);
+  if (!record) return;
 
-  /**
-   * Checks if mediaDevices and getUserMedia are supported in the current browser context.
-   */
-  isSupported(): boolean;
+  const now = this.clock.now();
+  const ttl = extensionTtlMs ?? this.DEFAULT_TTL_MS;
+
+  record.socketId = newSocketId;
+  record.lastSeenAt = now;
+  // Sliding expiration window: extend from current active timestamp
+  record.expiresAt = now + ttl;
 }
 ```
 
-#### Adapters:
-- `BrowserCameraService`: Production adapter delegating to `navigator.mediaDevices.getUserMedia`.
-- `MockCameraService`: In-memory test double returning a controllable mock `MediaStream` for QR scanner tests.
-
-### 10.3 Vue DI Registration (`apps/client/src/platform/di/tokens.ts`)
-```typescript
-import type { InjectionKey } from 'vue';
-import type { IClipboardService } from '../hardware/clipboard.interface';
-import type { ICameraService } from '../hardware/camera.interface';
-
-export const CLIPBOARD_SERVICE_KEY: InjectionKey<IClipboardService> = Symbol('CLIPBOARD_SERVICE');
-export const CAMERA_SERVICE_KEY: InjectionKey<ICameraService> = Symbol('CAMERA_SERVICE');
-```
+#### 5.4 Ingress Touch Points
+`touchSession` MUST be invoked during:
+1. `room:reconnect` socket handling.
+2. `room:join` socket handling (if session already exists).
+3. `game:move` handling to keep session alive during active gameplay.
+<!-- end contract -->
 
 ---
 
-## 11. Verification Checklist for Implementers
+## 6. Contract Verification Checklist
 
-| Scope Card | Contract Component | Verification Target |
-|---|---|---|
-| **SC-01** | `LivenessHealthResponseSchema` & `DetailedHealthResponseSchema` | `shared/src/contracts/schemas.ts` exports both schemas; `HealthCheckResponseSchema` is aliased to `LivenessHealthResponseSchema`. |
-| **SC-01** | `MakeMoveRequestSchema` | Accepts `expectedMoveNumber` and `idempotencyKey`. |
-| **SC-01** | Core WebSocket Schemas | `RoomStateSchema`, `GameStateSchema`, `PlayerSchema`, `MoveResultSchema`, `GameOverPayloadSchema` exported and tested. |
-| **SC-02** | `HttpErrorEnvelope` & `formatHttpError` | Server returns `{ status: "error", code, error: { ... } }` for 400, 403, 404, 429, 500. |
-| **SC-02** | `apps/server/src/platform/http/http.interface.ts` | Circular dependency between `http_server.ts` and controllers resolved (0 cycles reported by `dpdm`). |
-| **SC-03** | `FetchApiClient.checkHealth` | Correctly parses `GET /health` with `LivenessHealthResponseSchema` without throwing Zod errors. |
-| **SC-03** | `IClipboardService` & `ICameraService` | Wired in `platform/di/` and injected into `QrExportView`, `QrCodeModal`, and `useCameraStream`. |
-| **SC-04** | `createIfAbsent` in `IRoomStore` & `InMemoryRoomStore` | Concurrent room allocations reject collisions under lock without overwriting. |
-| **SC-04** | Monotonic Ticket Model | Timed-out lock executions cannot write to store; `StaleLockExecutionError` logged. |
-| **SC-04** | `IRoomGameAdapter` in `GameService` | `GameService` receives `IRoomGameAdapter` and does not import `room.store.ts` or `room.logic.ts`. |
+| Contract Area | Finding Ref | Test Suite | Verification Command |
+|---|---|---|---|
+| Room Create Ack `player` | MIN-024 | `apps/server/src/features/rooms/__tests__/room.socket_handler.spec.ts` | `pnpm --filter @fun-chess/server test` |
+| Host Lobby Leave Broadcast | MAJ-002 | `apps/server/src/features/rooms/__tests__/room.socket_handler.spec.ts` | `pnpm --filter @fun-chess/server test` |
+| Idempotency Key Ingress | MAJ-003 | `apps/client/src/features/multiplayer/__tests__/useGameActions.spec.ts` | `pnpm --filter @fun-chess/client test` |
+| Promotion Type Reconciliation | MIN-025 | `shared/src/__tests__/schemas.spec.ts` | `pnpm --filter @fun-chess/shared test` |
+| Single Error Prototype | MAJ-005 | `apps/server/src/features/rooms/__tests__/room.errors.spec.ts` | `pnpm --filter @fun-chess/server test` |
+| Differential Rate Limiting | MAJ-006, MAJ-011 | `apps/server/src/platform/socket/__tests__/socket_rate_limiter.spec.ts` | `pnpm --filter @fun-chess/server test` |
+| Sliding TTL Session | MIN-023 | `apps/server/src/features/rooms/__tests__/in_memory_session_registry.spec.ts` | `pnpm --filter @fun-chess/server test` |

@@ -40,6 +40,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV CLIENT_DIST_PATH=/app/apps/client/dist
 
 # Copy isolated server deployment and client static bundle
 COPY --chown=node:node --from=builder /app/pruned-server ./apps/server

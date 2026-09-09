@@ -7,6 +7,7 @@ import type {
   ScenarioProgressMap,
 } from '@fun-chess/shared';
 import { CURRICULUM_SECTIONS, ALL_SCENARIOS } from '../data';
+import { useRovingTabindex } from '@/platform/ui';
 import ScenarioCard from './ScenarioCard.vue';
 
 interface Props {
@@ -78,34 +79,13 @@ function handleFilterChange(cat: ScenarioCategory | 'all') {
   emit('selectCategory', cat);
 }
 
-function handleTabKeyDown(event: KeyboardEvent, currentId: ScenarioCategory | 'all') {
-  const tabs = categoryTabsList.value;
-  const currentIndex = tabs.indexOf(currentId);
-  let nextIndex = currentIndex;
-
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    event.preventDefault();
-    nextIndex = (currentIndex + 1) % tabs.length;
-  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-  } else if (event.key === 'Home') {
-    event.preventDefault();
-    nextIndex = 0;
-  } else if (event.key === 'End') {
-    event.preventDefault();
-    nextIndex = tabs.length - 1;
-  } else {
-    return;
-  }
-
-  const nextId = tabs[nextIndex];
-  if (nextId) {
-    handleFilterChange(nextId);
-    const tabEl = document.getElementById(`academy-tab-${nextId}`);
-    tabEl?.focus();
-  }
-}
+const { handleKeyDown: handleTabKeyDown, getTabindex } = useRovingTabindex({
+  items: categoryTabsList,
+  modelValue: activeFilter,
+  orientation: 'horizontal',
+  idPrefix: 'academy-tab-',
+  onSelect: handleFilterChange,
+});
 
 function handlePlayScenario(scenario: ChessScenario) {
   emit('selectScenario', scenario);
@@ -209,7 +189,7 @@ function getSectionStats(section: CurriculumSection) {
         type="button"
         role="tab"
         :aria-selected="activeFilter === 'all'"
-        :tabindex="activeFilter === 'all' ? 0 : -1"
+        :tabindex="getTabindex('all')"
         class="category-tab-btn"
         :class="{ 'is-active': activeFilter === 'all' }"
         @click="handleFilterChange('all')"
@@ -225,7 +205,7 @@ function getSectionStats(section: CurriculumSection) {
         type="button"
         role="tab"
         :aria-selected="activeFilter === sec.id"
-        :tabindex="activeFilter === sec.id ? 0 : -1"
+        :tabindex="getTabindex(sec.id)"
         class="category-tab-btn"
         :class="{ 'is-active': activeFilter === sec.id }"
         @click="handleFilterChange(sec.id)"

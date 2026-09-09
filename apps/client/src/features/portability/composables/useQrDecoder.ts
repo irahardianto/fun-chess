@@ -1,6 +1,7 @@
-import { ref, onUnmounted, getCurrentInstance, type Ref } from 'vue';
+import { ref, onUnmounted, getCurrentInstance, getCurrentScope, onScopeDispose, type Ref } from 'vue';
 import jsQR from 'jsqr';
-import { logger } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger } from '@/platform/telemetry';
 
 export interface UseQrDecoderOptions {
   onScan?: (code: string) => void;
@@ -24,6 +25,7 @@ export interface UseQrDecoderReturn {
  * Part of MIN-027 decomposition from useQrScanner.
  */
 export function useQrDecoder(defaultOptions: UseQrDecoderOptions = {}): UseQrDecoderReturn {
+  const logger = getCurrentInstance() ? useInjectLogger() : defaultLogger;
   const scannedCode = ref<string | null>(null);
   const isProcessing = ref(false);
   const isDecoding = ref(false);
@@ -118,7 +120,11 @@ export function useQrDecoder(defaultOptions: UseQrDecoderOptions = {}): UseQrDec
     );
   }
 
-  if (getCurrentInstance()) {
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      stopDecoding();
+    });
+  } else if (getCurrentInstance()) {
     onUnmounted(() => {
       stopDecoding();
     });

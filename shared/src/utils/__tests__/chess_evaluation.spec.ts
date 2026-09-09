@@ -9,11 +9,15 @@ import {
   isPawnPromotion,
   createInitialGameState,
   STANDARD_PIECE_POINTS,
+  STANDARD_PIECE_VALUES,
+  PIECE_STANDARD_POINTS,
+  PIECE_CENTIPAWN_VALUES,
+  PIECE_VALUES,
 } from "../chess_evaluation.js";
 import { DEFAULT_CHESS_FEN } from "../chess_factory.js";
 
 describe("chess_evaluation utils", () => {
-  describe("STANDARD_PIECE_POINTS", () => {
+  describe("STANDARD_PIECE_POINTS & Value Aliases (MAJ-035)", () => {
     it("exports standard chess piece point values: { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 }", () => {
       expect(STANDARD_PIECE_POINTS).toEqual({
         p: 1,
@@ -23,6 +27,23 @@ describe("chess_evaluation utils", () => {
         q: 9,
         k: 0,
       });
+    });
+
+    it("exports STANDARD_PIECE_VALUES and PIECE_STANDARD_POINTS referencing STANDARD_PIECE_POINTS", () => {
+      expect(STANDARD_PIECE_VALUES).toBe(STANDARD_PIECE_POINTS);
+      expect(PIECE_STANDARD_POINTS).toBe(STANDARD_PIECE_POINTS);
+    });
+
+    it("exports PIECE_CENTIPAWN_VALUES and PIECE_VALUES alias: { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 }", () => {
+      expect(PIECE_CENTIPAWN_VALUES).toEqual({
+        p: 100,
+        n: 320,
+        b: 330,
+        r: 500,
+        q: 900,
+        k: 0,
+      });
+      expect(PIECE_VALUES).toBe(PIECE_CENTIPAWN_VALUES);
     });
   });
 

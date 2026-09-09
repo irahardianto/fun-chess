@@ -36,7 +36,15 @@ export function useAppNavigation(options: AppNavigationOptions) {
       if (!raw) return 'academy';
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return 'academy';
-      const completed = Object.values(parsed).filter((item: any) => item && item.starsEarned > 0).length;
+      const completed = Object.values(parsed).filter((item: unknown) => {
+        return Boolean(
+          item &&
+          typeof item === 'object' &&
+          'starsEarned' in item &&
+          typeof (item as { starsEarned: unknown }).starsEarned === 'number' &&
+          (item as { starsEarned: number }).starsEarned > 0
+        );
+      }).length;
       return completed > 0 ? 'multiplayer_lan' : 'academy';
     } catch (err) {
       logger.warn('Failed to parse scenario progress for initial lobby mode', {
@@ -81,7 +89,7 @@ export function useAppNavigation(options: AppNavigationOptions) {
   const isActionLoading = ref(false);
   const myPlayerAvatar = ref<string>(getInitialAvatar());
 
-  async function loadInitialNetworkAndProgress(defaultProgressStore?: { getProgressMap: () => Promise<Record<string, any>> }): Promise<void> {
+  async function loadInitialNetworkAndProgress(defaultProgressStore?: { getProgressMap: () => Promise<Record<string, { starsEarned?: number }>> }): Promise<void> {
     if (typeof window !== 'undefined' && window.location?.search) {
       try {
         const roomParam =
@@ -99,7 +107,8 @@ export function useAppNavigation(options: AppNavigationOptions) {
     }
 
     try {
-      lanInfo.value = await apiClient.getLanInfo();
+      const info = await apiClient.getLanInfo();
+      lanInfo.value = info;
     } catch (err) {
       logger.warn('Failed to fetch server LAN info, using offline fallback', {
         operation: 'app_fetch_lan_info',
@@ -110,7 +119,7 @@ export function useAppNavigation(options: AppNavigationOptions) {
     if (defaultProgressStore) {
       try {
         const progressMap = await defaultProgressStore.getProgressMap();
-        const completedCount = Object.values(progressMap).filter((item) => item && item.starsEarned > 0).length;
+        const completedCount = Object.values(progressMap).filter((item) => Boolean(item && (item.starsEarned ?? 0) > 0)).length;
         if (completedCount > 0 && lobbyActiveMode.value === 'academy') {
           lobbyActiveMode.value = 'multiplayer_lan';
         }

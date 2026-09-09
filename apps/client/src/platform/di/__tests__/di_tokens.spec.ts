@@ -27,6 +27,7 @@ import {
   useInjectHaptics,
   useInjectWebRtcDiscovery,
   useInjectClipboardService,
+  useInjectClipboard,
   useInjectCameraService,
   useApiClient,
   useStorage,
@@ -141,6 +142,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
         expect(useInjectHaptics()).toBe(mockHaptics);
         expect(useInjectWebRtcDiscovery()).toBe(mockWebRtcDiscovery);
         expect(useInjectClipboardService()).toBe(mockClipboard);
+        expect(useInjectClipboard()).toBe(mockClipboard);
         expect(useInjectCameraService()).toBe(mockCamera);
       });
     });
@@ -329,23 +331,20 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       expect(useCameraService(customCamera)).toBe(customCamera);
     });
 
-    it('throws informative error when token is not provided in context and no custom instance given', () => {
+    it('unified helpers fall back gracefully to default platform instances when tokens are not provided (ENH-003)', () => {
       const app = createApp({});
 
       app.runWithContext(() => {
-        expect(() => useApiClient()).toThrow('Vue DI binding [API_CLIENT] not provided');
-        expect(() => useStorage()).toThrow('Vue DI binding [STORAGE] not provided');
-        expect(() => useSessionStorage()).toThrow('Vue DI binding [SESSION_STORAGE] not provided');
-        expect(() => useAudioService()).toThrow('Vue DI binding [AUDIO_SERVICE] not provided');
-        expect(() => useLogger()).toThrow('Vue DI binding [LOGGER] not provided');
-        expect(() => useScenarioStore()).toThrow('Vue DI binding [SCENARIO_STORE] not provided');
-        expect(() => usePuzzleStore()).toThrow('Vue DI binding [PUZZLE_STORE] not provided');
-        expect(() => useProgressStorage()).toThrow('Vue DI binding [PROGRESS_STORAGE] not provided');
-        expect(() => useFileDownloader()).toThrow('Vue DI binding [FILE_DOWNLOADER] not provided');
-        expect(() => useHaptics()).toThrow('Vue DI binding [HAPTICS] not provided');
-        expect(() => useWebRtcDiscovery()).toThrow('Vue DI binding [WEBRTC_DISCOVERY] not provided');
-        expect(() => useClipboardService()).toThrow('Vue DI binding [CLIPBOARD_SERVICE] not provided');
-        expect(() => useCameraService()).toThrow('Vue DI binding [CAMERA_SERVICE] not provided');
+        expect(useApiClient()).toBe(apiClient);
+        expect(useStorage()).toBe(safeLocalStorage);
+        expect(useSessionStorage()).toBe(safeSessionStorage);
+        expect(useAudioService()).toBe(audioSynthesizer);
+        expect(useLogger()).toBe(logger);
+        expect(useFileDownloader()).toBe(defaultFileDownloader);
+        expect(useHaptics()).toBe(defaultHapticsService);
+        expect(useWebRtcDiscovery()).toBe(defaultWebRtcDiscovery);
+        expect(useClipboardService()).toBe(defaultClipboardService);
+        expect(useCameraService()).toBe(defaultCameraService);
       });
     });
   });

@@ -54,8 +54,13 @@ export interface SessionRegistry {
 
   /**
    * Updates the socket ID and lastSeenAt timestamp for an active session.
+   * Extends the session expiration by extensionTtlMs or DEFAULT_TTL_MS (sliding TTL - MIN-023).
    */
-  touchSession(sessionToken: string, newSocketId: string): Promise<void>;
+  touchSession(
+    sessionToken: string,
+    newSocketId: string,
+    extensionTtlMs?: number,
+  ): Promise<void>;
 
   /**
    * Revokes and deletes a specific session token.

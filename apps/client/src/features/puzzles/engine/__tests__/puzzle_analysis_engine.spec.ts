@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { Chess } from 'chess.js';
 import type { Puzzle, PuzzleAnalysisResult } from '@fun-chess/shared';
+import { createSafeChess } from '@fun-chess/shared';
 import {
   classifyTacticalMotif,
   generateMistakeRefutation,
@@ -9,9 +11,14 @@ import {
   calculateMaterialDelta,
   calculateColorMaterial,
   getPieceCounts,
+  getMaterialCount,
+  PIECE_CENTIPAWN_VALUES,
+  STANDARD_PIECE_POINTS,
   puzzleAnalysisEngine,
   PuzzleAnalysisEngine,
 } from '../puzzle_analysis_engine';
+import { logger } from '@/platform/telemetry';
+
 
 describe('PuzzleAnalysisEngine Unit Tests (MAJ-037)', () => {
   describe('classifyTacticalMotif', () => {
@@ -349,7 +356,41 @@ describe('PuzzleAnalysisEngine Unit Tests (MAJ-037)', () => {
       expect(delta.netPoints).toBe(0);
       expect(delta.formattedAdvantage).toBe('Positional Advantage ⚡');
     });
+
+    it('calculates material counts using calculateBoardMaterial and shared piece point constants (MAJ-035)', () => {
+      expect(PIECE_CENTIPAWN_VALUES.q).toBe(900);
+      expect(PIECE_CENTIPAWN_VALUES.p).toBe(100);
+      expect(STANDARD_PIECE_POINTS.q).toBe(9);
+      expect(STANDARD_PIECE_POINTS.p).toBe(1);
+
+      const chess = createSafeChess('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+      const mat = getMaterialCount(chess);
+      expect(mat.white).toBe(4000);
+      expect(mat.black).toBe(4000);
+      expect(mat.net).toBe(0);
+    });
+
+    it('logs structured debug message when getPieceCounts encounters an error (MIN-006)', () => {
+      const validFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const debugSpy = vi.spyOn(logger, 'debug');
+      vi.spyOn(Chess.prototype, 'board').mockImplementationOnce(() => {
+        throw new Error('simulated board parsing failure');
+      });
+
+      const counts = getPieceCounts(validFen, 'w');
+      expect(counts.p).toBe(0);
+      expect(debugSpy).toHaveBeenCalledWith(
+        'Failed to count pieces from FEN, returning zero counts',
+        expect.objectContaining({
+          operation: 'get_piece_counts',
+          fen: validFen,
+          color: 'w',
+        })
+      );
+      debugSpy.mockRestore();
+    });
   });
+
 
   describe('analyzePuzzleSolution Resilience', () => {
     it('safely handles malformed puzzle FEN without throwing', () => {

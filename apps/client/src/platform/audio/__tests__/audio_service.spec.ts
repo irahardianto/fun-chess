@@ -103,7 +103,7 @@ describe('useAudio Composable with AudioService and Synthesizer', () => {
     expect(audio.isMuted.value).toBe(true);
     expect(audio.isSoundEnabled.value).toBe(false);
 
-    (mockSynth.toggleMute as any).mockReturnValue(false);
+    vi.mocked(mockSynth.toggleMute).mockReturnValue(false);
     const soundToggled = audio.toggleSound();
     expect(soundToggled).toBe(true);
   });
@@ -254,9 +254,9 @@ describe('useAudio Composable with AudioService and Synthesizer', () => {
   it('attaches and cleans up game domain event listeners', () => {
     const audio = useAudio(mockSynth);
 
-    let opponentMoveCb: any;
-    let checkCb: any;
-    let gameOverCb: any;
+    let opponentMoveCb: ((data: { move: { captured?: boolean }; gameState: unknown }) => void) | undefined;
+    let checkCb: (() => void) | undefined;
+    let gameOverCb: ((payload: { winner?: string }) => void) | undefined;
 
     const source: GameDomainEventSource = {
       onOpponentMove: vi.fn((cb) => {
@@ -280,19 +280,19 @@ describe('useAudio Composable with AudioService and Synthesizer', () => {
     expect(source.onGameOver).toHaveBeenCalled();
 
     // Trigger opponent move with capture
-    opponentMoveCb({ move: { captured: true }, gameState: {} });
+    opponentMoveCb!({ move: { captured: true }, gameState: {} });
     expect(mockSynth.playCapture).toHaveBeenCalled();
 
     // Trigger check
-    checkCb();
+    checkCb!();
     expect(mockSynth.playCheck).toHaveBeenCalled();
 
     // Trigger draw
-    gameOverCb({ winner: 'draw' });
+    gameOverCb!({ winner: 'draw' });
     expect(mockSynth.playDraw).toHaveBeenCalled();
 
     // Trigger victory
-    gameOverCb({ winner: 'w' });
+    gameOverCb!({ winner: 'w' });
     expect(mockSynth.playVictory).toHaveBeenCalled();
 
     // Unsubscribe cleanly

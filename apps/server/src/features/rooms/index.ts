@@ -12,10 +12,13 @@ export { RoomService } from "./room.service.js";
 export {
   registerRoomSocketHandlers,
   handleSocketDisconnect,
+  roomCreateRateLimiter,
 } from "./room.socket_handler.js";
 export {
   DisconnectTimerRegistry,
   defaultDisconnectTimerRegistry,
+  createDisconnectTimerRegistry,
+  resetDefaultDisconnectTimerRegistry,
   cancelDisconnectTimer,
   cancelAllDisconnectTimersForRoom,
   clearAllDisconnectTimers,
@@ -25,11 +28,11 @@ export type { IDisconnectTimerRegistry } from "./disconnect_timer_registry.js";
 export {
   SystemClock,
   UuidGenerator,
-} from "./clock.js";
+} from "../../platform/time/index.js";
 export type {
   IClock,
   IIdGenerator,
-} from "./clock.js";
+} from "@fun-chess/shared";
 export {
   AppError,
   RoomNotFoundError,

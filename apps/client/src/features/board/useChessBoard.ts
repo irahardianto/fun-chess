@@ -4,7 +4,7 @@
  * Encapsulates FEN tracking, turn status, game over / check signals,
  * captured pieces, material advantage, and legal move queries.
  */
-import { ref, computed, type Ref, type ComputedRef } from 'vue';
+import { ref, computed, getCurrentInstance, type Ref, type ComputedRef } from 'vue';
 import { Chess } from 'chess.js';
 import type {
   PieceColor,
@@ -15,12 +15,14 @@ import {
   createSafeChess,
   calculateMaterialAndCaptures,
 } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry/index.js';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry/index.js';
 
 export interface UseChessBoardOptions {
   initialFen?: string;
   chess?: Chess;
   orientation?: PieceColor;
+  logger?: ILogger;
 }
 
 export interface UseChessBoardReturn {
@@ -51,6 +53,12 @@ export function useChessBoard(
 ): UseChessBoardReturn {
   let chessInstance: Chess;
   let initialOrientation: PieceColor = 'w';
+  const optionsLogger =
+    source && typeof source === 'object' && !(source instanceof Chess)
+      ? source.logger
+      : undefined;
+  const logger =
+    optionsLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
 
   if (source instanceof Chess) {
     chessInstance = source;

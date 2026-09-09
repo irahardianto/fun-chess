@@ -253,6 +253,110 @@ describe('useSocketTransport composable', () => {
   });
 
   // ==========================================================================
+  // 3b. Socket.IO v4 Manager Reconnection Delegation (MAJ-004)
+  // ==========================================================================
+  describe('Socket.IO v4 Manager Reconnection Delegation (MAJ-004)', () => {
+    let managerHandlers: Record<string, any>;
+    let mockManager: any;
+    let mockSocketWithManager: any;
+
+    beforeEach(() => {
+      managerHandlers = {};
+      mockManager = {
+        on: vi.fn((event: string, handler: Function) => {
+          managerHandlers[event] = handler;
+        }),
+        off: vi.fn((event: string, handler: Function) => {
+          if (managerHandlers[event] === handler) {
+            delete managerHandlers[event];
+          }
+        }),
+      };
+      mockSocketWithManager = createMockSocket({
+        io: mockManager,
+      });
+    });
+
+    it('attaches reconnect_attempt and reconnect_failed to s.io Manager', () => {
+      useSocketTransport(mockSocketWithManager);
+
+      expect(mockManager.on).toHaveBeenCalledWith('reconnect_attempt', expect.any(Function));
+      expect(mockManager.on).toHaveBeenCalledWith('reconnect_failed', expect.any(Function));
+    });
+
+    it('sets isReconnecting to true and dispatches event on reconnect_attempt', () => {
+      const transport = useSocketTransport(mockSocketWithManager);
+      const attemptSubscriber = vi.fn();
+      registerSocketEventListener('reconnect_attempt', attemptSubscriber);
+
+      managerHandlers['reconnect_attempt'](2);
+
+      expect(transport.isReconnecting.value).toBe(true);
+      expect(attemptSubscriber).toHaveBeenCalledWith(2);
+    });
+
+    it('resets isReconnecting and updates errors on reconnect_failed on Manager', () => {
+      const transport = useSocketTransport(mockSocketWithManager);
+      const failedSubscriber = vi.fn();
+      const errorSubscriber = vi.fn();
+      registerSocketEventListener('reconnect_failed', failedSubscriber);
+      registerSocketEventListener('error', errorSubscriber);
+
+      transport.isReconnecting.value = true;
+      managerHandlers['reconnect_failed']();
+
+      expect(transport.isReconnecting.value).toBe(false);
+      expect(transport.connectionError.value).toContain('Reconnection failed');
+      expect(transport.lastError.value?.code).toBe('ERR_SOCKET_TIMEOUT');
+      expect(failedSubscriber).toHaveBeenCalled();
+      expect(errorSubscriber).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'ERR_SOCKET_TIMEOUT',
+          message: 'Reconnection failed after maximum attempts',
+        })
+      );
+    });
+
+    it('resets isReconnecting to false when connect fires', () => {
+      const transport = useSocketTransport(mockSocketWithManager);
+      transport.isReconnecting.value = true;
+
+      eventHandlers['connect']();
+
+      expect(transport.isReconnecting.value).toBe(false);
+    });
+
+    it('preserves isReconnecting on disconnect if reconnecting is active', () => {
+      const transport = useSocketTransport(mockSocketWithManager);
+      transport.isReconnecting.value = true;
+
+      eventHandlers['disconnect']('transport close');
+
+      expect(transport.isReconnecting.value).toBe(true);
+    });
+
+    it('resets isReconnecting on disconnect if not reconnecting', () => {
+      const transport = useSocketTransport(mockSocketWithManager);
+      transport.isReconnecting.value = false;
+
+      eventHandlers['disconnect']('io client disconnect');
+
+      expect(transport.isReconnecting.value).toBe(false);
+    });
+
+    it('cleans up Manager listeners when socket is detached', () => {
+      useSocketTransport(mockSocketWithManager);
+      expect(mockManager.on).toHaveBeenCalled();
+
+      const newSocket = createMockSocket({ id: 'sock_clean' });
+      useSocketTransport(newSocket as any);
+
+      expect(mockManager.off).toHaveBeenCalledWith('reconnect_attempt', expect.any(Function));
+      expect(mockManager.off).toHaveBeenCalledWith('reconnect_failed', expect.any(Function));
+    });
+  });
+
+  // ==========================================================================
   // 4. Structured Telemetry Interceptor Verification (All 21 Incoming Events)
   // ==========================================================================
   describe('Structured Telemetry Interceptor Verification (21 Events without Raw console.*)', () => {
@@ -533,6 +637,27 @@ describe('useSocketTransport composable', () => {
 
       expect(result.success).toBe(false);
       expect(transport.lastError.value?.code).toBe('ERR_INTERNAL_SERVER');
+    });
+
+    it('logs operation start at INFO level with static template (MIN-014, MAJ-024)', async () => {
+      const infoSpy = vi.spyOn(logger, 'info');
+
+      mockSocket.emit.mockImplementation((_event: string, _payload: any, ack: Function) => {
+        ack({ success: true });
+      });
+
+      await emitWithTimeout(mockSocket, 'test:event', {}, {
+        operation: 'test_operation_start_log',
+        timeoutMessage: 'Timed out',
+      });
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Socket emit dispatched',
+        expect.objectContaining({
+          operation: 'test_operation_start_log',
+          event: 'test:event',
+        })
+      );
     });
   });
 

@@ -1,11 +1,13 @@
 import { ref, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope, type Ref } from 'vue';
-import { logger, generateCorrelationId } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 import { useCameraService } from '@/platform/di/helpers';
 import { defaultCameraService, type ICameraService } from '@/platform/hardware/camera.interface';
 
 export interface UseCameraStreamOptions {
   facingMode?: 'environment' | 'user';
   cameraService?: ICameraService;
+  logger?: ILogger;
 }
 
 export interface UseCameraStreamReturn {
@@ -25,22 +27,23 @@ export interface UseCameraStreamReturn {
  * Stops all tracks in a MediaStream safely.
  * Remediates CRIT-007: Unconditionally stops all MediaStream tracks.
  */
-export function stopMediaStreamTracks(stream: MediaStream | null): void {
+export function stopMediaStreamTracks(stream: MediaStream | null, customLogger?: ILogger): void {
   if (!stream) return;
+  const log = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   try {
     const tracks = stream.getTracks();
     for (const track of tracks) {
       try {
         track.stop();
       } catch (err: unknown) {
-        logger.warn('Failed to stop media track', {
+        log.warn('Failed to stop media track', {
           operation: 'camera_stop_track',
           error: err instanceof Error ? err.message : String(err),
         });
       }
     }
   } catch (err: unknown) {
-    logger.warn('Failed to get tracks from stream', {
+    log.warn('Failed to get tracks from stream', {
       operation: 'camera_get_tracks',
       error: err instanceof Error ? err.message : String(err),
     });
@@ -53,6 +56,7 @@ export function stopMediaStreamTracks(stream: MediaStream | null): void {
  * Injects ICameraService (MAJ-015) and implements structured start/success logging (MIN-014).
  */
 export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): UseCameraStreamReturn {
+  const logger = defaultOptions.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   function resolveCameraService(custom?: ICameraService): ICameraService {
     if (custom) return custom;
     if (getCurrentInstance()) {

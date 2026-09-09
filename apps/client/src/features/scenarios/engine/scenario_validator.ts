@@ -1,6 +1,9 @@
+import { getCurrentInstance } from 'vue';
 import type { Square, TutorialStep, StepMoveConstraint } from '@fun-chess/shared';
 import type { Square as ChessSquare } from 'chess.js';
 import { createSafeChess } from '@fun-chess/shared';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
 export interface PlayerMoveInput {
   from: Square;
@@ -16,13 +19,16 @@ export interface PlayerMoveInput {
  * @param step - Current active TutorialStep
  * @param move - Proposed move by the player
  * @param chess - Optional chess.js engine instance or object with .fen()
+ * @param customLogger - Optional custom logger for DI
  * @returns true if the move satisfies the step constraints or delivers checkmate, false otherwise
  */
 export function validateStepMove(
   step: TutorialStep,
   move: PlayerMoveInput,
-  chess?: { fen(): string } | null
+  chess?: { fen(): string } | null,
+  customLogger?: ILogger
 ): boolean {
+  const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   if (!step) return false;
   if (!move || !move.from || !move.to) return false;
 
@@ -58,8 +64,11 @@ export function validateStepMove(
       if (res && testEngine.isCheckmate()) {
         return true;
       }
-    } catch {
-      // Invalid or illegal move
+    } catch (err) {
+      logger.debug('Invalid or illegal move during checkmate validation', {
+        operation: 'validate_step_move',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -72,8 +81,10 @@ export function validateStepMove(
 export function isSourceSquareAllowed(
   step: TutorialStep,
   from: Square,
-  chess?: { fen(): string } | null
+  chess?: { fen(): string } | null,
+  customLogger?: ILogger
 ): boolean {
+  const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   if (!step || !step.allowedMoves || step.allowedMoves.length === 0) {
     return true;
   }
@@ -101,8 +112,11 @@ export function isSourceSquareAllowed(
           return true;
         }
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      logger.debug('Move simulation failed during source square validation', {
+        operation: 'is_source_square_allowed',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -115,8 +129,10 @@ export function isSourceSquareAllowed(
 export function getAllowedTargetsForSource(
   step: TutorialStep,
   from: Square,
-  chess?: { fen(): string } | null
+  chess?: { fen(): string } | null,
+  customLogger?: ILogger
 ): Square[] {
+  const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   if (!step) {
     return [];
   }
@@ -150,8 +166,11 @@ export function getAllowedTargetsForSource(
           targets.add(m.to as Square);
         }
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      logger.debug('Move simulation failed during allowed targets retrieval', {
+        operation: 'get_allowed_targets_for_source',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

@@ -1,60 +1,38 @@
 import { describe, it, expect } from "vitest";
 import type {
   // Models
-  Square,
-  PieceColor,
-  PieceType,
-  RoomStatus,
   GameOverReason,
   Player,
-  MovePayload,
   MoveResult,
-  GameState,
-  RematchState,
+  PromotionPiece,
   RoomState,
   GameOverPayload,
   SessionInfo,
   SavedSession,
   // Errors
-  ErrorCode,
   SocketErrorPayload,
   // Scenario contracts
   ScenarioCategory,
   ScenarioDifficulty,
   TargetAgeGroup,
   StarRating,
-  StepMoveConstraint,
-  StepOpponentResponse,
-  TutorialStep,
   ChessScenario,
-  CurriculumSection,
   ScenarioProgress,
-  ScenarioProgressMap,
-  ScenarioProgressStore,
   ScenarioRunnerState,
   // AI contracts
   AiDifficultyLevel,
   MascotId,
   MascotDialogueTrigger,
   MascotPersona,
-  EvaluationScore,
-  PieceSquareTable,
-  PieceSquareTableSet,
   AiSearchConfig,
   AiMoveEvaluation,
-  ChessAiEngine,
-  HintTheme,
   HintRecommendation,
-  HintCalculator,
   TakebackSnapshot,
-  SoloAiGameState,
   // Navigation contracts
   AppGameMode,
-  LobbyModeOption,
   SoloAiLaunchConfig,
   AcademyLaunchConfig,
   AppShellState,
-  AppShellEventMap,
   // Audio contracts
   SoundEffectType,
   // Avatar contracts
@@ -63,7 +41,6 @@ import type {
   UnifiedProgressPayload,
   UnifiedProgressEnvelope,
   SyncMergeStrategy,
-  ProgressDiffPreview,
   IClock,
   IIdGenerator,
   ClientToServerEvents,
@@ -107,6 +84,7 @@ import {
   safeParseUrl,
   normalizeUrlString,
   PieceTypeSchema,
+  PromotionPieceSchema,
   PlayerSchema,
   MoveResultSchema,
   GameStateSchema,
@@ -116,6 +94,8 @@ import {
   RoomStateSchema,
   GameOverReasonSchema,
   GameOverPayloadSchema,
+  UnifiedProgressPayloadSchema,
+  UnifiedProgressEnvelopeSchema,
 } from "../index.js";
 
 describe("Shared Contracts & Data Model Specification", () => {
@@ -282,12 +262,17 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(conflict.code).toBe("ERR_CONFLICT");
       expect(conflict.statusCode).toBe(409);
       expect(conflict.message).toContain("State conflict for room 'ABCD'");
+      expect(conflict.name).toBe("OptimisticLockConflictError");
+      expect(conflict.roomCode).toBe("ABCD");
+      expect(conflict.expectedVersion).toBe(1);
+      expect(conflict.actualVersion).toBe(2);
       expect(conflict.details).toEqual({
         roomCode: "ABCD",
         expectedVersion: 1,
         actualVersion: 2,
       });
       expect(conflict).toBeInstanceOf(AppError);
+      expect(conflict).toBeInstanceOf(OptimisticLockConflictError);
 
       const invalidRoomCode = new InvalidRoomCodeError("ABC");
       expect(invalidRoomCode.isAppError).toBe(true);
@@ -937,6 +922,22 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(envelope.magic).toBe("FC_PROGRESS_V1");
       expect(envelope.schemaVersion).toBe(1);
       expect(envelope.payload.version).toBe(1);
+
+      // Validate with canonical Zod schemas (ENH-012)
+      const parsedPayload = UnifiedProgressPayloadSchema.parse(payload);
+      expect(parsedPayload.version).toBe(1);
+      expect(parsedPayload.puzzles.ratingProfile.rating).toBe(800);
+
+      const parsedEnvelope = UnifiedProgressEnvelopeSchema.parse(envelope);
+      expect(parsedEnvelope.magic).toBe("FC_PROGRESS_V1");
+      expect(parsedEnvelope.checksum).toBe("12345678");
+
+      expect(() =>
+        UnifiedProgressEnvelopeSchema.parse({
+          ...envelope,
+          magic: "WRONG_MAGIC",
+        }),
+      ).toThrow();
     });
 
     it("validates SyncMergeStrategy values", () => {
@@ -985,7 +986,7 @@ describe("Shared Contracts & Data Model Specification", () => {
         generateRandomInt: (min, _max) => min,
       };
       expect(idGen.generateId()).toBe("mock-uuid-456");
-      expect(idGen.generateRandomInt?.(1, 10)).toBe(1);
+      expect(idGen.generateRandomInt(1, 10)).toBe(1);
     });
   });
 
@@ -1065,6 +1066,9 @@ describe("Shared Contracts & Data Model Specification", () => {
           correlationId: "corr-12345",
         },
       };
+
+      const parsedBody = HttpErrorBodySchema.parse(envelope.error);
+      expect(parsedBody.code).toBe("ERR_ROOM_NOT_FOUND");
 
       const parsed = HttpErrorEnvelopeSchema.parse(envelope);
       expect(parsed.status).toBe("error");
@@ -1202,6 +1206,27 @@ describe("Shared Contracts & Data Model Specification", () => {
       ).toThrow();
     });
 
+    it("validates PromotionPieceSchema and PromotionPiece types (MIN-025)", () => {
+      const validPromotionPieces: PromotionPiece[] = ["q", "r", "b", "n"];
+      for (const p of validPromotionPieces) {
+        expect(PromotionPieceSchema.parse(p)).toBe(p);
+      }
+
+      // Rejects invalid promotion targets such as pawn, king, or arbitrary strings
+      expect(() => PromotionPieceSchema.parse("p")).toThrow();
+      expect(() => PromotionPieceSchema.parse("k")).toThrow();
+      expect(() => PromotionPieceSchema.parse("x")).toThrow();
+
+      // MoveResult with promotion piece
+      const promotionMove: MoveResult = {
+        ...validMoveResult,
+        to: "e8",
+        promotion: "q",
+      };
+      const parsed = MoveResultSchema.parse(promotionMove);
+      expect(parsed.promotion).toBe("q");
+    });
+
     it("validates GameStateSchema structure", () => {
       const parsed = GameStateSchema.parse(validGameState);
       expect(parsed.turn).toBe("b");
@@ -1265,7 +1290,7 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(parsed.totalMoves).toBe(4);
     });
 
-    it("validates MakeMoveRequestSchema with expectedMoveNumber and idempotencyKey (MAJ-031)", () => {
+    it("validates MakeMoveRequestSchema with expectedMoveNumber and idempotencyKey (MAJ-003, MAJ-031)", () => {
       const req = {
         roomCode: "ABCD",
         move: { from: "e2", to: "e4" },
@@ -1278,6 +1303,14 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(parsed.expectedMoveNumber).toBe(0);
       expect(parsed.idempotencyKey).toBe("9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d");
 
+      // Accepts custom alphanumeric/hyphenated/underscored string tokens (MAJ-003)
+      const parsedCustom = MakeMoveRequestSchema.parse({
+        roomCode: "ABCD",
+        move: { from: "e2", to: "e4" },
+        idempotencyKey: "nanoid_abc-123_XYZ",
+      });
+      expect(parsedCustom.idempotencyKey).toBe("nanoid_abc-123_XYZ");
+
       // Optional fields omitted
       const parsedMinimal = MakeMoveRequestSchema.parse({
         roomCode: "WXYZ",
@@ -1286,7 +1319,7 @@ describe("Shared Contracts & Data Model Specification", () => {
       expect(parsedMinimal.expectedMoveNumber).toBeUndefined();
       expect(parsedMinimal.idempotencyKey).toBeUndefined();
 
-      // Rejects negative expectedMoveNumber or invalid idempotencyKey UUID
+      // Rejects negative expectedMoveNumber
       expect(() =>
         MakeMoveRequestSchema.parse({
           roomCode: "ABCD",
@@ -1294,11 +1327,31 @@ describe("Shared Contracts & Data Model Specification", () => {
           expectedMoveNumber: -1,
         }),
       ).toThrow();
+
+      // Rejects empty idempotencyKey
       expect(() =>
         MakeMoveRequestSchema.parse({
           roomCode: "ABCD",
           move: { from: "e2", to: "e4" },
-          idempotencyKey: "not-a-uuid",
+          idempotencyKey: "",
+        }),
+      ).toThrow();
+
+      // Rejects idempotencyKey exceeding 64 characters
+      expect(() =>
+        MakeMoveRequestSchema.parse({
+          roomCode: "ABCD",
+          move: { from: "e2", to: "e4" },
+          idempotencyKey: "a".repeat(65),
+        }),
+      ).toThrow();
+
+      // Rejects invalid characters (spaces, special symbols)
+      expect(() =>
+        MakeMoveRequestSchema.parse({
+          roomCode: "ABCD",
+          move: { from: "e2", to: "e4" },
+          idempotencyKey: "invalid token!",
         }),
       ).toThrow();
     });
@@ -1396,6 +1449,43 @@ describe("Shared Contracts & Data Model Specification", () => {
         playerName: "Alex",
         roomStatus: "playing",
       });
+    });
+
+    it("verifies room:create acknowledgement callback signature includes player (MIN-024)", () => {
+      const mockCreateHandler: ClientToServerEvents["room:create"] = (
+        req,
+        callback,
+      ) => {
+        expect(req.playerName).toBe("HostPlayer");
+        callback?.({
+          success: true,
+          room: {} as RoomState,
+          player: {
+            id: "p1-uuid",
+            socketId: "sock-1",
+            name: "HostPlayer",
+            color: "w",
+            isHost: true,
+            isConnected: true,
+            connectedAt: 1000,
+          },
+          sessionToken: "secret-token-123",
+        });
+      };
+
+      let ackInvoked = false;
+      mockCreateHandler(
+        { playerName: "HostPlayer", preferredColor: "w", avatar: "🦁" },
+        (res) => {
+          ackInvoked = true;
+          if (res.success) {
+            expect(res.player.name).toBe("HostPlayer");
+            expect(res.player.isHost).toBe(true);
+            expect(res.sessionToken).toBe("secret-token-123");
+          }
+        },
+      );
+      expect(ackInvoked).toBe(true);
     });
   });
 });

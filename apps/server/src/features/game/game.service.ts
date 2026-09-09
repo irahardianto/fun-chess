@@ -3,7 +3,6 @@ import {
   GameOverReason,
   GameState,
   MakeMoveRequest,
-  MoveResult,
   PieceColor,
   Player,
   RoomState,
@@ -16,19 +15,13 @@ import {
   InvalidMoveError,
   InvalidPayloadError,
   OptimisticLockConflictError,
+  type IClock,
+  type IIdGenerator,
 } from "@fun-chess/shared";
 import type { IRoomGameAdapter } from "../rooms/index.js";
 import { ChessEngine } from "./chess_engine.js";
-import {
-  IClock,
-  SystemClock,
-  IIdGenerator,
-  UuidGenerator,
-} from "./clock.js";
-import {
-  IGameService,
-  MoveApplicationResult,
-} from "./game.interface.js";
+import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
+import { IGameService, MoveApplicationResult } from "./game.interface.js";
 
 export type { MoveApplicationResult };
 
@@ -90,7 +83,8 @@ export class GameService implements IGameService {
           const lastMoveResult =
             room.game.moveHistory[room.game.moveHistory.length - 1]!;
 
-          let checkInfo: { inCheck: PieceColor; kingSquare: string } | undefined;
+          let checkInfo:
+            { inCheck: PieceColor; kingSquare: string } | undefined;
           if (room.game.isCheck) {
             const checkedColor: PieceColor = room.game.turn;
             const kingSquare = ChessEngine.findKingSquare(
@@ -301,8 +295,7 @@ export class GameService implements IGameService {
       throw new PlayerNotInRoomError(socketId);
     }
 
-    const opponent =
-      player.color === "w" ? room.blackPlayer : room.whitePlayer;
+    const opponent = player.color === "w" ? room.blackPlayer : room.whitePlayer;
 
     const updatedRoom = await this.roomAdapter.updateDrawOffer(code, {
       offeredBy: player.id,

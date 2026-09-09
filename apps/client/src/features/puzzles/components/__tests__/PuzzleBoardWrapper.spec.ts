@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import PuzzleBoardWrapper from '../PuzzleBoardWrapper.vue';
-import ChessBoard from '../../../board/ChessBoard.vue';
+import { ChessBoard } from '@/features/board';
 import ProgressiveHintLayer from '../ProgressiveHintLayer.vue';
 import type { Square, HintData } from '@fun-chess/shared';
 

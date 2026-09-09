@@ -7,7 +7,11 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
-import { createTestServer, TestServerInstance } from "./helpers/test_server.js";
+import {
+  createTestServer,
+  TestServerInstance,
+  resetTestRateLimiters,
+} from "./helpers/test_server.js";
 import {
   createConnectedSocketClient,
   disconnectSockets,
@@ -46,6 +50,7 @@ describe("Game Completion Integration Tests", () => {
   });
 
   beforeEach(async () => {
+    resetTestRateLimiters();
     whiteClient = await createConnectedSocketClient(serverInstance.url);
     blackClient = await createConnectedSocketClient(serverInstance.url);
 

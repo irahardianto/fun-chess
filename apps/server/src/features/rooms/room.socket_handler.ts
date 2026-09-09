@@ -1,4 +1,5 @@
 import { Socket } from "socket.io";
+import { z } from "zod";
 import {
   CreateRoomRequest,
   CreateRoomRequestSchema,
@@ -13,6 +14,7 @@ import {
   GameOverPayload,
 } from "@fun-chess/shared";
 import { type Logger, runLoggedJob } from "../../platform/logger/index.js";
+import { env } from "../../platform/config/index.js";
 import {
   type SocketRateLimiter,
   createSocketRateLimiter,
@@ -22,8 +24,7 @@ import {
 import {
   createFeatureSocketHandler,
   type FeatureSocketHandlerOptions,
-} from "../common/socket_handler.utils.js";
-import { RoomService } from "./room.service.js";
+} from "../../platform/socket/socket_handler.utils.js";
 import type { IRoomService } from "./room.interface.js";
 import {
   type IDisconnectTimerRegistry,
@@ -47,6 +48,10 @@ export {
 };
 
 export const defaultSocketRateLimiter = createSocketRateLimiter();
+export const roomCreateRateLimiter = createSocketRateLimiter({
+  maxRequests: env.RATE_LIMIT_ROOM_CREATE_MAX,
+  windowMs: 60_000,
+});
 
 function createRoomHandler<TReq, TRes>(
   logger: Logger,
@@ -66,8 +71,14 @@ function createRoomHandler<TReq, TRes>(
     return inner(
       rawReq,
       callback
-        ? (res: any) => {
-            if (res?.error?.code === "ERR_RATE_LIMITED") {
+        ? (res: unknown) => {
+            if (
+              typeof res === "object" &&
+              res !== null &&
+              "error" in res &&
+              typeof (res as { error?: { code?: string } }).error === "object" &&
+              (res as { error?: { code?: string } }).error?.code === "ERR_RATE_LIMITED"
+            ) {
               const limitDesc = options.rateLimiter.getLimitDescription();
               const opDesc =
                 operationName === "room:create"
@@ -79,7 +90,8 @@ function createRoomHandler<TReq, TRes>(
                       : operationName === "room:leave"
                         ? "room leave"
                         : operationName;
-              res.error.message = `Rate limit exceeded for ${opDesc}. ${limitDesc}`;
+              (res as { error: { code: string; message: string } }).error.message =
+                `Rate limit exceeded for ${opDesc}. ${limitDesc}`;
             }
             callback(res);
           }
@@ -98,24 +110,33 @@ export function registerRoomSocketHandlers(
   logger: Logger,
   rateLimiter: SocketRateLimiter = defaultSocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
+  createRateLimiter: SocketRateLimiter = roomCreateRateLimiter,
 ): void {
-  // 1. room:create
+  // 1. room:create - differential rate limit (MAJ-006)
   const handleCreate = createRoomHandler<
     CreateRoomRequest,
-    { success: true; room: RoomState; sessionToken: string }
+    { success: true; room: RoomState; player: Player; sessionToken: string }
   >(
     logger,
     "room:create",
     socket,
-    { schema: CreateRoomRequestSchema as any, rateLimiter },
+    {
+      schema: CreateRoomRequestSchema as z.ZodType<CreateRoomRequest>,
+      rateLimiter: createRateLimiter,
+    },
     async (req) => {
       const result = await roomService.createRoom(req, socket.id);
+      if (socket.data) {
+        socket.data.userId = result.player.id;
+        socket.data.roomCode = result.room.roomCode;
+      }
       await socket.join(result.room.roomCode);
 
       socket.emit("room:created", result.room);
       return {
         success: true,
         room: result.room,
+        player: result.player,
         sessionToken: result.sessionToken,
       };
     },
@@ -131,9 +152,16 @@ export function registerRoomSocketHandlers(
     logger,
     "room:join",
     socket,
-    { schema: JoinRoomRequestSchema as any, rateLimiter },
+    {
+      schema: JoinRoomRequestSchema as z.ZodType<JoinRoomRequest>,
+      rateLimiter,
+    },
     async (req) => {
       const result = await roomService.joinRoom(req, socket.id);
+      if (socket.data) {
+        socket.data.userId = result.player.id;
+        socket.data.roomCode = result.room.roomCode;
+      }
       const roomCode = result.room.roomCode;
       await socket.join(roomCode);
 
@@ -166,9 +194,16 @@ export function registerRoomSocketHandlers(
     logger,
     "room:reconnect",
     socket,
-    { schema: ReconnectRequestSchema, rateLimiter },
+    {
+      schema: ReconnectRequestSchema as z.ZodType<ReconnectRequest>,
+      rateLimiter,
+    },
     async (req) => {
       const result = await roomService.reconnect(req, socket.id);
+      if (socket.data) {
+        socket.data.userId = result.player.id;
+        socket.data.roomCode = result.room.roomCode;
+      }
       const roomCode = result.room.roomCode;
       await socket.join(roomCode);
 
@@ -206,20 +241,33 @@ export function registerRoomSocketHandlers(
     logger,
     "room:leave",
     socket,
-    { schema: LeaveRoomRequestSchema, rateLimiter },
+    {
+      schema: LeaveRoomRequestSchema as z.ZodType<LeaveRoomRequest>,
+      rateLimiter,
+    },
     async (req) => {
       const result = await roomService.leaveRoom(req.roomCode, socket.id);
       const roomCode = req.roomCode.toUpperCase();
-      await socket.leave(roomCode);
 
       // Cancel disconnect timers for this player
       timerRegistry.cancel(roomCode, result.player.id);
 
-      if (result.gameOverPayload) {
+      if (result.shouldDelete) {
+        socket.to(roomCode).emit("room:player_left", {
+          playerId: result.player.id,
+          playerName: result.player.name,
+          reason: result.player.isHost ? "host_left" : "player_left",
+        });
+        timerRegistry.cancelAllForRoom(roomCode);
+        if (typeof io.in === "function") {
+          const socketsInRoom = await io.in(roomCode).fetchSockets();
+          for (const s of socketsInRoom) {
+            await s.leave(roomCode);
+          }
+        }
+      } else if (result.gameOverPayload) {
         timerRegistry.cancelAllForRoom(roomCode);
         io.to(roomCode).emit("game:over", result.gameOverPayload);
-      } else if (result.shouldDelete) {
-        timerRegistry.cancelAllForRoom(roomCode);
       } else {
         socket.to(roomCode).emit("room:player_left", {
           playerId: result.player.id,
@@ -228,6 +276,7 @@ export function registerRoomSocketHandlers(
         });
       }
 
+      await socket.leave(roomCode);
       return { success: true };
     },
   );
@@ -270,8 +319,15 @@ export async function handleSocketDisconnect(
           };
         },
       );
-    } catch {
-      // Handled by runLoggedJob
+    } catch (err) {
+      logger.error("Failed to process disconnect grace period abandonment", {
+        operation: "disconnect_grace_period_abandonment",
+        roomCode: room.roomCode,
+        error:
+          err instanceof Error
+            ? { name: err.name, message: err.message, stack: err.stack }
+            : { raw: err },
+      });
     }
   };
 

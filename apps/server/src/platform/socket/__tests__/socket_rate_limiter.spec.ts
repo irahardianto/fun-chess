@@ -5,6 +5,8 @@ import {
 } from "../index.js";
 import { NullLogger } from "../../logger/null_logger.js";
 
+type SocketLikeParam = Parameters<typeof extractClientIp>[0];
+
 describe("SocketRateLimiter & Client IP Extraction", () => {
   let limiter: SocketRateLimiter;
 
@@ -106,8 +108,8 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any)).toBe("10.0.0.1");
-      expect(extractClientIp(socket as any, false)).toBe("10.0.0.1");
+      expect(extractClientIp(socket as SocketLikeParam)).toBe("10.0.0.1");
+      expect(extractClientIp(socket as SocketLikeParam, false)).toBe("10.0.0.1");
     });
 
     it("extracts the RIGHTMOST IP from x-forwarded-for header when trustProxy is true (CRIT-006)", () => {
@@ -120,7 +122,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any, true)).toBe("150.172.238.178");
+      expect(extractClientIp(socket as SocketLikeParam, true)).toBe("150.172.238.178");
     });
 
     it("extracts the rightmost IP when x-forwarded-for header is an array when trustProxy is true", () => {
@@ -133,7 +135,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any, true)).toBe("198.51.100.99");
+      expect(extractClientIp(socket as SocketLikeParam, true)).toBe("198.51.100.99");
     });
 
     it("extracts IP from single-value x-forwarded-for header with surrounding whitespace when trustProxy is true", () => {
@@ -146,7 +148,7 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any, true)).toBe("198.51.100.42");
+      expect(extractClientIp(socket as SocketLikeParam, true)).toBe("198.51.100.42");
     });
 
     it("falls back to socket.handshake.address when x-forwarded-for is missing", () => {
@@ -157,8 +159,8 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any)).toBe("192.168.1.100");
-      expect(extractClientIp(socket as any, true)).toBe("192.168.1.100");
+      expect(extractClientIp(socket as SocketLikeParam)).toBe("192.168.1.100");
+      expect(extractClientIp(socket as SocketLikeParam, true)).toBe("192.168.1.100");
     });
 
     it("falls back to conn.remoteAddress when handshake.address is missing", () => {
@@ -171,8 +173,8 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any)).toBe("172.16.0.5");
-      expect(extractClientIp(socket as any, true)).toBe("172.16.0.5");
+      expect(extractClientIp(socket as SocketLikeParam)).toBe("172.16.0.5");
+      expect(extractClientIp(socket as SocketLikeParam, true)).toBe("172.16.0.5");
     });
 
     it("falls back to '127.0.0.1' when neither header nor address is available", () => {
@@ -182,8 +184,8 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
         },
       };
 
-      expect(extractClientIp(socket as any)).toBe("127.0.0.1");
-      expect(extractClientIp({} as any)).toBe("127.0.0.1");
+      expect(extractClientIp(socket as SocketLikeParam)).toBe("127.0.0.1");
+      expect(extractClientIp({} as SocketLikeParam)).toBe("127.0.0.1");
     });
   });
 

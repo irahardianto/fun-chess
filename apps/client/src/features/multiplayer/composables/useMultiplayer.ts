@@ -130,7 +130,11 @@ export function useMultiplayer(injectedSocket?: TypedSocket) {
     resign: game.resign,
     offerDraw: game.offerDraw,
     respondDraw: game.respondDraw,
+    acceptDraw: game.acceptDraw,
+    declineDraw: game.declineDraw,
     requestRematch: game.requestRematch,
     respondRematch: game.respondRematch,
+    acceptRematch: game.acceptRematch,
+    declineRematch: game.declineRematch,
   };
 }

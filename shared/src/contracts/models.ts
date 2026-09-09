@@ -17,6 +17,12 @@ export type PieceColor = "w" | "b";
 export type PieceType = "p" | "n" | "b" | "r" | "q" | "k";
 
 /**
+ * Pawn promotion piece target symbol strictly limited to legal chess promotion targets ('q', 'r', 'b', 'n').
+ * Conforms to FIDE laws and reconciles with PromotionPieceSchema (MIN-025).
+ */
+export type PromotionPiece = "q" | "r" | "b" | "n";
+
+/**
  * Multiplayer room lifecycle status.
  */
 export type RoomStatus =
@@ -128,8 +134,8 @@ export interface MoveResult {
   color: PieceColor;
   /** Captured piece type, if any */
   captured?: PieceType;
-  /** Promoted piece type, if any */
-  promotion?: PieceType;
+  /** Promoted piece type, if this move was a legal pawn promotion */
+  promotion?: PromotionPiece;
   /** Move flags, e.g. 'c' (capture), 'e' (en passant), 'k' (kingside castle) */
   flags: string;
   /** FEN string immediately after this move */

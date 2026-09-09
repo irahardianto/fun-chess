@@ -1,6 +1,14 @@
 import type { Page, Locator } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+interface SoloAiArenaElement extends Element {
+  __vueParentComponent?: {
+    setupState?: {
+      selectSquare?: (square: string) => void;
+    };
+  };
+}
+
 /**
  * Page Object Model representing the Fun Chess Game Arena (Multiplayer and Solo AI).
  */
@@ -57,11 +65,11 @@ export class GamePage {
     const isPromotionRank = to.endsWith('8') || to.endsWith('1');
     if (isPromotionRank) {
       await this.page.evaluate((dest) => {
-        const arena = document.querySelector('[data-testid="solo-ai-arena"]') as any;
+        const arena = document.querySelector<SoloAiArenaElement>('[data-testid="solo-ai-arena"]');
         if (arena?.__vueParentComponent?.setupState?.selectSquare) {
           arena.__vueParentComponent.setupState.selectSquare(dest);
         }
-      }, to).catch(() => {});
+      }, to);
     } else {
       await expect(toSquare.locator('[data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
     }
@@ -81,7 +89,7 @@ export class GamePage {
    */
   async resign(): Promise<void> {
     this.page.once('dialog', async (dialog) => {
-      await dialog.accept().catch(() => {});
+      await dialog.accept();
     });
 
     const activeResignBtn = this.page.locator('[data-testid="resign-action"]:visible, [data-testid="resign-btn"]:visible').first();
@@ -92,7 +100,7 @@ export class GamePage {
     const confirmBtn = this.page.locator(
       '[data-testid="confirm-resign-btn"]:visible, [data-testid="confirm-proceed-btn"]:visible, button:has-text("Resign"):visible'
     ).last();
-    if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await confirmBtn.isVisible({ timeout: 2000 })) {
       await confirmBtn.click();
     }
   }

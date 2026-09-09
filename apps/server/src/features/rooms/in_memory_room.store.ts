@@ -1,13 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import {
-  AppError,
-  GameState,
-  GameOverPayload,
-  Player,
+import type {
   RoomState,
+  IClock,
+  IIdGenerator,
 } from "@fun-chess/shared";
 import { RoomStore, RoomMutator } from "./room.store.js";
-import { IRoomGameAdapter } from "./room.interface.js";
 import {
   RoomNotFoundError,
   OptimisticLockConflictError,
@@ -15,22 +12,10 @@ import {
   LockExecutionTimeoutError,
   RoomAlreadyExistsError,
   StaleLockExecutionError,
-  GameNotActiveError,
   RoomCapacityExceededError,
 } from "./room.errors.js";
-import {
-  IClock,
-  SystemClock,
-  IIdGenerator,
-  UuidGenerator,
-} from "./clock.js";
-import {
-  applyGameMoveTransition,
-  finalizeGameTransition,
-  updateDrawOfferTransition,
-  updateRematchTransition,
-} from "./room.logic.js";
-import type { Logger } from "../../platform/logger/index.js";
+import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
+import { type Logger, defaultLogger } from "../../platform/logger/index.js";
 
 export const MAX_ROOMS = 10_000;
 
@@ -50,7 +35,7 @@ interface LockEntry {
  * Enforces linearizable per-room mutations via FIFO lock queues, monotonic CAS versioning,
  * and a monotonic ticket sequence model with stale execution rejection (CRIT-002, CRIT-003, CRIT-006).
  */
-export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
+export class InMemoryRoomStore implements RoomStore {
   private readonly rooms = new Map<string, RoomState>();
   private readonly lockQueues = new Map<string, LockEntry>();
   // PERF: Reverse index from socketId -> { roomCode, playerId } for O(1) disconnect lookups (HIGH-006)
@@ -79,11 +64,13 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
   public LOCK_TIMEOUT_MS = 5000;
   public EXECUTION_TIMEOUT_MS = 5000;
   public maxRooms: number = MAX_ROOMS;
-  private readonly logger?: Logger;
+  private readonly clock: IClock;
+  private readonly idGenerator: IIdGenerator;
+  private readonly logger: Logger;
 
   constructor(
-    private readonly clock: IClock = new SystemClock(),
-    private readonly idGenerator: IIdGenerator = new UuidGenerator(),
+    clockOrLogger?: IClock | Logger,
+    idGenerator?: IIdGenerator,
     optionsOrLogger?:
       | Logger
       | {
@@ -96,27 +83,42 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
       lockTimeoutMs?: number;
       executionTimeoutMs?: number;
       maxRooms?: number;
+      logger?: Logger;
     },
   ) {
-    if (optionsOrLogger) {
-      if (
-        "debug" in optionsOrLogger &&
-        typeof (optionsOrLogger as Logger).debug === "function"
-      ) {
-        this.logger = optionsOrLogger as Logger;
-      } else {
-        const opts = optionsOrLogger as {
-          lockTimeoutMs?: number;
-          executionTimeoutMs?: number;
-          maxRooms?: number;
-          logger?: Logger;
-        };
-        if (opts.lockTimeoutMs !== undefined)
-          this.LOCK_TIMEOUT_MS = opts.lockTimeoutMs;
-        if (opts.executionTimeoutMs !== undefined)
-          this.EXECUTION_TIMEOUT_MS = opts.executionTimeoutMs;
-        if (opts.maxRooms !== undefined) this.maxRooms = opts.maxRooms;
-        if (opts.logger) this.logger = opts.logger;
+    let resolvedLogger: Logger | undefined;
+    if (
+      clockOrLogger &&
+      "info" in clockOrLogger &&
+      typeof clockOrLogger.info === "function" &&
+      !("now" in clockOrLogger)
+    ) {
+      resolvedLogger = clockOrLogger as Logger;
+      this.clock = new SystemClock();
+      this.idGenerator = new UuidGenerator();
+    } else {
+      this.clock = (clockOrLogger as IClock) ?? new SystemClock();
+      this.idGenerator = idGenerator ?? new UuidGenerator();
+      if (optionsOrLogger) {
+        if (
+          "info" in optionsOrLogger &&
+          typeof (optionsOrLogger as Logger).info === "function"
+        ) {
+          resolvedLogger = optionsOrLogger as Logger;
+        } else {
+          const opts = optionsOrLogger as {
+            lockTimeoutMs?: number;
+            executionTimeoutMs?: number;
+            maxRooms?: number;
+            logger?: Logger;
+          };
+          if (opts.lockTimeoutMs !== undefined)
+            this.LOCK_TIMEOUT_MS = opts.lockTimeoutMs;
+          if (opts.executionTimeoutMs !== undefined)
+            this.EXECUTION_TIMEOUT_MS = opts.executionTimeoutMs;
+          if (opts.maxRooms !== undefined) this.maxRooms = opts.maxRooms;
+          if (opts.logger) resolvedLogger = opts.logger;
+        }
       }
     }
     if (options) {
@@ -125,7 +127,9 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
       if (options.executionTimeoutMs !== undefined)
         this.EXECUTION_TIMEOUT_MS = options.executionTimeoutMs;
       if (options.maxRooms !== undefined) this.maxRooms = options.maxRooms;
+      if (options.logger) resolvedLogger = options.logger;
     }
+    this.logger = resolvedLogger ?? defaultLogger;
   }
 
   private indexSockets(room: RoomState): void {
@@ -274,6 +278,7 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
     let acquireTimer: NodeJS.Timeout | undefined;
     let executionTimer: NodeJS.Timeout | undefined;
     let acquired = false;
+    let timedOut = false;
     try {
       // 1. Lock Acquisition Race (5000ms acquisition timeout)
       await Promise.race([
@@ -281,7 +286,7 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
         new Promise((_, reject) => {
           acquireTimer = setTimeout(() => {
             this.trackCancelledTicket(ticket);
-            this.logger?.debug("Lock acquisition timed out", {
+            this.logger.warn("Lock acquisition timed out", {
               operation: "room_lock_acquire_timeout",
               roomCode: code,
               ticket,
@@ -294,7 +299,7 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
       if (acquireTimer) clearTimeout(acquireTimer);
 
       this.activeTickets.set(code, ticket);
-      this.logger?.debug("Lock acquired", {
+      this.logger.debug("Lock acquired", {
         operation: "room_lock_acquired",
         roomCode: code,
         ticket,
@@ -303,11 +308,12 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
       // 2. Lock Execution Race (5000ms execution timeout) — MAJ-005, CRIT-002
       const executionTimeoutPromise = new Promise<never>((_, reject) => {
         executionTimer = setTimeout(() => {
+          timedOut = true;
           this.trackCancelledTicket(ticket);
           if (this.activeTickets.get(code) === ticket) {
             this.activeTickets.delete(code);
           }
-          this.logger?.debug("Lock execution timed out", {
+          this.logger.warn("Lock execution timed out", {
             operation: "room_lock_execution_timeout",
             roomCode: code,
             ticket,
@@ -317,6 +323,18 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
       });
 
       const actionPromise = this.lockContextStorage.run(context, () => action(context));
+
+      // Absorb post-timeout rejections to prevent unhandled promise rejection (CRIT-002)
+      actionPromise.catch((err) => {
+        if (timedOut) {
+          this.logger.warn("Orphaned lock action rejected after execution timeout", {
+            operation: "room_lock_orphaned_action_rejection",
+            roomCode: code,
+            ticket,
+            error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
+          });
+        }
+      });
 
       return await Promise.race([actionPromise, executionTimeoutPromise]);
     } finally {
@@ -493,85 +511,5 @@ export class InMemoryRoomStore implements RoomStore, IRoomGameAdapter {
     this.rooms.clear();
     this.activeTickets.clear();
     this.cancelledTickets.clear();
-  }
-
-  // --- IRoomGameAdapter Implementation (Fallback Adapter) ---
-
-  public async getRoom(roomCode: string): Promise<RoomState | null> {
-    return this.findByCode(roomCode);
-  }
-
-  public async applyGameMove(
-    roomCode: string,
-    nextGameState: GameState,
-    gameOverPayload?: GameOverPayload,
-  ): Promise<RoomState> {
-    return this.mutate(roomCode, (room) => {
-      if (room.status !== "playing") {
-        throw new GameNotActiveError(room.status);
-      }
-      if (nextGameState.moveCount <= room.game.moveCount) {
-        throw new OptimisticLockConflictError(
-          room.roomCode,
-          nextGameState.moveCount - 1,
-          room.game.moveCount,
-        );
-      }
-      const now = this.clock.now();
-      const updated = applyGameMoveTransition(
-        room,
-        nextGameState,
-        gameOverPayload,
-        now,
-      );
-      return { updatedRoom: updated, result: updated };
-    });
-  }
-
-  public async finalizeGame(
-    roomCode: string,
-    gameOverPayload: GameOverPayload,
-  ): Promise<RoomState> {
-    return this.mutate(roomCode, (room) => {
-      if (room.status !== "playing") {
-        throw new GameNotActiveError(room.status);
-      }
-      if (gameOverPayload.reason === "draw_agreement" && !room.drawOffer) {
-        throw new GameNotActiveError("No draw offer is currently pending");
-      }
-      const now = this.clock.now();
-      const updated = finalizeGameTransition(room, gameOverPayload, now);
-      return { updatedRoom: updated, result: updated };
-    });
-  }
-
-  public async updateDrawOffer(
-    roomCode: string,
-    drawOffer: RoomState["drawOffer"],
-  ): Promise<RoomState> {
-    return this.mutate(roomCode, (room) => {
-      const now = this.clock.now();
-      const updated = updateDrawOfferTransition(room, drawOffer, now);
-      return { updatedRoom: updated, result: updated };
-    });
-  }
-
-  public async updateRematch(
-    roomCode: string,
-    rematch: RoomState["rematch"],
-    newGameState?: GameState,
-    players?: { whitePlayer: Player | null; blackPlayer: Player | null },
-  ): Promise<RoomState> {
-    return this.mutate(roomCode, (room) => {
-      const now = this.clock.now();
-      const updated = updateRematchTransition(
-        room,
-        rematch,
-        newGameState,
-        now,
-        players,
-      );
-      return { updatedRoom: updated, result: updated };
-    });
   }
 }

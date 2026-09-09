@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import type { PieceColor, PieceType, Square } from '@fun-chess/shared';
 import type { PieceKey } from '@/assets/pieces';
-import { logger } from '@/platform/telemetry/index.js';
+import { useInjectLogger } from '@/platform/di';
 import ChessPieceSvg from '../../components/base/ChessPieceSvg.vue';
 
 interface Props {
@@ -37,6 +37,8 @@ const emit = defineEmits<{
   dragMove: [square: Square, event: PointerEvent, offset: { x: number; y: number }];
   dragEnd: [square: Square, event: PointerEvent, clientPos: { x: number; y: number }];
 }>();
+
+const logger = useInjectLogger();
 
 const resolvedColor = computed<PieceColor>(() => {
   if (props.color) return props.color;

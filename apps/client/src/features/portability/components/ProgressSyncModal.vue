@@ -8,7 +8,10 @@ import ProgressConflictModal from './ProgressConflictModal.vue';
 import { useProgressSync } from '../composables/useProgressSync';
 import { defaultProgressFileService } from '../services/progress_file.service';
 import { usePwaInstall } from '@/features/pwa';
-import { logger } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
+import { useRovingTabindex } from '@/platform/ui';
+
+const logger = useInjectLogger();
 
 const modelValue = defineModel<boolean>({ default: false });
 
@@ -107,6 +110,10 @@ async function handleImportFile(file: File) {
     }
   } catch (err: unknown) {
     syncError.value = err instanceof Error ? err.message : 'Failed to read save file.';
+    logger.warn('Failed to import progress file', {
+      operation: 'progress_sync_import_file',
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -115,20 +122,14 @@ function handleConflictResolved() {
   modelValue.value = false;
 }
 
-function handleTabKeyDown(event: KeyboardEvent) {
-  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'Home' || event.key === 'End') {
-    event.preventDefault();
-    if (event.key === 'Home') {
-      activeTab.value = 'export';
-    } else if (event.key === 'End') {
-      activeTab.value = 'import';
-    } else {
-      activeTab.value = activeTab.value === 'export' ? 'import' : 'export';
-    }
-    const tabEl = document.getElementById(activeTab.value === 'export' ? 'tab-export' : 'tab-import');
-    tabEl?.focus();
-  }
-}
+const syncTabs: readonly ('export' | 'import')[] = ['export', 'import'];
+
+const { handleKeyDown: handleTabKeyDown, getTabindex } = useRovingTabindex({
+  items: syncTabs,
+  modelValue: activeTab,
+  orientation: 'horizontal',
+  idPrefix: 'tab-',
+});
 </script>
 
 <template>
@@ -174,7 +175,7 @@ function handleTabKeyDown(event: KeyboardEvent) {
           :class="{ 'is-active': activeTab === 'export' }"
           :aria-selected="activeTab === 'export'"
           aria-controls="panel-export"
-          :tabindex="activeTab === 'export' ? 0 : -1"
+          :tabindex="getTabindex('export')"
           @click="activeTab = 'export'"
         >
           📤 Export Progress
@@ -187,7 +188,7 @@ function handleTabKeyDown(event: KeyboardEvent) {
           :class="{ 'is-active': activeTab === 'import' }"
           :aria-selected="activeTab === 'import'"
           aria-controls="panel-import"
-          :tabindex="activeTab === 'import' ? 0 : -1"
+          :tabindex="getTabindex('import')"
           @click="activeTab = 'import'"
         >
           📥 Import Progress

@@ -35,6 +35,12 @@ export class ShutdownCoordinator {
   private readonly onExit: (code: number) => void;
   private readonly additionalCleanups: Array<() => void | Promise<void>>;
   private forceExitTimer?: NodeJS.Timeout;
+  private sigintHandler?: () => void;
+  private sigtermHandler?: () => void;
+  private unhandledRejectionHandler?: (reason: unknown) => void;
+  private uncaughtExceptionHandler?: (err: Error) => void;
+  private serverErrorHandler?: (err: Error) => void;
+  private isDisposed = false;
 
   constructor(options: ShutdownCoordinatorOptions) {
     this.server = options.server;
@@ -74,7 +80,7 @@ export class ShutdownCoordinator {
     const corrId = correlationId ?? randomUUID();
     const startTime = performance.now();
 
-    this.logger.info(`Received ${signal}. Shutting down gracefully...`, {
+    this.logger.info("Shutdown signal received, initiating graceful shutdown", {
       operation: "server_shutdown",
       correlationId: corrId,
       signal,
@@ -184,27 +190,31 @@ export class ShutdownCoordinator {
 
   /**
    * Installs process-level signal listeners and crash guards.
+   * Retains handler references to prevent listener leaks (MAJ-010).
    */
   public installProcessHandlers(): void {
-    process.on("SIGINT", () => {
+    if (this.isDisposed) return;
+
+    this.sigintHandler = () => {
       void this.shutdown("SIGINT");
-    });
+    };
 
-    process.on("SIGTERM", () => {
+    this.sigtermHandler = () => {
       void this.shutdown("SIGTERM");
-    });
+    };
 
-    process.on("unhandledRejection", (reason: unknown) => {
+    this.unhandledRejectionHandler = (reason: unknown) => {
       this.logger.error("Unhandled promise rejection", {
         operation: "unhandled_rejection",
         correlationId: randomUUID(),
-        error: reason instanceof Error
-          ? { name: reason.name, message: reason.message, stack: reason.stack }
-          : { raw: reason },
+        error:
+          reason instanceof Error
+            ? { name: reason.name, message: reason.message, stack: reason.stack }
+            : { raw: reason },
       });
-    });
+    };
 
-    process.on("uncaughtException", (err: Error) => {
+    this.uncaughtExceptionHandler = (err: Error) => {
       const correlationId = randomUUID();
       this.logFatal("Uncaught exception, initiating emergency shutdown", {
         operation: "uncaught_exception",
@@ -212,9 +222,9 @@ export class ShutdownCoordinator {
         error: { name: err.name, message: err.message, stack: err.stack },
       });
       void this.shutdown("uncaughtException");
-    });
+    };
 
-    this.server.on("error", (err: Error) => {
+    this.serverErrorHandler = (err: Error) => {
       const correlationId = randomUUID();
       this.logFatal("HTTP server fatal socket error", {
         operation: "server_error",
@@ -222,6 +232,58 @@ export class ShutdownCoordinator {
         error: { name: err.name, message: err.message, stack: err.stack },
       });
       void this.shutdown("serverError");
-    });
+    };
+
+    process.on("SIGINT", this.sigintHandler);
+    process.on("SIGTERM", this.sigtermHandler);
+    process.on("unhandledRejection", this.unhandledRejectionHandler);
+    process.on("uncaughtException", this.uncaughtExceptionHandler);
+    this.server.on("error", this.serverErrorHandler);
+  }
+
+  /**
+   * Uninstalls all process-level and server event listeners (MAJ-010).
+   */
+  public uninstallProcessHandlers(): void {
+    if (this.sigintHandler) {
+      process.removeListener("SIGINT", this.sigintHandler);
+      this.sigintHandler = undefined;
+    }
+    if (this.sigtermHandler) {
+      process.removeListener("SIGTERM", this.sigtermHandler);
+      this.sigtermHandler = undefined;
+    }
+    if (this.unhandledRejectionHandler) {
+      process.removeListener("unhandledRejection", this.unhandledRejectionHandler);
+      this.unhandledRejectionHandler = undefined;
+    }
+    if (this.uncaughtExceptionHandler) {
+      process.removeListener("uncaughtException", this.uncaughtExceptionHandler);
+      this.uncaughtExceptionHandler = undefined;
+    }
+    if (this.serverErrorHandler) {
+      this.server.removeListener("error", this.serverErrorHandler);
+      this.serverErrorHandler = undefined;
+    }
+  }
+
+  /**
+   * Uninstalls all process handlers, cancels pending timers, and disposes resources (MAJ-010).
+   */
+  public dispose(): void {
+    if (this.isDisposed) return;
+    this.isDisposed = true;
+
+    this.uninstallProcessHandlers();
+
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
+
+    if (this.forceExitTimer) {
+      clearTimeout(this.forceExitTimer);
+      this.forceExitTimer = undefined;
+    }
   }
 }

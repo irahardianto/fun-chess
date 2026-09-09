@@ -1,12 +1,13 @@
 import { ref, onMounted, getCurrentInstance } from 'vue';
 import type { LanInfoResponse } from '@fun-chess/shared';
-import { safeLocalStorage, createSafeStorage, type KeyValueStorage } from '../platform/storage';
-import { apiClient, type IApiClient } from '../platform/api';
-import { logger } from '../platform/telemetry';
+import { useInjectLogger, useInjectStorage, useInjectApiClient, useInjectWebRtcDiscovery } from '@/platform/di';
+import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
+import { apiClient, type IApiClient } from '@/platform/api';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 import {
   type IWebRtcDiscovery,
   defaultWebRtcDiscovery,
-} from '../platform/hardware';
+} from '@/platform/hardware';
 
 const STORAGE_KEY = 'fun_chess_lan_ip';
 
@@ -34,14 +35,16 @@ export interface LanDiscoveryOptions {
   storage?: KeyValueStorage;
   apiClient?: IApiClient;
   webRtcDiscovery?: IWebRtcDiscovery;
+  logger?: ILogger;
 }
 
 export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
   const storage =
     options.storage ??
-    (safeLocalStorage.isAvailable() ? safeLocalStorage : createSafeStorage('localStorage'));
-  const client = options.apiClient ?? apiClient;
-  const webRtc = options.webRtcDiscovery ?? defaultWebRtcDiscovery;
+    (getCurrentInstance() ? useInjectStorage() : safeLocalStorage);
+  const client = options.apiClient ?? (getCurrentInstance() ? useInjectApiClient() : apiClient);
+  const webRtc = options.webRtcDiscovery ?? (getCurrentInstance() ? useInjectWebRtcDiscovery() : defaultWebRtcDiscovery);
+  const log = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
 
   const serverLanInfo = ref<LanInfoResponse | null>(null);
   const activeLanIp = ref<string>('');
@@ -57,7 +60,7 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
         activeLanIp.value = saved;
       }
     } catch (err) {
-      logger.warn('Failed to read saved LAN IP from storage', {
+      log.warn('Failed to read saved LAN IP from storage', {
         operation: 'lan_storage_read',
         error: err instanceof Error ? err.message : String(err),
       });
@@ -76,7 +79,7 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
         activeLanIp.value = data.lanIp;
       }
     } catch (err) {
-      logger.warn('Failed to fetch server LAN info (offline mode)', {
+      log.warn('Failed to fetch server LAN info (offline mode)', {
         operation: 'lan_fetch_info',
         error: err instanceof Error ? err.message : String(err),
       });
@@ -91,7 +94,7 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
         try {
           storage.setItem(STORAGE_KEY, webrtcIp);
         } catch (err) {
-          logger.warn('Failed to cache WebRTC LAN IP to storage', {
+          log.warn('Failed to cache WebRTC LAN IP to storage', {
             operation: 'lan_storage_cache',
             error: err instanceof Error ? err.message : String(err),
           });
@@ -112,7 +115,7 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
         storage.removeItem(STORAGE_KEY);
       }
     } catch (err) {
-      logger.warn('Failed to persist LAN IP in storage', {
+      log.warn('Failed to persist LAN IP in storage', {
         operation: 'lan_storage_persist',
         error: err instanceof Error ? err.message : String(err),
       });

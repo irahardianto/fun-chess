@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { GameService } from "../game.service.js";
+import type { MoveApplicationResult } from "../game.interface.js";
 import { MockRoomGameAdapter } from "./mock_room_adapter.js";
 import {
   RoomState,
@@ -10,10 +11,10 @@ import {
   InvalidMoveError,
   InvalidPayloadError,
   OptimisticLockConflictError,
+  type IClock,
 } from "@fun-chess/shared";
 import { ChessEngine } from "../chess_engine.js";
 import { Chess } from "chess.js";
-import { IClock, IIdGenerator } from "../clock.js";
 
 describe("GameService", () => {
   let store: MockRoomGameAdapter;
@@ -114,7 +115,7 @@ describe("GameService", () => {
         { from: "f6", to: "g8", sock: "sock_black" },
       ];
 
-      let lastResult: any;
+      let lastResult: MoveApplicationResult | undefined;
       for (const m of moves) {
         lastResult = await service.makeMove(
           { roomCode: "3FOLD", move: { from: m.from, to: m.to } },
@@ -128,7 +129,9 @@ describe("GameService", () => {
       expect(lastResult.gameOverPayload).toBeDefined();
       expect(lastResult.gameOverPayload?.winner).toBe("draw");
       expect(lastResult.gameOverPayload?.reason).toBe("threefold_repetition");
-      expect(lastResult.gameOverPayload?.message).toContain("threefold repetition");
+      expect(lastResult.gameOverPayload?.message).toContain(
+        "threefold repetition",
+      );
     });
 
     it("detects stalemate draw and sets room status to game_over with stalemate reason", async () => {
@@ -189,9 +192,6 @@ describe("GameService", () => {
     });
 
     it("detects check and populates checkInfo", async () => {
-      // White queen on e2, black king on e8 -> White plays Qe7+ (assuming pawn not blocking)
-      const checkPositionFen =
-        "rnbqkbnr/pppp1ppp/8/8/4P3/8/PPPPQPPP/RNB1KBNR w KQkq - 0 1";
       // Let's use Queen to e7 check directly
       const openCheckFen =
         "rnb1kbnr/pppp1ppp/8/8/4q3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1";
@@ -287,7 +287,11 @@ describe("GameService", () => {
 
       // Play 1. e4
       const firstMove = await service.makeMove(
-        { roomCode: "IDEMP", move: { from: "e2", to: "e4" }, expectedMoveNumber: 0 },
+        {
+          roomCode: "IDEMP",
+          move: { from: "e2", to: "e4" },
+          expectedMoveNumber: 0,
+        },
         "sock_white",
       );
 
@@ -298,7 +302,11 @@ describe("GameService", () => {
 
       // Duplicate resubmission of 1. e4 with expectedMoveNumber = 0 (now < moveCount 1)
       const replay = await service.makeMove(
-        { roomCode: "IDEMP", move: { from: "e2", to: "e4" }, expectedMoveNumber: 0 },
+        {
+          roomCode: "IDEMP",
+          move: { from: "e2", to: "e4" },
+          expectedMoveNumber: 0,
+        },
         "sock_white",
       );
 
@@ -321,7 +329,11 @@ describe("GameService", () => {
       // White sends a different move (d2-d4) with expectedMoveNumber = 0
       await expect(
         service.makeMove(
-          { roomCode: "CONFLICT", move: { from: "d2", to: "d4" }, expectedMoveNumber: 0 },
+          {
+            roomCode: "CONFLICT",
+            move: { from: "d2", to: "d4" },
+            expectedMoveNumber: 0,
+          },
           "sock_white",
         ),
       ).rejects.toBeInstanceOf(OptimisticLockConflictError);
@@ -333,10 +345,16 @@ describe("GameService", () => {
 
       await expect(
         service.makeMove(
-          { roomCode: "FUTURE", move: { from: "e2", to: "e4" }, expectedMoveNumber: 5 },
+          {
+            roomCode: "FUTURE",
+            move: { from: "e2", to: "e4" },
+            expectedMoveNumber: 5,
+          },
           "sock_white",
         ),
-      ).rejects.toThrow("Move out of sequence: expectedMoveNumber is in the future");
+      ).rejects.toThrow(
+        "Move out of sequence: expectedMoveNumber is in the future",
+      );
     });
 
     it("handles idempotencyKey deduplication when client resubmits after move was applied (MAJ-031)", async () => {
@@ -344,7 +362,11 @@ describe("GameService", () => {
       await store.save(room);
 
       await service.makeMove(
-        { roomCode: "IDEMP_KEY", move: { from: "e2", to: "e4" }, idempotencyKey: "key-1" },
+        {
+          roomCode: "IDEMP_KEY",
+          move: { from: "e2", to: "e4" },
+          idempotencyKey: "key-1",
+        },
         "sock_white",
       );
 
@@ -352,7 +374,11 @@ describe("GameService", () => {
 
       // Duplicate request with idempotencyKey
       const replay = await service.makeMove(
-        { roomCode: "IDEMP_KEY", move: { from: "e2", to: "e4" }, idempotencyKey: "key-1" },
+        {
+          roomCode: "IDEMP_KEY",
+          move: { from: "e2", to: "e4" },
+          idempotencyKey: "key-1",
+        },
         "sock_white",
       );
 
@@ -412,7 +438,10 @@ describe("GameService", () => {
       const room = createActiveGameRoom("DRAW");
       await store.save(room);
 
-      const { room: roomWithOffer } = await service.offerDraw("DRAW", "sock_white");
+      const { room: roomWithOffer } = await service.offerDraw(
+        "DRAW",
+        "sock_white",
+      );
 
       // Player reconnects: socketId changes from sock_white to sock_white_new
       roomWithOffer.whitePlayer!.socketId = "sock_white_new";
@@ -622,7 +651,9 @@ describe("GameService", () => {
       // 2. offerDraw
       await service.offerDraw("MUTATE", "sock_black");
       expect(store.updateDrawOfferCalls).toHaveLength(1);
-      expect(store.updateDrawOfferCalls[0].drawOffer?.offeredBy).toBe("p_black_id");
+      expect(store.updateDrawOfferCalls[0].drawOffer?.offeredBy).toBe(
+        "p_black_id",
+      );
 
       // 3. respondDraw
       await service.respondDraw("MUTATE", "sock_white", false);
@@ -633,12 +664,16 @@ describe("GameService", () => {
       await service.resign("MUTATE", "sock_black");
       expect(store.finalizeGameCalls).toHaveLength(1);
       expect(store.finalizeGameCalls[0].gameOverPayload.winner).toBe("w");
-      expect(store.finalizeGameCalls[0].gameOverPayload.reason).toBe("resignation");
+      expect(store.finalizeGameCalls[0].gameOverPayload.reason).toBe(
+        "resignation",
+      );
 
       // 5. requestRematch
       await service.requestRematch("MUTATE", "sock_white");
       expect(store.updateRematchCalls).toHaveLength(1);
-      expect(store.updateRematchCalls[0].rematch?.requestedBy).toBe("p_white_id");
+      expect(store.updateRematchCalls[0].rematch?.requestedBy).toBe(
+        "p_white_id",
+      );
 
       // 6. respondRematch
       await service.respondRematch("MUTATE", "sock_black", true);

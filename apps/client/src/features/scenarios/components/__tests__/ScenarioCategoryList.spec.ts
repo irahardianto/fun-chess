@@ -124,4 +124,30 @@ describe('ScenarioCategoryList.vue', () => {
     const hero = wrapper.find('[data-testid="continue-learning-hero"]');
     expect(hero.exists()).toBe(false);
   });
+
+  it('supports roving tabindex keyboard navigation on curriculum category tabs', async () => {
+    const wrapper = mount(ScenarioCategoryList, {
+      props: {
+        sections: CURRICULUM_SECTIONS,
+      },
+    });
+
+    const allTab = wrapper.find('#academy-tab-all');
+    expect(allTab.attributes('tabindex')).toBe('0');
+
+    // ArrowRight -> selects first section tab
+    await allTab.trigger('keydown', { key: 'ArrowRight' });
+    expect(wrapper.emitted('selectCategory')).toBeTruthy();
+    expect(wrapper.emitted('selectCategory')?.[0]).toEqual([CURRICULUM_SECTIONS[0]!.id]);
+
+    // End -> selects last section tab
+    await allTab.trigger('keydown', { key: 'End' });
+    const lastSection = CURRICULUM_SECTIONS[CURRICULUM_SECTIONS.length - 1]!;
+    expect(wrapper.emitted('selectCategory')?.[1]).toEqual([lastSection.id]);
+
+    // Home -> selects all lessons tab
+    await allTab.trigger('keydown', { key: 'Home' });
+    expect(wrapper.emitted('selectCategory')?.[2]).toEqual(['all']);
+  });
 });
+

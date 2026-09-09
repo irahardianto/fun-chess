@@ -192,10 +192,10 @@ describe("serveStaticFile", () => {
         socket: { remoteAddress: "192.168.1.100" },
       } as unknown as IncomingMessage;
 
-      const loggedWarnings: { msg: string; meta: any }[] = [];
+      const loggedWarnings: { msg: string; meta?: Record<string, unknown> }[] = [];
       const mockLogger = {
         info: () => {},
-        warn: (msg: string, meta: any) => {
+        warn: (msg: string, meta?: Record<string, unknown>) => {
           loggedWarnings.push({ msg, meta });
         },
         error: () => {},
@@ -246,8 +246,8 @@ describe("serveStaticFile", () => {
         let warned = false;
         const mockLogger = {
           info: () => {},
-          warn: (msg: string, meta: any) => {
-            if (meta?.operation === "security_violation") warned = true;
+          warn: (_msg: string, meta?: Record<string, unknown>) => {
+            if (meta?.["operation"] === "security_violation") warned = true;
           },
           error: () => {},
           debug: () => {},
@@ -288,10 +288,10 @@ describe("serveStaticFile", () => {
         headers: { "x-forwarded-for": "172.16.0.22" },
       } as unknown as IncomingMessage;
 
-      const loggedWarnings: any[] = [];
+      const loggedWarnings: { msg: string; meta?: Record<string, unknown> }[] = [];
       const mockLogger = {
         info: () => {},
-        warn: (msg: string, meta: any) => loggedWarnings.push({ msg, meta }),
+        warn: (msg: string, meta?: Record<string, unknown>) => loggedWarnings.push({ msg, meta }),
         error: () => {},
         debug: () => {},
         child: () => mockLogger,
@@ -308,8 +308,8 @@ describe("serveStaticFile", () => {
       expect(statusCode).toBe(403);
       expect(responseBody).toBe("Forbidden");
       expect(loggedWarnings.length).toBeGreaterThan(0);
-      expect(loggedWarnings[0].meta.operation).toBe("security_violation");
-      expect(loggedWarnings[0].meta.clientIp).toBe("172.16.0.22");
+      expect(loggedWarnings[0]?.meta?.["operation"]).toBe("security_violation");
+      expect(loggedWarnings[0]?.meta?.["clientIp"]).toBe("172.16.0.22");
     });
 
     it("detects null byte injection (%00 and \\0) returning 403 Forbidden (MAJ-034)", async () => {
@@ -360,8 +360,8 @@ describe("serveStaticFile", () => {
 
       const mockLogger = {
         info: () => {},
-        warn: (_msg: string, meta: any) => {
-          loggedIp = meta.clientIp;
+        warn: (_msg: string, meta?: Record<string, unknown>) => {
+          loggedIp = String(meta?.["clientIp"] || "");
         },
         error: () => {},
         debug: () => {},
@@ -371,14 +371,14 @@ describe("serveStaticFile", () => {
       await serveStaticFile(
         customReq,
         mockRes,
-        { distPath: tempDir },
+        { distPath: tempDir, trustProxy: true },
         mockLogger,
       );
 
       expect(loggedIp).toBe("198.51.100.77");
     });
 
-    it("passes correlationId into static file serving security logs (MAJ-016)", async () => {
+    it("attaches correlationId to security violation logs when provided (MAJ-016)", async () => {
       let loggedCorrId = "";
 
       const mockRes = {
@@ -393,8 +393,8 @@ describe("serveStaticFile", () => {
 
       const mockLogger = {
         info: () => {},
-        warn: (_msg: string, meta: any) => {
-          loggedCorrId = meta.correlationId;
+        warn: (_msg: string, meta?: Record<string, unknown>) => {
+          loggedCorrId = String(meta?.["correlationId"] || "");
         },
         error: () => {},
         debug: () => {},
@@ -409,6 +409,45 @@ describe("serveStaticFile", () => {
       );
 
       expect(loggedCorrId).toBe("static-corr-999");
+    });
+
+    it("detects symlinks pointing outside rootDir and returns 403 Forbidden (MAJ-001)", async () => {
+      const outsideFile = path.join(os.tmpdir(), `fc-outside-${Date.now()}.txt`);
+      await fs.writeFile(outsideFile, "secret outside content");
+      const symlinkPath = path.join(tempDir, "symlink-outside.txt");
+      await fs.symlink(outsideFile, symlinkPath);
+
+      try {
+        let statusCode = 0;
+        let responseBody = "";
+
+        const mockRes = {
+          writeHead: (status: number) => {
+            statusCode = status;
+            return mockRes;
+          },
+          end: (body?: string) => {
+            responseBody = body || "";
+            return mockRes;
+          },
+        } as unknown as ServerResponse;
+
+        const customReq = {
+          url: "/symlink-outside.txt",
+          headers: {},
+        } as unknown as IncomingMessage;
+
+        const handled = await serveStaticFile(customReq, mockRes, {
+          distPath: tempDir,
+        });
+
+        expect(handled).toBe(true);
+        expect(statusCode).toBe(403);
+        expect(responseBody).toBe("Forbidden");
+      } finally {
+        await fs.unlink(symlinkPath).catch(() => {});
+        await fs.unlink(outsideFile).catch(() => {});
+      }
     });
   });
 
@@ -427,9 +466,9 @@ describe("serveStaticFile", () => {
       } as IncomingMessage;
 
       const mockRes = {
-        writeHead: (status: number, headers?: any) => {
+        writeHead: (status: number, headers?: Record<string, string | number | readonly string[]>) => {
           statusCode = status;
-          responseHeaders = headers || {};
+          responseHeaders = (headers as Record<string, string>) || {};
           return mockRes;
         },
         end: (body?: string) => {
@@ -534,7 +573,7 @@ describe("serveStaticFile", () => {
       });
 
       let statusCode: number | undefined;
-      let headers: any;
+      let headers: Record<string, string | number | readonly string[]> = {};
       let body = "";
 
       const mockReq = {
@@ -544,12 +583,12 @@ describe("serveStaticFile", () => {
       } as IncomingMessage;
 
       const mockRes = {
-        writeHead: (status: number, hdrs: any) => {
+        writeHead: (status: number, hdrs: Record<string, string | number | readonly string[]>) => {
           statusCode = status;
           headers = hdrs;
           return mockRes;
         },
-        end: (data?: any) => {
+        end: (data?: string | Uint8Array) => {
           if (data) body += data.toString();
           return mockRes;
         },
@@ -574,8 +613,9 @@ describe("serveStaticFile", () => {
 
       memoryStorage.setErrorSimulator((_path, op) => {
         if (op === "stat") {
-          const err = new Error("Permission denied") as any;
-          err.code = "EACCES";
+          const err = Object.assign(new Error("Permission denied"), {
+            code: "EACCES",
+          });
           return err;
         }
         return undefined;
@@ -595,7 +635,7 @@ describe("serveStaticFile", () => {
           statusCode = status;
           return mockRes;
         },
-        end: (data?: any) => {
+        end: (data?: string | Uint8Array) => {
           if (data) body += data.toString();
           return mockRes;
         },
@@ -619,8 +659,9 @@ describe("serveStaticFile", () => {
 
       memoryStorage.setErrorSimulator((_path, op) => {
         if (op === "readFile") {
-          const err = new Error("Too many open files") as any;
-          err.code = "EMFILE";
+          const err = Object.assign(new Error("Too many open files"), {
+            code: "EMFILE",
+          });
           return err;
         }
         return undefined;
@@ -640,7 +681,7 @@ describe("serveStaticFile", () => {
           statusCode = status;
           return mockRes;
         },
-        end: (data?: any) => {
+        end: (data?: string | Uint8Array) => {
           if (data) body += data.toString();
           return mockRes;
         },

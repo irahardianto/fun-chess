@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryPuzzleProgressStore } from '../in_memory_puzzle_store';
+import { InMemoryPuzzleProgressStore } from '../in_memory_puzzle_progress.store';
+
 
 describe('InMemoryPuzzleProgressStore (Test Adapter)', () => {
   let store: InMemoryPuzzleProgressStore;
@@ -49,4 +50,15 @@ describe('InMemoryPuzzleProgressStore (Test Adapter)', () => {
     expect(progress.ratingProfile.totalSolved).toBe(0);
     expect(Object.keys(progress.solvedPuzzles).length).toBe(0);
   });
+
+  it('uses injected IClock for deterministic timestamping', async () => {
+    const fixedTime = 1700000000000;
+    const mockClock = { now: () => fixedTime };
+    const timedStore = new InMemoryPuzzleProgressStore(undefined, mockClock);
+
+    const res = await timedStore.recordPuzzleAttempt('puz_001', 'fork', 'solved_first_try', 3);
+    expect(res.lastActiveAt).toBe(fixedTime);
+    expect(res.solvedPuzzles['puz_001']?.solvedAt).toBe(fixedTime);
+  });
 });
+

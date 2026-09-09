@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { BaseButton, BaseCard, BaseInput } from '@/components/base';
+import { useRovingTabindex } from '@/platform/ui';
 
 defineProps<{
   loading?: boolean;
@@ -22,38 +23,12 @@ watch(hostNickname, () => {
 
 const colorOptions: readonly ('w' | 'random' | 'b')[] = ['w', 'random', 'b'];
 
-function onColorKeyDown(event: KeyboardEvent, currentColor: 'w' | 'random' | 'b') {
-  const currentIndex = colorOptions.indexOf(currentColor);
-  let nextIndex = currentIndex;
-
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    event.preventDefault();
-    nextIndex = (currentIndex + 1) % colorOptions.length;
-  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    nextIndex = (currentIndex - 1 + colorOptions.length) % colorOptions.length;
-  } else if (event.key === 'Home') {
-    event.preventDefault();
-    nextIndex = 0;
-  } else if (event.key === 'End') {
-    event.preventDefault();
-    nextIndex = colorOptions.length - 1;
-  } else {
-    return;
-  }
-
-  const nextColor = colorOptions[nextIndex];
-  if (nextColor) {
-    preferredColor.value = nextColor;
-    const btnMap: Record<'w' | 'random' | 'b', string> = {
-      w: 'color-white-btn',
-      random: 'color-random-btn',
-      b: 'color-black-btn',
-    };
-    const el = document.querySelector<HTMLButtonElement>(`[data-testid="${btnMap[nextColor]}"]`);
-    el?.focus();
-  }
-}
+const { handleKeyDown: onColorKeyDown, getTabindex: getColorTabindex } = useRovingTabindex({
+  items: colorOptions,
+  modelValue: preferredColor,
+  orientation: 'horizontal',
+  idPrefix: 'host-color-',
+});
 
 function onHostSubmit() {
   const name = hostNickname.value.trim();
@@ -91,12 +66,13 @@ function onHostSubmit() {
         <label class="section-label">Choose your piece color:</label>
         <div class="color-picker-control" role="radiogroup" aria-label="Choose your piece color">
           <button
+            id="host-color-w"
             type="button"
             class="color-option-btn"
             :class="{ 'is-selected': preferredColor === 'w' }"
             role="radio"
             :aria-checked="preferredColor === 'w'"
-            :tabindex="preferredColor === 'w' ? 0 : -1"
+            :tabindex="getColorTabindex('w')"
             aria-label="Play as white (first move)"
             data-testid="color-white-btn"
             @click="preferredColor = 'w'"
@@ -107,12 +83,13 @@ function onHostSubmit() {
           </button>
 
           <button
+            id="host-color-random"
             type="button"
             class="color-option-btn"
             :class="{ 'is-selected': preferredColor === 'random' }"
             role="radio"
             :aria-checked="preferredColor === 'random'"
-            :tabindex="preferredColor === 'random' ? 0 : -1"
+            :tabindex="getColorTabindex('random')"
             aria-label="Play as random color (surprise me)"
             data-testid="color-random-btn"
             @click="preferredColor = 'random'"
@@ -123,12 +100,13 @@ function onHostSubmit() {
           </button>
 
           <button
+            id="host-color-b"
             type="button"
             class="color-option-btn"
             :class="{ 'is-selected': preferredColor === 'b' }"
             role="radio"
             :aria-checked="preferredColor === 'b'"
-            :tabindex="preferredColor === 'b' ? 0 : -1"
+            :tabindex="getColorTabindex('b')"
             aria-label="Play as black (defend)"
             data-testid="color-black-btn"
             @click="preferredColor = 'b'"

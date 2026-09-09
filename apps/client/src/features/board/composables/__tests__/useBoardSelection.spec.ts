@@ -6,8 +6,8 @@ import { useBoardSelection, type BoardSelectionOptions } from '../useBoardSelect
 describe('useBoardSelection', () => {
   let boardMap: Map<Square, { color: 'w' | 'b'; type: string }>;
   let legalMovesMap: Map<Square, Square[]>;
-  let currentTurn = ref<'w' | 'b'>('w');
-  let playerColor = ref<'w' | 'b' | null>('w');
+  const currentTurn = ref<'w' | 'b'>('w');
+  const playerColor = ref<'w' | 'b' | null>('w');
   let executeMoveMock = vi.fn();
 
   function createOptions(): BoardSelectionOptions {

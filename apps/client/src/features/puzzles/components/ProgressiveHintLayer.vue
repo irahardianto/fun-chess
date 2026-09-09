@@ -32,7 +32,7 @@ export function squareToCoordinates(
 <script setup lang="ts">
 import { computed } from 'vue';
 import { type HintData, type HintLevel, type PieceType, createSafeChess } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry/index.js';
+import { useInjectLogger } from '@/platform/di';
 import BaseButton from '../../../components/base/BaseButton.vue';
 import ChessPieceSvg from '../../../components/base/ChessPieceSvg.vue';
 
@@ -69,6 +69,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'request-hint'): void;
 }>();
+
+const logger = useInjectLogger();
 
 const effectiveLevel = computed(() => {
   return props.hintLevel || props.hintData?.level || 0;

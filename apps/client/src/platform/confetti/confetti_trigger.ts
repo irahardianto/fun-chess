@@ -118,7 +118,7 @@ export class ConfettiTrigger {
   public triggerCustom(options: ConfettiOptions = {}): void {
     try {
       if (!this.canExecute()) return;
-      this.confettiFn(options as any);
+      this.confettiFn(options as Parameters<typeof defaultConfetti>[0]);
     } catch (err) {
       logger.debug('Custom confetti trigger failed', {
         operation: 'confetti_custom_trigger',

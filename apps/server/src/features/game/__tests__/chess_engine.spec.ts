@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Chess } from "chess.js";
+import type { MoveResult, Square } from "@fun-chess/shared";
 import { ChessEngine } from "../chess_engine.js";
 
 describe("ChessEngine", () => {
@@ -232,7 +233,7 @@ describe("ChessEngine", () => {
       ];
 
       let currentFen = new Chess().fen();
-      let history: any[] = [];
+      let history: MoveResult[] = [];
 
       for (let i = 0; i < moves.length; i++) {
         const m = moves[i]!;
@@ -278,7 +279,7 @@ describe("ChessEngine", () => {
       ];
 
       let currentFen = new Chess().fen();
-      let history: any[] = [];
+      let history: MoveResult[] = [];
 
       for (let i = 0; i < moves.length; i++) {
         const m = moves[i]!;
@@ -319,7 +320,9 @@ describe("ChessEngine", () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.chess).toBeInstanceOf(Chess);
-        expect(result.chess.fen()).toContain("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -");
+        expect(result.chess.fen()).toContain(
+          "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -",
+        );
         expect(result.moveResultObj).toBeDefined();
         expect(result.moveResultObj.from).toBe("e2");
         expect(result.moveResultObj.to).toBe("e4");
@@ -374,7 +377,7 @@ describe("ChessEngine", () => {
       const initialFen = new Chess().fen();
       const result = ChessEngine.validateMove(
         initialFen,
-        { from: "z9" as any, to: "e4" },
+        { from: "z9" as unknown as Square, to: "e4" },
         "w",
       );
 
@@ -421,12 +424,15 @@ describe("ChessEngine", () => {
       const moveObj = chess.move({ from: "e7", to: "d8", promotion: "q" });
       expect(moveObj).toBeDefined();
 
+      const fixedTimestamp = 1750000000000;
       const { nextState, moveResult } = ChessEngine.applyMove(
         chess,
         moveObj!,
         [],
+        fixedTimestamp,
       );
 
+      expect(moveResult.timestamp).toBe(fixedTimestamp);
       expect(moveResult.captured).toBe("r");
       expect(moveResult.promotion).toBe("q");
       expect(moveResult.san).toContain("exd8=Q");
@@ -439,7 +445,10 @@ describe("ChessEngine", () => {
       // Black king on a8, White queen on b1, White king on a6 (Black is stalemated)
       const stalemateFen = "k7/8/K7/8/8/8/8/1Q6 b - - 1 1";
       const chess = new Chess(stalemateFen);
-      const state = ChessEngine.extractGameState(chess, { from: "b6", to: "a6" });
+      const state = ChessEngine.extractGameState(chess, {
+        from: "b6",
+        to: "a6",
+      });
 
       expect(state.isStalemate).toBe(true);
       expect(state.isDraw).toBe(true);
@@ -583,9 +592,13 @@ describe("ChessEngine", () => {
 
     it("returns null when king is absent", () => {
       const chess = new Chess();
-      const customBoard = chess.board().map((row) =>
-        row.map((piece) => (piece?.type === "k" && piece.color === "b" ? null : piece)),
-      );
+      const customBoard = chess
+        .board()
+        .map((row) =>
+          row.map((piece) =>
+            piece?.type === "k" && piece.color === "b" ? null : piece,
+          ),
+        );
       vi.spyOn(chess, "board").mockReturnValue(customBoard);
       expect(ChessEngine.getKingSquare(chess, "w")).toBe("e1");
       expect(ChessEngine.getKingSquare(chess, "b")).toBeNull();

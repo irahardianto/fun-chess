@@ -6,7 +6,7 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Findings CRIT-005, MAJ-017, MAJ-020.
  */
 
-import { ref, shallowRef } from 'vue';
+import { ref, shallowRef, getCurrentInstance } from 'vue';
 import { z } from 'zod';
 import {
   GameOverReasonSchema,
@@ -18,7 +18,28 @@ import {
   type SocketErrorPayload,
 } from '@fun-chess/shared';
 import { createSocketClient, type TypedSocket } from '@/platform/socket/socket_client';
-import { generateCorrelationId, logger } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
+import { generateCorrelationId, logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+
+let customLogger: ILogger | null = null;
+export function setSocketTransportLogger(logger: ILogger | null): void {
+  customLogger = logger;
+}
+
+function getActiveLogger(): ILogger {
+  return customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+}
+
+const logger: ILogger = {
+  debug: (msg, meta) => getActiveLogger().debug(msg, meta),
+  info: (msg, meta) => getActiveLogger().info(msg, meta),
+  warn: (msg, meta) => getActiveLogger().warn(msg, meta),
+  error: (msg, meta) => getActiveLogger().error(msg, meta),
+  fatal: (msg, meta) => getActiveLogger().fatal(msg, meta),
+  child: (context) => getActiveLogger().child(context),
+};
+
+export type { TypedSocket };
 
 export interface EmitWithTimeoutOptions<TRes extends { success: boolean; error?: SocketErrorPayload }> {
   timeoutMs?: number;
@@ -30,7 +51,7 @@ export interface EmitWithTimeoutOptions<TRes extends { success: boolean; error?:
   onError?: (err: SocketErrorPayload) => void;
 }
 
-export type SocketEventHandler = (...args: any[]) => void;
+export type SocketEventHandler<T = unknown> = (payload: T, ...args: unknown[]) => void;
 
 // ----------------------------------------------------------------------------
 // Module-Singleton Reactive Transport State (MAJ-013)
@@ -44,33 +65,37 @@ const lastError = ref<SocketErrorPayload | null>(null);
 const latencyMs = ref<number>(0);
 
 // Subscriber registry for domain event listeners
-const eventSubscribers = new Map<string, Set<SocketEventHandler>>();
+const eventSubscribers = new Map<string, Set<SocketEventHandler<unknown>>>();
 
 /**
  * Registers an internal domain subscriber for a socket event.
  * Returns an unsubscribe cleanup function.
  */
-export function registerSocketEventListener(event: string, handler: SocketEventHandler): () => void {
+export function registerSocketEventListener<T = unknown>(
+  event: string,
+  handler: (payload: T, ...args: unknown[]) => void
+): () => void {
   let handlers = eventSubscribers.get(event);
   if (!handlers) {
-    handlers = new Set<SocketEventHandler>();
+    handlers = new Set<SocketEventHandler<unknown>>();
     eventSubscribers.set(event, handlers);
   }
-  handlers.add(handler);
+  const genericHandler = handler as unknown as SocketEventHandler<unknown>;
+  handlers.add(genericHandler);
   return () => {
-    handlers?.delete(handler);
+    handlers?.delete(genericHandler);
     if (handlers && handlers.size === 0) {
       eventSubscribers.delete(event);
     }
   };
 }
 
-function dispatchEvent(event: string, ...args: any[]): void {
+function dispatchEvent(event: string, ...args: unknown[]): void {
   const handlers = eventSubscribers.get(event);
   if (handlers) {
-    handlers.forEach((h) => {
+    handlers.forEach((handler) => {
       try {
-        h(...args);
+        handler(args[0], ...args.slice(1));
       } catch (err) {
         logger.warn('Error in socket event subscriber', {
           operation: 'socket_event_dispatch',
@@ -99,35 +124,57 @@ function handleConnect() {
   dispatchEvent('connect');
 }
 
-function handleDisconnect(reason?: string) {
+function handleDisconnect(reason?: unknown) {
   isConnected.value = false;
-  isReconnecting.value = false;
+  if (!isReconnecting.value) {
+    isReconnecting.value = false;
+  }
+
+  const reasonStr = typeof reason === 'string' ? reason : reason ? String(reason) : 'unknown';
 
   logger.info('Socket disconnected', {
     operation: 'socket_disconnect',
     socketId: socketId.value,
-    reason: reason || 'unknown',
+    reason: reasonStr,
   });
 
   dispatchEvent('disconnect', reason);
 }
 
-function handleConnectError(err: Error) {
+function handleConnectError(err?: unknown) {
   isConnected.value = false;
   isReconnecting.value = false;
-  connectionError.value = err?.message || 'Connection error';
+  const message =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'object' && err !== null && 'message' in err
+        ? String((err as { message: unknown }).message)
+        : String(err || 'Connection error');
+  connectionError.value = message;
   const errPayload: SocketErrorPayload = {
     code: 'ERR_SOCKET_TIMEOUT',
-    message: err?.message || 'Connection error',
+    message,
   };
   lastError.value = errPayload;
 
   logger.warn('Socket connection error encountered', {
     operation: 'socket_connect_error',
-    error: err?.message || String(err),
+    error: message,
   });
 
   dispatchEvent('connect_error', err);
+}
+
+function handleReconnectAttempt(attempt?: unknown) {
+  isReconnecting.value = true;
+  const attemptNumber = typeof attempt === 'number' ? attempt : 1;
+
+  logger.info('Socket reconnection attempt started', {
+    operation: 'socket_reconnect_attempt',
+    attempt: attemptNumber,
+  });
+
+  dispatchEvent('reconnect_attempt', attempt);
 }
 
 function handleReconnectFailed() {
@@ -145,6 +192,7 @@ function handleReconnectFailed() {
   });
 
   dispatchEvent('reconnect_failed');
+  dispatchEvent('error', errPayload);
 }
 
 // ----------------------------------------------------------------------------
@@ -303,7 +351,7 @@ export function validateInboundPayload<T>(
 ): T | null {
   const result = schema.safeParse(data);
   if (!result.success) {
-    logger.warn(`Inbound socket payload validation failed for event "${event}"`, {
+    logger.warn('Inbound socket payload validation failed', {
       operation: 'socket_payload_validation',
       event,
       issues: result.error.issues,
@@ -314,216 +362,246 @@ export function validateInboundPayload<T>(
   return result.data;
 }
 
-function handleRoomCreated(raw: unknown) {
-  const room = validateInboundPayload('room:created', InboundRoomSchema, raw);
-  if (!room) return;
-
-  logger.info('Room created event received', {
-    operation: 'socket_event_room_created',
-    roomCode: room.roomCode,
-    hostId: (room as any).hostId,
-  });
-  dispatchEvent('room:created', room as unknown as RoomState);
+export interface InboundHandlerConfig<T, TDispatched = T> {
+  event: string;
+  schema: z.ZodType<T>;
+  logMessage: string;
+  operation: string;
+  logLevel?: 'info' | 'warn';
+  getContext?: (data: T) => Record<string, unknown>;
+  transform?: (data: T) => TDispatched;
+  onValid?: (data: T) => void;
 }
 
-function handleRoomJoined(raw: unknown) {
-  const room = validateInboundPayload('room:joined', InboundRoomSchema, raw);
-  if (!room) return;
+/**
+ * Higher-order factory to deduplicate socket event ingress handlers (MAJ-034).
+ */
+export function createInboundHandler<T, TDispatched = T>(
+  config: InboundHandlerConfig<T, TDispatched>
+): (raw: unknown) => void {
+  const { event, schema, logMessage, operation, logLevel = 'info', getContext, transform, onValid } = config;
 
-  logger.info('Room joined event received', {
-    operation: 'socket_event_room_joined',
-    roomCode: room.roomCode,
-  });
-  dispatchEvent('room:joined', room as unknown as RoomState);
+  return (raw: unknown) => {
+    const data = validateInboundPayload(event, schema, raw);
+    if (!data) return;
+
+    const context: Record<string, unknown> = {
+      operation,
+      ...(getContext ? getContext(data) : {}),
+    };
+
+    if (logLevel === 'warn') {
+      logger.warn(logMessage, context);
+    } else {
+      logger.info(logMessage, context);
+    }
+
+    if (onValid) {
+      onValid(data);
+    }
+
+    const payloadToDispatch = transform ? transform(data) : data;
+    dispatchEvent(event, payloadToDispatch);
+  };
 }
 
-function handlePlayerJoined(raw: unknown) {
-  const data = validateInboundPayload('room:player_joined', InboundPlayerJoinedSchema, raw);
-  if (!data) return;
+const handleRoomCreated = createInboundHandler({
+  event: 'room:created',
+  schema: InboundRoomSchema,
+  logMessage: 'Room created event received',
+  operation: 'socket_event_room_created',
+  getContext: (room: Record<string, unknown>) => ({
+    roomCode: String(room.roomCode ?? ''),
+    hostId: room.hostId ? String(room.hostId) : undefined,
+  }),
+  transform: (room) => room as unknown as RoomState,
+});
 
-  logger.info('Player joined room event received', {
-    operation: 'socket_event_player_joined',
+const handleRoomJoined = createInboundHandler({
+  event: 'room:joined',
+  schema: InboundRoomSchema,
+  logMessage: 'Room joined event received',
+  operation: 'socket_event_room_joined',
+  getContext: (room) => ({
+    roomCode: room.roomCode,
+  }),
+  transform: (room) => room as unknown as RoomState,
+});
+
+const handlePlayerJoined = createInboundHandler({
+  event: 'room:player_joined',
+  schema: InboundPlayerJoinedSchema,
+  logMessage: 'Player joined room event received',
+  operation: 'socket_event_player_joined',
+  getContext: (data) => ({
     roomCode: data.room.roomCode,
     playerId: data.player.id,
-  });
-  dispatchEvent('room:player_joined', data);
-}
+  }),
+});
 
-function handlePlayerLeft(raw: unknown) {
-  const data = validateInboundPayload('room:player_left', InboundPlayerLeftSchema, raw);
-  if (!data) return;
-
-  logger.info('Player left room event received', {
-    operation: 'socket_event_player_left',
+const handlePlayerLeft = createInboundHandler({
+  event: 'room:player_left',
+  schema: InboundPlayerLeftSchema,
+  logMessage: 'Player left room event received',
+  operation: 'socket_event_player_left',
+  getContext: (data) => ({
     playerId: data.playerId,
     playerName: data.playerName,
     reason: data.reason,
-  });
-  dispatchEvent('room:player_left', data);
-}
+  }),
+});
 
-function handlePlayerDisconnected(raw: unknown) {
-  const data = validateInboundPayload('room:player_disconnected', InboundPlayerDisconnectedSchema, raw);
-  if (!data) return;
-
-  logger.info('Player disconnected event received', {
-    operation: 'socket_event_player_disconnected',
+const handlePlayerDisconnected = createInboundHandler({
+  event: 'room:player_disconnected',
+  schema: InboundPlayerDisconnectedSchema,
+  logMessage: 'Player disconnected event received',
+  operation: 'socket_event_player_disconnected',
+  getContext: (data) => ({
     playerId: data.playerId ?? data.player?.id,
     gracePeriodMs: data.gracePeriodMs,
     roomStatus: data.roomStatus,
-  });
-  dispatchEvent('room:player_disconnected', data);
-}
+  }),
+});
 
-function handlePlayerReconnected(raw: unknown) {
-  const data = validateInboundPayload('room:player_reconnected', InboundPlayerReconnectedSchema, raw);
-  if (!data) return;
-
-  logger.info('Player reconnected event received', {
-    operation: 'socket_event_player_reconnected',
+const handlePlayerReconnected = createInboundHandler({
+  event: 'room:player_reconnected',
+  schema: InboundPlayerReconnectedSchema,
+  logMessage: 'Player reconnected event received',
+  operation: 'socket_event_player_reconnected',
+  getContext: (data) => ({
     playerId: data.playerId,
     playerName: data.playerName,
     roomStatus: data.roomStatus,
-  });
-  dispatchEvent('room:player_reconnected', data);
-}
+  }),
+});
 
-function handleRoomReconnected(raw: unknown) {
-  const data = validateInboundPayload('room:reconnected', InboundRoomReconnectedSchema, raw);
-  if (!data) return;
-
-  logger.info('Room reconnected event received', {
-    operation: 'socket_event_room_reconnected',
+const handleRoomReconnected = createInboundHandler({
+  event: 'room:reconnected',
+  schema: InboundRoomReconnectedSchema,
+  logMessage: 'Room reconnected event received',
+  operation: 'socket_event_room_reconnected',
+  getContext: (data) => ({
     roomCode: data.room.roomCode,
     playerId: data.player.id,
-  });
-  dispatchEvent('room:reconnected', data);
-}
+  }),
+});
 
-function handleGameStarted(raw: unknown) {
-  const gameState = validateInboundPayload('game:started', InboundGameStartedSchema, raw);
-  if (!gameState) return;
+const handleGameStarted = createInboundHandler({
+  event: 'game:started',
+  schema: InboundGameStartedSchema,
+  logMessage: 'Game started event received',
+  operation: 'socket_event_game_started',
+  getContext: (gameState) => ({
+    turn: gameState.turn,
+  }),
+  transform: (gameState) => gameState as unknown as GameState,
+});
 
-  logger.info('Game started event received', {
-    operation: 'socket_event_game_started',
-    turn: (gameState as any).turn,
-  });
-  dispatchEvent('game:started', gameState as unknown as GameState);
-}
+const handleGameMoved = createInboundHandler({
+  event: 'game:moved',
+  schema: InboundGameMovedSchema,
+  logMessage: 'Game moved event received',
+  operation: 'socket_event_game_moved',
+  getContext: (data: { move?: { moveNumber?: number; san?: string }; gameState?: { turn?: string } }) => ({
+    moveNumber: data.move?.moveNumber,
+    san: data.move?.san,
+    turn: data.gameState?.turn,
+  }),
+});
 
-function handleGameMoved(raw: unknown) {
-  const data = validateInboundPayload('game:moved', InboundGameMovedSchema, raw);
-  if (!data) return;
-
-  logger.info('Game moved event received', {
-    operation: 'socket_event_game_moved',
-    moveNumber: (data.move as any)?.moveNumber,
-    san: (data.move as any)?.san,
-    turn: (data.gameState as any)?.turn,
-  });
-  dispatchEvent('game:moved', data);
-}
-
-function handleGameCheck(raw: unknown) {
-  const data = validateInboundPayload('game:check', InboundGameCheckSchema, raw);
-  if (!data) return;
-
-  logger.info('Game check event received', {
-    operation: 'socket_event_game_check',
+const handleGameCheck = createInboundHandler({
+  event: 'game:check',
+  schema: InboundGameCheckSchema,
+  logMessage: 'Game check event received',
+  operation: 'socket_event_game_check',
+  getContext: (data) => ({
     inCheck: data.inCheck,
     kingSquare: data.kingSquare,
-  });
-  dispatchEvent('game:check', data);
-}
+  }),
+});
 
-function handleGameOver(raw: unknown) {
-  const payload = validateInboundPayload('game:over', InboundGameOverSchema, raw);
-  if (!payload) return;
-
-  logger.info('Game over event received', {
-    operation: 'socket_event_game_over',
+const handleGameOver = createInboundHandler({
+  event: 'game:over',
+  schema: InboundGameOverSchema,
+  logMessage: 'Game over event received',
+  operation: 'socket_event_game_over',
+  getContext: (payload) => ({
     winner: payload.winner,
     reason: payload.reason,
-    totalMoves: (payload as any).totalMoves,
-  });
-  dispatchEvent('game:over', payload as GameOverPayload);
-}
+    totalMoves: payload.totalMoves,
+  }),
+  transform: (payload) => payload as unknown as GameOverPayload,
+});
 
-function handleDrawOffered(raw: unknown) {
-  const data = validateInboundPayload('game:draw_offered', InboundDrawOfferedSchema, raw);
-  if (!data) return;
-
-  logger.info('Draw offered event received', {
-    operation: 'socket_event_draw_offered',
+const handleDrawOffered = createInboundHandler({
+  event: 'game:draw_offered',
+  schema: InboundDrawOfferedSchema,
+  logMessage: 'Draw offered event received',
+  operation: 'socket_event_draw_offered',
+  getContext: (data) => ({
     fromPlayerId: data.fromPlayerId,
     fromPlayerName: data.fromPlayerName,
-  });
-  dispatchEvent('game:draw_offered', data);
-}
+  }),
+});
 
-function handleDrawDeclined(raw: unknown) {
-  const data = validateInboundPayload('game:draw_declined', InboundDrawDeclinedSchema, raw);
-  if (!data) return;
+const handleDrawDeclined = createInboundHandler({
+  event: 'game:draw_declined',
+  schema: InboundDrawDeclinedSchema,
+  logMessage: 'Draw declined event received',
+  operation: 'socket_event_draw_declined',
+  getContext: (data) => ({
+    byPlayerId: data?.byPlayerId,
+  }),
+});
 
-  logger.info('Draw declined event received', {
-    operation: 'socket_event_draw_declined',
-    byPlayerId: data.byPlayerId,
-  });
-  dispatchEvent('game:draw_declined', data);
-}
-
-function handleRematchRequested(raw: unknown) {
-  const data = validateInboundPayload('game:rematch_requested', InboundRematchRequestedSchema, raw);
-  if (!data) return;
-
-  logger.info('Rematch requested event received', {
-    operation: 'socket_event_rematch_requested',
+const handleRematchRequested = createInboundHandler({
+  event: 'game:rematch_requested',
+  schema: InboundRematchRequestedSchema,
+  logMessage: 'Rematch requested event received',
+  operation: 'socket_event_rematch_requested',
+  getContext: (data) => ({
     requestedBy: data.requestedBy,
     requesterName: data.requesterName,
-  });
-  dispatchEvent('game:rematch_requested', data);
-}
+  }),
+});
 
-function handleRematchStarted(raw: unknown) {
-  const data = validateInboundPayload('game:rematch_started', InboundRematchStartedSchema, raw);
-  if (!data) return;
+const handleRematchStarted = createInboundHandler({
+  event: 'game:rematch_started',
+  schema: InboundRematchStartedSchema,
+  logMessage: 'Rematch started event received',
+  operation: 'socket_event_rematch_started',
+});
 
-  logger.info('Rematch started event received', {
-    operation: 'socket_event_rematch_started',
-  });
-  dispatchEvent('game:rematch_started', data);
-}
+const handleRematchDeclined = createInboundHandler({
+  event: 'game:rematch_declined',
+  schema: InboundRematchDeclinedSchema,
+  logMessage: 'Rematch declined event received',
+  operation: 'socket_event_rematch_declined',
+  getContext: (data) => ({
+    byPlayerId: data?.byPlayerId,
+  }),
+});
 
-function handleRematchDeclined(raw: unknown) {
-  const data = validateInboundPayload('game:rematch_declined', InboundRematchDeclinedSchema, raw);
-  if (!data) return;
+const handleError = createInboundHandler({
+  event: 'error',
+  schema: InboundErrorPayloadSchema,
+  logMessage: 'Socket error payload received',
+  operation: 'socket_event_error',
+  logLevel: 'warn',
+  getContext: (err: { code: string; message: string }) => ({
+    errorCode: err.code,
+    errorMessage: err.message,
+  }),
+  onValid: (err) => {
+    lastError.value = err as unknown as SocketErrorPayload;
+  },
+  transform: (err) => err as unknown as SocketErrorPayload,
+});
 
-  logger.info('Rematch declined event received', {
-    operation: 'socket_event_rematch_declined',
-    byPlayerId: data.byPlayerId,
-  });
-  dispatchEvent('game:rematch_declined', data);
-}
-
-function handleError(raw: unknown) {
-  const err = validateInboundPayload('error', InboundErrorPayloadSchema, raw);
-  if (!err) return;
-
-  const typedErr = err as unknown as SocketErrorPayload;
-  lastError.value = typedErr;
-  logger.warn('Socket error payload received', {
-    operation: 'socket_event_error',
-    errorCode: typedErr.code,
-    errorMessage: typedErr.message,
-  });
-  dispatchEvent('error', typedErr);
-}
-
-const eventHandlers: Record<string, (...args: any[]) => void> = {
+const eventHandlers: Record<string, (...args: unknown[]) => void> = {
   connect: handleConnect,
   disconnect: handleDisconnect,
   connect_error: handleConnectError,
-  reconnect_failed: handleReconnectFailed,
   'room:created': handleRoomCreated,
   'room:joined': handleRoomJoined,
   'room:player_joined': handlePlayerJoined,
@@ -543,28 +621,67 @@ const eventHandlers: Record<string, (...args: any[]) => void> = {
   error: handleError,
 };
 
+const managerHandlers: Record<string, (...args: unknown[]) => void> = {
+  reconnect_attempt: handleReconnectAttempt,
+  reconnect_failed: handleReconnectFailed,
+};
+
+interface SocketWithManager {
+  on(event: string, fn: (...args: unknown[]) => void): void;
+  off?(event: string, fn: (...args: unknown[]) => void): void;
+  io?: {
+    on?(event: string, fn: (...args: unknown[]) => void): void;
+    off?(event: string, fn: (...args: unknown[]) => void): void;
+  };
+}
+
 const attachedSockets = new WeakSet<object>();
 
-export function attachSocketListeners(s: TypedSocket): void {
-  if (attachedSockets.has(s)) {
+export function attachSocketListeners(targetSocket: TypedSocket): void {
+  if (attachedSockets.has(targetSocket)) {
     return;
   }
-  attachedSockets.add(s);
+  attachedSockets.add(targetSocket);
 
+  const sock = targetSocket as unknown as SocketWithManager;
   for (const [event, handler] of Object.entries(eventHandlers)) {
-    (s as any).on(event, handler);
+    sock.on(event, handler);
+  }
+
+  // Socket.IO client v4 manages reconnection on socket.io (Manager) [MAJ-004]
+  const manager = sock.io;
+  if (manager && typeof manager.on === 'function') {
+    for (const [event, handler] of Object.entries(managerHandlers)) {
+      manager.on(event, handler);
+    }
+  } else {
+    for (const [event, handler] of Object.entries(managerHandlers)) {
+      sock.on(event, handler);
+    }
   }
 }
 
-export function detachSocketListeners(s: TypedSocket): void {
-  if (!attachedSockets.has(s)) {
+export function detachSocketListeners(targetSocket: TypedSocket): void {
+  if (!attachedSockets.has(targetSocket)) {
     return;
   }
-  attachedSockets.delete(s);
+  attachedSockets.delete(targetSocket);
 
-  if (typeof (s as any).off === 'function') {
+  // Clean up Manager listeners [MAJ-004]
+  const sock = targetSocket as unknown as SocketWithManager;
+  const manager = sock.io;
+  if (manager && typeof manager.off === 'function') {
+    for (const [event, handler] of Object.entries(managerHandlers)) {
+      manager.off(event, handler);
+    }
+  }
+
+  if (typeof sock.off === 'function') {
+    for (const [event, handler] of Object.entries(managerHandlers)) {
+      sock.off(event, handler);
+    }
     for (const [event, handler] of Object.entries(eventHandlers)) {
-      (s as any).off(event, handler);
+      sock.off(event, handler);
     }
   }
 }
@@ -598,9 +715,9 @@ export function initSocket(url?: string, correlationId?: string, client?: TypedS
  * Establishes socket connection if currently disconnected.
  */
 export function connect(url?: string): void {
-  const s = socket.value || initSocket(url);
-  if (!s.connected) {
-    s.connect();
+  const targetSocket = socket.value || initSocket(url);
+  if (!targetSocket.connected) {
+    targetSocket.connect();
   }
 }
 
@@ -619,7 +736,7 @@ export function disconnect(): void {
  * Standard socket emit with timeout handling, latency measurement, and 3-point structured logging.
  */
 export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: SocketErrorPayload }>(
-  s: TypedSocket,
+  targetSocket: TypedSocket,
   event: string,
   payload: TReq,
   options: EmitWithTimeoutOptions<TRes>
@@ -629,7 +746,7 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
   const correlationId = options.correlationId || generateCorrelationId();
   const { operation, callback } = options;
 
-  logger.debug('Socket emit dispatched', {
+  logger.info('Socket emit dispatched', {
     operation,
     correlationId,
     event,
@@ -651,7 +768,7 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
       };
       lastError.value = err;
 
-      logger.warn(`${operation} failed: timed out (timeout)`, {
+      logger.warn('Socket operation timed out', {
         operation,
         correlationId,
         duration,
@@ -668,7 +785,7 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
       resolve(res);
     }, timeoutMs);
 
-    (s as any).emit(event, payload, (res: TRes) => {
+    (targetSocket as unknown as { emit: (e: string, p: unknown, cb: (r: TRes) => void) => void }).emit(event, payload, (res: TRes) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -676,7 +793,7 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
       latencyMs.value = duration;
 
       if (res && res.success) {
-        logger.info(`${operation} succeeded successfully`, {
+        logger.info('Socket operation succeeded successfully', {
           operation,
           correlationId,
           duration,
@@ -687,12 +804,12 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
       } else {
         const errPayload: SocketErrorPayload = res?.error ?? {
           code: 'ERR_INTERNAL_SERVER',
-          message: `${operation} failed`,
+          message: 'Socket operation failed',
           correlationId,
         };
         lastError.value = errPayload;
 
-        logger.warn(`${operation} failed with failure`, {
+        logger.warn('Socket operation failed with failure', {
           operation,
           correlationId,
           duration,
@@ -722,6 +839,7 @@ export function resetTransportState(): void {
   connectionError.value = null;
   lastError.value = null;
   latencyMs.value = 0;
+  customLogger = null;
 }
 
 export const resetSocketTransportState = resetTransportState;
@@ -729,7 +847,13 @@ export const resetSocketTransportState = resetTransportState;
 /**
  * Primary composable exposing socket transport state and lifecycle controls.
  */
-export function useSocketTransport(injectedSocket?: TypedSocket) {
+export function useSocketTransport(
+  injectedSocket?: TypedSocket,
+  options?: { logger?: ILogger }
+) {
+  if (options?.logger) {
+    customLogger = options.logger;
+  }
   if (injectedSocket) {
     if (socket.value && socket.value !== injectedSocket) {
       detachSocketListeners(socket.value);

@@ -104,11 +104,14 @@ export function normalizePublicUrl(rawUrl: string, logger?: Logger): string {
 
     return `${protocol}//${hostname}${portSuffix}${pathname}`;
   } catch (error) {
-    logger?.debug("Failed to normalize public URL, falling back to trimmed string", {
-      operation: "normalize_public_url",
-      rawUrl: trimmed,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger?.debug(
+      "Failed to normalize public URL, falling back to trimmed string",
+      {
+        operation: "normalize_public_url",
+        rawUrl: trimmed,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
     return trimmed.replace(/\/+$/, "");
   }
 }
@@ -189,7 +192,26 @@ export class RelayAddressService implements IRelayAddressService {
       }
     }
 
-    const interfaces = customInterfaces ?? os.networkInterfaces();
+    let interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>;
+    if (customInterfaces) {
+      interfaces = customInterfaces;
+    } else {
+      try {
+        interfaces = os.networkInterfaces();
+      } catch (err) {
+        this.config.logger?.warn(
+          "Failed to retrieve network interfaces from OS, falling back to localhost",
+          {
+            operation: "get_all_lan_interfaces",
+            error: err instanceof Error ? err.message : String(err),
+          },
+        );
+        if (!addresses.includes("127.0.0.1")) {
+          addresses.push("127.0.0.1");
+        }
+        return addresses;
+      }
+    }
 
     for (const name of Object.keys(interfaces)) {
       const netList = interfaces[name];
@@ -316,8 +338,7 @@ export class RelayAddressService implements IRelayAddressService {
       const joinUrl = publicUrl;
 
       // In production cloud relay (no custom test interfaces injected), suppress internal network topology (MIN-004)
-      const cloudInterfaces =
-        customInterfaces !== undefined ? interfaces : [];
+      const cloudInterfaces = customInterfaces !== undefined ? interfaces : [];
 
       return {
         lanIp,

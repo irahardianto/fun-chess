@@ -14,5 +14,5 @@ export interface IIdGenerator {
   /** Generates a unique string identifier (e.g. UUIDv4) */
   generateId(): string;
   /** Generates a pseudo-random integer between min (inclusive) and max (exclusive) */
-  generateRandomInt?(min: number, max: number): number;
+  generateRandomInt(min: number, max: number): number;
 }

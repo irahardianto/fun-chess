@@ -47,7 +47,12 @@ export class PinoLogger implements Logger {
     } else {
       const opts = (options as PinoLoggerOptions) || {};
       const level = opts.level ?? "info";
-      const pinoFn: any = (pino as any).default || pino;
+      type PinoFactory = (options?: LoggerOptions) => PinoInstance;
+      const pinoFn = (
+        typeof pino === "function"
+          ? pino
+          : (pino as unknown as { default: PinoFactory }).default
+      ) as unknown as PinoFactory;
       this.logger = pinoFn({
         level,
         redact: {

@@ -12,3 +12,6 @@ export * from './JoinCard.vue';
 
 export { default as QrCodeModal } from './QrCodeModal.vue';
 export * from './QrCodeModal.vue';
+
+export * from './useLanDiscovery';
+export * from './lobby_url_builder';

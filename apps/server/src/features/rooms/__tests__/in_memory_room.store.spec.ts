@@ -7,6 +7,19 @@ import {
   LockTimeoutError,
   LockExecutionTimeoutError,
 } from "../room.errors.js";
+import type { Logger } from "../../../platform/logger/index.js";
+
+interface TestableStore {
+  lockQueues: Map<string, unknown>;
+  LOCK_TIMEOUT_MS: number;
+  EXECUTION_TIMEOUT_MS: number;
+  cancelledTickets: Set<number>;
+  trackCancelledTicket(ticket: number): void;
+}
+
+function testStore(s: InMemoryRoomStore): TestableStore {
+  return s as unknown as TestableStore;
+}
 
 describe("InMemoryRoomStore", () => {
   let store: InMemoryRoomStore;
@@ -232,17 +245,17 @@ describe("InMemoryRoomStore", () => {
     it("cleans up lock queue after operations complete (eviction when waitersCount <= 0)", async () => {
       const code = "EVIC";
       await store.withLock(code, async () => {
-        expect((store as any).lockQueues.has(code)).toBe(true);
+        expect(testStore(store).lockQueues.has(code)).toBe(true);
       });
 
-      expect((store as any).lockQueues.has(code)).toBe(false);
-      expect((store as any).lockQueues.size).toBe(0);
+      expect(testStore(store).lockQueues.has(code)).toBe(false);
+      expect(testStore(store).lockQueues.size).toBe(0);
     });
 
     it("throws LockTimeoutError when waiting for lock exceeds LOCK_TIMEOUT_MS", async () => {
       const code = "TMOT";
       // Temporarily override LOCK_TIMEOUT_MS for fast test execution
-      (store as any).LOCK_TIMEOUT_MS = 30;
+      testStore(store).LOCK_TIMEOUT_MS = 30;
 
       let blockerResolve!: () => void;
       const blockerPromise = new Promise<void>((resolve) => {
@@ -265,7 +278,7 @@ describe("InMemoryRoomStore", () => {
 
     it("preserves mutual exclusion when an intermediate waiter times out (CRIT-002)", async () => {
       const code = "CRIT";
-      (store as any).LOCK_TIMEOUT_MS = 30;
+      testStore(store).LOCK_TIMEOUT_MS = 30;
 
       let holderFinished = false;
       let holderResolve!: () => void;
@@ -289,10 +302,10 @@ describe("InMemoryRoomStore", () => {
       // Verify that holder is STILL running and holder has NOT finished
       expect(holderFinished).toBe(false);
       // Verify that the queue is NOT prematurely deleted from lockQueues
-      expect((store as any).lockQueues.has(code)).toBe(true);
+      expect(testStore(store).lockQueues.has(code)).toBe(true);
 
       // 3. Waiter 2 is queued behind waiter 1 (with plenty of time)
-      (store as any).LOCK_TIMEOUT_MS = 5000;
+      testStore(store).LOCK_TIMEOUT_MS = 5000;
       let waiter2Started = false;
       const waiter2 = store.withLock(code, async () => {
         // When waiter 2 runs, holder MUST be finished
@@ -316,12 +329,12 @@ describe("InMemoryRoomStore", () => {
       expect(waiter2Started).toBe(true);
 
       // After all complete, lock queue is cleaned up
-      expect((store as any).lockQueues.has(code)).toBe(false);
+      expect(testStore(store).lockQueues.has(code)).toBe(false);
     });
 
     it("throws LockExecutionTimeoutError when action execution exceeds EXECUTION_TIMEOUT_MS (MAJ-005)", async () => {
       const code = "EXECTMO";
-      (store as any).EXECUTION_TIMEOUT_MS = 30;
+      testStore(store).EXECUTION_TIMEOUT_MS = 30;
 
       const hangingAction = store.withLock(code, async () => {
         // Hang indefinitely
@@ -331,9 +344,87 @@ describe("InMemoryRoomStore", () => {
       await expect(hangingAction).rejects.toThrow(LockExecutionTimeoutError);
 
       // Verify lock was released immediately: next waiter can acquire
-      (store as any).EXECUTION_TIMEOUT_MS = 5000;
+      (store as unknown as { EXECUTION_TIMEOUT_MS: number }).EXECUTION_TIMEOUT_MS = 5000;
       const nextAction = await store.withLock(code, async () => "unblocked");
       expect(nextAction).toBe("unblocked");
+    });
+
+    it("absorbs post-timeout rejection from orphaned lock action without unhandled rejection (CRIT-002)", async () => {
+      const code = "ORPHAN";
+      const warnLogs: { msg: string; meta?: Record<string, unknown> }[] = [];
+      const mockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn((msg: string, meta?: Record<string, unknown>) => {
+          warnLogs.push({ msg, meta });
+        }),
+        error: vi.fn(),
+        fatal: vi.fn(),
+        child: () => mockLogger as unknown as Logger,
+      } as unknown as Logger;
+
+      const customStore = new InMemoryRoomStore(undefined, undefined, {
+        executionTimeoutMs: 20,
+        logger: mockLogger,
+      });
+
+      let orphanedActionResolve!: () => void;
+      const blocker = new Promise<void>((resolve) => {
+        orphanedActionResolve = resolve;
+      });
+
+      // Launch an action that times out, then rejects after timeout
+      const timedOutPromise = customStore.withLock(code, async () => {
+        await blocker;
+        throw new Error("Post-timeout async explosion in orphaned action");
+      });
+
+      await expect(timedOutPromise).rejects.toThrow(LockExecutionTimeoutError);
+
+      // Trigger the rejection in the background after execution timeout has expired
+      orphanedActionResolve();
+
+      // Wait a tick for the post-timeout rejection to run and be caught
+      await new Promise((resolve) => setTimeout(resolve, 15));
+
+      const postTimeoutWarn = warnLogs.find(
+        (log) => log.msg === "Orphaned lock action rejected after execution timeout",
+      );
+      expect(postTimeoutWarn).toBeDefined();
+    });
+
+    it("elevates lock timeout events to warn level (MAJ-027)", async () => {
+      const warnLogs: string[] = [];
+      const mockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn((msg: string) => {
+          warnLogs.push(msg);
+        }),
+        error: vi.fn(),
+        fatal: vi.fn(),
+        child: () => mockLogger as unknown as Logger,
+      } as unknown as Logger;
+
+      const customStore = new InMemoryRoomStore(mockLogger);
+      customStore.LOCK_TIMEOUT_MS = 20;
+
+      let releaseLock!: () => void;
+      const blocker = new Promise<void>((r) => {
+        releaseLock = r;
+      });
+      const first = customStore.withLock("WARN", async () => {
+        await blocker;
+      });
+
+      await expect(customStore.withLock("WARN", async () => "ok")).rejects.toThrow(
+        LockTimeoutError,
+      );
+
+      releaseLock();
+      await first;
+
+      expect(warnLogs).toContain("Lock acquisition timed out");
     });
   });
 
@@ -429,7 +520,7 @@ describe("InMemoryRoomStore", () => {
       const deletePromise = store.delete("HOLD");
 
       // Lock queue must NOT be deleted immediately because action2 and delete are queued
-      const queueEntry = (store as any).lockQueues.get("HOLD");
+      const queueEntry = testStore(store).lockQueues.get("HOLD");
       expect(queueEntry).toBeDefined();
 
       const [res1, res2, deleted] = await Promise.all([action1, action2, deletePromise]);
@@ -442,7 +533,7 @@ describe("InMemoryRoomStore", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       // After waiters settle, queue should be cleaned up
-      expect((store as any).lockQueues.get("HOLD")).toBeUndefined();
+      expect(testStore(store).lockQueues.get("HOLD")).toBeUndefined();
     });
   });
 
@@ -453,14 +544,14 @@ describe("InMemoryRoomStore", () => {
       const customStore = new InMemoryRoomStore(mockClock);
 
       const room = createDummyRoom("TIME");
-      delete (room as any).lastActivityAt;
+      delete (room as Partial<RoomState>).lastActivityAt;
       await customStore.save(room);
 
       const saved = await customStore.findByCode("TIME");
       expect(saved?.lastActivityAt).toBe(fixedTime);
 
       const updatedTime = 1700000000000;
-      let currentTime = updatedTime;
+      const currentTime = updatedTime;
       const updatingClock = { now: () => currentTime };
       const updatingStore = new InMemoryRoomStore(updatingClock);
       await updatingStore.save(createDummyRoom("MUT8"));
@@ -483,10 +574,10 @@ describe("InMemoryRoomStore", () => {
 
       // Simulate inserting max + 100 cancelled tickets
       for (let i = 1; i <= max + 100; i++) {
-        (store as any).trackCancelledTicket(i);
+        testStore(store).trackCancelledTicket(i);
       }
 
-      const set = (store as any).cancelledTickets as Set<number>;
+      const set = testStore(store).cancelledTickets;
       expect(set.size).toBe(max);
       // Earliest 100 tickets should have been evicted
       expect(set.has(1)).toBe(false);

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useLanDiscovery, isValidIPv4, detectWebRtcLanIp } from '../useLanDiscovery';
-import { safeLocalStorage } from '../../platform/storage';
+import { safeLocalStorage } from '@/platform/storage';
 
 describe('useLanDiscovery composable', () => {
   let mockStorage: Record<string, string> = {};
@@ -109,7 +109,7 @@ describe('useLanDiscovery composable', () => {
 
   it('detects LAN IP via WebRTC ICE candidate gathering', async () => {
     class MockRTCPeerConnection {
-      onicecandidate: ((event: any) => void) | null = null;
+      onicecandidate: ((event: { candidate?: { candidate?: string } | null }) => void) | null = null;
       createDataChannel() {}
       async createOffer() {
         return {};

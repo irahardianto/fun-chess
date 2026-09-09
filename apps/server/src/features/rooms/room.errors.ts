@@ -12,6 +12,7 @@ export {
   UnauthorizedError,
   InvalidPayloadError,
   RateLimitExceededError,
+  OptimisticLockConflictError,
 } from "@fun-chess/shared";
 
 /**
@@ -43,20 +44,6 @@ export class StaleLockExecutionError extends AppError {
       { roomCode, ticket },
     );
     this.name = "StaleLockExecutionError";
-  }
-}
-
-/**
- * Thrown when an optimistic concurrency control version check fails during a room mutation.
- */
-export class OptimisticLockConflictError extends AppError {
-  constructor(roomCode: string, expectedVersion: number, actualVersion: number) {
-    super(
-      "ERR_CONFLICT",
-      `State conflict for room '${roomCode}': expected version ${expectedVersion}, found ${actualVersion}. The room was updated concurrently.`,
-      409,
-      { roomCode, expectedVersion, actualVersion },
-    );
   }
 }
 

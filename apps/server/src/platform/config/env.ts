@@ -59,6 +59,10 @@ export const ServerEnvSchema = BaseServerEnvSchema.extend({
     emptyStringToUndefined,
     z.coerce.number().int().positive().optional(),
   ),
+  RATE_LIMIT_ROOM_CREATE_MAX: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().default(3),
+  ),
 }).superRefine((val, ctx) => {
   if (val.NODE_ENV === "production") {
     if (!val.CORS_ORIGIN && !val.PUBLIC_URL && !val.CLIENT_URL) {
@@ -121,17 +125,21 @@ export function resolveAllowedOrigins(env?: Partial<ServerEnv>): string[] {
       .map((o) => o.trim().replace(/\/+$/, ""))
       .filter(Boolean);
   }
+  const origins = new Set<string>();
   if (clientUrl) {
     const parsed = safeParseUrl(clientUrl);
     if (parsed) {
-      return [parsed.origin.replace(/\/+$/, "")];
+      origins.add(parsed.origin.replace(/\/+$/, ""));
     }
   }
   if (publicUrl) {
     const parsed = safeParseUrl(publicUrl);
     if (parsed) {
-      return [parsed.origin.replace(/\/+$/, "")];
+      origins.add(parsed.origin.replace(/\/+$/, ""));
     }
+  }
+  if (origins.size > 0) {
+    return Array.from(origins);
   }
   if (nodeEnv === "production") {
     throw new Error("FATAL: CORS_ORIGIN, PUBLIC_URL, or CLIENT_URL must be configured in production mode.");
@@ -172,3 +180,5 @@ export function loadServerConfig(rawEnv: Record<string, unknown> = process.env):
 }
 
 export const validateServerConfig = loadServerConfig;
+
+export const env: ServerEnv = loadServerConfig();

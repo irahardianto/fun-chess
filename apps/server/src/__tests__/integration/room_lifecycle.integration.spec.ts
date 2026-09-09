@@ -7,7 +7,11 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
-import { createTestServer, TestServerInstance } from "./helpers/test_server.js";
+import {
+  createTestServer,
+  TestServerInstance,
+  resetTestRateLimiters,
+} from "./helpers/test_server.js";
 import {
   createConnectedSocketClient,
   disconnectSockets,
@@ -41,6 +45,7 @@ describe("Room Lifecycle Integration Tests", () => {
   });
 
   beforeEach(async () => {
+    resetTestRateLimiters();
     hostClient = await createConnectedSocketClient(serverInstance.url);
     joinerClient = await createConnectedSocketClient(serverInstance.url);
     spectatorClient = await createConnectedSocketClient(serverInstance.url);
@@ -202,5 +207,156 @@ describe("Room Lifecycle Integration Tests", () => {
     expect(reconnectRes.success).toBe(false);
     if (reconnectRes.success) return;
     expect(reconnectRes.error.code).toBe("ERR_UNAUTHORIZED");
+  });
+
+  it("should broadcast room:player_left with reason 'host_left' and teardown room when host leaves in lobby status (SC-4, MAJ-026)", async () => {
+    // Arrange: Host creates room in lobby status
+    const createRes = await emitAck<
+      CreateRoomRequest,
+      { success: true; room: RoomState; sessionToken: string }
+    >(hostClient, "room:create", {
+      playerName: "HostPlayer",
+      preferredColor: "w",
+      avatar: "🦁",
+    });
+    const roomCode = createRes.room.roomCode;
+    const hostPlayerId = createRes.room.whitePlayer!.id;
+    expect(createRes.room.status).toBe("lobby");
+
+    // Add joiner socket to the room channel to observe host leave
+    const serverJoinerSocket = serverInstance.io.sockets.sockets.get(
+      joinerClient.id!,
+    );
+    expect(serverJoinerSocket).toBeDefined();
+    await serverJoinerSocket?.join(roomCode);
+
+    const playerLeftPromise = waitForEvent<{
+      playerId: string;
+      playerName: string;
+      reason: string;
+    }>(joinerClient, "room:player_left");
+
+    // Act: Host voluntarily leaves lobby
+    const leaveAck = await emitAck<LeaveRoomRequest, { success: true }>(
+      hostClient,
+      "room:leave",
+      { roomCode },
+    );
+    expect(leaveAck.success).toBe(true);
+
+    // Assert: Joiner receives player_left with reason 'host_left'
+    const leftEvent = await playerLeftPromise;
+    expect(leftEvent.playerId).toBe(hostPlayerId);
+    expect(leftEvent.playerName).toBe("HostPlayer");
+    expect(leftEvent.reason).toBe("host_left");
+
+    // Assert: Room is torn down and deleted from storage
+    const roomAfterLeave = await serverInstance.roomStore.findByCode(roomCode);
+    expect(roomAfterLeave).toBeNull();
+  });
+
+  it("enforces differential rate limiting on room:create allowing 3 req/min and rejecting 4th with ERR_RATE_LIMITED (SC-4, MAJ-006)", async () => {
+    resetTestRateLimiters();
+
+    // 1st request -> permitted
+    const res1 = await emitAck<
+      CreateRoomRequest,
+      | { success: true; room: RoomState; sessionToken: string }
+      | { success: false; error: SocketErrorPayload }
+    >(hostClient, "room:create", {
+      playerName: "RateLimit1",
+      preferredColor: "w",
+      avatar: "🦁",
+    });
+    expect(res1.success).toBe(true);
+
+    // 2nd request -> permitted
+    const res2 = await emitAck<
+      CreateRoomRequest,
+      | { success: true; room: RoomState; sessionToken: string }
+      | { success: false; error: SocketErrorPayload }
+    >(hostClient, "room:create", {
+      playerName: "RateLimit2",
+      preferredColor: "w",
+      avatar: "🦁",
+    });
+    expect(res2.success).toBe(true);
+
+    // 3rd request -> permitted
+    const res3 = await emitAck<
+      CreateRoomRequest,
+      | { success: true; room: RoomState; sessionToken: string }
+      | { success: false; error: SocketErrorPayload }
+    >(hostClient, "room:create", {
+      playerName: "RateLimit3",
+      preferredColor: "w",
+      avatar: "🦁",
+    });
+    expect(res3.success).toBe(true);
+
+    // 4th request -> rejected by rate limiter
+    const res4 = await emitAck<
+      CreateRoomRequest,
+      | { success: true; room: RoomState; sessionToken: string }
+      | { success: false; error: SocketErrorPayload }
+    >(hostClient, "room:create", {
+      playerName: "RateLimit4",
+      preferredColor: "w",
+      avatar: "🦁",
+    });
+    expect(res4.success).toBe(false);
+    if (res4.success) return;
+    expect(res4.error.code).toBe("ERR_RATE_LIMITED");
+    expect(res4.error.message).toContain("Rate limit exceeded for room creation");
+  });
+
+  it("extends session TTL (sliding window) upon player reconnection (SC-4, MIN-023)", async () => {
+    // Arrange: Create room
+    const createRes = await emitAck<
+      CreateRoomRequest,
+      { success: true; room: RoomState; sessionToken: string }
+    >(hostClient, "room:create", {
+      playerName: "SlidingHost",
+      preferredColor: "w",
+      avatar: "🦁",
+    });
+    const roomCode = createRes.room.roomCode;
+    const playerId = createRes.room.whitePlayer!.id;
+    const sessionToken = createRes.sessionToken;
+
+    // Fetch initial session record from registry
+    const initialSession = await serverInstance.sessionRegistry.validateSession(
+      sessionToken,
+      roomCode,
+      playerId,
+    );
+    expect(initialSession).not.toBeNull();
+    const initialExpiresAt = initialSession!.expiresAt;
+
+    // Disconnect host
+    hostClient.disconnect();
+
+    // Reconnect with new socket after small delay
+    await new Promise((r) => setTimeout(r, 50));
+    const newClient = await createConnectedSocketClient(serverInstance.url);
+
+    const reconnectRes = await emitAck<
+      ReconnectRequest,
+      | { success: true; room: RoomState; player: Player }
+      | { success: false; error: SocketErrorPayload }
+    >(newClient, "room:reconnect", { roomCode, playerId, sessionToken });
+    expect(reconnectRes.success).toBe(true);
+
+    // Verify session TTL was extended (sliding window)
+    const touchedSession = await serverInstance.sessionRegistry.validateSession(
+      sessionToken,
+      roomCode,
+      playerId,
+    );
+    expect(touchedSession).not.toBeNull();
+    expect(touchedSession!.socketId).toBe(newClient.id);
+    expect(touchedSession!.expiresAt).toBeGreaterThanOrEqual(initialExpiresAt);
+
+    newClient.disconnect();
   });
 });

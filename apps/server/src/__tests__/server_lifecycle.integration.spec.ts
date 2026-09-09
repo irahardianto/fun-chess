@@ -8,6 +8,16 @@ import { TypedSocketServer } from "../platform/socket/socket_server.js";
 import { MockRoomStore } from "../features/rooms/mock_room.store.js";
 import { RelayAddressService } from "../features/lan/relay_address.service.js";
 
+interface ErrorResponseBody {
+  status: string;
+  code: number;
+  error: {
+    code: string;
+    message: string;
+    correlationId?: string;
+  };
+}
+
 describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
   describe("HTTP 500 Error Catch Blocks (http_server.ts:280-306)", () => {
     let server: HttpServer;
@@ -62,7 +72,7 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
       expect(res.status).toBe(500);
       expect(res.headers.get("content-type")).toContain("application/json");
 
-      const body = (await res.json()) as any;
+      const body = (await res.json()) as ErrorResponseBody;
 
       expect(body.status).toBe("error");
       expect(body.code).toBe(500);
@@ -95,7 +105,7 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
 
       // Assert
       expect(res.status).toBe(500);
-      const body = (await res.json()) as any;
+      const body = (await res.json()) as ErrorResponseBody;
 
       expect(body.status).toBe("error");
       expect(body.code).toBe(500);
@@ -244,7 +254,7 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
     });
 
     it("handles callback error from io.close during shutdown and exits with 1 (MAJ-004)", async () => {
-      mockIo.close = vi.fn((cb?: (err?: any) => void) => {
+      mockIo.close = vi.fn((cb?: (err?: Error | null) => void) => {
         if (cb) cb(new Error("Socket.IO adapter close error"));
       });
 
@@ -366,11 +376,12 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
 
       // Intercept process.on to test listeners in isolation without mutating real Node process
       vi.spyOn(process, "on").mockImplementation(
-        (event: string, listener: any) => {
-          if (!processListeners[event]) {
-            processListeners[event] = [];
+        (event: string | symbol, listener: (...args: unknown[]) => void) => {
+          const evName = String(event);
+          if (!processListeners[evName]) {
+            processListeners[evName] = [];
           }
-          processListeners[event]!.push(listener);
+          processListeners[evName]!.push(listener);
           return process;
         },
       );
@@ -446,8 +457,8 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
     });
 
     it("handles HTTP server socket fatal errors and initiates serverError shutdown", () => {
-      let serverErrorHandler: Function | undefined;
-      mockServer.on = vi.fn((event: string, handler: any) => {
+      let serverErrorHandler: ((...args: unknown[]) => void) | undefined;
+      mockServer.on = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
         if (event === "error") {
           serverErrorHandler = handler;
         }

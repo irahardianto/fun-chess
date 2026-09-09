@@ -1,87 +1,85 @@
 /**
  * Typed Vue injection helpers for platform infrastructure and domain stores.
- * Conforms to Architectural Patterns Rule 3 (Dependency Direction) and Finding MAJ-014.
+ * Unified with canonical useInject* composables per MAJ-016 and ENH-003.
  */
 
-import { inject } from 'vue';
-import {
-  API_CLIENT_KEY,
-  STORAGE_KEY,
-  SESSION_STORAGE_KEY,
-  AUDIO_SERVICE_KEY,
-  LOGGER_KEY,
-  SCENARIO_STORE_KEY,
-  PUZZLE_STORE_KEY,
-  PROGRESS_STORAGE_KEY,
-  FILE_DOWNLOADER_KEY,
-  HAPTICS_KEY,
-  WEBRTC_DISCOVERY_KEY,
-  CLIPBOARD_SERVICE_KEY,
-  CAMERA_SERVICE_KEY,
-  type IApiClient,
-  type KeyValueStorage,
-  type IAudioService,
-  type ILogger,
-  type IFileDownloader,
-  type IHapticsService,
-  type IWebRtcDiscovery,
-  type IClipboardService,
-  type ICameraService,
-} from './tokens';
+import type { IApiClient } from '../api/api_client.interface';
+import type { KeyValueStorage } from '../storage/key_value_storage';
+import type { IAudioService } from '../audio/audio.interface';
+import type { ILogger } from '../telemetry';
+import type {
+  IFileDownloader,
+  IHapticsService,
+  IWebRtcDiscovery,
+  IClipboardService,
+  ICameraService,
+} from '../hardware';
 import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage } from '@fun-chess/shared';
 
-function throwMissingDI(name: string): never {
-  throw new Error(`Vue DI binding [${name}] not provided in current injection context`);
-}
+import {
+  useInjectApiClient,
+  useInjectStorage,
+  useInjectSessionStorage,
+  useInjectAudioService,
+  useInjectLogger,
+  useInjectScenarioStore,
+  useInjectPuzzleStore,
+  useInjectProgressStorage,
+  useInjectFileDownloader,
+  useInjectHaptics,
+  useInjectWebRtcDiscovery,
+  useInjectClipboardService,
+  useInjectCameraService,
+} from './index';
 
 export function useApiClient(custom?: IApiClient): IApiClient {
-  return custom ?? inject(API_CLIENT_KEY) ?? throwMissingDI('API_CLIENT');
+  return custom ?? useInjectApiClient();
 }
 
 export function useStorage(custom?: KeyValueStorage): KeyValueStorage {
-  return custom ?? inject(STORAGE_KEY) ?? throwMissingDI('STORAGE');
+  return custom ?? useInjectStorage();
 }
 
 export function useSessionStorage(custom?: KeyValueStorage): KeyValueStorage {
-  return custom ?? inject(SESSION_STORAGE_KEY) ?? throwMissingDI('SESSION_STORAGE');
+  return custom ?? useInjectSessionStorage();
 }
 
 export function useAudioService(custom?: IAudioService): IAudioService {
-  return custom ?? inject(AUDIO_SERVICE_KEY) ?? throwMissingDI('AUDIO_SERVICE');
+  return custom ?? useInjectAudioService();
 }
 
 export function useLogger(custom?: ILogger): ILogger {
-  return custom ?? inject(LOGGER_KEY) ?? throwMissingDI('LOGGER');
+  return custom ?? useInjectLogger();
 }
 
 export function useScenarioStore(custom?: ScenarioProgressStore): ScenarioProgressStore {
-  return custom ?? inject(SCENARIO_STORE_KEY) ?? throwMissingDI('SCENARIO_STORE');
+  return custom ?? useInjectScenarioStore();
 }
 
 export function usePuzzleStore(custom?: PuzzleProgressStore): PuzzleProgressStore {
-  return custom ?? inject(PUZZLE_STORE_KEY) ?? throwMissingDI('PUZZLE_STORE');
+  return custom ?? useInjectPuzzleStore();
 }
 
 export function useProgressStorage(custom?: ProgressStorage): ProgressStorage {
-  return custom ?? inject(PROGRESS_STORAGE_KEY) ?? throwMissingDI('PROGRESS_STORAGE');
+  return custom ?? useInjectProgressStorage();
 }
 
 export function useFileDownloader(custom?: IFileDownloader): IFileDownloader {
-  return custom ?? inject(FILE_DOWNLOADER_KEY) ?? throwMissingDI('FILE_DOWNLOADER');
+  return custom ?? useInjectFileDownloader();
 }
 
 export function useHaptics(custom?: IHapticsService): IHapticsService {
-  return custom ?? inject(HAPTICS_KEY) ?? throwMissingDI('HAPTICS');
+  return custom ?? useInjectHaptics();
 }
 
 export function useWebRtcDiscovery(custom?: IWebRtcDiscovery): IWebRtcDiscovery {
-  return custom ?? inject(WEBRTC_DISCOVERY_KEY) ?? throwMissingDI('WEBRTC_DISCOVERY');
+  return custom ?? useInjectWebRtcDiscovery();
 }
 
 export function useClipboardService(custom?: IClipboardService): IClipboardService {
-  return custom ?? inject(CLIPBOARD_SERVICE_KEY) ?? throwMissingDI('CLIPBOARD_SERVICE');
+  return custom ?? useInjectClipboardService();
 }
 
 export function useCameraService(custom?: ICameraService): ICameraService {
-  return custom ?? inject(CAMERA_SERVICE_KEY) ?? throwMissingDI('CAMERA_SERVICE');
+  return custom ?? useInjectCameraService();
 }

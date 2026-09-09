@@ -18,7 +18,9 @@ import {
   handleSocketDisconnect,
   clearAllDisconnectTimers,
   DisconnectTimerRegistry,
+  roomCreateRateLimiter,
   type IDisconnectTimerRegistry,
+  type IRoomGameAdapter,
 } from "../../../features/rooms/index.js";
 import {
   ChessEngine,
@@ -28,11 +30,11 @@ import {
 import { Chess } from "chess.js";
 import { RelayAddressService } from "../../../features/lan/relay_address.service.js";
 
-if (typeof (ChessEngine as any).findKingSquare !== "function") {
-  (ChessEngine as any).findKingSquare = (fen: string, color: any) => {
+if (typeof (ChessEngine as unknown as { findKingSquare?: unknown }).findKingSquare !== "function") {
+  (ChessEngine as unknown as { findKingSquare: (fen: string, color: unknown) => unknown }).findKingSquare = (fen: string, color: unknown) => {
     try {
       const chess = new Chess(fen);
-      return ChessEngine.getKingSquare(chess, color);
+      return ChessEngine.getKingSquare(chess, color as "w" | "b");
     } catch {
       return null;
     }
@@ -63,6 +65,13 @@ export interface CreateTestServerOptions {
 }
 
 /**
+ * Resets socket rate limiter tracking entries to prevent cross-test interference.
+ */
+export function resetTestRateLimiters(): void {
+  roomCreateRateLimiter.clear();
+}
+
+/**
  * Creates, configures, and starts a test server using the real production server modules.
  * Replaces the former 1,146-line shadow server implementation to ensure contract and integration
  * tests exercise production backend behavior directly (CRIT-004).
@@ -70,6 +79,7 @@ export interface CreateTestServerOptions {
 export async function createTestServer(
   customPortOrOptions: number | CreateTestServerOptions = 0,
 ): Promise<TestServerInstance> {
+  resetTestRateLimiters();
   const options: CreateTestServerOptions =
     typeof customPortOrOptions === "number"
       ? { customPort: customPortOrOptions }
@@ -89,24 +99,25 @@ export async function createTestServer(
   );
 
   // Safe fallback delegation so roomService can satisfy either IRoomGameAdapter or direct RoomStore callers
-  if (typeof (roomService as any).mutate !== "function") {
-    (roomService as any).mutate = roomStore.mutate.bind(roomStore);
+  const roomServiceRecord = roomService as unknown as Record<string, unknown>;
+  if (typeof roomServiceRecord.mutate !== "function") {
+    roomServiceRecord.mutate = roomStore.mutate.bind(roomStore);
   }
-  if (typeof (roomService as any).withLock !== "function") {
-    (roomService as any).withLock = roomStore.withLock.bind(roomStore);
+  if (typeof roomServiceRecord.withLock !== "function") {
+    roomServiceRecord.withLock = roomStore.withLock.bind(roomStore);
   }
-  if (typeof (roomService as any).findByCode !== "function") {
-    (roomService as any).findByCode = roomStore.findByCode.bind(roomStore);
+  if (typeof roomServiceRecord.findByCode !== "function") {
+    roomServiceRecord.findByCode = roomStore.findByCode.bind(roomStore);
   }
-  if (typeof (roomService as any).save !== "function") {
-    (roomService as any).save = roomStore.save.bind(roomStore);
+  if (typeof roomServiceRecord.save !== "function") {
+    roomServiceRecord.save = roomStore.save.bind(roomStore);
   }
-  if (typeof (roomService as any).delete !== "function") {
-    (roomService as any).delete = roomStore.delete.bind(roomStore);
+  if (typeof roomServiceRecord.delete !== "function") {
+    roomServiceRecord.delete = roomStore.delete.bind(roomStore);
   }
 
   // Instantiate GameService passing roomService (IRoomGameAdapter) instead of roomStore directly
-  const gameService = new GameService(roomService as any, sessionRegistry);
+  const gameService = new GameService(roomService as unknown as IRoomGameAdapter);
 
   // Rate limiter for tests: high capacity and disabled background interval to prevent timer leaks
   const rateLimiter = new SocketRateLimiter({
@@ -195,7 +206,7 @@ export async function createTestServer(
     distPath: clientDistPath,
     allowedOrigins,
     getActiveSocketCount: () => (io ? io.sockets.sockets.size : 0),
-    env: options.env as any,
+    env: options.env as ServerEnv,
     rateLimiter: options.rateLimiter,
   });
 

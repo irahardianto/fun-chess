@@ -1,11 +1,6 @@
-import { PieceColor } from "@fun-chess/shared";
+import type { PieceColor, IClock, IIdGenerator } from "@fun-chess/shared";
 import { SessionRecord, SessionRegistry } from "./session_registry.js";
-import {
-  IClock,
-  SystemClock,
-  IIdGenerator,
-  UuidGenerator,
-} from "./clock.js";
+import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
 
 /**
  * In-memory production implementation of SessionRegistry.
@@ -99,11 +94,14 @@ export class InMemorySessionRegistry implements SessionRegistry {
   public async touchSession(
     sessionToken: string,
     newSocketId: string,
+    extensionTtlMs?: number,
   ): Promise<void> {
     const record = this.sessions.get(sessionToken);
     if (record) {
+      const now = this.clock.now();
       record.socketId = newSocketId;
-      record.lastSeenAt = this.clock.now();
+      record.lastSeenAt = now;
+      record.expiresAt = now + (extensionTtlMs ?? this.DEFAULT_TTL_MS);
     }
   }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useProgressSync } from '../useProgressSync';
 import { InMemoryUnifiedStoreMock } from '../../store/in_memory_unified.store.mock';
+import type { IProgressFileService } from '../../services/progress_file.service';
 import type { UnifiedProgressPayload } from '@fun-chess/shared';
 
 describe('useProgressSync Composable', () => {
@@ -56,14 +57,14 @@ describe('useProgressSync Composable', () => {
   });
 
   it('exports JSON and QR string correctly', async () => {
-    const mockFileService = {
+    const mockFileService: IProgressFileService = {
       downloadProgressFile: vi.fn(),
       readProgressFile: vi.fn(),
     };
 
     const { exportJson, exportQrString } = useProgressSync({
       storage: mockStorage,
-      fileService: mockFileService as any,
+      fileService: mockFileService,
     });
 
     const json = await exportJson('test.json');
@@ -180,7 +181,7 @@ describe('useProgressSync Composable', () => {
   });
 
   it('sets actionable error message when exportJson fails', async () => {
-    const failingFileService = {
+    const failingFileService: IProgressFileService = {
       downloadProgressFile: vi.fn().mockImplementation(() => {
         throw new Error('Permission denied');
       }),
@@ -189,10 +190,32 @@ describe('useProgressSync Composable', () => {
 
     const { exportJson, syncError } = useProgressSync({
       storage: mockStorage,
-      fileService: failingFileService as any,
+      fileService: failingFileService,
     });
 
     await expect(exportJson()).rejects.toThrow('Permission denied');
     expect(syncError.value).toContain('Permission denied');
+  });
+
+  it('rejects import payload exceeding 2MB limit and sets syncError (MIN-032)', async () => {
+    const { importPayload, syncError } = useProgressSync({
+      storage: mockStorage,
+    });
+
+    const oversized = 'x'.repeat(2 * 1024 * 1024 + 1);
+    const result = await importPayload(oversized);
+
+    expect(result).toBe(false);
+    expect(syncError.value).toBe('Save data exceeds maximum allowed size of 2MB.');
+  });
+
+  it('rejects empty or invalid input with actionable error message (MIN-032)', async () => {
+    const { importPayload, syncError } = useProgressSync({
+      storage: mockStorage,
+    });
+
+    const result = await importPayload('');
+    expect(result).toBe(false);
+    expect(syncError.value).toBe('Select a valid save file (.json) or scan a QR code.');
   });
 });

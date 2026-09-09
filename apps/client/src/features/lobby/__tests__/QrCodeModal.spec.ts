@@ -5,23 +5,38 @@ import path from 'path';
 import QrCodeModal from '../QrCodeModal.vue';
 import QRCode from 'qrcode';
 import { logger } from '@/platform/telemetry';
+import { safeLocalStorage } from '@/platform/storage';
 
 describe('QrCodeModal.vue', () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
+    safeLocalStorage.clear();
     (vi.spyOn(QRCode, 'toDataURL') as any).mockResolvedValue('data:image/png;base64,mockQrCode');
     Object.assign(navigator, {
       clipboard: {
         writeText: vi.fn().mockResolvedValue(undefined),
       },
     });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        lanIp: '127.0.0.1',
+        port: 3000,
+        localUrl: 'http://localhost:3000',
+        joinUrl: 'http://localhost:3000',
+        interfaces: [],
+      }),
+    }));
   });
 
   afterEach(() => {
+    safeLocalStorage.clear();
     vi.useRealTimers();
     if (wrapper) wrapper.unmount();
     document.body.innerHTML = '';
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -276,7 +291,7 @@ describe('QrCodeModal.vue', () => {
       const copyBtn = document.body.querySelector('[data-testid="copy-link-btn"]') as HTMLButtonElement;
       expect(copyBtn).not.toBeNull();
       copyBtn.click();
-      await wrapper.vm.$nextTick();
+      await flushPromises();
 
       expect(execCommandFn).toHaveBeenCalledWith('copy');
       expect(copyBtn.textContent).toContain('Copied!');
@@ -385,7 +400,7 @@ describe('QrCodeModal.vue', () => {
 
       const copyBtn = document.body.querySelector('[data-testid="copy-link-btn"]') as HTMLButtonElement;
       copyBtn.click();
-      await wrapper.vm.$nextTick();
+      await flushPromises();
 
       const errorNotice = document.body.querySelector('[data-testid="copy-error-notice"]');
       expect(errorNotice).not.toBeNull();

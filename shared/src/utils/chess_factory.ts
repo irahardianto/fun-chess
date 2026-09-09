@@ -140,6 +140,46 @@ export function createSafeChess(
 }
 
 /**
+ * Restores chess instance to its previous FEN, falling back to reset on failure.
+ * Extracted helper to avoid deeply nested try-catch blocks in safeLoadFen (ENH-011).
+ *
+ * @param chess - Active Chess instance
+ * @param previousFen - Previous valid FEN string
+ * @param logger - Optional logger
+ */
+function restoreChessState(
+  chess: Chess,
+  previousFen: string,
+  logger?: ChessLogger,
+): void {
+  try {
+    chess.load(previousFen);
+  } catch (restoreErr) {
+    logger?.warn(
+      `[safeLoadFen] Failed to restore previous FEN "${previousFen}": ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
+      {
+        operation: "safe_load_fen_restore_previous",
+        previousFen,
+        error:
+          restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
+      },
+    );
+    try {
+      chess.reset();
+    } catch (resetErr) {
+      logger?.error?.(
+        `[safeLoadFen] Failed to reset chess instance after load failure: ${resetErr instanceof Error ? resetErr.message : String(resetErr)}`,
+        {
+          operation: "safe_load_fen_reset_fallback",
+          error:
+            resetErr instanceof Error ? resetErr.message : String(resetErr),
+        },
+      );
+    }
+  }
+}
+
+/**
  * Safely loads a FEN into an existing Chess instance without crashing if the FEN is invalid.
  * If the FEN is invalid or throws, the chess instance is restored to its previous position
  * (or standard position if corrupted) and returns false.
@@ -172,38 +212,12 @@ export function safeLoadFen(
     return true;
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logger?.warn(
-      `[safeLoadFen] Failed to load FEN "${fen}": ${errorMsg}.`,
-      {
-        operation: "safe_load_fen",
-        fen,
-        error: errorMsg,
-      },
-    );
-    // Restore previous state if possible
-    try {
-      chess.load(previousFen);
-    } catch (restoreErr) {
-      logger?.warn(
-        `[safeLoadFen] Failed to restore previous FEN "${previousFen}": ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
-        {
-          operation: "safe_load_fen_restore_previous",
-          previousFen,
-          error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
-        },
-      );
-      try {
-        chess.reset();
-      } catch (resetErr) {
-        logger?.error?.(
-          `[safeLoadFen] Failed to reset chess instance after load failure: ${resetErr instanceof Error ? resetErr.message : String(resetErr)}`,
-          {
-            operation: "safe_load_fen_reset_fallback",
-            error: resetErr instanceof Error ? resetErr.message : String(resetErr),
-          },
-        );
-      }
-    }
+    logger?.warn(`[safeLoadFen] Failed to load FEN "${fen}": ${errorMsg}.`, {
+      operation: "safe_load_fen",
+      fen,
+      error: errorMsg,
+    });
+    restoreChessState(chess, previousFen, logger);
     return false;
   }
 }

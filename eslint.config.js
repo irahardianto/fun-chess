@@ -42,23 +42,53 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-unused-vars': [
-        'warn',
+        'error',
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
         },
       ],
-      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-empty-object-type': 'off',
       '@typescript-eslint/no-unsafe-function-type': 'off',
       '@typescript-eslint/no-require-imports': 'off',
-      'no-useless-assignment': 'warn',
+      'no-useless-assignment': 'off',
       'no-control-regex': 'off',
       'no-prototype-builtins': 'off',
       'preserve-caught-error': 'off',
-      'prefer-const': 'warn',
+      'prefer-const': 'error',
       'vue/multi-word-component-names': 'off',
       'vue/no-v-html': 'off',
+      'vue/max-attributes-per-line': 'off',
+      'vue/singleline-html-element-content-newline': 'off',
+      'vue/one-component-per-file': 'off',
+      'vue/html-self-closing': 'off',
+      'vue/html-indent': 'off',
+      'vue/v-on-event-hyphenation': 'off',
+      'vue/attributes-order': 'off',
+    },
+  },
+  {
+    // Test files: relax no-explicit-any for test mocks/stubs and doubles
+    files: [
+      '**/*.spec.ts',
+      '**/*.test.ts',
+      '**/*.e2e.test.ts',
+      '**/__tests__/**',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'prefer-const': 'off',
+      'no-useless-assignment': 'off',
+    },
+  },
+  {
+    // WebRTC camera constraints fallback catch clauses
+    files: ['**/useCameraStream.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   }
 );

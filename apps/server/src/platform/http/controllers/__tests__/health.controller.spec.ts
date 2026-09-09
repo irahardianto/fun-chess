@@ -36,9 +36,10 @@ describe("HealthController", () => {
     expect(new Date(liveness.timestamp).getTime()).not.toBeNaN();
 
     // Verify operational metrics are not leaked
-    expect((liveness as any).activeRooms).toBeUndefined();
-    expect((liveness as any).activeSockets).toBeUndefined();
-    expect((liveness as any).memoryUsageMb).toBeUndefined();
+    const livenessRecord = liveness as unknown as Record<string, unknown>;
+    expect(livenessRecord["activeRooms"]).toBeUndefined();
+    expect(livenessRecord["activeSockets"]).toBeUndefined();
+    expect(livenessRecord["memoryUsageMb"]).toBeUndefined();
   });
 
   it("returns detailed health metrics in development mode", async () => {
@@ -107,5 +108,21 @@ describe("HealthController", () => {
     const detailed = await controller.getDetailedHealth();
     expect(detailed.relay?.mode).toBe("cloud");
     expect(detailed.relay?.publicUrl).toBe("https://fun-chess.a.run.app");
+  });
+
+  it("delegates getHealth() directly to getDetailedHealth() (MIN-030)", async () => {
+    const controller = new HealthController({
+      roomStore: mockRoomStore,
+      addressService: mockAddressService,
+      port: 3000,
+      getActiveSocketCount: () => 2,
+      isProduction: false,
+    });
+
+    const health = await controller.getHealth();
+    expect(health.status).toBe("ok");
+    expect(health.activeRooms).toBe(3);
+    expect(health.activeSockets).toBe(2);
+    expect(health.memoryUsageMb.rss).toBeGreaterThan(0);
   });
 });

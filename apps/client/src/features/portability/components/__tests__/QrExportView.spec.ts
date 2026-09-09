@@ -1,9 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import QrExportView from '../QrExportView.vue';
 import type { UnifiedProgressPayload } from '@fun-chess/shared';
 
 describe('QrExportView.vue', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      getImageData: vi.fn(),
+      putImageData: vi.fn(),
+      createImageData: vi.fn().mockReturnValue({ data: new Uint8ClampedArray(1000) }),
+    } as unknown as CanvasRenderingContext2D);
+  });
   const payload: UnifiedProgressPayload = {
     version: 1,
     exportedAt: 1000,

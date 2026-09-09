@@ -10,7 +10,7 @@ import { UNIFIED_PROGRESS_SCHEMA_VERSION, assertValidProgress } from '@fun-chess
 import { LocalStorageProgressStore } from '@/features/scenarios';
 import { LocalStoragePuzzleProgressStore } from '@/features/puzzles';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
-import { logger, generateCorrelationId } from '@/platform/telemetry';
+import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
 export class StorageCommitError extends Error {
   public readonly rolledBack: boolean;
@@ -33,7 +33,8 @@ interface StorageSnapshot {
 export class LocalStorageUnifiedStore implements ProgressStorage {
   constructor(
     private readonly scenarioStore: ScenarioProgressStore,
-    private readonly puzzleStore: PuzzleProgressStore
+    private readonly puzzleStore: PuzzleProgressStore,
+    private readonly logger: ILogger = defaultLogger
   ) {}
 
   public async getUnifiedProgress(): Promise<UnifiedProgressPayload> {
@@ -62,7 +63,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
     const correlationId = generateCorrelationId();
     const startTime = performance.now();
 
-    logger.info('Starting unified progress overwrite', {
+    this.logger.info('Starting unified progress overwrite', {
       operation: 'unified_store_overwrite_all',
       correlationId,
     });
@@ -117,7 +118,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
           await this.puzzleStore.restoreProgress(snapshot.puzzles);
           rollbackSucceeded = true;
         } catch (rollbackErr) {
-          logger.fatal('FATAL: Two-phase commit rollback failed', {
+          this.logger.fatal('FATAL: Two-phase commit rollback failed', {
             operation: 'unified_store_rollback',
             correlationId,
             error:
@@ -149,7 +150,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
       }
 
       const duration = Math.round(performance.now() - startTime);
-      logger.info('Unified progress overwrite succeeded', {
+      this.logger.info('Unified progress overwrite succeeded', {
         operation: 'unified_store_overwrite_all',
         correlationId,
         duration,
@@ -157,7 +158,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
       });
     } catch (err) {
       const duration = Math.round(performance.now() - startTime);
-      logger.error('Unified progress overwrite failed', {
+      this.logger.error('Unified progress overwrite failed', {
         operation: 'unified_store_overwrite_all',
         correlationId,
         duration,
@@ -172,10 +173,11 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
   }
 }
 
-export function createDefaultLocalStorageUnifiedStore(): LocalStorageUnifiedStore {
+export function createDefaultLocalStorageUnifiedStore(logger: ILogger = defaultLogger): LocalStorageUnifiedStore {
   return new LocalStorageUnifiedStore(
     new LocalStorageProgressStore(),
-    new LocalStoragePuzzleProgressStore()
+    new LocalStoragePuzzleProgressStore(),
+    logger
   );
 }
 

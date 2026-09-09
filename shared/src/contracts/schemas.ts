@@ -65,6 +65,7 @@ export const ChessSquareSchema = z
  * Pawn promotion piece target schema ('q', 'r', 'b', 'n').
  */
 export const PromotionPieceSchema = z.enum(["q", "r", "b", "n"]);
+export type PromotionPieceDto = z.infer<typeof PromotionPieceSchema>;
 
 /**
  * Public player representation schema.
@@ -254,6 +255,8 @@ export type MovePayload = z.infer<typeof MovePayloadSchema>;
 
 /**
  * Socket request schema for submitting a move in an active game room.
+ * Accepts RFC 4122 UUID or any safe unique client string token (1-64 chars)
+ * to support UUID, nanoid, or cryptographic hex digests without client bypass (MAJ-003).
  */
 export const MakeMoveRequestSchema = z.object({
   roomCode: RoomCodeSchema,
@@ -264,11 +267,15 @@ export const MakeMoveRequestSchema = z.object({
    */
   expectedMoveNumber: z.number().int().nonnegative().optional(),
   /**
-   * Client-generated UUID idempotency token.
-   * If a move with this idempotency key was already applied, the server returns
-   * the existing move result without throwing NotYourTurnError.
+   * Client-generated idempotency token.
+   * Can be a standard UUIDv4 or any alphanumeric/hyphenated token (1 to 64 chars).
    */
-  idempotencyKey: z.string().uuid().optional(),
+  idempotencyKey: z
+    .string()
+    .min(1, "Idempotency key must not be empty")
+    .max(64, "Idempotency key cannot exceed 64 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Idempotency key must be alphanumeric, hyphen, or underscore")
+    .optional(),
 });
 export type MakeMoveRequest = z.infer<typeof MakeMoveRequestSchema>;
 
@@ -406,7 +413,7 @@ const emptyStringToUndefined = (val: unknown): unknown =>
  */
 export function normalizeUrlString(val: unknown): unknown {
   if (typeof val !== "string") return val;
-  let trimmed = val.trim();
+  const trimmed = val.trim();
   if (trimmed === "") return undefined;
   if (trimmed.startsWith("//")) {
     return `https:${trimmed}`;
@@ -478,3 +485,141 @@ export const ServerEnvSchema = z.object({
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
 });
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
+
+/**
+ * Performance star rating schema (1, 2, or 3 stars).
+ */
+export const StarRatingSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+]);
+export type StarRatingDto = z.infer<typeof StarRatingSchema>;
+
+/**
+ * User progress record schema for an individual scenario.
+ */
+export const ScenarioProgressSchema = z.object({
+  scenarioId: z.string().min(1),
+  starsEarned: StarRatingSchema,
+  attemptsCount: z.number().int().nonnegative(),
+  hintsUsedTotal: z.number().int().nonnegative(),
+  firstCompletedAt: z.number().nonnegative(),
+  lastCompletedAt: z.number().nonnegative(),
+});
+export type ScenarioProgressDto = z.infer<typeof ScenarioProgressSchema>;
+
+/**
+ * Key-value mapping schema of scenario ID to scenario progress record.
+ */
+export const ScenarioProgressMapSchema = z.record(
+  z.string(),
+  ScenarioProgressSchema,
+);
+export type ScenarioProgressMapDto = z.infer<typeof ScenarioProgressMapSchema>;
+
+/**
+ * Historical rating point schema for adaptive rating progression.
+ */
+export const RatingHistoryPointSchema = z.object({
+  timestamp: z.number().nonnegative(),
+  rating: z.number(),
+  puzzleId: z.string(),
+  delta: z.number(),
+});
+export type RatingHistoryPointDto = z.infer<typeof RatingHistoryPointSchema>;
+
+/**
+ * Adaptive Elo rating state schema.
+ */
+export const AdaptiveRatingStateSchema = z.object({
+  rating: z.number(),
+  ratingDeviation: z.number(),
+  peakRating: z.number(),
+  totalAttempted: z.number().int().nonnegative(),
+  totalSolved: z.number().int().nonnegative(),
+  bestStreak: z.number().int().nonnegative(),
+  ratingHistory: z.array(RatingHistoryPointSchema),
+});
+export type AdaptiveRatingStateDto = z.infer<typeof AdaptiveRatingStateSchema>;
+
+/**
+ * Theme mastery progress record schema.
+ */
+export const ThemeMasteryProgressSchema = z.object({
+  theme: z.string().min(1),
+  attempted: z.number().int().nonnegative(),
+  solved: z.number().int().nonnegative(),
+  starsEarned: z.number().int().nonnegative(),
+  masteryLevel: z.enum(["novice", "apprentice", "master"]),
+  lastPracticedAt: z.number().nonnegative(),
+});
+export type ThemeMasteryProgressDto = z.infer<typeof ThemeMasteryProgressSchema>;
+
+/**
+ * High scores and arcade run statistics schema.
+ */
+export const PuzzleArcadeStatsSchema = z.object({
+  puzzleRushHighScore: z.number().int().nonnegative(),
+  puzzleRushBestStreak: z.number().int().nonnegative(),
+  streakSurvivorHighScore: z.number().int().nonnegative(),
+  totalRushRuns: z.number().int().nonnegative(),
+});
+export type PuzzleArcadeStatsDto = z.infer<typeof PuzzleArcadeStatsSchema>;
+
+/**
+ * Record schema of a solved puzzle.
+ */
+export const SolvedPuzzleRecordSchema = z.object({
+  stars: StarRatingSchema,
+  solvedAt: z.number().nonnegative(),
+});
+export type SolvedPuzzleRecordDto = z.infer<typeof SolvedPuzzleRecordSchema>;
+
+/**
+ * Overall persistent user progress across Puzzle Hub.
+ */
+export const PuzzleProgressSchema = z.object({
+  ratingProfile: AdaptiveRatingStateSchema,
+  themeMastery: z.record(z.string(), ThemeMasteryProgressSchema),
+  arcadeStats: PuzzleArcadeStatsSchema,
+  solvedPuzzles: z.record(z.string(), SolvedPuzzleRecordSchema),
+  createdAt: z.number().nonnegative(),
+  lastActiveAt: z.number().nonnegative(),
+});
+export type PuzzleProgressDto = z.infer<typeof PuzzleProgressSchema>;
+
+/**
+ * Canonical top-level schema containing complete user progress across all single-player modes (ENH-012).
+ */
+export const UnifiedProgressPayloadSchema = z.object({
+  version: z.number().int().positive(),
+  exportedAt: z.number().nonnegative(),
+  clientVersion: z.string().optional(),
+  scenarios: ScenarioProgressMapSchema,
+  puzzles: PuzzleProgressSchema,
+});
+export type UnifiedProgressPayloadDto = z.infer<typeof UnifiedProgressPayloadSchema>;
+
+/**
+ * Envelope structure schema used when exporting to JSON backup files (ENH-012).
+ */
+export const UnifiedProgressEnvelopeSchema = z.object({
+  magic: z.literal("FC_PROGRESS_V1"),
+  schemaVersion: z.number().int().positive(),
+  exportedAt: z.string().min(1),
+  checksum: z.string().min(1),
+  payload: UnifiedProgressPayloadSchema,
+});
+export type UnifiedProgressEnvelopeDto = z.infer<typeof UnifiedProgressEnvelopeSchema>;
+
+/**
+ * Strategy schema for resolving conflicts when importing progress.
+ */
+export const SyncMergeStrategySchema = z.enum([
+  "smart_merge",
+  "replace_local",
+  "keep_local",
+]);
+export type SyncMergeStrategyDto = z.infer<typeof SyncMergeStrategySchema>;
+

@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import BaseButton from '@/components/base/BaseButton.vue';
 import { useClipboardService } from '@/platform/di/helpers';
 import { defaultClipboardService, type IClipboardService } from '@/platform/hardware/clipboard.interface';
-import { logger } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
 
 const props = defineProps<{
   payload: UnifiedProgressPayload | null;
@@ -29,6 +29,7 @@ function resolveClipboardService(): IClipboardService {
 }
 
 const clipboardService = resolveClipboardService();
+const logger = useInjectLogger();
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const isCopied = ref(false);
 let copyTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -54,7 +55,12 @@ async function renderQrCode() {
   if (!canvasRef.value || !props.qrString) return;
 
   try {
-    const ctx = canvasRef.value.getContext ? canvasRef.value.getContext('2d') : null;
+    let ctx: CanvasRenderingContext2D | null = null;
+    try {
+      ctx = canvasRef.value.getContext ? canvasRef.value.getContext('2d') : null;
+    } catch {
+      ctx = null;
+    }
     if (ctx) {
       await QRCode.toCanvas(canvasRef.value, props.qrString, {
         errorCorrectionLevel: 'M',

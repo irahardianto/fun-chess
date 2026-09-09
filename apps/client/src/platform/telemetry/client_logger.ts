@@ -88,7 +88,7 @@ export class ClientLogger implements ILogger {
 
     switch (level) {
       case 'debug': {
-        const dbgFn = (console as any)['debug'] ?? console.info;
+        const dbgFn = typeof console['debug'] === 'function' ? console['debug'] : console.info;
         dbgFn(prefix, message, merged);
         break;
       }

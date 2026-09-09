@@ -1,13 +1,20 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
-import { startServer, type ServerInstance } from "../index.js";
+import {
+  startServer,
+  setupDomainServices,
+  setupSocketGateway,
+  setupBackgroundJobs,
+  type ServerInstance,
+} from "../index.js";
 import { NullLogger } from "../platform/logger/null_logger.js";
 import type {
-  HealthCheckResponse,
   LanInfoResponse,
   LivenessHealthResponse,
   DetailedHealthResponse,
 } from "@fun-chess/shared";
+import type { ServerEnv } from "../platform/config/index.js";
+import { createSocketRateLimiter } from "../platform/socket/index.js";
 
 describe("Server Bootstrap Integration (MAJ-033)", () => {
   let instance: ServerInstance | undefined;
@@ -53,9 +60,10 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     expect(data.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(data.timestamp).toBeDefined();
     expect(new Date(data.timestamp).getTime()).not.toBeNaN();
-    expect((data as any).activeRooms).toBeUndefined();
-    expect((data as any).activeSockets).toBeUndefined();
-    expect((data as any).memoryUsageMb).toBeUndefined();
+    const untypedData = data as unknown as Record<string, unknown>;
+    expect(untypedData.activeRooms).toBeUndefined();
+    expect(untypedData.activeSockets).toBeUndefined();
+    expect(untypedData.memoryUsageMb).toBeUndefined();
 
     // Act: Deep operational telemetry on /metrics
     const metricsRes = await fetch(`${instance.url}/metrics`);
@@ -242,7 +250,7 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
         port: 0,
         logger: undefined,
         config: {
-          LOG_LEVEL: "invalid_log_level" as any,
+          LOG_LEVEL: "invalid_log_level" as unknown as ServerEnv["LOG_LEVEL"],
         },
       }),
     ).rejects.toThrow();
@@ -284,4 +292,191 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
       }
     }
   });
+
+  it("decomposes server setup into modular helper functions (MAJ-031)", () => {
+    const env = {
+      PORT: 3000,
+      HOST: "127.0.0.1",
+      NODE_ENV: "test" as const,
+      LOG_LEVEL: "info" as const,
+      TRUST_PROXY: false,
+    };
+    const services = setupDomainServices({}, env as unknown as ServerEnv, 3000);
+    expect(services.roomStore).toBeDefined();
+    expect(services.roomService).toBeDefined();
+    expect(services.gameService).toBeDefined();
+    expect(services.relayAddressService).toBeDefined();
+    expect(services.timerRegistry).toBeDefined();
+
+    const interval = setupBackgroundJobs(services.roomService, new NullLogger());
+    expect(interval).toBeDefined();
+    clearInterval(interval);
+  });
+
+  it("propagates error when server.close yields an error during close() (MAJ-008)", async () => {
+    instance = await startServer(createOptions());
+
+    // Mock server.close to simulate an error callback
+    instance.server.close = vi.fn((cb?: (err?: Error | null) => void) => {
+      if (cb) cb(new Error("Simulated close failure"));
+      return instance!.server;
+    });
+
+    await expect(instance.close()).rejects.toThrow("Simulated close failure");
+    instance = undefined;
+  });
+
+  it("cleans up resources when server startup listen fails (MAJ-009)", async () => {
+    // Attempting to listen on an invalid address or privileged port should fail
+    await expect(
+      startServer({
+        port: -1, // Invalid port causes server.listen to error immediately
+        host: "invalid-host-name-that-cannot-bind",
+        logger: new NullLogger(),
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("logs structured error when socket experiences a transport error event (MAJ-042)", async () => {
+    const logger = new NullLogger();
+    instance = await startServer(createOptions({ logger }));
+
+    const client: ClientSocket = ioClient(instance.url, {
+      transports: ["websocket"],
+      forceNew: true,
+      reconnection: false,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Connect timeout")), 5000);
+      client.on("connect", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      client.on("connect_error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    // Obtain the server-side socket representation
+    const serverSockets = await instance.io.fetchSockets();
+    expect(serverSockets.length).toBeGreaterThan(0);
+    const serverSocket = instance.io.sockets.sockets.get(serverSockets[0]!.id);
+    expect(serverSocket).toBeDefined();
+
+    // Trigger transport error on the server socket local listeners
+    for (const listener of serverSocket!.listeners("error")) {
+      (listener as (err: Error) => void)(
+        new Error("Simulated transport socket error"),
+      );
+    }
+
+    // Verify error was logged with mandatory 3-point context (MAJ-042)
+    const errorLog = logger.errorLogs.find(
+      (l) => l.context?.operation === "socket_error",
+    );
+    expect(errorLog).toBeDefined();
+    expect(errorLog?.message).toBe("Client socket transport error");
+    expect(errorLog?.context?.socketId).toBe(serverSocket!.id);
+    expect(errorLog?.context?.correlationId).toBeDefined();
+    expect((errorLog?.context?.error as { message?: string })?.message).toBe(
+      "Simulated transport socket error",
+    );
+
+    client.disconnect();
+  });
+
+  it("catches and logs exception when socket disconnect handler fails (MAJ-042)", async () => {
+    const logger = new NullLogger();
+    instance = await startServer(createOptions({ logger }));
+
+    const client: ClientSocket = ioClient(instance.url, {
+      transports: ["websocket"],
+      forceNew: true,
+      reconnection: false,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Connect timeout")), 5000);
+      client.on("connect", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      client.on("connect_error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    const serverSockets = await instance.io.fetchSockets();
+    expect(serverSockets.length).toBeGreaterThan(0);
+    const socketId = serverSockets[0]!.id;
+
+    // Simulate unexpected failure inside roomService.handleDisconnect
+    vi.spyOn(instance.roomService, "handleDisconnect").mockRejectedValueOnce(
+      new Error("Simulated disconnect exception"),
+    );
+
+    // Disconnect client to trigger disconnect event
+    client.disconnect();
+
+    // Allow async disconnect handler catch block to run
+    await new Promise<void>((resolve) => {
+      const checkInterval = setInterval(() => {
+        const found = logger.errorLogs.some(
+          (l) => l.context?.operation === "socket_disconnect_error",
+        );
+        if (found) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 20);
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        resolve();
+      }, 2000);
+    });
+
+    const disconnectErrorLog = logger.errorLogs.find(
+      (l) => l.context?.operation === "socket_disconnect_error",
+    );
+    expect(disconnectErrorLog).toBeDefined();
+    expect(disconnectErrorLog?.message).toBe(
+      "Client socket disconnect handler failed",
+    );
+    expect(disconnectErrorLog?.context?.socketId).toBe(socketId);
+    expect(disconnectErrorLog?.context?.correlationId).toBeDefined();
+    expect(
+      (disconnectErrorLog?.context?.error as { message?: string })?.message,
+    ).toBe("Simulated disconnect exception");
+  });
+
+  it("registers socket gateway handlers via setupSocketGateway (MAJ-031, MAJ-042)", () => {
+    const env: ServerEnv = {
+      PORT: 3000,
+      HOST: "127.0.0.1",
+      NODE_ENV: "test",
+      LOG_LEVEL: "info",
+      TRUST_PROXY: false,
+    };
+    const logger = new NullLogger();
+    const services = setupDomainServices({}, env, 3000);
+    const rateLimiter = createSocketRateLimiter({ logger });
+
+    expect(typeof setupSocketGateway).toBe("function");
+    const mockIo = {
+      on: vi.fn(),
+    };
+    setupSocketGateway(
+      mockIo as unknown as ServerInstance["io"],
+      services,
+      rateLimiter,
+      env,
+      logger,
+    );
+    expect(mockIo.on).toHaveBeenCalledWith("connection", expect.any(Function));
+    rateLimiter.destroy();
+  });
 });
+

@@ -333,7 +333,7 @@ describe('useAppNavigation composable', () => {
     });
 
     it('logs warning gracefully if LAN info request fails', async () => {
-      (mockApiClient.getLanInfo as any).mockRejectedValueOnce(new Error('Network error'));
+      vi.mocked(mockApiClient.getLanInfo).mockRejectedValueOnce(new Error('Network error'));
 
       const nav = useAppNavigation({
         storage: mockStorage,

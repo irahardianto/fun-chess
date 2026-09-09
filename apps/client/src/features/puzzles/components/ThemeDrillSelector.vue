@@ -115,7 +115,7 @@ function handleCategoryKeyDown(
   currentId: PuzzleThemeCategory | "all",
 ) {
   const currentIndex = categories.findIndex((c) => c.id === currentId);
-  let nextIndex = currentIndex;
+  let nextIndex: number;
 
   if (event.key === "ArrowRight" || event.key === "ArrowDown") {
     event.preventDefault();

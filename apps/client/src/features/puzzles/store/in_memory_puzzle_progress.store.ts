@@ -5,16 +5,22 @@ import type {
   PuzzleTheme,
   PuzzleAttemptResult,
   StarRating,
+  IClock,
 } from '@fun-chess/shared';
 import {
   DEFAULT_PUZZLE_PROGRESS,
   DEFAULT_ADAPTIVE_RATING,
 } from './puzzle_progress.store';
+import { systemClock } from './local_storage_puzzle_progress.store';
+
 
 export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
   private progress: PuzzleProgress;
+  private readonly clock: IClock;
 
-  constructor(initialProgress?: Partial<PuzzleProgress>) {
+  constructor(initialProgress?: Partial<PuzzleProgress>, clock: IClock = systemClock) {
+    this.clock = clock;
+    const now = this.clock.now();
     this.progress = {
       ...DEFAULT_PUZZLE_PROGRESS,
       ...initialProgress,
@@ -28,6 +34,8 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
         ...(initialProgress?.arcadeStats || {}),
       },
       solvedPuzzles: { ...(initialProgress?.solvedPuzzles || {}) },
+      createdAt: typeof initialProgress?.createdAt === 'number' ? initialProgress.createdAt : now,
+      lastActiveAt: typeof initialProgress?.lastActiveAt === 'number' ? initialProgress.lastActiveAt : now,
     };
   }
 
@@ -42,7 +50,7 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
         ...newRatingState,
         peakRating: Math.max(this.progress.ratingProfile.peakRating, newRatingState.rating),
       },
-      lastActiveAt: Date.now(),
+      lastActiveAt: this.clock.now(),
     };
   }
 
@@ -53,7 +61,7 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
     stars: StarRating
   ): Promise<PuzzleProgress> {
     const isSuccess = result.startsWith('solved');
-    const now = Date.now();
+    const now = this.clock.now();
 
     const newSolvedPuzzles = { ...this.progress.solvedPuzzles };
     if (isSuccess) {
@@ -112,7 +120,7 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
     score: number,
     streak: number
   ): Promise<PuzzleProgress> {
-    const now = Date.now();
+    const now = this.clock.now();
     const newArcade = { ...this.progress.arcadeStats };
 
     if (mode === 'puzzle_rush') {
@@ -142,7 +150,7 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
   }
 
   public async restoreProgress(progress: PuzzleProgress): Promise<void> {
-    const now = Date.now();
+    const now = this.clock.now();
     this.progress = {
       ...DEFAULT_PUZZLE_PROGRESS,
       ...progress,
@@ -162,7 +170,7 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
   }
 
   public async resetAll(): Promise<void> {
-    const now = Date.now();
+    const now = this.clock.now();
     this.progress = {
       ...DEFAULT_PUZZLE_PROGRESS,
       ratingProfile: { ...DEFAULT_ADAPTIVE_RATING },

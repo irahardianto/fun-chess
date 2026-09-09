@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { usePuzzleProgress } from '../usePuzzleProgress';
-import { InMemoryPuzzleProgressStore } from '../../store/in_memory_puzzle_store';
+import { InMemoryPuzzleProgressStore } from '../../store/in_memory_puzzle_progress.store';
 
 describe('usePuzzleProgress Composable', () => {
   let memoryStore: InMemoryPuzzleProgressStore;

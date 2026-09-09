@@ -66,7 +66,21 @@ export class DisconnectTimerRegistry implements IDisconnectTimerRegistry {
   }
 }
 
-export const defaultDisconnectTimerRegistry = new DisconnectTimerRegistry();
+/**
+ * Creates an isolated DisconnectTimerRegistry instance for test environments (ENH-001).
+ */
+export function createDisconnectTimerRegistry(): DisconnectTimerRegistry {
+  return new DisconnectTimerRegistry();
+}
+
+export const defaultDisconnectTimerRegistry = createDisconnectTimerRegistry();
+
+/**
+ * Resets the default singleton registry and cancels all active timers (ENH-001).
+ */
+export function resetDefaultDisconnectTimerRegistry(): void {
+  defaultDisconnectTimerRegistry.clear();
+}
 
 export function cancelDisconnectTimer(
   roomCode: string,

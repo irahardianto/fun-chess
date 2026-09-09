@@ -1,3 +1,4 @@
+import { getCurrentInstance } from 'vue';
 import { Chess, type Move } from 'chess.js';
 import type {
   Square,
@@ -17,33 +18,27 @@ import {
   formatPlayerMoveToUci,
   createSafeChess,
   isValidFen,
+  calculateBoardMaterial,
+  PIECE_CENTIPAWN_VALUES,
+  PIECE_VALUES,
+  STANDARD_PIECE_POINTS,
+  PIECE_STANDARD_POINTS,
 } from '@fun-chess/shared';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
-/**
- * Centipawn values for chess pieces.
- */
-export const PIECE_CENTIPAWN_VALUES: Record<PieceType, number> = {
-  p: 100,
-  n: 320,
-  b: 330,
-  r: 500,
-  q: 900,
-  k: 0,
+function getEffectiveLogger(custom?: ILogger): ILogger {
+  return custom ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+}
+
+export {
+  calculateBoardMaterial,
+  PIECE_CENTIPAWN_VALUES,
+  PIECE_VALUES,
+  STANDARD_PIECE_POINTS,
+  PIECE_STANDARD_POINTS,
 };
 
-export const PIECE_VALUES = PIECE_CENTIPAWN_VALUES;
-
-/**
- * Standard point scale for chess pieces (+9, +5, +3, +1).
- */
-export const PIECE_STANDARD_POINTS: Record<PieceType, number> = {
-  p: 1,
-  n: 3,
-  b: 3,
-  r: 5,
-  q: 9,
-  k: 0,
-};
 
 /**
  * Human-readable piece display names.
@@ -85,24 +80,27 @@ export const THEME_RULES_OF_THUMB: Record<string, string> = {
 /**
  * Counts total centipawn material on board for a specific color (excluding king).
  */
-export function calculateColorMaterial(fen: string, color: PieceColor): number {
+export function calculateColorMaterial(fen: string, color: PieceColor, customLogger?: ILogger): number {
+  const logger = getEffectiveLogger(customLogger);
   if (!isValidFen(fen)) return 0;
   try {
     const chess = createSafeChess(fen);
-    const board = chess.board();
+    const summary = calculateBoardMaterial(chess);
+    const counts = color === 'w' ? summary.whiteCounts : summary.blackCounts;
     let total = 0;
-    for (let r = 0; r < 8; r++) {
-      const row = board[r];
-      if (!row) continue;
-      for (let c = 0; c < 8; c++) {
-        const piece = row[c];
-        if (piece && piece.color === color && piece.type !== 'k') {
-          total += PIECE_CENTIPAWN_VALUES[piece.type as PieceType] ?? 0;
-        }
+    for (const [pieceType, count] of Object.entries(counts)) {
+      if (pieceType !== 'k') {
+        total += count * (PIECE_CENTIPAWN_VALUES[pieceType as PieceType] ?? 0);
       }
     }
     return total;
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to calculate color material from FEN', {
+      operation: 'calculate_color_material',
+      fen,
+      color,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return 0;
   }
 }
@@ -110,45 +108,42 @@ export function calculateColorMaterial(fen: string, color: PieceColor): number {
 /**
  * Counts piece occurrences for a given color.
  */
-export function getPieceCounts(fen: string, color: PieceColor): Record<PieceType, number> {
+export function getPieceCounts(fen: string, color: PieceColor, customLogger?: ILogger): Record<PieceType, number> {
+  const logger = getEffectiveLogger(customLogger);
   const counts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
   if (!isValidFen(fen)) return counts;
   try {
     const chess = createSafeChess(fen);
-    for (const row of chess.board()) {
-      for (const p of row) {
-        if (p && p.color === color) {
-          counts[p.type as PieceType]++;
-        }
-      }
-    }
-  } catch {
-    // Ignore error and return zeroes
+    const summary = calculateBoardMaterial(chess);
+    return { ...(color === 'w' ? summary.whiteCounts : summary.blackCounts) };
+  } catch (err) {
+    logger.debug('Failed to count pieces from FEN, returning zero counts', {
+      operation: 'get_piece_counts',
+      fen,
+      color,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return counts;
   }
-  return counts;
 }
 
 /**
  * Counts total centipawn material on board for white and black (excluding kings).
  */
 export function getMaterialCount(chess: Chess): { white: number; black: number; net: number } {
-  const board = chess.board();
+  const summary = calculateBoardMaterial(chess);
   let white = 0;
   let black = 0;
 
-  for (let r = 0; r < 8; r++) {
-    const row = board[r];
-    if (!row) continue;
-    for (let c = 0; c < 8; c++) {
-      const piece = row[c];
-      if (piece && piece.type !== 'k') {
-        const val = PIECE_CENTIPAWN_VALUES[piece.type as PieceType] ?? 0;
-        if (piece.color === 'w') {
-          white += val;
-        } else {
-          black += val;
-        }
-      }
+  for (const [pieceType, count] of Object.entries(summary.whiteCounts)) {
+    if (pieceType !== 'k') {
+      white += count * (PIECE_CENTIPAWN_VALUES[pieceType as PieceType] ?? 0);
+    }
+  }
+
+  for (const [pieceType, count] of Object.entries(summary.blackCounts)) {
+    if (pieceType !== 'k') {
+      black += count * (PIECE_CENTIPAWN_VALUES[pieceType as PieceType] ?? 0);
     }
   }
 
@@ -223,16 +218,10 @@ export function calculateMaterialDelta(
   let capturedPiece: PieceType | undefined;
 
   const countPieces = (ch: Chess, col: PieceColor): Record<PieceType, number> => {
-    const counts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
-    for (const row of ch.board()) {
-      for (const p of row) {
-        if (p && p.color === col) {
-          counts[p.type as PieceType]++;
-        }
-      }
-    }
-    return counts;
+    const summary = calculateBoardMaterial(ch);
+    return { ...(col === 'w' ? summary.whiteCounts : summary.blackCounts) };
   };
+
 
   const oppInitCounts = countPieces(chessInit, oppColor);
   const oppFinalCounts = countPieces(chessFinal, oppColor);
@@ -719,7 +708,7 @@ export function generateMistakeRefutation(
 
   const playerColor = chess.turn();
   const playerUci = formatPlayerMoveToUci(playerMove);
-  let playerResult: Move | null = null;
+  let playerResult: Move | null;
   try {
     playerResult = chess.move({
       from: playerMove.from as unknown as import('chess.js').Square,
@@ -840,7 +829,7 @@ export function generateStepBreakdowns(puzzle: Puzzle): readonly PuzzleStepExpla
     const movingPiece = chess.get(from as unknown as import('chess.js').Square);
     const pieceName = movingPiece ? PIECE_DISPLAY_NAMES[movingPiece.type as PieceType] : 'Piece';
 
-    let moveRes: Move | null = null;
+    let moveRes: Move | null;
     try {
       moveRes = chess.move({
         from: from as unknown as import('chess.js').Square,
@@ -866,7 +855,7 @@ export function generateStepBreakdowns(puzzle: Puzzle): readonly PuzzleStepExpla
     }
 
     // Synthesize explanation
-    let explanation = '';
+    let explanation: string;
     if (chess.isCheckmate()) {
       explanation = isPlayer
         ? `You play ${moveSan}, delivering checkmate! 👑`

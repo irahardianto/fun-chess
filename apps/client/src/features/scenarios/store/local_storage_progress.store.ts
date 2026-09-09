@@ -6,7 +6,7 @@ import type {
 } from '@fun-chess/shared';
 import { safeLocalStorage, STORAGE_KEYS, type KeyValueStorage } from '@/platform/storage';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
-import { logger } from '@/platform/telemetry';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
 export const SCENARIO_PROGRESS_STORAGE_KEY = STORAGE_KEYS.SCENARIO_PROGRESS;
 
@@ -18,14 +18,17 @@ export const SCENARIO_PROGRESS_STORAGE_KEY = STORAGE_KEYS.SCENARIO_PROGRESS;
 export class LocalStorageProgressStore implements ScenarioProgressStore {
   private readonly storageKey: string;
   private readonly storage: KeyValueStorage;
+  private readonly logger: ILogger;
   private memoryFallback: Map<string, ScenarioProgress> = new Map();
 
   constructor(
     storageKey: string = SCENARIO_PROGRESS_STORAGE_KEY,
-    storage: KeyValueStorage = safeLocalStorage
+    storage: KeyValueStorage = safeLocalStorage,
+    logger: ILogger = defaultLogger
   ) {
     this.storageKey = storageKey;
     this.storage = storage;
+    this.logger = logger;
   }
 
   private sanitizeRecord(raw: unknown): ScenarioProgress | null {
@@ -95,7 +98,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
       }
       return result;
     } catch (err) {
-      logger.warn('Corrupted scenario progress JSON in storage', {
+      this.logger.warn('Corrupted scenario progress JSON in storage', {
         operation: 'scenario_get_progress_map',
         storageKey: this.storageKey,
         error: err instanceof Error ? err.message : String(err),
@@ -149,7 +152,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
             suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
           });
         } else {
-          logger.warn('Failed to persist scenario progress to storage', {
+          this.logger.warn('Failed to persist scenario progress to storage', {
             operation: 'save_scenario_progress',
             scenarioId,
             error: err instanceof Error ? err.message : String(err),
@@ -187,7 +190,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
           });
           throw err;
         }
-        logger.warn('Failed to persist restored scenario progress to storage', {
+        this.logger.warn('Failed to persist restored scenario progress to storage', {
           operation: 'restore_scenario_progress_map',
           error: err instanceof Error ? err.message : String(err),
         });
@@ -201,7 +204,7 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
       try {
         this.storage.removeItem(this.storageKey);
       } catch (err) {
-        logger.warn('Failed to remove scenario progress from storage', {
+        this.logger.warn('Failed to remove scenario progress from storage', {
           operation: 'reset_scenario_progress',
           error: err instanceof Error ? err.message : String(err),
         });
@@ -210,4 +213,12 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
   }
 }
 
-export const defaultLocalStorageProgressStore = new LocalStorageProgressStore();
+export function createDefaultLocalStorageProgressStore(
+  storageKey: string = SCENARIO_PROGRESS_STORAGE_KEY,
+  storage: KeyValueStorage = safeLocalStorage,
+  logger: ILogger = defaultLogger
+): LocalStorageProgressStore {
+  return new LocalStorageProgressStore(storageKey, storage, logger);
+}
+
+export const defaultLocalStorageProgressStore = createDefaultLocalStorageProgressStore();

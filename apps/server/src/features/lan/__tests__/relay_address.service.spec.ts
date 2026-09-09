@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { NetworkInterfaceInfo } from "node:os";
+import os, { NetworkInterfaceInfo } from "node:os";
 import {
   RelayAddressService,
   normalizePublicUrl,
@@ -457,6 +457,20 @@ describe("RelayAddressService", () => {
       expect(info.isCloudRelay).toBe(false);
       expect(info.lanIp).toBe("127.0.0.1");
       expect(info.joinUrl).toBe("http://127.0.0.1:3000");
+    });
+
+    it("falls back to ['127.0.0.1'] when os.networkInterfaces() throws an error (MAJ-013)", () => {
+      const spy = vi.spyOn(os, "networkInterfaces").mockImplementation(() => {
+        throw new Error("UV_ENOBUFS: no buffer space available");
+      });
+      try {
+        const addresses = service.getAllLanInterfaces();
+        expect(addresses).toEqual(["127.0.0.1"]);
+        const localIp = service.getLocalLanIp();
+        expect(localIp).toBe("127.0.0.1");
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 

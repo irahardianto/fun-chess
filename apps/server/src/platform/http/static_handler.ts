@@ -48,14 +48,15 @@ export function checkPathTraversal(rootDir: string, urlPath: string): boolean {
   }
 
   const lowerUrl = urlPath.toLowerCase();
-  let decodedPath = "";
+  let decodedPath: string;
   try {
-    decodedPath = decodeURIComponent(urlPath);
+    let decoded = decodeURIComponent(urlPath);
     try {
-      decodedPath = decodeURIComponent(decodedPath);
+      decoded = decodeURIComponent(decoded);
     } catch {
       // Ignore secondary decoding failure
     }
+    decodedPath = decoded;
   } catch {
     decodedPath = urlPath;
   }
@@ -231,7 +232,59 @@ export async function serveStaticFile(
     }
   }
 
-  // 3. Read and Send File Content
+  // 3. Symlink Canonicalization Guard (MAJ-001, CWE-59)
+  if (fileStorage.realpath) {
+    try {
+      const canonicalRoot = await fileStorage.realpath(rootDir);
+      const canonicalTarget = await fileStorage.realpath(targetFilePath);
+      const isInsideRoot =
+        canonicalTarget === canonicalRoot ||
+        canonicalTarget.startsWith(
+          canonicalRoot.endsWith(path.sep) ? canonicalRoot : canonicalRoot + path.sep,
+        );
+
+      if (!isInsideRoot) {
+        logger?.warn("Symlink directory traversal detected", {
+          operation: "security_violation",
+          correlationId,
+          path: urlPath,
+          targetFilePath,
+          canonicalTarget,
+          clientIp,
+        });
+        res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+        if (isHead) {
+          res.end();
+        } else {
+          res.end("Forbidden");
+        }
+        return true;
+      }
+    } catch (err: unknown) {
+      const errCode = (err as { code?: string })?.code;
+      if (errCode && errCode !== "ENOENT") {
+        logger?.error("Failed to resolve canonical path for static file", {
+          operation: "http_static",
+          correlationId,
+          path: urlPath,
+          targetFilePath,
+          error:
+            err instanceof Error
+              ? { name: err.name, message: err.message, stack: err.stack }
+              : { raw: err },
+        });
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        if (isHead) {
+          res.end();
+        } else {
+          res.end("Internal Server Error");
+        }
+        return true;
+      }
+    }
+  }
+
+  // 4. Read and Send File Content
   try {
     const content = await fileStorage.readFile(targetFilePath);
     const resolvedExt = path.extname(targetFilePath).toLowerCase();

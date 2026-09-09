@@ -1,13 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AudioSynthesizer } from '../audio_synthesizer';
 import { NullAudioService } from '../null_audio_service';
 import type { IAudioService } from '../audio.interface';
+import { logger } from '../../telemetry';
 
 describe('AudioSynthesizer', () => {
   let synth: AudioSynthesizer;
 
   beforeEach(() => {
     synth = new AudioSynthesizer({ muted: false });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('implements IAudioService contract', () => {
@@ -95,7 +101,7 @@ describe('AudioSynthesizer', () => {
     };
 
     // Attach mock to window
-    vi.stubGlobal('AudioContext', vi.fn(() => mockAudioContext));
+    vi.stubGlobal('AudioContext', vi.fn(function() { return mockAudioContext; }));
 
     const audioSynth = new AudioSynthesizer();
     audioSynth.playMove();
@@ -185,7 +191,7 @@ describe('AudioSynthesizer', () => {
       resume: vi.fn().mockResolvedValue(undefined),
     };
 
-    vi.stubGlobal('AudioContext', vi.fn(() => mockAudioContext));
+    vi.stubGlobal('AudioContext', vi.fn(function() { return mockAudioContext; }));
 
     const audioSynth = new AudioSynthesizer({ muted: false });
     audioSynth.initContext();
@@ -215,7 +221,7 @@ describe('AudioSynthesizer', () => {
       resume: vi.fn().mockResolvedValue(undefined),
     };
 
-    vi.stubGlobal('AudioContext', vi.fn(() => mockAudioContext));
+    vi.stubGlobal('AudioContext', vi.fn(function() { return mockAudioContext; }));
 
     const audioSynth = new AudioSynthesizer();
     const ctx = audioSynth.initContext();
@@ -243,7 +249,7 @@ describe('AudioSynthesizer', () => {
       close: mockClose,
     };
 
-    vi.stubGlobal('AudioContext', vi.fn(() => mockAudioContext));
+    vi.stubGlobal('AudioContext', vi.fn(function() { return mockAudioContext; }));
 
     const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
 
@@ -261,6 +267,107 @@ describe('AudioSynthesizer', () => {
 
     removeEventListenerSpy.mockRestore();
     vi.unstubAllGlobals();
+  });
+
+  it('should return null and log warning when AudioContext constructor throws [MIN-033]', () => {
+    // Arrange
+    const warnSpy = vi.spyOn(logger, 'warn');
+    vi.stubGlobal(
+      'AudioContext',
+      vi.fn(function () {
+        throw new Error('Web Audio initialization error');
+      }),
+    );
+    const audioSynth = new AudioSynthesizer();
+
+    // Act
+    const ctx = audioSynth.initContext();
+
+    // Assert
+    expect(ctx).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to initialize AudioContext',
+      expect.objectContaining({
+        operation: 'audio_init_context',
+        error: 'Web Audio initialization error',
+      }),
+    );
+  });
+
+  it('should log warning when autoplay policy suspends AudioContext and resume rejects [MIN-033]', async () => {
+    // Arrange
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const resumeRejection = new Error('Autoplay policy prevented playback');
+    const mockAudioContext = {
+      currentTime: 0,
+      state: 'suspended',
+      destination: {},
+      createGain: vi.fn(() => ({
+        gain: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      })),
+      resume: vi.fn().mockRejectedValue(resumeRejection),
+    };
+    vi.stubGlobal(
+      'AudioContext',
+      vi.fn(function () {
+        return mockAudioContext;
+      }),
+    );
+    const audioSynth = new AudioSynthesizer();
+
+    // Act
+    const ctx = audioSynth.initContext();
+    expect(ctx).toBe(mockAudioContext);
+    await Promise.resolve();
+
+    // Assert
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Autoplay policy suspended AudioContext',
+      expect.objectContaining({
+        operation: 'audio_resume_autoplay',
+        error: 'Autoplay policy prevented playback',
+      }),
+    );
+  });
+
+  it('should log warning when resumeContext fails to resume suspended context [MIN-033]', async () => {
+    // Arrange
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const resumeRejection = new Error('Failed to resume context');
+    const mockAudioContext = {
+      currentTime: 0,
+      state: 'suspended',
+      destination: {},
+      createGain: vi.fn(() => ({
+        gain: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      })),
+      resume: vi.fn().mockRejectedValue(resumeRejection),
+    };
+    vi.stubGlobal(
+      'AudioContext',
+      vi.fn(function () {
+        return mockAudioContext;
+      }),
+    );
+    const audioSynth = new AudioSynthesizer();
+    audioSynth.initContext();
+    await Promise.resolve();
+    warnSpy.mockClear();
+
+    // Act
+    audioSynth.resumeContext();
+    await Promise.resolve();
+
+    // Assert
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to resume suspended AudioContext',
+      expect.objectContaining({
+        operation: 'audio_resume_context',
+        error: 'Failed to resume context',
+      }),
+    );
   });
 });
 

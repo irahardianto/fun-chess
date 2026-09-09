@@ -10,5 +10,11 @@ export * from './AppModalContainer.vue';
 export { default as AppViewRouter } from './AppViewRouter.vue';
 export * from './AppViewRouter.vue';
 
+export { default as AppAudioProvider } from './AppAudioProvider.vue';
+export * from './AppAudioProvider.vue';
+
+export { default as AppPwaBanner } from './AppPwaBanner.vue';
+export * from './AppPwaBanner.vue';
+
 export * from './composables/useTheme';
 export * from './composables/useNotification';

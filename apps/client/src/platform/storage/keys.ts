@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
   LAN_IP: 'fun_chess_lan_ip',
   SESSION_TOKEN: 'fun_chess_session_token',
   PWA_SNOOZE: 'fun_chess_pwa_install_snoozed_until',
+  AUDIO_MUTED: 'fun_chess_audio_muted',
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
@@ -35,6 +36,11 @@ export function migrateStorageV1ToV2(
 ): void {
   const correlationId = generateCorrelationId();
   const startTime = Date.now();
+
+  logger.info('Storage migration started', {
+    operation: 'storage_migration_v1_v2',
+    correlationId,
+  });
 
   try {
     if (!storage.isAvailable()) return;

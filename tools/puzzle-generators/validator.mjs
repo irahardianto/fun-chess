@@ -1,6 +1,15 @@
-import { Chess } from 'chess.js';
 import * as fs from 'fs';
 import * as path from 'path';
+
+let Chess;
+try {
+  const chessModule = await import('chess.js');
+  Chess = chessModule.Chess || chessModule.default?.Chess || chessModule.default;
+} catch {
+  const chessModule = await import('../../apps/server/node_modules/chess.js/dist/esm/chess.js');
+  Chess = chessModule.Chess || chessModule.default?.Chess || chessModule.default;
+}
+
 
 const SQUARE_REGEX = /^[a-h][1-8]$/;
 
@@ -227,8 +236,14 @@ export function savePack(filePath, puzzles) {
   }
 
   fs.writeFileSync(filePath, JSON.stringify(enriched, null, 2) + '\n', 'utf-8');
-  console.log(
-    `✅ Successfully saved ${enriched.length} authentic puzzles to ${path.basename(filePath)} (100% unique FENs, ${(moveRatio * 100).toFixed(1)}% unique lines)`
+  console.info(
+    `[${new Date().toISOString()}] [INFO] Successfully saved ${enriched.length} authentic puzzles to ${path.basename(filePath)} ` +
+    JSON.stringify({
+      pack: path.basename(filePath),
+      puzzles: enriched.length,
+      uniqueFens: fenSet.size,
+      uniqueLinesRatio: `${(moveRatio * 100).toFixed(1)}%`,
+    })
   );
 }
 
@@ -301,9 +316,22 @@ if (process.argv[1] && process.argv[1].endsWith('validator.mjs')) {
   try {
     const res = validateAllPacks();
     console.table(res.summary);
-    console.log(`\n🎉 ALL ${res.totalPacks} PACKS VALIDATED: ${res.totalPuzzles} total puzzles, ${res.globalUniqueFens} unique FENs, 100% PASS!`);
+    console.info(
+      `[${new Date().toISOString()}] [INFO] ALL ${res.totalPacks} PACKS VALIDATED ` +
+      JSON.stringify({
+        totalPacks: res.totalPacks,
+        totalPuzzles: res.totalPuzzles,
+        globalUniqueFens: res.globalUniqueFens,
+        status: "100% PASS",
+      })
+    );
   } catch (err) {
-    console.error('❌ Validation failed:', err.message);
+    console.error(
+      `[${new Date().toISOString()}] [ERROR] Validation failed: ` +
+      JSON.stringify({
+        error: err instanceof Error ? { name: err.name, message: err.message } : String(err),
+      })
+    );
     process.exit(1);
   }
 }

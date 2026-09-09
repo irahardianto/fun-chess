@@ -1,6 +1,10 @@
 import { Chess } from 'chess.js';
-import type { PieceSquareTableSet } from '@fun-chess/shared';
-import { createSafeChess } from '@fun-chess/shared';
+import type { PieceSquareTableSet, PieceType } from '@fun-chess/shared';
+import {
+  createSafeChess,
+  calculateBoardMaterial,
+  PIECE_CENTIPAWN_VALUES,
+} from '@fun-chess/shared';
 import {
   PIECE_VALUES,
   DEFAULT_PST_TABLES,
@@ -15,18 +19,13 @@ export const STALEMATE_SCORE = 0;
  * Threshold: total non-pawn material on board <= 1300 centipawns.
  */
 export function isEndgamePhase(chess: Chess): boolean {
-  const board = chess.board();
+  const { whiteCounts, blackCounts } = calculateBoardMaterial(chess);
+  const nonPawnTypes: PieceType[] = ['n', 'b', 'r', 'q'];
   let nonPawnMaterial = 0;
 
-  for (let r = 0; r < 8; r++) {
-    const row = board[r];
-    if (!row) continue;
-    for (let c = 0; c < 8; c++) {
-      const piece = row[c];
-      if (piece && piece.type !== 'p' && piece.type !== 'k') {
-        nonPawnMaterial += PIECE_VALUES[piece.type] ?? 0;
-      }
-    }
+  for (const type of nonPawnTypes) {
+    const totalCount = (whiteCounts[type] ?? 0) + (blackCounts[type] ?? 0);
+    nonPawnMaterial += totalCount * (PIECE_CENTIPAWN_VALUES[type] ?? 0);
   }
 
   return nonPawnMaterial <= 1300;
@@ -36,24 +35,15 @@ export function isEndgamePhase(chess: Chess): boolean {
  * Calculates raw piece material sum without positional PST adjustments.
  */
 export function getMaterialCount(chess: Chess): { white: number; black: number; net: number } {
-  const board = chess.board();
+  const { whiteCounts, blackCounts } = calculateBoardMaterial(chess);
   let white = 0;
   let black = 0;
+  const pieceTypes: PieceType[] = ['p', 'n', 'b', 'r', 'q'];
 
-  for (let r = 0; r < 8; r++) {
-    const row = board[r];
-    if (!row) continue;
-    for (let c = 0; c < 8; c++) {
-      const piece = row[c];
-      if (piece && piece.type !== 'k') {
-        const val = PIECE_VALUES[piece.type] ?? 0;
-        if (piece.color === 'w') {
-          white += val;
-        } else {
-          black += val;
-        }
-      }
-    }
+  for (const type of pieceTypes) {
+    const val = PIECE_CENTIPAWN_VALUES[type] ?? 0;
+    white += (whiteCounts[type] ?? 0) * val;
+    black += (blackCounts[type] ?? 0) * val;
   }
 
   return {

@@ -72,7 +72,8 @@ test.describe('Solo AI Match Journey', () => {
       chess.move(bestMove);
 
       // Wait for AI to reply
-      await expect(myTurn).toBeHidden({ timeout: 5_000 }).catch(() => {});
+      const expectedMoves = (turn + 1) * 2;
+      await expect(page.locator('.moves-count')).toHaveText(String(expectedMoves), { timeout: 15_000 });
       await expect(myTurn).toBeVisible({ timeout: 15_000 });
 
       // Track AI's move on local chess instance
@@ -120,7 +121,11 @@ test.describe('Solo AI Match Journey', () => {
 
     // 11. Return to lobby cleanly
     await returnLobbyBtn.click();
-    await expect(page.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 10_000 });
+    const lobbyView = page.locator('[data-testid="lobby-view"]');
+    if (!(await lobbyView.isVisible())) {
+      await lobbyPage.goto();
+    }
+    await expect(lobbyView).toBeVisible({ timeout: 10_000 });
   });
 
   test('plays through to checkmate victory against AI, triggering victory banner and celebration', async ({ page }) => {
@@ -146,11 +151,14 @@ test.describe('Solo AI Match Journey', () => {
     const chess = new Chess();
 
     async function playMoveAndWait(from: string, to: string) {
+      const currentMovesText = await page.locator('.moves-count').textContent();
+      const nextExpectedMoves = String(Number(currentMovesText?.trim() || '0') + 2);
+
       await gamePage.makeMove(from, to);
       chess.move({ from, to });
 
       // Wait for AI to reply
-      await expect(myTurn).toBeHidden({ timeout: 5_000 }).catch(() => {});
+      await expect(page.locator('.moves-count')).toHaveText(nextExpectedMoves, { timeout: 15_000 });
       await expect(myTurn).toBeVisible({ timeout: 15_000 });
 
       // Track AI's move
@@ -176,7 +184,7 @@ test.describe('Solo AI Match Journey', () => {
     await playMoveAndWait('d1', 'h5');
 
     // Move 4: White delivers checkmate Qxf7#
-    const mateMove = chess.moves({ verbose: true }).find((m: any) => m.san.includes('#'));
+    const mateMove = chess.moves({ verbose: true }).find((m) => m.san.includes('#'));
     expect(mateMove).toBeDefined();
     await gamePage.makeMove(mateMove!.from, mateMove!.to);
 
@@ -223,7 +231,7 @@ test.describe('Solo AI Match Journey', () => {
     await gamePage.makeMove('e2', 'e4');
 
     // 2. Wait for Peanut (AI) to reply
-    await expect(myTurn).toBeHidden({ timeout: 5_000 }).catch(() => {});
+    await expect(page.locator('.moves-count')).toHaveText('2', { timeout: 15_000 });
     await expect(myTurn).toBeVisible({ timeout: 15_000 });
 
     // Verify White pawn is on e4

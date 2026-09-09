@@ -5,7 +5,7 @@ import { savePack } from './validator.mjs';
 import { FORK_DATA } from './packs/forks_pack.mjs';
 import { PIN_DATA } from './packs/pins_pack.mjs';
 import { SKEWER_DATA } from './packs/skewers_pack.mjs';
-import { DISCOVERED_CHECKS_DATA } from './packs/discovered_checks_pack.mjs';
+import { DISCOVERED_CHECK_DATA } from './packs/discovered_checks_pack.mjs';
 import { DEFLECTION_DECOY_DATA } from './packs/deflection_decoy_pack.mjs';
 import { GREEK_GIFT_DATA } from './packs/greek_gift_pack.mjs';
 import { WINDMILL_DATA } from './packs/windmill_pack.mjs';
@@ -22,7 +22,7 @@ const PACKS = [
   { file: 'forks.json', data: FORK_DATA },
   { file: 'pins.json', data: PIN_DATA },
   { file: 'skewers.json', data: SKEWER_DATA },
-  { file: 'discovered_checks.json', data: DISCOVERED_CHECKS_DATA },
+  { file: 'discovered_checks.json', data: DISCOVERED_CHECK_DATA },
   { file: 'deflection_decoy.json', data: DEFLECTION_DECOY_DATA },
   { file: 'greek_gift.json', data: GREEK_GIFT_DATA },
   { file: 'windmill.json', data: WINDMILL_DATA },
@@ -39,4 +39,11 @@ for (const pack of PACKS) {
   totalPuzzles += pack.data.length;
 }
 
-console.log(`\n🎉 Successfully generated all ${PACKS.length} puzzle packs with ${totalPuzzles} total puzzles!`);
+console.info(
+  `[${new Date().toISOString()}] [INFO] Successfully generated all ${PACKS.length} puzzle packs ` +
+  JSON.stringify({
+    totalPacks: PACKS.length,
+    totalPuzzles,
+    status: "success",
+  })
+);

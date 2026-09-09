@@ -1,4 +1,3 @@
-import { randomInt } from "node:crypto";
 import {
   CreateRoomRequest,
   GameOverPayload,
@@ -9,17 +8,15 @@ import {
   ReconnectRequest,
   RoomState,
   createGameOverPayload,
+  type IClock,
+  type IIdGenerator,
 } from "@fun-chess/shared";
 import { RoomStore } from "./room.store.js";
 import { IRoomService, IRoomGameAdapter } from "./room.interface.js";
 import { SessionRegistry } from "./session_registry.js";
 import { InMemorySessionRegistry } from "./in_memory_session_registry.js";
-import {
-  IClock,
-  SystemClock,
-  IIdGenerator,
-  UuidGenerator,
-} from "./clock.js";
+import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
+import { type Logger, defaultLogger, runLoggedJob } from "../../platform/logger/index.js";
 import {
   type IDisconnectTimerRegistry,
   DisconnectTimerRegistry,
@@ -57,13 +54,18 @@ const ROOM_CODE_LENGTH = 4;
  * Pure state transitions are delegated to room.logic.ts (MAJ-015).
  */
 export class RoomService implements IRoomService, IRoomGameAdapter {
+  private readonly logger: Logger;
+
   constructor(
     private readonly store: RoomStore,
     private readonly sessionRegistry: SessionRegistry = new InMemorySessionRegistry(),
     private readonly clock: IClock = new SystemClock(),
     private readonly idGenerator: IIdGenerator = new UuidGenerator(),
     private readonly timerRegistry: IDisconnectTimerRegistry = new DisconnectTimerRegistry(),
-  ) {}
+    logger?: Logger,
+  ) {
+    this.logger = logger ?? defaultLogger;
+  }
 
   /**
    * Initializes a new game room with host player and returns state + sessionToken.
@@ -71,7 +73,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   public async createRoom(
     req: CreateRoomRequest,
     socketId: string,
-  ): Promise<{ room: RoomState; sessionToken: string }> {
+  ): Promise<{ room: RoomState; player: Player; sessionToken: string }> {
     const rawName = req.playerName?.trim();
     if (!rawName || rawName.length === 0) {
       throw new InvalidPayloadError(
@@ -90,9 +92,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
 
     const randomIntVal =
       !req.preferredColor || req.preferredColor === "random"
-        ? this.idGenerator.generateRandomInt
-          ? this.idGenerator.generateRandomInt(0, 2)
-          : randomInt(0, 2)
+        ? this.idGenerator.generateRandomInt(0, 2)
         : 0;
 
     const { hostColor } = assignPlayerColors(req.preferredColor, randomIntVal);
@@ -152,7 +152,11 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       socketId,
     });
 
-    return { room: createdRoom, sessionToken: sessionRecord.sessionToken };
+    return {
+      room: createdRoom,
+      player: hostPlayer,
+      sessionToken: sessionRecord.sessionToken,
+    };
   }
 
   /**
@@ -310,7 +314,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         throw new RoomNotFoundError(normalizedCode);
       }
 
-      let leavingPlayer: Player | null = null;
+      let leavingPlayer: Player | null;
       if (room.whitePlayer?.socketId === socketId) {
         leavingPlayer = room.whitePlayer;
       } else if (room.blackPlayer?.socketId === socketId) {
@@ -394,16 +398,39 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         }
 
         const timer = setTimeout(async () => {
-          targetTimerRegistry.cancel(matchedRoom.roomCode, playerId);
-          if (targetTimerRegistry !== this.timerRegistry) {
-            this.timerRegistry.cancel(matchedRoom.roomCode, playerId);
-          }
-          const forfeitResult = await this.handleAbandonmentForfeit(
-            matchedRoom.roomCode,
-            playerId,
-          );
-          if (forfeitResult && onForfeit) {
-            await onForfeit(forfeitResult.room, forfeitResult.gameOverPayload);
+          try {
+            await runLoggedJob(
+              this.logger,
+              "disconnect_grace_period_abandonment",
+              async () => {
+                targetTimerRegistry.cancel(matchedRoom.roomCode, playerId);
+                if (targetTimerRegistry !== this.timerRegistry) {
+                  this.timerRegistry.cancel(matchedRoom.roomCode, playerId);
+                }
+                const forfeitResult = await this.handleAbandonmentForfeit(
+                  matchedRoom.roomCode,
+                  playerId,
+                );
+                if (forfeitResult && onForfeit) {
+                  await onForfeit(forfeitResult.room, forfeitResult.gameOverPayload);
+                }
+                return {
+                  roomCode: matchedRoom.roomCode,
+                  playerId,
+                  forfeited: Boolean(forfeitResult),
+                };
+              },
+            );
+          } catch (err) {
+            this.logger.error("Disconnect grace period abandonment job failed", {
+              operation: "disconnect_grace_period_abandonment",
+              roomCode: matchedRoom.roomCode,
+              playerId,
+              error:
+                err instanceof Error
+                  ? { name: err.name, message: err.message, stack: err.stack }
+                  : { raw: err },
+            });
           }
         }, gracePeriodMs);
 
@@ -641,9 +668,10 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   private generateRoomCodeCandidate(): string {
     let code = "";
     for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
-      const idx = this.idGenerator.generateRandomInt
-        ? this.idGenerator.generateRandomInt(0, ROOM_CODE_CHARSET.length)
-        : randomInt(0, ROOM_CODE_CHARSET.length);
+      const idx = this.idGenerator.generateRandomInt(
+        0,
+        ROOM_CODE_CHARSET.length,
+      );
       code += ROOM_CODE_CHARSET.charAt(idx);
     }
     return code;

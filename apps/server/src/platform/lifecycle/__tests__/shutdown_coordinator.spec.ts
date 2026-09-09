@@ -5,8 +5,8 @@ import { Server as HttpServer } from "node:http";
 import { TypedSocketServer } from "../../socket/socket_server.js";
 
 describe("ShutdownCoordinator", () => {
-  let mockServer: any;
-  let mockIo: any;
+  let mockServer: HttpServer;
+  let mockIo: TypedSocketServer;
   let logger: NullLogger;
   let exitCalls: number[];
 
@@ -18,19 +18,20 @@ describe("ShutdownCoordinator", () => {
     mockServer = {
       close: vi.fn((cb?: (err?: Error) => void) => {
         if (cb) cb();
-        return mockServer as HttpServer;
+        return mockServer;
       }),
       closeIdleConnections: vi.fn(),
       closeAllConnections: vi.fn(),
       on: vi.fn(),
-    };
+      removeListener: vi.fn(),
+    } as unknown as HttpServer;
 
     mockIo = {
       close: vi.fn((cb?: () => void) => {
         if (cb) cb();
       }),
       disconnectSockets: vi.fn(),
-    };
+    } as unknown as TypedSocketServer;
   });
 
   afterEach(() => {
@@ -46,8 +47,8 @@ describe("ShutdownCoordinator", () => {
     const interval = setInterval(() => {}, 1000);
 
     const coordinator = new ShutdownCoordinator({
-      server: mockServer as HttpServer,
-      io: mockIo as TypedSocketServer,
+      server: mockServer,
+      io: mockIo,
       logger,
       cleanupInterval: interval,
       timeoutMs: 3000,
@@ -59,13 +60,17 @@ describe("ShutdownCoordinator", () => {
 
     expect(cleanupCalled).toBe(true);
     expect(mockIo.disconnectSockets).toHaveBeenCalledWith(true);
-    expect(mockServer.closeIdleConnections).toHaveBeenCalledTimes(1);
-    expect(mockServer.closeAllConnections).toHaveBeenCalledTimes(1);
+    const serverWithControl = mockServer as unknown as {
+      closeIdleConnections: () => void;
+      closeAllConnections: () => void;
+    };
+    expect(serverWithControl.closeIdleConnections).toHaveBeenCalledTimes(1);
+    expect(serverWithControl.closeAllConnections).toHaveBeenCalledTimes(1);
     expect(mockIo.close).toHaveBeenCalledTimes(1);
     expect(mockServer.close).toHaveBeenCalledTimes(1);
     expect(exitCalls).toEqual([0]);
 
-    expect(logger.infoLogs.some((l) => l.message.includes("Received SIGTERM"))).toBe(true);
+    expect(logger.infoLogs.some((l) => l.context?.["signal"] === "SIGTERM")).toBe(true);
     const completeLog = logger.infoLogs.find((l) =>
       l.message.includes("Fun Chess server closed successfully"),
     );
@@ -76,8 +81,8 @@ describe("ShutdownCoordinator", () => {
 
   it("handles duplicate shutdown calls idempotently", async () => {
     const coordinator = new ShutdownCoordinator({
-      server: mockServer as HttpServer,
-      io: mockIo as TypedSocketServer,
+      server: mockServer,
+      io: mockIo,
       logger,
       onExit: (code) => exitCalls.push(code),
     });
@@ -104,7 +109,7 @@ describe("ShutdownCoordinator", () => {
 
     const coordinator = new ShutdownCoordinator({
       server: hangingServer as unknown as HttpServer,
-      io: mockIo as TypedSocketServer,
+      io: mockIo,
       logger,
       timeoutMs: 2000,
       onExit: (code) => exitCalls.push(code),
@@ -118,23 +123,23 @@ describe("ShutdownCoordinator", () => {
     await shutdownPromise.catch(() => {});
 
     expect(exitCalls).toContain(1);
-    const fatalOrError = ((logger as any).fatalLogs ?? logger.errorLogs) as Array<{ message: string; context?: Record<string, unknown> }>;
+    const fatalOrError = [...logger.fatalLogs, ...logger.errorLogs];
     const timeoutLog = fatalOrError.find((l) => l.message.includes("Forced shutdown due to timeout"));
     expect(timeoutLog).toBeDefined();
     expect(timeoutLog?.context?.["duration"]).toBeTypeOf("number");
   });
 
-  it("passes correlationId in shutdown logs (MAJ-016)", async () => {
+  it("passes correlationId in shutdown logs (MAJ-016, MAJ-024)", async () => {
     const coordinator = new ShutdownCoordinator({
-      server: mockServer as HttpServer,
-      io: mockIo as TypedSocketServer,
+      server: mockServer,
+      io: mockIo,
       logger,
       onExit: (code) => exitCalls.push(code),
     });
 
     await coordinator.shutdown("SIGTERM", "custom-corr-id-123");
 
-    const startLog = logger.infoLogs.find((l) => l.message.includes("Received SIGTERM"));
+    const startLog = logger.infoLogs.find((l) => l.context?.["signal"] === "SIGTERM");
     expect(startLog?.context?.["correlationId"]).toBe("custom-corr-id-123");
     const completeLog = logger.infoLogs.find((l) => l.message.includes("Fun Chess server closed successfully"));
     expect(completeLog?.context?.["correlationId"]).toBe("custom-corr-id-123");
@@ -153,7 +158,7 @@ describe("ShutdownCoordinator", () => {
 
     const coordinator = new ShutdownCoordinator({
       server: errorServer as unknown as HttpServer,
-      io: mockIo as TypedSocketServer,
+      io: mockIo,
       logger,
       onExit: (code) => exitCalls.push(code),
     });
@@ -161,13 +166,32 @@ describe("ShutdownCoordinator", () => {
     await coordinator.shutdown("SIGTERM");
 
     expect(exitCalls).toEqual([1]);
-    const fatalOrError = ((logger as any).fatalLogs ?? logger.errorLogs) as Array<{
-      message: string;
-      context?: Record<string, unknown>;
-    }>;
+    const fatalOrError = [...logger.fatalLogs, ...logger.errorLogs];
     const errorLog = fatalOrError.find((l) =>
       l.message.includes("Error closing server during shutdown"),
     );
     expect(errorLog).toBeDefined();
+  });
+
+  it("installs and uninstalls process handlers and disposes intervals cleanly (MAJ-010)", () => {
+    const removeListenerSpy = vi.spyOn(process, "removeListener");
+    const addListenerSpy = vi.spyOn(process, "on");
+    const interval = setInterval(() => {}, 10000);
+
+    const coordinator = new ShutdownCoordinator({
+      server: mockServer,
+      io: mockIo,
+      logger,
+      cleanupInterval: interval,
+    });
+
+    coordinator.installProcessHandlers();
+    expect(addListenerSpy).toHaveBeenCalledWith("SIGINT", expect.any(Function));
+    expect(addListenerSpy).toHaveBeenCalledWith("SIGTERM", expect.any(Function));
+
+    coordinator.dispose();
+    expect(removeListenerSpy).toHaveBeenCalledWith("SIGINT", expect.any(Function));
+    expect(removeListenerSpy).toHaveBeenCalledWith("SIGTERM", expect.any(Function));
+    expect(mockServer.removeListener).toHaveBeenCalledWith("error", expect.any(Function));
   });
 });

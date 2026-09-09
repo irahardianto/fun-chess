@@ -1,4 +1,3 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import type { LanInfoResponse } from "@fun-chess/shared";
 import type { ServerEnv } from "../config/env.js";
 import type { Logger } from "../logger/logger.interface.js";

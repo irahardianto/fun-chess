@@ -16,10 +16,12 @@ import LobbyModeSelector from './LobbyModeSelector.vue';
 import { AiOpponentSelect } from '../ai';
 import { ScenarioCategoryList, useScenarioProgress } from '../scenarios';
 import { PuzzleHubView } from '../puzzles';
-import { useLanDiscovery } from '../../composables/useLanDiscovery';
+import { useLanDiscovery } from './useLanDiscovery';
+import { isCloudRelayMode, buildLobbyBaseUrl } from './lobby_url_builder';
 import { useNetworkStatus, usePwaInstall } from '../pwa';
-import { safeLocalStorage, STORAGE_KEYS } from '@/platform/storage';
-import { logger } from '@/platform/telemetry';
+import { STORAGE_KEYS } from '@/platform/storage';
+import { useInjectLogger, useInjectStorage } from '@/platform/di';
+import { useRovingTabindex } from '@/platform/ui';
 import type { PuzzleTheme } from '@fun-chess/shared';
 
 interface Props {
@@ -63,12 +65,15 @@ const emit = defineEmits<{
   'open-sync': [];
 }>();
 
+const storage = useInjectStorage();
+const logger = useInjectLogger();
+
 function getSavedAvatar(): string {
   if (props.initialAvatar && (PLAYER_AVATARS as readonly string[]).includes(props.initialAvatar)) {
     return props.initialAvatar;
   }
-  if (typeof window !== 'undefined' && safeLocalStorage.isAvailable()) {
-    const saved = safeLocalStorage.getItem(STORAGE_KEYS.PLAYER_AVATAR);
+  if (typeof window !== 'undefined' && storage.isAvailable()) {
+    const saved = storage.getItem(STORAGE_KEYS.PLAYER_AVATAR);
     if (saved && (PLAYER_AVATARS as readonly string[]).includes(saved)) {
       return saved;
     }
@@ -80,37 +85,16 @@ const selectedAvatar = ref<string>(getSavedAvatar());
 
 function selectAvatar(avatar: string) {
   selectedAvatar.value = avatar;
-  safeLocalStorage.safeSetItem(STORAGE_KEYS.PLAYER_AVATAR, avatar);
+  storage.safeSetItem(STORAGE_KEYS.PLAYER_AVATAR, avatar);
 }
 
-function handleAvatarKeyDown(event: KeyboardEvent, currentEmoji: string) {
-  const avatars = PLAYER_AVATARS as readonly string[];
-  const currentIndex = avatars.indexOf(currentEmoji);
-  let nextIndex = currentIndex;
-
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    event.preventDefault();
-    nextIndex = (currentIndex + 1) % avatars.length;
-  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    nextIndex = (currentIndex - 1 + avatars.length) % avatars.length;
-  } else if (event.key === 'Home') {
-    event.preventDefault();
-    nextIndex = 0;
-  } else if (event.key === 'End') {
-    event.preventDefault();
-    nextIndex = avatars.length - 1;
-  } else {
-    return;
-  }
-
-  const nextEmoji = avatars[nextIndex];
-  if (nextEmoji) {
-    selectAvatar(nextEmoji);
-    const el = document.querySelector<HTMLButtonElement>(`[data-testid="lobby-avatar-option-${nextEmoji}"]`);
-    el?.focus();
-  }
-}
+const { handleKeyDown: handleAvatarKeyDown, getTabindex: getAvatarTabindex } = useRovingTabindex({
+  items: PLAYER_AVATARS,
+  modelValue: selectedAvatar,
+  orientation: 'horizontal',
+  idPrefix: 'lobby-avatar-option-',
+  onSelect: selectAvatar,
+});
 
 const { serverLanInfo, activeLanIp } = useLanDiscovery();
 const scenarioProgress = useScenarioProgress();
@@ -148,55 +132,22 @@ watch(
   }
 );
 
-const isCloudMode = computed(() => {
-  const info = props.lanInfo || serverLanInfo.value;
-  return (
-    !!info?.isCloudRelay ||
-    info?.relayMode === 'cloud' ||
-    Boolean(info?.publicUrl) ||
-    (typeof window !== 'undefined' && window.location.protocol === 'https:')
-  );
-});
+const isCloudMode = computed(() =>
+  isCloudRelayMode({
+    lanInfo: props.lanInfo || serverLanInfo.value,
+  })
+);
 
 const activeProgressMap = computed(() => {
   return props.progressMap ?? scenarioProgress.progressMap.value;
 });
 
-const effectiveJoinUrl = computed(() => {
-  const info = props.lanInfo || serverLanInfo.value;
-  if (isCloudMode.value) {
-    if (info?.publicUrl) {
-      return info.publicUrl.replace(/\/+$/, '');
-    }
-    if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
-      return window.location.origin.replace(/\/+$/, '');
-    }
-  }
-
-  const host =
-    activeLanIp.value && activeLanIp.value !== '127.0.0.1' && activeLanIp.value !== 'localhost'
-      ? activeLanIp.value
-      : info?.lanIp && info.lanIp !== '127.0.0.1'
-        ? info.lanIp
-        : typeof window !== 'undefined'
-          ? window.location.hostname
-          : 'localhost';
-
-  const port =
-    isCloudMode.value
-      ? ''
-      : typeof window !== 'undefined' && window.location.port
-        ? (window.location.port === '80' || window.location.port === '443' ? '' : window.location.port)
-        : typeof window !== 'undefined' && window.location.protocol === 'https:'
-          ? ''
-          : info?.port
-            ? (info.port === 80 || info.port === 443 ? '' : String(info.port))
-            : '3000';
-
-  const protocol = typeof window !== 'undefined' && window.location.protocol ? window.location.protocol : 'http:';
-  const portPart = port ? `:${port}` : '';
-  return `${protocol}//${host}${portPart}`;
-});
+const effectiveJoinUrl = computed(() =>
+  buildLobbyBaseUrl({
+    lanInfo: props.lanInfo || serverLanInfo.value,
+    activeLanIp: activeLanIp.value,
+  })
+);
 
 function handleModeChange(mode: AppGameMode) {
   activeMode.value = mode;
@@ -323,11 +274,12 @@ function handleLaunchRush(subMode?: 'puzzle_rush' | 'streak_survivor') {
           <button
             v-for="emoji in PLAYER_AVATARS"
             :key="emoji"
+            :id="`lobby-avatar-option-${emoji}`"
             type="button"
             class="avatar-option-btn"
             :class="{ 'is-selected': selectedAvatar === emoji }"
             :aria-checked="selectedAvatar === emoji"
-            :tabindex="selectedAvatar === emoji ? 0 : -1"
+            :tabindex="getAvatarTabindex(emoji)"
             :aria-label="`Select ${emoji} avatar`"
             :data-testid="`lobby-avatar-option-${emoji}`"
             role="radio"

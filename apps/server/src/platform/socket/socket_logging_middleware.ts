@@ -27,6 +27,12 @@ export interface WrapSocketHandlerOptions<TReq = unknown> {
   schema?: z.ZodSchema<TReq>;
   rateLimiter?: SocketRateLimiter;
   trustProxy?: boolean;
+  /**
+   * Whether to include sanitized payload in the info-level "Operation started" log.
+   * Default: true. Set to false to reduce log verbosity (ENH-007).
+   * Note: payload is always logged at debug level.
+   */
+  logPayload?: boolean;
 }
 
 const SENSITIVE_EXACT_KEYS = new Set([
@@ -124,6 +130,7 @@ interface ParsedOptions<TReq, TRes> {
   schema?: z.ZodSchema<TReq>;
   rateLimiter?: SocketRateLimiter;
   trustProxy?: boolean;
+  logPayload?: boolean;
   handler: SocketHandlerFn<TReq, TRes>;
 }
 
@@ -151,13 +158,13 @@ function parseHandlerArguments<TReq, TRes>(
     schema: opts.schema,
     rateLimiter: opts.rateLimiter,
     trustProxy: opts.trustProxy,
+    logPayload: opts.logPayload,
     handler: maybeHandler as SocketHandlerFn<TReq, TRes>,
   };
 }
 
 function buildErrorPayload(
   err: unknown,
-  correlationId: string,
 ): {
   statusCode: number;
   code: ErrorCode;
@@ -251,7 +258,7 @@ export function wrapSocketHandler<TReq, TRes>(
     | SocketHandlerFn<TReq, TRes>,
   maybeHandler?: SocketHandlerFn<TReq, TRes>,
 ) {
-  const { schema, rateLimiter, trustProxy, handler } = parseHandlerArguments(
+  const { schema, rateLimiter, trustProxy, logPayload, handler } = parseHandlerArguments(
     schemaOrOptionsOrHandler,
     maybeHandler,
   );
@@ -277,14 +284,25 @@ export function wrapSocketHandler<TReq, TRes>(
     const correlationId = randomUUID();
     const startTime = performance.now();
     const userId = extractUserId(rawReq, socketObj);
+    const sanitizedPayload = sanitizePayload(rawReq);
 
-    logger.info("Operation started", {
+    const startContext: Record<string, unknown> = {
       operation: operationName,
       correlationId,
       socketId,
       ...(clientIp ? { clientIp } : {}),
       ...(userId ? { userId } : {}),
-      payload: sanitizePayload(rawReq),
+    };
+
+    if (logPayload !== false) {
+      startContext["payload"] = sanitizedPayload;
+    }
+
+    logger.info("Operation started", startContext);
+    logger.debug("Operation payload details", {
+      operation: operationName,
+      correlationId,
+      payload: sanitizedPayload,
     });
 
     // 1. Rate Limiting Pre-check (CRIT-001, MAJ-001, MAJ-003)
@@ -292,7 +310,7 @@ export function wrapSocketHandler<TReq, TRes>(
     if (effectiveRateLimiter && !effectiveRateLimiter.consume(rateLimitKey)) {
       const duration = Math.round(performance.now() - startTime);
       const limitDesc =
-        (effectiveRateLimiter as any).getLimitDescription?.() ||
+        effectiveRateLimiter.getLimitDescription?.() ||
         "Rate limit exceeded. Please wait.";
       const errorPayload: SocketErrorPayload = {
         code: "ERR_RATE_LIMITED",
@@ -376,10 +394,7 @@ export function wrapSocketHandler<TReq, TRes>(
       return result;
     } catch (err: unknown) {
       const duration = Math.round(performance.now() - startTime);
-      const { statusCode, code, clientMessage, details, rawError } = buildErrorPayload(
-        err,
-        correlationId,
-      );
+      const { statusCode, code, clientMessage, details, rawError } = buildErrorPayload(err);
 
       const errorPayload: SocketErrorPayload = {
         code,

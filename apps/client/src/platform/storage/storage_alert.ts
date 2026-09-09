@@ -1,3 +1,5 @@
+import { logger as defaultLogger, type ILogger } from '../telemetry';
+
 /**
  * Cross-browser detection for Web Storage quota exceeded errors.
  * Covers WebKit, Blink, Gecko, and legacy Safari Private Browsing DOM exceptions.
@@ -45,6 +47,8 @@ export type StorageAlertListener = (event: StorageQuotaAlertEvent) => void;
 export class StorageAlertDispatcher {
   private readonly listeners = new Set<StorageAlertListener>();
 
+  constructor(private readonly logger: ILogger = defaultLogger) {}
+
   public subscribe(listener: StorageAlertListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -55,7 +59,10 @@ export class StorageAlertDispatcher {
       try {
         listener(event);
       } catch (err) {
-        console.error('Error in storage alert listener:', err);
+        this.logger.error('Error in storage alert listener', {
+          operation: 'storage_alert_notify',
+          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
+        });
       }
     }
   }

@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { ref, computed, watch } from 'vue';
 import type { AppGameMode, LobbyModeOption } from '@fun-chess/shared';
+import { useRovingTabindex } from '@/platform/ui';
 
 interface Props {
   modelValue?: AppGameMode;
@@ -47,38 +49,31 @@ const modeOptions: readonly LobbyModeOption[] = [
   },
 ];
 
+const modeIds = computed(() => modeOptions.map((m) => m.id));
+const selectedMode = ref<AppGameMode>(props.modelValue);
+
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (newVal) selectedMode.value = newVal;
+  },
+);
+
 function selectMode(modeId: AppGameMode) {
+  selectedMode.value = modeId;
   emit('update:modelValue', modeId);
   emit('select', modeId);
 }
 
-function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
-  const currentIndex = modeOptions.findIndex((m) => m.id === currentModeId);
-  let nextIndex = currentIndex;
-
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    event.preventDefault();
-    nextIndex = (currentIndex + 1) % modeOptions.length;
-  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    nextIndex = (currentIndex - 1 + modeOptions.length) % modeOptions.length;
-  } else if (event.key === 'Home') {
-    event.preventDefault();
-    nextIndex = 0;
-  } else if (event.key === 'End') {
-    event.preventDefault();
-    nextIndex = modeOptions.length - 1;
-  } else {
-    return;
-  }
-
-  const nextMode = modeOptions[nextIndex];
-  if (nextMode) {
-    selectMode(nextMode.id);
-    const tabEl = document.getElementById(`mode-tab-${nextMode.id}`);
-    tabEl?.focus();
-  }
-}
+const { handleKeyDown, getTabindex } = useRovingTabindex({
+  items: modeIds,
+  modelValue: selectedMode,
+  orientation: 'both',
+  idPrefix: 'mode-tab-',
+  onSelect: (id) => {
+    selectMode(id);
+  },
+});
 </script>
 
 <template>
@@ -94,7 +89,7 @@ function handleKeyDown(event: KeyboardEvent, currentModeId: AppGameMode) {
       :id="`mode-tab-${mode.id}`"
       type="button"
       role="tab"
-      :tabindex="props.modelValue === mode.id ? 0 : -1"
+      :tabindex="getTabindex(mode.id)"
       :aria-selected="props.modelValue === mode.id"
       :aria-controls="`mode-panel-${mode.id}`"
       :data-testid="`mode-tab-${mode.id}`"

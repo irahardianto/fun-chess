@@ -118,15 +118,15 @@ export function base64UrlToBytes(str: string): Uint8Array {
   }
 
   if (extraChars === 2) {
-    const c0 = B64_LOOKUP[cleanStr.charCodeAt(inIdx++)]!;
-    const c1 = B64_LOOKUP[cleanStr.charCodeAt(inIdx++)]!;
-    bytes[outIdx++] = (c0 << 2) | (c1 >> 4);
+    const c0 = B64_LOOKUP[cleanStr.charCodeAt(inIdx)]!;
+    const c1 = B64_LOOKUP[cleanStr.charCodeAt(inIdx + 1)]!;
+    bytes[outIdx] = (c0 << 2) | (c1 >> 4);
   } else if (extraChars === 3) {
-    const c0 = B64_LOOKUP[cleanStr.charCodeAt(inIdx++)]!;
-    const c1 = B64_LOOKUP[cleanStr.charCodeAt(inIdx++)]!;
-    const c2 = B64_LOOKUP[cleanStr.charCodeAt(inIdx++)]!;
-    bytes[outIdx++] = (c0 << 2) | (c1 >> 4);
-    bytes[outIdx++] = ((c1 & 0x0f) << 4) | (c2 >> 2);
+    const c0 = B64_LOOKUP[cleanStr.charCodeAt(inIdx)]!;
+    const c1 = B64_LOOKUP[cleanStr.charCodeAt(inIdx + 1)]!;
+    const c2 = B64_LOOKUP[cleanStr.charCodeAt(inIdx + 2)]!;
+    bytes[outIdx] = (c0 << 2) | (c1 >> 4);
+    bytes[outIdx + 1] = ((c1 & 0x0f) << 4) | (c2 >> 2);
   }
 
   return bytes;

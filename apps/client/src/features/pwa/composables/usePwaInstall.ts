@@ -1,6 +1,7 @@
-import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
-import { safeLocalStorage } from '@/platform/storage';
-import { logger } from '@/platform/telemetry';
+import { ref, computed, getCurrentScope, onScopeDispose, getCurrentInstance } from 'vue';
+import { useInjectLogger, useInjectStorage } from '@/platform/di';
+import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
 export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -19,17 +20,36 @@ const snoozeTrigger = ref<number>(0);
 
 let listenerCount = 0;
 let initialized = false;
+let customStorage: KeyValueStorage | null = null;
+let customLogger: ILogger | null = null;
 
-function checkSnoozeStatus(): boolean {
+export function setPwaInstallStorage(storage: KeyValueStorage | null): void {
+  customStorage = storage;
+}
+
+export function setPwaInstallLogger(logger: ILogger | null): void {
+  customLogger = logger;
+}
+
+function getEffectiveStorage(custom?: KeyValueStorage): KeyValueStorage {
+  return custom ?? customStorage ?? (getCurrentInstance() ? useInjectStorage() : safeLocalStorage);
+}
+
+function getEffectiveLogger(custom?: ILogger): ILogger {
+  return custom ?? customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+}
+
+function checkSnoozeStatus(customStorage?: KeyValueStorage, customLogger?: ILogger): boolean {
   // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   snoozeTrigger.value; // reactive dependency
   try {
-    const snoozedUntil = safeLocalStorage.getItem(SNOOZE_STORAGE_KEY);
+    const storage = getEffectiveStorage(customStorage);
+    const snoozedUntil = storage.getItem(SNOOZE_STORAGE_KEY);
     if (!snoozedUntil) return false;
     const until = Number(snoozedUntil);
     return !isNaN(until) && until > Date.now();
   } catch (err) {
-    logger.warn('Failed to read PWA snooze status from storage', {
+    getEffectiveLogger(customLogger).warn('Failed to read PWA snooze status from storage', {
       operation: 'pwa_check_snooze_status',
       error: err instanceof Error ? err.message : String(err),
     });
@@ -52,7 +72,7 @@ function handleBeforeInstallPrompt(e: Event): void {
   e.preventDefault();
   isAppInstalledFlag.value = false;
   deferredPrompt.value = e as BeforeInstallPromptEvent;
-  logger.info('Captured beforeinstallprompt event', {
+  getEffectiveLogger().info('Captured beforeinstallprompt event', {
     operation: 'pwa_before_install_prompt',
   });
 }
@@ -60,7 +80,7 @@ function handleBeforeInstallPrompt(e: Event): void {
 function handleAppInstalled(): void {
   isAppInstalledFlag.value = true;
   deferredPrompt.value = null;
-  logger.info('App installed successfully into standalone mode', {
+  getEffectiveLogger().info('App installed successfully into standalone mode', {
     operation: 'pwa_app_installed',
   });
 }
@@ -93,14 +113,24 @@ export function resetPwaInstallState(): void {
   snoozeTrigger.value = 0;
   listenerCount = 0;
   initialized = false;
+  customStorage = null;
+  customLogger = null;
+}
+
+export interface UsePwaInstallOptions {
+  storage?: KeyValueStorage;
+  logger?: ILogger;
 }
 
 /**
  * Composable for device-adaptive PWA installation prompt handling.
  */
-export function usePwaInstall() {
+export function usePwaInstall(options?: UsePwaInstallOptions) {
   setupPwaListeners();
   listenerCount++;
+
+  const effectiveStorage = getEffectiveStorage(options?.storage);
+  const effectiveLogger = getEffectiveLogger(options?.logger);
 
   const isStandalone = computed<boolean>(() => {
     return checkStandalone();
@@ -120,7 +150,7 @@ export function usePwaInstall() {
 
   const isIos = isIosSafari;
 
-  const isSnoozed = computed<boolean>(() => checkSnoozeStatus());
+  const isSnoozed = computed<boolean>(() => checkSnoozeStatus(options?.storage, options?.logger));
 
   const hasInstallPrompt = computed<boolean>(() => deferredPrompt.value !== null);
 
@@ -151,7 +181,7 @@ export function usePwaInstall() {
         const promptEvent = deferredPrompt.value;
         await promptEvent.prompt();
         const choice = await promptEvent.userChoice;
-        logger.info('User response to install prompt', {
+        effectiveLogger.info('User response to install prompt', {
           operation: 'pwa_prompt_install',
           outcome: choice.outcome,
         });
@@ -161,7 +191,7 @@ export function usePwaInstall() {
         deferredPrompt.value = null;
         return choice.outcome === 'accepted';
       } catch (err) {
-        logger.error('Error prompting installation', {
+        effectiveLogger.error('Error prompting installation', {
           operation: 'pwa_prompt_install',
           error: err instanceof Error ? err.message : String(err),
         });
@@ -180,15 +210,15 @@ export function usePwaInstall() {
       typeof days === 'number' && !isNaN(days) && days > 0 ? days : DEFAULT_SNOOZE_DAYS;
     const until = Date.now() + validDays * 24 * 60 * 60 * 1000;
     try {
-      safeLocalStorage.setItem(SNOOZE_STORAGE_KEY, until.toString());
+      effectiveStorage.setItem(SNOOZE_STORAGE_KEY, until.toString());
     } catch (err) {
-      logger.warn('Failed to persist install snooze', {
+      effectiveLogger.warn('Failed to persist install snooze', {
         operation: 'pwa_snooze_prompt',
         error: err instanceof Error ? err.message : String(err),
       });
     }
     snoozeTrigger.value++;
-    logger.info('Install prompt snoozed', {
+    effectiveLogger.info('Install prompt snoozed', {
       operation: 'pwa_snooze_prompt',
       days: validDays,
       until: new Date(until).toISOString(),
@@ -209,9 +239,9 @@ export function usePwaInstall() {
 
   function resetSnooze(): void {
     try {
-      safeLocalStorage.removeItem(SNOOZE_STORAGE_KEY);
+      effectiveStorage.removeItem(SNOOZE_STORAGE_KEY);
     } catch (err) {
-      logger.warn('Failed to reset install snooze from storage', {
+      effectiveLogger.warn('Failed to reset install snooze from storage', {
         operation: 'pwa_reset_snooze',
         error: err instanceof Error ? err.message : String(err),
       });

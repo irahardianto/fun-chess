@@ -4,8 +4,18 @@ import QRCode from 'qrcode';
 import type { LanInfoResponse } from '@fun-chess/shared';
 import BaseModal from '../../components/base/BaseModal.vue';
 import BaseButton from '../../components/base/BaseButton.vue';
-import { useLanDiscovery, isValidIPv4 } from '../../composables/useLanDiscovery';
-import { logger } from '@/platform/telemetry';
+import { useLanDiscovery, isValidIPv4 } from './useLanDiscovery';
+import {
+  isCloudRelayMode,
+  resolveEffectiveHost,
+  resolveEffectivePort,
+  buildLobbyJoinUrl,
+  isLocalhostAddress,
+} from './lobby_url_builder';
+import { useInjectLogger, useInjectClipboard } from '@/platform/di';
+
+const logger = useInjectLogger();
+const clipboard = useInjectClipboard();
 
 type QrGenerationStatus = 'generating' | 'ready' | 'error';
 
@@ -84,97 +94,39 @@ const availableInterfaces = computed(() => {
   return Array.from(list);
 });
 
-const isCloudMode = computed(() => {
-  const info = props.lanInfo || serverLanInfo.value;
-  return (
-    !!info?.isCloudRelay ||
-    info?.relayMode === 'cloud' ||
-    Boolean(info?.publicUrl) ||
-    (typeof window !== 'undefined' && window.location.protocol === 'https:')
-  );
-});
+const isCloudMode = computed(() =>
+  isCloudRelayMode({
+    lanInfo: props.lanInfo || serverLanInfo.value,
+  })
+);
 
-const effectiveHost = computed(() => {
-  // 1. Manual user override or stored activeLanIp (only in LAN mode)
-  if (!isCloudMode.value && activeLanIp.value && activeLanIp.value !== '127.0.0.1' && activeLanIp.value !== 'localhost') {
-    return activeLanIp.value;
-  }
-  // 2. Cloud Relay publicUrl hostname
-  const info = props.lanInfo || serverLanInfo.value;
-  if (isCloudMode.value && info?.publicUrl) {
-    try {
-      const urlObj = new URL(info.publicUrl.startsWith('http') ? info.publicUrl : `https://${info.publicUrl}`);
-      return urlObj.hostname;
-    } catch (err: unknown) {
-      logger.warn('Failed to parse Cloud Relay publicUrl hostname', {
-        operation: 'qr_modal_resolve_url',
-        publicUrl: info.publicUrl,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      // fallback
-    }
-  }
-  // 3. Window location if accessed via hostname/domain directly
-  if (
-    typeof window !== 'undefined' &&
-    window.location.hostname &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1'
-  ) {
-    return window.location.hostname;
-  }
-  // 4. Server-detected LAN IP
-  if (info?.lanIp && info.lanIp !== '127.0.0.1' && info.lanIp !== 'localhost') {
-    return info.lanIp;
-  }
-  return typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-});
+const effectiveHost = computed(() =>
+  resolveEffectiveHost({
+    lanInfo: props.lanInfo || serverLanInfo.value,
+    activeLanIp: activeLanIp.value,
+    isCloud: isCloudMode.value,
+  })
+);
 
-const effectivePort = computed(() => {
-  // Never append container internal port in Cloud Relay mode or on standard HTTPS/HTTP ports
-  if (isCloudMode.value) {
-    return '';
-  }
-  if (typeof window !== 'undefined') {
-    if (window.location.protocol === 'https:') return '';
-    if (window.location.port) {
-      return (window.location.port === '80' || window.location.port === '443') ? '' : window.location.port;
-    }
-  }
-  const info = props.lanInfo || serverLanInfo.value;
-  if (info?.isCloudRelay || info?.relayMode === 'cloud' || info?.publicUrl) {
-    return '';
-  }
-  if (info?.port) {
-    return (info.port === 80 || info.port === 443) ? '' : String(info.port);
-  }
-  return '3000';
-});
+const effectivePort = computed(() =>
+  resolveEffectivePort({
+    lanInfo: props.lanInfo || serverLanInfo.value,
+    isCloud: isCloudMode.value,
+  })
+);
 
-const effectiveJoinUrl = computed(() => {
-  if (props.joinUrl) return props.joinUrl;
-  const info = props.lanInfo || serverLanInfo.value;
-  if (isCloudMode.value) {
-    if (info?.publicUrl) {
-      const base = info.publicUrl.replace(/\/+$/, '');
-      return `${base}/?join=${props.roomCode}`;
-    }
-    if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
-      const base = window.location.origin.replace(/\/+$/, '');
-      return `${base}/?join=${props.roomCode}`;
-    }
-  }
-  const protocol = typeof window !== 'undefined' && window.location.protocol ? window.location.protocol : 'http:';
-  const port = effectivePort.value;
-  const portPart = port ? `:${port}` : '';
-  const host = effectiveHost.value;
-  return `${protocol}//${host}${portPart}/?join=${props.roomCode}`;
-});
+const effectiveJoinUrl = computed(() =>
+  buildLobbyJoinUrl({
+    lanInfo: props.lanInfo || serverLanInfo.value,
+    activeLanIp: activeLanIp.value,
+    roomCode: props.roomCode,
+    joinUrl: props.joinUrl,
+  })
+);
 
 const isLocalhost = computed(() => {
   if (isCloudMode.value) return false;
-  const host = effectiveHost.value;
-  return host === 'localhost' || host === '127.0.0.1';
+  return isLocalhostAddress(effectiveHost.value);
 });
 
 async function generateQr() {
@@ -248,51 +200,16 @@ function prefillPrefix(prefix: string) {
 
 async function copyLink() {
   const text = effectiveJoinUrl.value;
-  let succeeded = false;
+  let succeeded: boolean;
 
-  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    try {
-      await navigator.clipboard.writeText(text);
-      succeeded = true;
-    } catch (err: unknown) {
-      logger.warn('Failed to copy to clipboard via navigator.clipboard', {
-        operation: 'qr_modal_copy_clipboard',
-        error: err instanceof Error ? err.message : String(err),
-      });
-      // Fallback for non-secure HTTP LAN contexts
-    }
-  }
-
-  if (!succeeded && typeof document !== 'undefined') {
-    const textarea = document.createElement('textarea');
-    try {
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.top = '0';
-      textarea.style.left = '0';
-      textarea.style.width = '1px';
-      textarea.style.height = '1px';
-      textarea.style.padding = '0';
-      textarea.style.border = 'none';
-      textarea.style.outline = 'none';
-      textarea.style.boxShadow = 'none';
-      textarea.style.background = 'transparent';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      succeeded = document.execCommand('copy');
-    } catch (err: unknown) {
-      logger.warn('Failed to copy to clipboard via legacy execCommand', {
-        operation: 'qr_modal_copy_legacy',
-        error: err instanceof Error ? err.message : String(err),
-      });
-      succeeded = false;
-    } finally {
-      if (textarea.parentNode) {
-        document.body.removeChild(textarea);
-      }
-    }
+  try {
+    succeeded = await clipboard.copyText(text);
+  } catch (err: unknown) {
+    logger.warn('Failed to copy to clipboard via clipboard service', {
+      operation: 'qr_modal_copy_clipboard',
+      error: err instanceof Error ? err.message : String(err),
+    });
+    succeeded = false;
   }
 
   if (succeeded) {

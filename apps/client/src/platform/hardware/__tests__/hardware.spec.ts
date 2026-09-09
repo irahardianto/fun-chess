@@ -16,6 +16,7 @@ import {
   MockCameraService,
   defaultCameraService,
 } from '../index';
+import type { ILogger } from '@/platform/telemetry';
 
 describe('Hardware Platform Abstractions (MAJ-012)', () => {
   describe('File Downloader', () => {
@@ -48,6 +49,7 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
       vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockAnchor);
       URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
       URL.revokeObjectURL = vi.fn();
+      vi.useFakeTimers();
 
       const downloader = new BrowserFileDownloader();
       downloader.download('{"hello":"world"}', 'test.json', 'application/json');
@@ -56,7 +58,9 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
       expect(mockAnchor.download).toBe('test.json');
       expect(mockAnchor.click).toHaveBeenCalled();
       expect(mockAnchor.parentNode?.removeChild).toHaveBeenCalledWith(mockAnchor);
+      vi.advanceTimersByTime(1000);
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+      vi.useRealTimers();
     });
 
     it('BrowserFileDownloader handles Blob content directly', () => {
@@ -74,6 +78,7 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
       vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockAnchor);
       URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-blob');
       URL.revokeObjectURL = vi.fn();
+      vi.useFakeTimers();
 
       const downloader = new BrowserFileDownloader();
       const blob = new Blob(['binary'], { type: 'text/plain' });
@@ -81,7 +86,9 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
 
       expect(mockAnchor.download).toBe('file.txt');
       expect(mockAnchor.click).toHaveBeenCalled();
+      vi.advanceTimersByTime(1000);
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-blob');
+      vi.useRealTimers();
     });
 
     it('tracks downloads and supports clear in MockFileDownloader', () => {
@@ -241,7 +248,7 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
 
       vi.stubGlobal('RTCPeerConnection', FailingRTCPeerConnection);
 
-      const discovery = new BrowserWebRtcDiscovery(mockLogger as any);
+      const discovery = new BrowserWebRtcDiscovery(mockLogger as unknown as ILogger);
       const ip = await discovery.discoverLocalIp(100);
 
       expect(ip).toBeNull();

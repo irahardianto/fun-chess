@@ -115,6 +115,8 @@ export function useInjectClipboardService(fallback?: IClipboardService): IClipbo
   return inject(CLIPBOARD_SERVICE_KEY, fallback ?? defaultClipboardService);
 }
 
+export const useInjectClipboard = useInjectClipboardService;
+
 export function useInjectCameraService(fallback?: ICameraService): ICameraService {
   return inject(CAMERA_SERVICE_KEY, fallback ?? defaultCameraService);
 }

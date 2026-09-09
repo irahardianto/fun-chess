@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import type { Square } from '@fun-chess/shared';
 import {
   AppNavbar,
   AppViewRouter,
   AppToastManager,
   AppModalContainer,
+  AppAudioProvider,
+  AppPwaBanner,
   useTheme,
   useNotification,
 } from '@/components/layout';
 import { useModalManager, useAppNavigation } from '@/components/layout/composables';
-import { OfflineIndicator, usePwaInstall, useNetworkStatus } from '@/features/pwa';
+import { usePwaInstall, useNetworkStatus } from '@/features/pwa';
 import { useProgressSync } from '@/features/portability';
-import { useSocket, useChessGame, useAudio, useConfetti } from '@/composables';
+import { useSocket, useChessGame, useConfetti } from '@/composables';
 import { useInjectApiClient, useInjectStorage, useInjectLogger } from '@/platform/di';
 import { STORAGE_KEYS } from '@/platform/storage';
 import { defaultLocalStorageProgressStore } from '@/features/scenarios';
@@ -25,24 +27,25 @@ const safeLocalStorage = useInjectStorage();
 const logger = useInjectLogger();
 
 // ----------------------------------------------------------------------------
+// Audio Provider & Sound Effects (MAJ-036 / SC-5)
+// ----------------------------------------------------------------------------
+const audioProviderRef = ref<InstanceType<typeof AppAudioProvider> | null>(null);
+
+const playMove = () => audioProviderRef.value?.playMove();
+const playCapture = () => audioProviderRef.value?.playCapture();
+const playCheck = () => audioProviderRef.value?.playCheck();
+const playVictory = () => audioProviderRef.value?.playVictory();
+const playDraw = () => audioProviderRef.value?.playDraw();
+const playStart = () => audioProviderRef.value?.playStart();
+const playError = () => audioProviderRef.value?.playError();
+const playStarEarned = () => audioProviderRef.value?.playStarEarned();
+const playClick = () => audioProviderRef.value?.playClick();
+
+// ----------------------------------------------------------------------------
 // Feature Composables
 // ----------------------------------------------------------------------------
 const { isDarkMode, toggleTheme, initTheme } = useTheme();
 const { notifications, notificationAnnouncement, showNotification, dismissNotification } = useNotification();
-const {
-  isMuted,
-  toggleMute,
-  playMove,
-  playCapture,
-  playCheck,
-  playVictory,
-  playDraw,
-  playStart,
-  playError,
-  playStarEarned,
-  playClick,
-  attachGameEventListeners,
-} = useAudio();
 const { celebrate } = useConfetti();
 useNetworkStatus();
 
@@ -206,20 +209,10 @@ const showIncomingRematchModal = computed(() => {
 // ----------------------------------------------------------------------------
 // Lifecycle & Event Synchronization
 // ----------------------------------------------------------------------------
-let cleanupAudioListeners: (() => void) | null = null;
-
 onMounted(async () => {
   initTheme();
   connect();
-  cleanupAudioListeners = attachGameEventListeners(socketApi);
   await loadInitialNetworkAndProgress(defaultLocalStorageProgressStore);
-});
-
-onUnmounted(() => {
-  if (cleanupAudioListeners) {
-    cleanupAudioListeners();
-    cleanupAudioListeners = null;
-  }
 });
 
 watch(
@@ -423,14 +416,24 @@ defineExpose({
 </script>
 
 <template>
-  <div class="app-shell" data-testid="app-shell">
-    <a href="#main-content" class="skip-link">Skip to main content</a>
-    <OfflineIndicator />
-    <div class="sr-only" role="status" aria-live="polite">{{ notificationAnnouncement }}</div>
+  <AppAudioProvider
+    ref="audioProviderRef"
+    :socket-api="socketApi"
+    v-slot="{ isMuted: audioMuted, toggleMute: audioToggleMute }"
+  >
+    <div class="app-shell" data-testid="app-shell">
+      <a href="#main-content" class="skip-link">Skip to main content</a>
+      <AppPwaBanner
+        :current-app-mode="currentAppMode"
+        :is-room-active="Boolean(currentRoom)"
+        @install="promptInstall"
+        @snooze="snoozePrompt"
+      />
+      <div class="sr-only" role="status" aria-live="polite">{{ notificationAnnouncement }}</div>
 
     <AppNavbar
       :is-dark-mode="isDarkMode"
-      :is-muted="isMuted"
+      :is-muted="audioMuted"
       :can-install="canInstall && !isStandalone && !currentRoom && currentAppMode === 'lobby'"
       :current-room="currentRoom"
       :current-player="currentPlayer"
@@ -439,7 +442,7 @@ defineExpose({
       :active-scenario="activeScenario"
       :puzzle-sub-mode="puzzleSubMode"
       @toggle-theme="toggleTheme"
-      @toggle-mute="toggleMute"
+      @toggle-mute="audioToggleMute"
       @install-pwa="promptInstall"
       @prompt-install="promptInstall"
       @navigate-home="handleNavbarBrandClick"
@@ -500,6 +503,8 @@ defineExpose({
         @launch-drills="launchDrills($event)"
         @launch-ladder="launchLadder"
         @launch-rush="launchRush($event)"
+        @solo-ai-exit="exitSoloAi"
+        @solo-ai-change-opponent="exitSoloAi"
         @exit-solo-ai="exitSoloAi"
         @change-opponent="exitSoloAi"
         @academy-back="exitAcademy"
@@ -562,6 +567,7 @@ defineExpose({
     <!-- Contracts: data-testid="app-notification-banner", 'Flip board' 'Offer draw' 'Hide moves' : 'View moves' -->
     <span class="action-btn--subdued-danger" data-testid="resign-action" style="display:none"></span>
   </div>
+</AppAudioProvider>
 </template>
 
 <style scoped>

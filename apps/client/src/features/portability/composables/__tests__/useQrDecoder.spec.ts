@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { effectScope } from 'vue';
 import jsQR from 'jsqr';
 import { useQrDecoder } from '../useQrDecoder';
 
@@ -123,5 +124,20 @@ describe('useQrDecoder', () => {
 
     expect(scannedCode.value).toBeNull();
     expect(isProcessing.value).toBe(false);
+  });
+
+  it('stops decoding when effectScope is disposed (ENH-005)', () => {
+    const scope = effectScope();
+    let decoder!: ReturnType<typeof useQrDecoder>;
+
+    scope.run(() => {
+      decoder = useQrDecoder();
+      decoder.startDecoding(mockVideo, mockCanvas);
+    });
+
+    expect(decoder.isDecoding.value).toBe(true);
+    scope.stop();
+    expect(decoder.isDecoding.value).toBe(false);
+    expect(cancelAnimationFrame).toHaveBeenCalled();
   });
 });

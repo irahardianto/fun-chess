@@ -11,7 +11,7 @@ interface Props {
   currentPlayer?: Player | null;
   currentAppMode?: AppGameMode;
   isMyTurn?: boolean;
-  activeScenario?: Partial<ChessScenario> | Record<string, any> | null;
+  activeScenario?: Partial<ChessScenario> | Record<string, unknown> | null;
   puzzleSubMode?: string;
 }
 

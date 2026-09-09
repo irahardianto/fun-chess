@@ -32,7 +32,7 @@ interface Props {
   isConflictModalOpen?: boolean;
   currentProgress?: UnifiedProgressPayload | null;
   incomingPayload?: UnifiedProgressPayload | null;
-  diffPreview?: ProgressDiffPreview | Record<string, any> | null;
+  diffPreview?: ProgressDiffPreview | Record<string, unknown> | null;
   isInstallModalOpen?: boolean;
   showInstallBanner?: boolean;
   showConfirmModal?: boolean;
@@ -88,6 +88,7 @@ const emit = defineEmits<{
   'decline-rematch': [];
   'resolve-conflict': [strategy: 'smart_merge' | 'replace_local' | 'keep_local'];
   'cancel-conflict': [];
+  'dismiss-conflict': [];
   'prompt-install': [];
   'snooze-prompt': [];
   notify: [payload: { message: string; type: 'error' | 'info' | 'success'; durationMs?: number }];

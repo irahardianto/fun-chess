@@ -2,7 +2,6 @@ import { ref, computed, readonly, onUnmounted, getCurrentInstance, onScopeDispos
 import type { Move } from 'chess.js';
 import type {
   Square,
-  PieceColor,
   PieceType,
   TutorialStep,
   ChessScenario,
@@ -15,108 +14,141 @@ import {
 } from '../engine/scenario_validator';
 import { calculateStars, calculateAccuracy } from '../engine/star_calculator';
 import { useBoardSelection } from '../../board/index';
-import { logger } from '@/platform/telemetry';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+import {
+  useScenarioStepNavigation,
+  type ScenarioStepOutcomeEvent,
+} from './useScenarioStepNavigation';
+import { useScenarioBot } from './useScenarioBot';
+import { useScenarioHints } from './useScenarioHints';
 
-export interface ScenarioStepOutcomeEvent {
-  type: 'scenario_step_completed';
-  starsAwarded: number;
-  isLessonComplete: boolean;
-}
+export type { ScenarioStepOutcomeEvent };
 
 export interface UseScenarioRunnerOptions {
   scenario?: ChessScenario | null;
+  logger?: ILogger;
   onStepOutcome?: (event: ScenarioStepOutcomeEvent) => void;
 }
 
+/**
+ * Orchestrator composable for interactive chess tutorial scenarios (MAJ-030).
+ * Composes useScenarioStepNavigation, useScenarioBot, useScenarioHints, and useBoardSelection.
+ */
 export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScenario) {
   const optionsObj: UseScenarioRunnerOptions =
     options && 'steps' in options
       ? { scenario: options }
       : options ?? {};
 
+  const logger = optionsObj.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+
   const initialScenario = optionsObj.scenario ?? null;
-
-  // Reactive State
-  const scenario = ref<ChessScenario | null>(initialScenario);
-  const currentStepIndex = ref<number>(0);
-  const currentFen = ref<string>(
-    initialScenario?.steps[0]?.setupFen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-  );
-
-  const hintsUsedCurrentAttempt = ref<number>(0);
-  const mistakesCurrentAttempt = ref<number>(0);
-  const activeHint = ref<string | null>(null);
-  const hintGlowSquare = ref<Square | null>(null);
-  const hintTargetSquare = ref<Square | null>(null);
-
-  const isWaitingForBotResponse = ref<boolean>(false);
-  const feedbackMessage = ref<string | null>(null);
-  const isStepSuccess = ref<boolean>(false);
-  const isCompleted = ref<boolean>(false);
-  const isShaking = ref<boolean>(false);
-
-  const lastMove = ref<{ from: string; to: string } | null>(null);
-  const lastStepOutcome = ref<ScenarioStepOutcomeEvent | null>(null);
+  const initialFenStr =
+    initialScenario?.steps[0]?.setupFen ??
+    'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
   // Internal chess.js engine instance
-  const chess = createSafeChess(currentFen.value);
+  const chess = createSafeChess(initialFenStr);
 
-  // Active timers
-  let botTimer: ReturnType<typeof setTimeout> | null = null;
+  // Attempt statistics & UI animation state
+  const mistakesCurrentAttempt = ref<number>(0);
+  const feedbackMessage = ref<string | null>(null);
+  const isStepSuccess = ref<boolean>(false);
+  const isShaking = ref<boolean>(false);
+  const lastMove = ref<{ from: string; to: string } | null>(null);
   let shakeTimer: ReturnType<typeof setTimeout> | null = null;
-  let nextStepTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Computed Properties
-  const totalSteps = computed(() => scenario.value?.steps.length ?? 0);
-
-  const currentStep = computed<TutorialStep | null>(() => {
-    if (!scenario.value || scenario.value.steps.length === 0) return null;
-    return scenario.value.steps[currentStepIndex.value] ?? null;
-  });
-
-  const playerColor = computed<PieceColor>(() => {
-    return currentStep.value?.playerColor ?? 'w';
-  });
-
-  const isMyTurn = computed<boolean>(() => {
-    if (isWaitingForBotResponse.value || isCompleted.value) return false;
-    return true;
-  });
-
-  const calculatedStars = computed<StarRating>(() => {
-    return calculateStars(hintsUsedCurrentAttempt.value, mistakesCurrentAttempt.value);
-  });
-
-  const accuracy = computed<number>(() => {
-    return calculateAccuracy(totalSteps.value, mistakesCurrentAttempt.value);
-  });
-
-  function clearTimers(): void {
-    if (botTimer) {
-      clearTimeout(botTimer);
-      botTimer = null;
-    }
-    if (shakeTimer) {
-      clearTimeout(shakeTimer);
-      shakeTimer = null;
-    }
-    if (nextStepTimer) {
-      clearTimeout(nextStepTimer);
-      nextStepTimer = null;
-    }
-  }
-
-  function syncEngineFen(fenStr: string): void {
+  function syncEngineFen(fenStr: string): string {
     try {
       safeLoadFen(chess, fenStr);
-      currentFen.value = chess.fen();
+      return chess.fen();
     } catch (err) {
       logger.warn('Failed to load FEN into engine, using fallback string', {
         operation: 'scenario_sync_fen',
         fen: fenStr,
         error: err instanceof Error ? err.message : String(err),
       });
-      currentFen.value = fenStr;
+      return fenStr;
+    }
+  }
+
+  // 1. Hints Sub-Composable (MAJ-030)
+  const hints = useScenarioHints({
+    currentStep: computed(() => nav.currentStep.value),
+  });
+
+  // 2. Board Selection State Machine (MIN-010)
+  const boardSelection = useBoardSelection({
+    getPieceAt: (sq) => {
+      try {
+        const piece = chess.get(sq as unknown as import('chess.js').Square);
+        if (!piece) return null;
+        return { type: piece.type, color: piece.color as 'w' | 'b' };
+      } catch (err) {
+        logger.warn('Failed to inspect piece at square', {
+          operation: 'scenario_get_piece',
+          square: sq,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      }
+    },
+    getLegalMovesForSquare: (sq) => getLegalMovesForSquare(sq),
+    currentTurn: computed(() => nav.playerColor.value as 'w' | 'b'),
+    playerColor: computed(() => nav.playerColor.value as 'w' | 'b'),
+    executeMove: (from, to, promotion) => applyPlayerMove({ from, to, promotion }),
+  });
+
+  // 3. Navigation Sub-Composable (MAJ-030)
+  const nav = useScenarioStepNavigation({
+    scenario: initialScenario,
+    onStepOutcome: (event) => optionsObj.onStepOutcome?.(event),
+    onStepLoaded: () => {
+      hints.resetStepHints();
+      feedbackMessage.value = null;
+      isStepSuccess.value = false;
+      isShaking.value = false;
+      lastMove.value = null;
+      boardSelection.clearSelection();
+    },
+    getStarsAwarded: () => calculatedStars.value,
+    syncEngineFen,
+  });
+
+  // 4. Bot Counter-Move Sub-Composable (MAJ-030)
+  const bot = useScenarioBot({
+    chess,
+    logger,
+    onBotMoveSuccess: (move, fen) => {
+      nav.currentFen.value = fen;
+      lastMove.value = move;
+    },
+    onBotMoveComplete: (success) => {
+      if (success) {
+        nav.advanceOrCompleteStep();
+      }
+    },
+  });
+
+  // Derived Performance Metrics
+  const calculatedStars = computed<StarRating>(() => {
+    return calculateStars(hints.hintsUsedCurrentAttempt.value, mistakesCurrentAttempt.value);
+  });
+
+  const accuracy = computed<number>(() => {
+    return calculateAccuracy(nav.totalSteps.value, mistakesCurrentAttempt.value);
+  });
+
+  const isMyTurn = computed<boolean>(() => {
+    if (bot.isWaitingForBotResponse.value || nav.isCompleted.value) return false;
+    return true;
+  });
+
+  function clearShakeTimer(): void {
+    if (shakeTimer) {
+      clearTimeout(shakeTimer);
+      shakeTimer = null;
     }
   }
 
@@ -141,48 +173,15 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     return isPawnPromotion(from, to, chess);
   }
 
-  function loadStep(stepIdx: number): void {
-    clearTimers();
-    if (!scenario.value || stepIdx < 0 || stepIdx >= scenario.value.steps.length) {
-      return;
-    }
-
-    currentStepIndex.value = stepIdx;
-    const step = scenario.value.steps[stepIdx];
-    if (!step) return;
-    syncEngineFen(step.setupFen);
-
-    activeHint.value = null;
-    hintGlowSquare.value = null;
-    hintTargetSquare.value = null;
-    feedbackMessage.value = null;
-    isStepSuccess.value = false;
-    isWaitingForBotResponse.value = false;
-    isShaking.value = false;
-    lastMove.value = null;
-    boardSelection.clearSelection();
-  }
-
-  function loadScenario(newScenario: ChessScenario, initialStepIdx = 0): void {
-    clearTimers();
-    scenario.value = newScenario;
-    hintsUsedCurrentAttempt.value = 0;
-    mistakesCurrentAttempt.value = 0;
-    isCompleted.value = false;
-    loadStep(initialStepIdx);
-  }
-
   function handleFailedPlayerMove(): void {
     mistakesCurrentAttempt.value++;
     isShaking.value = true;
     feedbackMessage.value = 'Not quite! Look for the goal square or tap 💡 Hint for a clue.';
 
     // Auto-hint reveal after 2 mistakes (SC-4 UX Polish)
-    if (mistakesCurrentAttempt.value >= 2 && !activeHint.value) {
-      revealHint();
-    }
+    hints.checkAutoHint(mistakesCurrentAttempt.value, nav.currentStep.value);
 
-    if (shakeTimer) clearTimeout(shakeTimer);
+    clearShakeTimer();
     shakeTimer = setTimeout(() => {
       isShaking.value = false;
     }, 400);
@@ -211,7 +210,6 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
         to: move.to,
         error: err instanceof Error ? err.message : String(err),
       });
-      res = null;
     }
 
     if (!res) {
@@ -226,7 +224,7 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       }
     }
 
-    currentFen.value = chess.fen();
+    nav.currentFen.value = chess.fen();
     lastMove.value = { from: move.from, to: move.to };
     isStepSuccess.value = true;
     feedbackMessage.value = chess.isCheckmate()
@@ -237,80 +235,12 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     return { isCheckmate: chess.isCheckmate() };
   }
 
-  function scheduleOpponentReply(opp: NonNullable<TutorialStep['opponentResponse']>): void {
-    isWaitingForBotResponse.value = true;
-    const delay = opp.delayMs ?? 500;
-
-    botTimer = setTimeout(() => {
-      let oppMoveSuccess = false;
-      try {
-        const oppPromo = opp.promotion
-          ? (opp.promotion.toLowerCase() as 'q' | 'r' | 'b' | 'n')
-          : undefined;
-        let oppRes: Move | null = null;
-
-        try {
-          oppRes = chess.move({
-            from: opp.from as unknown as import('chess.js').Square,
-            to: opp.to as unknown as import('chess.js').Square,
-            promotion: oppPromo,
-          });
-        } catch (err) {
-          logger.warn('Failed to apply bot response via chess engine, using fallback mutation', {
-            operation: 'scenario_bot_response_engine',
-            from: opp.from,
-            to: opp.to,
-            error: err instanceof Error ? err.message : String(err),
-          });
-          oppRes = null;
-        }
-
-        if (!oppRes) {
-          const oppP = chess.get(opp.from as unknown as import('chess.js').Square);
-          if (oppP) {
-            chess.remove(opp.from as unknown as import('chess.js').Square);
-            chess.put(
-              { type: (oppPromo as PieceType) ?? oppP.type, color: oppP.color },
-              opp.to as unknown as import('chess.js').Square
-            );
-            oppMoveSuccess = true;
-          } else {
-            logger.warn('Opponent move failed: piece not found at source square', {
-              operation: 'scenario_bot_response_piece_missing',
-              from: opp.from,
-            });
-            oppMoveSuccess = false;
-          }
-        } else {
-          oppMoveSuccess = true;
-        }
-
-        if (oppMoveSuccess) {
-          currentFen.value = chess.fen();
-          lastMove.value = { from: opp.from, to: opp.to };
-        }
-      } catch (err) {
-        logger.warn('Bot response execution failed', {
-          operation: 'scenario_bot_response_execution',
-          error: err instanceof Error ? err.message : String(err),
-        });
-        oppMoveSuccess = false;
-      } finally {
-        isWaitingForBotResponse.value = false;
-        // MAJ-025: Only advance step if move succeeded!
-        if (oppMoveSuccess) {
-          advanceOrCompleteStep();
-        }
-      }
-    }, delay);
-  }
-
   function applyPlayerMove(move: { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' }): boolean {
-    if (!currentStep.value || isWaitingForBotResponse.value || isCompleted.value) {
+    if (!nav.currentStep.value || bot.isWaitingForBotResponse.value || nav.isCompleted.value) {
       return false;
     }
 
-    const step = currentStep.value;
+    const step = nav.currentStep.value;
     const isValidForStep = validateStepMove(step, move, chess);
 
     if (!isValidForStep) {
@@ -324,15 +254,15 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
 
       // Sound alternative checkmate: if move delivers sound checkmate, accept immediately!
       if (isCheckmate) {
-        advanceOrCompleteStep();
+        nav.advanceOrCompleteStep();
         return true;
       }
 
       // Check if there is an automated opponent response
       if (step.opponentResponse) {
-        scheduleOpponentReply(step.opponentResponse);
+        bot.scheduleOpponentReply(step.opponentResponse);
       } else {
-        advanceOrCompleteStep();
+        nav.advanceOrCompleteStep();
       }
 
       return true;
@@ -345,30 +275,8 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     }
   }
 
-  // Unified Board Selection State Machine (MIN-010)
-  const boardSelection = useBoardSelection({
-    getPieceAt: (sq) => {
-      try {
-        const piece = chess.get(sq as unknown as import('chess.js').Square);
-        if (!piece) return null;
-        return { type: piece.type, color: piece.color as 'w' | 'b' };
-      } catch (err) {
-        logger.warn('Failed to inspect piece at square', {
-          operation: 'scenario_get_piece',
-          square: sq,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        return null;
-      }
-    },
-    getLegalMovesForSquare: (sq) => getLegalMovesForSquare(sq),
-    currentTurn: computed(() => playerColor.value as 'w' | 'b'),
-    playerColor: computed(() => playerColor.value as 'w' | 'b'),
-    executeMove: (from, to, promotion) => applyPlayerMove({ from, to, promotion }),
-  });
-
   function selectSquare(sq: Square): void {
-    if (isWaitingForBotResponse.value || isCompleted.value) return;
+    if (bot.isWaitingForBotResponse.value || nav.isCompleted.value) return;
 
     // If square already selected and clicked square is in legal moves
     if (boardSelection.selectedSquare.value && boardSelection.isLegalTarget(sq)) {
@@ -379,9 +287,9 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     // Check if clicked square has a piece belonging to player or is allowed source for tutorial
     try {
       const piece = chess.get(sq as unknown as import('chess.js').Square);
-      const isPieceOfPlayer = piece && piece.color === playerColor.value;
-      const stepAllowedSource = currentStep.value
-        ? isSourceSquareAllowed(currentStep.value, sq, chess)
+      const isPieceOfPlayer = piece && piece.color === nav.playerColor.value;
+      const stepAllowedSource = nav.currentStep.value
+        ? isSourceSquareAllowed(nav.currentStep.value, sq, chess)
         : false;
 
       if (isPieceOfPlayer || stepAllowedSource) {
@@ -408,108 +316,57 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     boardSelection.cancelPromotion();
   }
 
-  function advanceOrCompleteStep(): void {
-    const isLastStep = currentStepIndex.value + 1 >= totalSteps.value;
-
-    nextStepTimer = setTimeout(() => {
-      if (isLastStep) {
-        isCompleted.value = true;
-        const outcome: ScenarioStepOutcomeEvent = {
-          type: 'scenario_step_completed',
-          starsAwarded: calculatedStars.value,
-          isLessonComplete: true,
-        };
-        lastStepOutcome.value = outcome;
-        optionsObj.onStepOutcome?.(outcome);
-      } else {
-        const outcome: ScenarioStepOutcomeEvent = {
-          type: 'scenario_step_completed',
-          starsAwarded: calculatedStars.value,
-          isLessonComplete: false,
-        };
-        lastStepOutcome.value = outcome;
-        optionsObj.onStepOutcome?.(outcome);
-        loadStep(currentStepIndex.value + 1);
-      }
-    }, 700);
-  }
-
-  function revealHint(): void {
-    if (!currentStep.value) return;
-    hintsUsedCurrentAttempt.value++;
-    activeHint.value = currentStep.value.hint;
-
-    // Determine highlight glow squares
-    if (currentStep.value.allowedMoves && currentStep.value.allowedMoves.length > 0) {
-      const firstMove = currentStep.value.allowedMoves[0];
-      hintGlowSquare.value = firstMove?.from ?? null;
-      hintTargetSquare.value = firstMove?.to ?? null;
-    } else if (currentStep.value.highlightSquares && currentStep.value.highlightSquares.length > 0) {
-      hintGlowSquare.value = currentStep.value.highlightSquares[0] ?? null;
-      hintTargetSquare.value = currentStep.value.highlightSquares[1] ?? null;
-    }
-  }
-
-  function resetCurrentStep(): void {
-    loadStep(currentStepIndex.value);
-  }
-
-  function nextStep(): void {
-    if (currentStepIndex.value + 1 < totalSteps.value) {
-      loadStep(currentStepIndex.value + 1);
-    } else {
-      isCompleted.value = true;
-    }
+  function loadScenario(newScenario: ChessScenario, initialStepIdx = 0): void {
+    bot.clearBotTimers();
+    clearShakeTimer();
+    hints.resetAllHints();
+    mistakesCurrentAttempt.value = 0;
+    nav.loadScenario(newScenario, initialStepIdx);
   }
 
   if (getCurrentScope()) {
     onScopeDispose(() => {
-      clearTimers();
+      clearShakeTimer();
     });
   } else if (getCurrentInstance()) {
     onUnmounted(() => {
-      clearTimers();
+      clearShakeTimer();
     });
   }
 
-  // Initialize initial scenario step if available
-  if (initialScenario) {
-    loadStep(0);
-  }
-
   return {
-    scenario: readonly(scenario),
-    currentStepIndex: readonly(currentStepIndex),
-    currentStep,
-    currentFen: readonly(currentFen),
-    playerColor,
+    scenario: readonly(nav.scenario),
+    currentStepIndex: readonly(nav.currentStepIndex),
+    currentStep: nav.currentStep,
+    currentFen: readonly(nav.currentFen),
+    playerColor: nav.playerColor,
     isMyTurn,
-    totalSteps,
-    isCompleted: readonly(isCompleted),
-    hintsUsedCurrentAttempt: readonly(hintsUsedCurrentAttempt),
+    totalSteps: nav.totalSteps,
+    isCompleted: readonly(nav.isCompleted),
+    hintsUsedCurrentAttempt: readonly(hints.hintsUsedCurrentAttempt),
     mistakesCurrentAttempt: readonly(mistakesCurrentAttempt),
-    activeHint: readonly(activeHint),
-    hintGlowSquare: readonly(hintGlowSquare),
-    hintTargetSquare: readonly(hintTargetSquare),
-    isWaitingForBotResponse: readonly(isWaitingForBotResponse),
+    activeHint: readonly(hints.activeHint),
+    hintGlowSquare: readonly(hints.hintGlowSquare),
+    hintTargetSquare: readonly(hints.hintTargetSquare),
+    isWaitingForBotResponse: readonly(bot.isWaitingForBotResponse),
     feedbackMessage: readonly(feedbackMessage),
     isStepSuccess: readonly(isStepSuccess),
     isShaking: readonly(isShaking),
     calculatedStars,
     accuracy,
-    lastStepOutcome: readonly(lastStepOutcome),
+    lastStepOutcome: readonly(nav.lastStepOutcome),
     selectedSquare: computed(() => boardSelection.selectedSquare.value),
     legalMoves: computed(() => boardSelection.legalMovesForSelected.value),
     lastMove: readonly(lastMove),
     pendingPromotion: computed(() => boardSelection.pendingPromotion.value),
     loadScenario,
-    loadStep,
+    loadStep: nav.loadStep,
     selectSquare,
     applyPlayerMove,
     completePromotion,
     cancelPromotion,
-    revealHint,
-    resetCurrentStep,
-    nextStep,
+    revealHint: hints.revealHint,
+    resetCurrentStep: nav.resetCurrentStep,
+    nextStep: nav.nextStep,
   };
 }

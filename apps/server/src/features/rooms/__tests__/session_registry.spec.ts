@@ -175,6 +175,53 @@ describe("InMemorySessionRegistry", () => {
         registry.touchSession("invalid-token", "sock-new"),
       ).resolves.toBeUndefined();
     });
+
+    it("extends session expiresAt with sliding TTL on touch (MIN-023)", async () => {
+      const created = await registry.createSession({
+        playerId: "player-1",
+        roomCode: "ROOM",
+        color: "w",
+        isHost: true,
+        socketId: "sock-1",
+        ttlMs: 5000,
+      });
+
+      const initialExpiresAt = created.expiresAt;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      await registry.touchSession(created.sessionToken, "sock-1");
+
+      const touched = await registry.validateSession(
+        created.sessionToken,
+        "ROOM",
+        "player-1",
+      );
+
+      // Default TTL (2 hours) should be applied from current now, extending well past initialExpiresAt
+      expect(touched?.expiresAt).toBeGreaterThan(initialExpiresAt);
+    });
+
+    it("respects custom extensionTtlMs on touchSession (MIN-023)", async () => {
+      const created = await registry.createSession({
+        playerId: "player-1",
+        roomCode: "ROOM",
+        color: "w",
+        isHost: true,
+        socketId: "sock-1",
+        ttlMs: 10_000,
+      });
+
+      await registry.touchSession(created.sessionToken, "sock-1", 30_000);
+
+      const touched = await registry.validateSession(
+        created.sessionToken,
+        "ROOM",
+        "player-1",
+      );
+
+      expect(touched).not.toBeNull();
+      expect(touched!.expiresAt).toBeGreaterThan(created.createdAt + 20_000);
+    });
   });
 
   describe("deleteSession", () => {

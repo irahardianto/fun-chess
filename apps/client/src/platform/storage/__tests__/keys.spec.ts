@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { STORAGE_KEYS, migrateStorageV1ToV2 } from '../keys';
 import { InMemoryStorageAdapter } from '../in_memory_storage_adapter';
 import type { KeyValueStorage } from '../key_value_storage';
+import type { ILogger } from '@/platform/telemetry';
 
 describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
   beforeEach(() => {
@@ -114,7 +115,7 @@ describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
       setLevel: vi.fn(),
     };
 
-    migrateStorageV1ToV2(storage, mockLogger as any);
+    migrateStorageV1ToV2(storage, mockLogger as unknown as ILogger);
 
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('Corrupted'),
@@ -141,7 +142,7 @@ describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
       setLevel: vi.fn(),
     };
 
-    migrateStorageV1ToV2(storage, mockLogger as any);
+    migrateStorageV1ToV2(storage, mockLogger as unknown as ILogger);
 
     expect(mockLogger.info).toHaveBeenCalledWith(
       expect.stringContaining('Migrated storage v1 to v2 successfully'),
@@ -178,7 +179,7 @@ describe('Storage Keys & V1 to V2 Migration (CRIT-001 & MIN-006)', () => {
       setLevel: vi.fn(),
     };
 
-    expect(() => migrateStorageV1ToV2(throwingStorage, mockLogger as any)).not.toThrow();
+    expect(() => migrateStorageV1ToV2(throwingStorage, mockLogger as unknown as ILogger)).not.toThrow();
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.stringContaining('Storage migration failed'),
       expect.objectContaining({

@@ -127,7 +127,7 @@ describe('ConfettiTrigger', () => {
 
   it('clear calls reset on confettiFn if available and handles errors gracefully [MIN-033]', () => {
     const mockReset = vi.fn();
-    (mockConfetti as any).reset = mockReset;
+    (mockConfetti as typeof mockConfetti & { reset?: () => void }).reset = mockReset;
 
     expect(() => trigger.clear()).not.toThrow();
     expect(mockReset).toHaveBeenCalledTimes(1);

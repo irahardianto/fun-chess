@@ -129,4 +129,34 @@ describe('LocalStoragePuzzleProgressStore', () => {
     const progress = await store.getProgress();
     expect(progress.solvedPuzzles['puz_quota_001']).toBeDefined();
   });
+
+  it('uses injected IClock for deterministic timestamping on lastActiveAt and recordPuzzleAttempt (MAJ-019)', async () => {
+    const fixedTime = 1700000000000;
+    const mockClock = { now: vi.fn(() => fixedTime) };
+    const customStore = new LocalStoragePuzzleProgressStore(
+      'test_clock_key',
+      undefined,
+      mockClock
+    );
+
+    await customStore.updateRating({
+      rating: 900,
+      ratingDeviation: 100,
+      peakRating: 900,
+      totalAttempted: 1,
+      totalSolved: 1,
+      bestStreak: 1,
+      ratingHistory: [],
+    });
+
+    const progress = await customStore.getProgress();
+    expect(progress.lastActiveAt).toBe(fixedTime);
+
+    const attemptResult = await customStore.recordPuzzleAttempt('puz_fork_001', 'fork', 'solved_first_try', 3);
+    expect(attemptResult.lastActiveAt).toBe(fixedTime);
+    expect(attemptResult.solvedPuzzles['puz_fork_001']?.solvedAt).toBe(fixedTime);
+    expect(attemptResult.themeMastery['fork']?.lastPracticedAt).toBe(fixedTime);
+    expect(mockClock.now).toHaveBeenCalled();
+  });
 });
+

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProgressFileService } from '../progress_file.service';
+import { MockFileDownloader } from '@/platform/hardware';
 
 describe('ProgressFileService', () => {
   let service: ProgressFileService;
@@ -8,7 +9,14 @@ describe('ProgressFileService', () => {
     service = new ProgressFileService();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it('triggers download with createObjectURL and click', () => {
+    vi.useFakeTimers();
     const mockCreateObjectURL = vi.fn().mockReturnValue('blob:http://localhost/mock-uuid');
     const mockRevokeObjectURL = vi.fn();
     vi.stubGlobal('URL', {
@@ -24,12 +32,17 @@ describe('ProgressFileService', () => {
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(appendSpy).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
+
+    // BrowserFileDownloader revokes object URL in setTimeout(..., 1000)
+    expect(mockRevokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
     expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/mock-uuid');
 
     clickSpy.mockRestore();
   });
 
   it('guarantees DOM node removal and URL revocation in finally block even when click throws', () => {
+    vi.useFakeTimers();
     const mockCreateObjectURL = vi.fn().mockReturnValue('blob:http://localhost/mock-uuid');
     const mockRevokeObjectURL = vi.fn();
     vi.stubGlobal('URL', {
@@ -47,9 +60,24 @@ describe('ProgressFileService', () => {
     );
 
     expect(removeChildSpy).toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
     expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/mock-uuid');
 
     clickSpy.mockRestore();
+  });
+
+  it('delegates to injected IFileDownloader implementation', () => {
+    const mockDownloader = new MockFileDownloader();
+    const customService = new ProgressFileService(undefined, mockDownloader);
+
+    customService.downloadProgressFile('{"data": 123}', 'backup.json');
+
+    expect(mockDownloader.calls).toHaveLength(1);
+    expect(mockDownloader.calls[0]).toEqual({
+      content: '{"data": 123}',
+      filename: 'backup.json',
+      mimeType: 'application/json;charset=utf-8',
+    });
   });
 
   it('reads file content using file.text()', async () => {

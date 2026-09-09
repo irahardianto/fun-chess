@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Square, PieceColor, HintData, HintLevel } from '@fun-chess/shared';
-import ChessBoard from '../../board/ChessBoard.vue';
+import { ChessBoard } from '@/features/board';
 import ProgressiveHintLayer from './ProgressiveHintLayer.vue';
 
 interface Props {

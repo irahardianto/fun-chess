@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import AppToastManager from '../AppToastManager.vue';
+import type { AppNotification } from '../composables/useNotification';
 
-function createProps(notif: any = null, announcement?: string) {
+function createProps(notif: AppNotification | null = null, announcement?: string) {
   return {
     notification: notif,
     notifications: notif ? [notif] : [],

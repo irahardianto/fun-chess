@@ -2,6 +2,9 @@ import { ref, computed, readonly, onUnmounted, getCurrentInstance, onScopeDispos
 import type {
   PuzzleProgressStore,
 } from '@fun-chess/shared';
+import { useInjectLogger } from '@/platform/di';
+import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+
 import {
   calculateTimeTick,
   applyRushSolve,
@@ -19,7 +22,9 @@ export interface UsePuzzleRushOptions {
   customStore?: PuzzleProgressStore;
   initialDurationSeconds?: number;
   maxStrikes?: number;
+  logger?: ILogger;
 }
+
 
 function isPuzzleProgressStore(obj: unknown): obj is PuzzleProgressStore {
   return (
@@ -46,6 +51,8 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   }
 
   const progressStore = usePuzzleProgress(customStore);
+  const fallbackLogger = options && !isPuzzleProgressStore(options) ? options.logger : undefined;
+  const logger = fallbackLogger ?? (getCurrentInstance() ? useInjectLogger(fallbackLogger) : defaultLogger) ?? defaultLogger;
 
   const mode = ref<'puzzle_rush' | 'streak_survivor'>(initialMode);
   const timeRemainingSeconds = ref<number>(initialDuration);
@@ -117,6 +124,13 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
     isNewHighScore.value = false;
     lastTimeBonus.value = 0;
 
+    logger.info('Starting puzzle rush run', {
+      operation: 'puzzle_rush_start',
+      mode: selectedMode,
+      initialDuration,
+      maxStrikes: maxStrikesLimit,
+    });
+
     // Load first puzzle scaled to beginner/intermediate tier
     loadNextPuzzle();
 
@@ -165,6 +179,23 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
         isNewHighScore.value = true;
       }
 
+      logger.info('Puzzle solved during rush run', {
+        operation: 'puzzle_rush_solve',
+        mode: 'puzzle_rush',
+        score: score.value,
+        streak: currentStreak.value,
+        comboMultiplier: comboMultiplier.value,
+        timeBonusSeconds: solveResult.timeBonusSeconds,
+        solveDurationMs,
+        isNewHighScore: isNewHighScore.value,
+      });
+
+      logger.info('Submitting arcade score for puzzle rush', {
+        operation: 'puzzle_rush_submit_score',
+        mode: 'puzzle_rush',
+        score: score.value,
+        streak: currentStreak.value,
+      });
       await progressStore.saveArcadeResult('puzzle_rush', score.value, currentStreak.value);
     } else {
       const solveResult = applySurvivorSolve(
@@ -181,6 +212,22 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
         isNewHighScore.value = true;
       }
 
+      logger.info('Puzzle solved during survivor run', {
+        operation: 'puzzle_survivor_solve',
+        mode: 'streak_survivor',
+        score: score.value,
+        streak: currentStreak.value,
+        bestStreak: bestStreak.value,
+        solveDurationMs,
+        isNewHighScore: isNewHighScore.value,
+      });
+
+      logger.info('Submitting arcade score for streak survivor', {
+        operation: 'puzzle_rush_submit_score',
+        mode: 'streak_survivor',
+        score: score.value,
+        bestStreak: bestStreak.value,
+      });
       await progressStore.saveArcadeResult('streak_survivor', score.value, bestStreak.value);
     }
 
@@ -200,6 +247,14 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       currentStreak.value = 0;
       comboMultiplier.value = 1;
 
+      logger.warn('Puzzle mistake during rush run', {
+        operation: 'puzzle_rush_mistake',
+        mode: 'puzzle_rush',
+        strikes: strikes.value,
+        maxStrikes: maxStrikesLimit,
+        isGameOver: strikeResult.isGameOver,
+      });
+
       if (strikeResult.isGameOver) {
         endGame();
       } else {
@@ -212,6 +267,15 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       livesRemaining.value = strikeResult.livesRemaining;
       strikes.value += 1;
       currentStreak.value = 0;
+
+      logger.warn('Puzzle mistake during survivor run', {
+        operation: 'puzzle_survivor_mistake',
+        mode: 'streak_survivor',
+        livesRemaining: livesRemaining.value,
+        strikes: strikes.value,
+        maxStrikes: maxStrikesLimit,
+        isGameOver: strikeResult.isGameOver || strikes.value >= maxStrikesLimit,
+      });
 
       if (strikeResult.isGameOver || strikes.value >= maxStrikesLimit) {
         endGame();
@@ -226,11 +290,23 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   function endGame(): void {
     clearAllTimers();
     isGameOver.value = true;
+    logger.info('Ending puzzle rush run', {
+      operation: 'puzzle_rush_end',
+      mode: mode.value,
+      finalScore: score.value,
+      finalStreak: mode.value === 'puzzle_rush' ? currentStreak.value : bestStreak.value,
+      isNewHighScore: isNewHighScore.value,
+    });
   }
 
   function stopRun(): void {
     clearAllTimers();
     isGameOver.value = true;
+    logger.info('Stopping puzzle rush run manually', {
+      operation: 'puzzle_rush_stop',
+      mode: mode.value,
+      score: score.value,
+    });
   }
 
   if (getCurrentScope()) {

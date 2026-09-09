@@ -48,7 +48,9 @@ export class BrowserFileDownloader implements IFileDownloader {
         link.parentNode.removeChild(link);
       }
       if (url) {
-        URL.revokeObjectURL(url);
+        setTimeout(() => {
+          URL.revokeObjectURL(url!);
+        }, 1000);
       }
     }
   }

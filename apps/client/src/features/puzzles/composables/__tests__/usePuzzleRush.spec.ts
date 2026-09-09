@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import { usePuzzleRush } from '../usePuzzleRush';
-import { InMemoryPuzzleProgressStore } from '../../store/in_memory_puzzle_store';
+import { InMemoryPuzzleProgressStore } from '../../store/in_memory_puzzle_progress.store';
 
 describe('usePuzzleRush Composable', () => {
   let memoryStore: InMemoryPuzzleProgressStore;
@@ -50,4 +51,64 @@ describe('usePuzzleRush Composable', () => {
     survivor.handleRunnerFailed();
     expect(survivor.isGameOver.value).toBe(true);
   });
+
+  it('logs structured telemetry across game loop lifecycle and score submission (MAJ-029)', async () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      fatal: vi.fn(),
+      child: vi.fn(),
+    };
+
+    const rush = usePuzzleRush({
+      customStore: memoryStore,
+      logger: mockLogger as any,
+    });
+
+    rush.startRun('puzzle_rush');
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Starting puzzle rush run',
+      expect.objectContaining({
+        operation: 'puzzle_rush_start',
+        mode: 'puzzle_rush',
+      })
+    );
+
+    await rush.handleRunnerSolved();
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Puzzle solved during rush run',
+      expect.objectContaining({
+        operation: 'puzzle_rush_solve',
+        mode: 'puzzle_rush',
+      })
+    );
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Submitting arcade score for puzzle rush',
+      expect.objectContaining({
+        operation: 'puzzle_rush_submit_score',
+        mode: 'puzzle_rush',
+      })
+    );
+
+    rush.handleRunnerFailed();
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Puzzle mistake during rush run',
+      expect.objectContaining({
+        operation: 'puzzle_rush_mistake',
+        mode: 'puzzle_rush',
+      })
+    );
+
+    rush.stopRun();
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Stopping puzzle rush run manually',
+      expect.objectContaining({
+        operation: 'puzzle_rush_stop',
+        mode: 'puzzle_rush',
+      })
+    );
+  });
 });
+

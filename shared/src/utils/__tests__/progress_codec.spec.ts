@@ -413,5 +413,37 @@ describe("Progress Codec (Deflate + CRC-32 + Base64URL QR & JSON Envelope)", () 
         new Uint8Array(0),
       );
     });
+
+    it("correctly decodes Base64URL strings for all remainder lengths (extraChars === 2, 3, 0) (MIN-021)", () => {
+      // Test length % 4 === 2 (e.g. 1 byte -> 2 Base64URL chars)
+      const oneByte = new Uint8Array([0x42]);
+      const b64One = bytesToBase64Url(oneByte);
+      expect(b64One.length % 4).toBe(2);
+      expect(base64UrlToBytes(b64One)).toEqual(oneByte);
+
+      // Test length % 4 === 3 (e.g. 2 bytes -> 3 Base64URL chars)
+      const twoBytes = new Uint8Array([0x42, 0x99]);
+      const b64Two = bytesToBase64Url(twoBytes);
+      expect(b64Two.length % 4).toBe(3);
+      expect(base64UrlToBytes(b64Two)).toEqual(twoBytes);
+
+      // Test length % 4 === 0 (e.g. 3 bytes -> 4 Base64URL chars)
+      const threeBytes = new Uint8Array([0x42, 0x99, 0xff]);
+      const b64Three = bytesToBase64Url(threeBytes);
+      expect(b64Three.length % 4).toBe(0);
+      expect(base64UrlToBytes(b64Three)).toEqual(threeBytes);
+
+      // Test multi-block with extraChars === 2 (e.g. 4 bytes -> 6 Base64URL chars)
+      const fourBytes = new Uint8Array([0x12, 0x34, 0x56, 0x78]);
+      const b64Four = bytesToBase64Url(fourBytes);
+      expect(b64Four.length % 4).toBe(2);
+      expect(base64UrlToBytes(b64Four)).toEqual(fourBytes);
+
+      // Test multi-block with extraChars === 3 (e.g. 5 bytes -> 7 Base64URL chars)
+      const fiveBytes = new Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a]);
+      const b64Five = bytesToBase64Url(fiveBytes);
+      expect(b64Five.length % 4).toBe(3);
+      expect(base64UrlToBytes(b64Five)).toEqual(fiveBytes);
+    });
   });
 });

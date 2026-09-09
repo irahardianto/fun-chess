@@ -10,18 +10,9 @@ export type {
   MoveValidationResult,
   MoveApplicationOutcome,
 } from "./chess_engine.js";
-export type {
-  IGameService,
-  MoveApplicationResult,
-} from "./game.interface.js";
+export type { IGameService, MoveApplicationResult } from "./game.interface.js";
 export { GameService } from "./game.service.js";
-export { registerGameSocketHandlers } from "./game.socket_handler.js";
 export {
-  SystemClock,
-  UuidGenerator,
-} from "./clock.js";
-export type {
-  IClock,
-  IIdGenerator,
-} from "./clock.js";
-
+  registerGameSocketHandlers,
+  defaultSocketRateLimiter,
+} from "./game.socket_handler.js";

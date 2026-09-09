@@ -107,13 +107,24 @@ export interface ServerToClientEvents {
  * Contract defining all events sent from Client to Server via Socket.io.
  */
 export interface ClientToServerEvents {
-  /** Creates a new game room; returns private session credentials in ack callback */
+  /**
+   * Creates a new game room; returns private session credentials and authoritative player profile in ack callback.
+   * Conforms to MIN-024 contract symmetry with room:join and room:reconnect.
+   */
   "room:create": (
     req: CreateRoomRequest,
     callback?: (
       res:
-        | { success: true; room: RoomState; sessionToken: string }
-        | { success: false; error: SocketErrorPayload },
+        | {
+            success: true;
+            room: RoomState;
+            player: Player;
+            sessionToken: string;
+          }
+        | {
+            success: false;
+            error: SocketErrorPayload;
+          },
     ) => void,
   ) => void;
   /** Joins an existing game room; returns private session credentials in ack callback */

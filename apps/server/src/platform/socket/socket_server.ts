@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Server as HttpServer } from "node:http";
 import { Server as SocketIOServer, ServerOptions } from "socket.io";
 import { ClientToServerEvents, ServerToClientEvents } from "@fun-chess/shared";
@@ -81,6 +82,7 @@ export function createSocketServer(
       const sanitizedUrl = errorObj.req?.url?.split("?")[0];
 
       logger.warn("Socket engine connection error", {
+        correlationId: randomUUID(),
         operation: "socket_engine_connection_error",
         code: errorObj.code,
         message: errorObj.message,

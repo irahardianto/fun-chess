@@ -1,4 +1,4 @@
-import { stat, readFile } from "node:fs/promises";
+import { stat, readFile, realpath } from "node:fs/promises";
 
 export interface FileStat {
   isDirectory: boolean;
@@ -8,10 +8,12 @@ export interface FileStat {
 export interface IFileStorage {
   stat(filePath: string): Promise<FileStat>;
   readFile(filePath: string): Promise<Buffer>;
+  realpath(filePath: string): Promise<string>;
 }
 
 /**
  * Production Node.js filesystem adapter implementing IFileStorage (MAJ-016).
+ * Canonicalizes real filesystem paths and resolves symlinks (MAJ-001).
  */
 export class NodeFileStorage implements IFileStorage {
   async stat(filePath: string): Promise<FileStat> {
@@ -24,6 +26,10 @@ export class NodeFileStorage implements IFileStorage {
 
   async readFile(filePath: string): Promise<Buffer> {
     return await readFile(filePath);
+  }
+
+  async realpath(filePath: string): Promise<string> {
+    return await realpath(filePath);
   }
 }
 
@@ -62,6 +68,21 @@ export class MemoryFileStorage implements IFileStorage {
     this.errorSimulator = simulator;
   }
 
+  async realpath(filePath: string): Promise<string> {
+    if (this.errorSimulator) {
+      const simulated = this.errorSimulator(filePath, "stat");
+      if (simulated) throw simulated;
+    }
+    if (this.files.has(filePath) || this.directories.has(filePath)) {
+      return filePath;
+    }
+    const enoent = Object.assign(
+      new Error(`ENOENT: no such file or directory, realpath '${filePath}'`),
+      { code: "ENOENT" },
+    );
+    throw enoent;
+  }
+
   async stat(filePath: string): Promise<FileStat> {
     if (this.errorSimulator) {
       const simulated = this.errorSimulator(filePath, "stat");
@@ -77,8 +98,10 @@ export class MemoryFileStorage implements IFileStorage {
       return { isDirectory: false, size: file.length };
     }
 
-    const enoent = new Error(`ENOENT: no such file or directory, stat '${filePath}'`) as any;
-    enoent.code = "ENOENT";
+    const enoent = Object.assign(
+      new Error(`ENOENT: no such file or directory, stat '${filePath}'`),
+      { code: "ENOENT" },
+    );
     throw enoent;
   }
 
@@ -93,8 +116,10 @@ export class MemoryFileStorage implements IFileStorage {
       return file;
     }
 
-    const enoent = new Error(`ENOENT: no such file or directory, open '${filePath}'`) as any;
-    enoent.code = "ENOENT";
+    const enoent = Object.assign(
+      new Error(`ENOENT: no such file or directory, open '${filePath}'`),
+      { code: "ENOENT" },
+    );
     throw enoent;
   }
 }
