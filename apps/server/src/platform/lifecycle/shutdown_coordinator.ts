@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import { serializeError } from "@fun-chess/shared";
 import { TypedSocketServer } from "../socket/socket_server.js";
 import { Logger } from "../logger/logger.interface.js";
-import type { ITimerService, TimerHandle } from "../../features/rooms/index.js";
+import type { ITimerService, TimerHandle } from "@fun-chess/shared";
 
 export interface HttpServerWithConnectionControl {
   closeIdleConnections?: () => void;
@@ -29,7 +29,7 @@ export interface ShutdownCoordinatorOptions {
  * Measures and logs shutdown duration (MIN-013) with correlation IDs (MAJ-016).
  */
 export class ShutdownCoordinator {
-  private isShuttingDown = false;
+  private _isShuttingDown = false;
   private readonly server: HttpServer;
   private readonly io: TypedSocketServer;
   private readonly logger: Logger;
@@ -73,15 +73,23 @@ export class ShutdownCoordinator {
     this.additionalCleanups.push(fn);
   }
 
+  public get isShuttingDown(): boolean {
+    return this._isShuttingDown;
+  }
+
+  public get isTerminating(): boolean {
+    return this._isShuttingDown;
+  }
+
   /**
    * Initiates graceful shutdown sequence.
    * Accepts optional correlationId, defaulting to randomUUID() (MAJ-016).
    */
   public async shutdown(signal: string, correlationId?: string): Promise<void> {
-    if (this.isShuttingDown) {
+    if (this._isShuttingDown) {
       return;
     }
-    this.isShuttingDown = true;
+    this._isShuttingDown = true;
     const corrId = correlationId ?? randomUUID();
     const startTime = performance.now();
     let exitCode = 0;

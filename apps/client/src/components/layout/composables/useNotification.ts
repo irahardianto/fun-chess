@@ -1,4 +1,12 @@
-import { ref, computed, type Ref, type ComputedRef } from 'vue';
+import { ref, computed, onScopeDispose, getCurrentScope, type Ref, type ComputedRef } from 'vue';
+
+function tryOnScopeDispose(fn: () => void): boolean {
+  if (getCurrentScope()) {
+    onScopeDispose(fn);
+    return true;
+  }
+  return false;
+}
 
 export interface AppNotification {
   id: number;
@@ -71,6 +79,13 @@ function dismissNotification(id?: number): void {
  * screen reader live-region announcements, and manual dismissal.
  */
 export function useNotification(): UseNotificationReturn {
+  tryOnScopeDispose(() => {
+    if (activeTimer) {
+      clearTimeout(activeTimer);
+      activeTimer = null;
+    }
+  });
+
   function clearAll(): void {
     if (activeTimer) {
       clearTimeout(activeTimer);

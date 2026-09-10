@@ -21,45 +21,28 @@ const snoozeTrigger = ref<number>(0);
 
 let listenerCount = 0;
 let initialized = false;
-let customStorage: KeyValueStorage | null = null;
-let customLogger: ILogger | null = null;
-let customClock: IClock | null = null;
-
-export function setPwaInstallStorage(storage: KeyValueStorage | null): void {
-  customStorage = storage;
-}
-
-export function setPwaInstallLogger(logger: ILogger | null): void {
-  customLogger = logger;
-}
-
-export function setPwaInstallClock(clock: IClock | null): void {
-  customClock = clock;
-}
 
 function getEffectiveStorage(custom?: KeyValueStorage): KeyValueStorage {
-  return custom ?? customStorage ?? (getCurrentInstance() ? useInjectStorage() : safeLocalStorage);
+  return custom ?? (getCurrentInstance() ? useInjectStorage() : safeLocalStorage);
 }
 
 function getEffectiveLogger(custom?: ILogger): ILogger {
-  return custom ?? customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+  return custom ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
 }
 
 function getEffectiveClock(custom?: IClock): IClock {
-  return custom ?? customClock ?? (hasInjectionContext() ? inject(CLOCK_KEY, systemClock) : systemClock);
+  return custom ?? (hasInjectionContext() ? inject(CLOCK_KEY, systemClock) : systemClock);
 }
 
-function checkSnoozeStatus(customStorage?: KeyValueStorage, customLogger?: ILogger, customClockInstance?: IClock): boolean {
+function checkSnoozeStatus(storage: KeyValueStorage, logger: ILogger, clock: IClock): boolean {
   void snoozeTrigger.value; // reactive dependency
   try {
-    const storage = getEffectiveStorage(customStorage);
     const snoozedUntil = storage.getItem(SNOOZE_STORAGE_KEY);
     if (!snoozedUntil) return false;
     const until = Number(snoozedUntil);
-    const clock = getEffectiveClock(customClockInstance);
     return !isNaN(until) && until > clock.now();
   } catch (err) {
-    getEffectiveLogger(customLogger).warn('Failed to read PWA snooze status from storage', {
+    logger.warn('Failed to read PWA snooze status from storage', {
       operation: 'pwa_check_snooze_status',
       error: err instanceof Error ? err.message : String(err),
     });
@@ -123,9 +106,6 @@ export function resetPwaInstallState(): void {
   snoozeTrigger.value = 0;
   listenerCount = 0;
   initialized = false;
-  customStorage = null;
-  customLogger = null;
-  customClock = null;
 }
 
 export interface UsePwaInstallOptions {
@@ -163,7 +143,9 @@ export function usePwaInstall(options?: UsePwaInstallOptions) {
 
   const isIos = isIosSafari;
 
-  const isSnoozed = computed<boolean>(() => checkSnoozeStatus(options?.storage, options?.logger, options?.clock));
+  const isSnoozed = computed<boolean>(() =>
+    checkSnoozeStatus(effectiveStorage, effectiveLogger, effectiveClock)
+  );
 
   const hasInstallPrompt = computed<boolean>(() => deferredPrompt.value !== null);
 

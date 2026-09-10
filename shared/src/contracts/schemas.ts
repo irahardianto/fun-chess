@@ -649,11 +649,44 @@ export const ServerEnvSchema = z.object({
   SESSION_SECRET: z.preprocess(emptyStringToUndefined, z.string().optional()),
   CLIENT_URL: z.preprocess(emptyStringToUndefined, z.string().optional()),
   CLIENT_DIST_PATH: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  TRUST_PROXY: z.preprocess((val) => {
+    if (typeof val === "boolean") return val;
+    if (typeof val === "string") return val.toLowerCase() === "true" || val === "1";
+    return false;
+  }, z.boolean().default(false)),
+  RATE_LIMIT_WINDOW_MS: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().optional(),
+  ),
+  RATE_LIMIT_MAX_REQUESTS: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().optional(),
+  ),
+  RATE_LIMIT_MAX_KEYS: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().optional(),
+  ),
+  RATE_LIMIT_ROOM_CREATE_MAX: z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().default(3),
+  ),
 });
+
+/**
+ * Base canonical server environment configuration schema (MIN-001).
+ * Extended or consumed across server platform configuration.
+ */
+export const BaseServerEnvSchema = ServerEnvSchema;
+
 /**
  * Inferred server environment configuration type.
  */
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
+
+/**
+ * Inferred base server environment configuration type.
+ */
+export type BaseServerEnv = z.infer<typeof BaseServerEnvSchema>;
 
 /**
  * Performance star rating schema (1, 2, or 3 stars).

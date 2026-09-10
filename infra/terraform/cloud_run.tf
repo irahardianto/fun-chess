@@ -1,3 +1,44 @@
+# -----------------------------------------------------------------------------
+# Google Secret Manager Resources (MAJ-001)
+# -----------------------------------------------------------------------------
+
+locals {
+  sm_sess_id   = google_secret_manager_secret.session_secret.id
+  sm_metr_id   = google_secret_manager_secret.metrics_secret.id
+  sm_sess_name = google_secret_manager_secret.session_secret.secret_id
+  sm_metr_name = google_secret_manager_secret.metrics_secret.secret_id
+}
+
+resource "google_secret_manager_secret" "session_secret" {
+  secret_id = "${var.service_name}-session-secret"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "session_secret" {
+  secret      = local.sm_sess_id
+  secret_data = var.session_secret
+}
+
+resource "google_secret_manager_secret" "metrics_secret" {
+  secret_id = "${var.service_name}-metrics-secret"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "metrics_secret" {
+  secret      = local.sm_metr_id
+  secret_data = var.metrics_secret
+}
+
+# -----------------------------------------------------------------------------
+# Cloud Run v2 Service
+# -----------------------------------------------------------------------------
+
 resource "google_cloud_run_v2_service" "default" {
   name     = var.service_name
   location = var.gcp_region
@@ -47,13 +88,23 @@ resource "google_cloud_run_v2_service" "default" {
       }
 
       env {
-        name  = "SESSION_SECRET"
-        value = var.session_secret
+        name = "SESSION_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = local.sm_sess_name
+            version = "latest"
+          }
+        }
       }
 
       env {
-        name  = "METRICS_SECRET"
-        value = var.metrics_secret
+        name = "METRICS_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = local.sm_metr_name
+            version = "latest"
+          }
+        }
       }
 
 

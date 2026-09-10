@@ -119,7 +119,7 @@ function handleRoomPlayerLeft(data?: { playerId?: string; playerName?: string; r
     }
     if (currentRoom.value.spectators) {
       currentRoom.value.spectators = currentRoom.value.spectators.filter(
-        (s) => s.id !== data.playerId
+        (spec) => spec.id !== data.playerId
       );
     }
     if (currentPlayer.value?.id === data.playerId) {
@@ -164,7 +164,7 @@ function handleRoomPlayerDisconnected(data: {
   if (isBlack && currentRoom.value.blackPlayer) {
     currentRoom.value.blackPlayer.isConnected = false;
   }
-  const spectator = currentRoom.value.spectators?.find((s) => s.id === disconnectedId);
+  const spectator = currentRoom.value.spectators?.find((spec) => spec.id === disconnectedId);
   if (spectator) {
     spectator.isConnected = false;
   }
@@ -186,7 +186,7 @@ function handleRoomPlayerReconnected(data: {
   if (currentRoom.value.blackPlayer?.id === data.playerId) {
     currentRoom.value.blackPlayer.isConnected = true;
   }
-  const spectator = currentRoom.value.spectators?.find((s) => s.id === data.playerId);
+  const spectator = currentRoom.value.spectators?.find((spec) => spec.id === data.playerId);
   if (spectator) {
     spectator.isConnected = true;
   }
@@ -287,7 +287,7 @@ export function checkAndAutoReconnect(): void {
     currentRoom.value.roomCode !== saved.roomCode ||
     !currentPlayer.value ||
     currentPlayer.value.id !== saved.playerId ||
-    currentPlayer.value.socketId !== currentSockId ||
+    (Boolean(currentSockId) && currentPlayer.value.socketId !== currentSockId) ||
     !currentPlayer.value.isConnected ||
     currentRoom.value.status === 'paused_disconnect';
 
@@ -359,14 +359,14 @@ export async function createRoom(
     return { success: false, error: err };
   }
 
-  const s = transport.socket.value || transport.initSocket();
-  if (!s.connected) s.connect();
+  const socketInstance = transport.socket.value || transport.initSocket();
+  if (!socketInstance.connected) socketInstance.connect();
 
   return transport.emitWithTimeout<
     CreateRoomRequest,
     | { success: true; room: RoomState; player: Player; sessionToken: string }
     | { success: false; error: SocketErrorPayload }
-  >(s, 'room:create', validationResult.data, {
+  >(socketInstance, 'room:create', validationResult.data, {
     timeoutMs: 8000,
     timeoutMessage: 'Connection timed out. Please ensure the server is running.',
     operation: 'socket_room_create',
@@ -376,9 +376,9 @@ export async function createRoom(
       sessionToken.value = res.sessionToken;
       if (res.player) {
         currentPlayer.value = res.player;
-      } else if (res.room.whitePlayer?.socketId === s.id) {
+      } else if (res.room.whitePlayer?.socketId === socketInstance.id) {
         currentPlayer.value = res.room.whitePlayer;
-      } else if (res.room.blackPlayer?.socketId === s.id) {
+      } else if (res.room.blackPlayer?.socketId === socketInstance.id) {
         currentPlayer.value = res.room.blackPlayer;
       } else if (res.room.hostId) {
         currentPlayer.value =
@@ -433,14 +433,14 @@ export async function joinRoom(
     return { success: false, error: err };
   }
 
-  const s = transport.socket.value || transport.initSocket();
-  if (!s.connected) s.connect();
+  const socketInstance = transport.socket.value || transport.initSocket();
+  if (!socketInstance.connected) socketInstance.connect();
 
   return transport.emitWithTimeout<
     JoinRoomRequest,
     | { success: true; room: RoomState; player: Player; sessionToken: string }
     | { success: false; error: SocketErrorPayload }
-  >(s, 'room:join', validationResult.data, {
+  >(socketInstance, 'room:join', validationResult.data, {
     timeoutMs: 8000,
     timeoutMessage: 'Connection timed out. Please check the room code and try again.',
     operation: 'socket_room_join',
@@ -495,13 +495,13 @@ export async function reconnect(
     return { success: false, error: err };
   }
 
-  const s = transport.socket.value || transport.initSocket();
-  if (!s.connected) s.connect();
+  const socketInstance = transport.socket.value || transport.initSocket();
+  if (!socketInstance.connected) socketInstance.connect();
 
   return transport.emitWithTimeout<
     ReconnectRequest,
     ReconnectAckPayload
-  >(s, 'room:reconnect', validationResult.data, {
+  >(socketInstance, 'room:reconnect', validationResult.data, {
     timeoutMs: 8000,
     timeoutMessage: 'Reconnection timed out.',
     operation: 'socket_room_reconnect',
@@ -581,8 +581,8 @@ export async function leaveRoom(
   }
 
   const code = validationResult.data.roomCode;
-  const s = transport.socket.value;
-  if (!s || !s.connected) {
+  const socketInstance = transport.socket.value;
+  if (!socketInstance || !socketInstance.connected) {
     currentRoom.value = null;
     currentPlayer.value = null;
     sessionToken.value = null;
@@ -631,7 +631,7 @@ export async function leaveRoom(
       finalize(true);
     }, 2000);
 
-    s.emit('room:leave', { roomCode: code }, (res?: { success?: boolean }) => {
+    socketInstance.emit('room:leave', { roomCode: code }, (res?: { success?: boolean }) => {
       finalize(res?.success !== false);
     });
   });

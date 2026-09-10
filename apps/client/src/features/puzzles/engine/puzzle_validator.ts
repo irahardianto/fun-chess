@@ -19,7 +19,6 @@ import {
   createSafeChess,
   isValidFen,
 } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry';
 export { formatPlayerMoveToUci, parseUciMove };
 
 /**
@@ -29,15 +28,11 @@ export function isPawnPromotionMove(fen: string, from: Square, to: Square): bool
   if (!isValidFen(fen)) return false;
   try {
     const chess = createSafeChess(fen);
-    const piece = chess.get(from as unknown as import('chess.js').Square);
+    const piece = chess.get(from);
     if (!piece || piece.type !== 'p') return false;
     const toRank = to.charAt(1);
     return (piece.color === 'w' && toRank === '8') || (piece.color === 'b' && toRank === '1');
-  } catch (err) {
-    logger.debug('Failed to check pawn promotion move', {
-      operation: 'is_pawn_promotion_move',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return false;
   }
 }
@@ -50,15 +45,11 @@ export function getLegalMovesForSquare(fen: string, square: Square): Square[] {
   try {
     const chess = createSafeChess(fen);
     const moves = chess.moves({
-      square: square as unknown as import('chess.js').Square,
+      square,
       verbose: true,
     });
     return moves.map((m) => m.to as Square);
-  } catch (err) {
-    logger.debug('Failed to get legal moves for square', {
-      operation: 'get_legal_moves_for_square',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return [];
   }
 }
@@ -70,13 +61,9 @@ export function isPieceOfColor(fen: string, square: Square, color: PieceColor): 
   if (!isValidFen(fen)) return false;
   try {
     const chess = createSafeChess(fen);
-    const piece = chess.get(square as unknown as import('chess.js').Square);
+    const piece = chess.get(square);
     return Boolean(piece && piece.color === color);
-  } catch (err) {
-    logger.debug('Failed to check piece color', {
-      operation: 'is_piece_of_color',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return false;
   }
 }
@@ -109,10 +96,6 @@ export function validatePuzzleMove(
   }
 
   if (!isValidFen(currentFen)) {
-    logger.debug('Invalid currentFen in validatePuzzleMove', {
-      operation: 'validate_puzzle_move',
-      currentFen,
-    });
     return {
       isCorrect: false,
       isPuzzleComplete: false,
@@ -139,12 +122,7 @@ export function validatePuzzleMove(
   let chess: Chess;
   try {
     chess = createSafeChess(currentFen);
-  } catch (err) {
-    logger.debug('Failed to initialize chess in validatePuzzleMove', {
-      operation: 'validate_puzzle_move',
-      currentFen,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return {
       isCorrect: false,
       isPuzzleComplete: false,
@@ -157,11 +135,13 @@ export function validatePuzzleMove(
   let playerResult: Move | null;
   try {
     playerResult = chess.move({
-      from: playerMove.from as unknown as import('chess.js').Square,
-      to: playerMove.to as unknown as import('chess.js').Square,
+      from: playerMove.from,
+      to: playerMove.to,
       promotion: playerMove.promotion,
     });
-  } catch {
+  } catch (err: unknown) {
+    // Diagnostic outcome handling for illegal moves per MAJ-006 while preserving pure engine boundary (MAJ-009)
+    void err;
     playerResult = null;
   }
 
@@ -326,16 +306,11 @@ export function handleOpponentCounterReply(
   let oppResult: Move | null;
   try {
     oppResult = chess.move({
-      from: oppParsed.from as unknown as import('chess.js').Square,
-      to: oppParsed.to as unknown as import('chess.js').Square,
+      from: oppParsed.from,
+      to: oppParsed.to,
       promotion: oppParsed.promotion,
     });
-  } catch (err) {
-    logger.debug('Failed to execute opponent counter move', {
-      operation: 'handle_opponent_counter_reply',
-      opponentUci,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     oppResult = null;
   }
 

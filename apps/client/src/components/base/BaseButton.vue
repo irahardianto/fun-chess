@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 
 export type ButtonVariant = 'primary' | 'accent' | 'danger' | 'ghost' | 'success';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -28,7 +28,7 @@ const emit = defineEmits<{
   click: [event: MouseEvent];
 }>();
 
-const buttonRef = ref<HTMLButtonElement | null>(null);
+const buttonRef = useTemplateRef<HTMLButtonElement>('buttonRef');
 
 function focus() {
   buttonRef.value?.focus();

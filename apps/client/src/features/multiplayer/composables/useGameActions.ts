@@ -6,7 +6,7 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Findings MAJ-009, MAJ-031, MIN-030.
  */
 
-import { ref, shallowRef, computed, getCurrentInstance, type ComputedRef } from 'vue';
+import { ref, shallowRef, computed, type ComputedRef } from 'vue';
 import type { z } from 'zod';
 import type {
   GameOverPayload,
@@ -32,16 +32,11 @@ import {
   RequestRematchRequestSchema,
   RespondRematchRequestSchema,
 } from '@fun-chess/shared';
-import { useInjectLogger } from '@/platform/di';
-import { generateCorrelationId, logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+import { resolveLogger } from '@/platform/di';
+import { generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
-let customLogger: ILogger | null = null;
-export function setGameActionsLogger(logger: ILogger | null): void {
-  customLogger = logger;
-}
-
-function getActiveLogger(): ILogger {
-  return customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
+function getActiveLogger(custom?: ILogger | null): ILogger {
+  return resolveLogger(custom);
 }
 
 const logger: ILogger = {
@@ -69,6 +64,8 @@ import {
 } from './room_session_state';
 
 export type OpponentMoveCallback = (data: { move: MoveResult; gameState: GameState }) => void;
+export type GameCheckCallback = () => void;
+export type GameOverCallback = (payload: GameOverPayload) => void;
 export type NotificationType = 'info' | 'success' | 'warn' | 'error';
 export type NotificationHandler = (message: string, type: NotificationType) => void;
 
@@ -118,6 +115,8 @@ const lastGameOver = ref<GameOverPayload | null>(null);
 const kingInCheck = ref<{ inCheck: PieceColor; kingSquare: string } | null>(null);
 const lastMoveEvent = shallowRef<{ move: MoveResult; gameState: GameState } | null>(null);
 const opponentMoveListeners = new Set<OpponentMoveCallback>();
+const gameCheckListeners = new Set<GameCheckCallback>();
+const gameOverListeners = new Set<GameOverCallback>();
 
 const gameState: ComputedRef<GameState | null> = computed(() => {
   return currentRoom.value?.game ?? null;
@@ -184,11 +183,31 @@ function handleGameMoved(data: { move: MoveResult; gameState: GameState }) {
 
 function handleGameCheck(data: { inCheck: PieceColor; kingSquare: string }) {
   kingInCheck.value = data;
+  gameCheckListeners.forEach((cb) => {
+    try {
+      cb();
+    } catch (err) {
+      logger.warn('Error in onGameCheck listener', {
+        operation: 'socket_game_check_listener',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
 }
 
 function handleGameOver(payload: GameOverPayload) {
   lastGameOver.value = payload;
   drawOfferedBy.value = null;
+  gameOverListeners.forEach((cb) => {
+    try {
+      cb(payload);
+    } catch (err) {
+      logger.warn('Error in onGameOver listener', {
+        operation: 'socket_game_over_listener',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
 }
 
 function handleGameDrawOffered(data: { fromPlayerId: string; fromPlayerName: string }) {
@@ -310,6 +329,28 @@ export function onOpponentMove(cb: OpponentMoveCallback): () => void {
   opponentMoveListeners.add(cb);
   return () => {
     opponentMoveListeners.delete(cb);
+  };
+}
+
+/**
+ * Registers a subscriber for game check events (decoupled audio/visual triggers).
+ * Returns an unsubscribe cleanup function.
+ */
+export function onGameCheck(cb: GameCheckCallback): () => void {
+  gameCheckListeners.add(cb);
+  return () => {
+    gameCheckListeners.delete(cb);
+  };
+}
+
+/**
+ * Registers a subscriber for game over events (decoupled audio/visual triggers).
+ * Returns an unsubscribe cleanup function.
+ */
+export function onGameOver(cb: GameOverCallback): () => void {
+  gameOverListeners.add(cb);
+  return () => {
+    gameOverListeners.delete(cb);
   };
 }
 
@@ -692,10 +733,11 @@ export function resetGameActionsState(preserveSubscribers = true): void {
   lastMoveEvent.value = null;
   if (!preserveSubscribers) {
     opponentMoveListeners.clear();
+    gameCheckListeners.clear();
+    gameOverListeners.clear();
     customNotificationHandler = null;
     notificationListeners.clear();
   }
-  customLogger = null;
   initGameActionsListeners();
 }
 
@@ -710,9 +752,6 @@ export function useGameActions(options?: {
   onNotification?: NotificationHandler;
 }) {
   initGameActionsListeners();
-  if (options?.logger) {
-    customLogger = options.logger;
-  }
   if (options?.onNotification) {
     onGameActionNotification(options.onNotification);
   }
@@ -727,6 +766,8 @@ export function useGameActions(options?: {
     kingInCheck,
     lastMoveEvent,
     onOpponentMove,
+    onGameCheck,
+    onGameOver,
     makeMove,
     resign,
     offerDraw,

@@ -16,8 +16,8 @@ export * from './useSocket';
 // Board Presentation & Chess Engine
 export * from './useChessGame';
 
-// Lobby & LAN Discovery (Relocated per MIN-011)
-export * from '../features/lobby/useLanDiscovery';
+// Lobby & LAN Discovery (Relocated per MIN-011, public barrel export per MIN-008)
+export * from '../features/lobby';
 
 // Multimedia & Sensory Effects
 export * from './useAudio';

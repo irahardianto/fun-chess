@@ -438,6 +438,12 @@ describe("room.logic pure functions", () => {
       expect(nextRoom.spectators).toEqual([]);
       expect(nextRoom.status).toBe("playing");
     });
+
+    it("throws PlayerNotInRoomError when leaving player is not in room (MIN-027)", () => {
+      expect(() =>
+        leaveRoomTransition(playingRoom, "p_unregistered_999", 6000),
+      ).toThrow(PlayerNotInRoomError);
+    });
   });
 
   describe("applyGameMoveTransition & finalizeGameTransition", () => {

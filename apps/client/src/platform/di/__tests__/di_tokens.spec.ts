@@ -16,6 +16,7 @@ import {
   CLIPBOARD_SERVICE_KEY,
   CAMERA_SERVICE_KEY,
   CLOCK_KEY,
+  TIMER_SERVICE_KEY,
   useInjectApiClient,
   useInjectStorage,
   useInjectSessionStorage,
@@ -90,6 +91,7 @@ describe('DI Tokens & Inject Wrappers (MAJ-032)', () => {
       { name: 'CLIPBOARD_SERVICE_KEY', key: CLIPBOARD_SERVICE_KEY, expectedDesc: 'CLIPBOARD_SERVICE' },
       { name: 'CAMERA_SERVICE_KEY', key: CAMERA_SERVICE_KEY, expectedDesc: 'CAMERA_SERVICE' },
       { name: 'CLOCK_KEY', key: CLOCK_KEY, expectedDesc: 'CLOCK' },
+      { name: 'TIMER_SERVICE_KEY', key: TIMER_SERVICE_KEY, expectedDesc: 'TIMER_SERVICE' },
     ];
 
     it.each(tokens)('$name is a valid Symbol with expected description "$expectedDesc"', ({ key, expectedDesc }) => {

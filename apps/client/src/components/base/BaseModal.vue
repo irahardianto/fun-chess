@@ -7,8 +7,9 @@ defineOptions({
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'full';
 
+const modelValue = defineModel<boolean>({ default: false });
+
 interface Props {
-  modelValue?: boolean;
   isOpen?: boolean;
   title?: string;
   ariaLabel?: string;
@@ -19,7 +20,6 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  modelValue: undefined,
   isOpen: undefined,
   title: undefined,
   ariaLabel: undefined,
@@ -30,7 +30,6 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean];
   close: [];
 }>();
 
@@ -40,9 +39,8 @@ const modalContainerRef = ref<HTMLElement | null>(null);
 let previousActiveElement: HTMLElement | null = null;
 
 const isVisible = computed(() => {
-  if (props.modelValue !== undefined) return props.modelValue;
   if (props.isOpen !== undefined) return props.isOpen;
-  return false;
+  return modelValue.value;
 });
 
 const FOCUSABLE_SELECTOR = [
@@ -107,7 +105,7 @@ function restoreFocus() {
 }
 
 function handleClose() {
-  emit('update:modelValue', false);
+  modelValue.value = false;
   emit('close');
 }
 

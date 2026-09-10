@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import ProgressiveHintLayer, { squareToCoordinates } from '../ProgressiveHintLayer.vue';
+import ProgressiveHintLayer from '../ProgressiveHintLayer.vue';
+import { squareToCoordinates } from '../hint_coordinates';
 
 describe('ProgressiveHintLayer.vue', () => {
   it('renders nothing when hint level is 0', () => {

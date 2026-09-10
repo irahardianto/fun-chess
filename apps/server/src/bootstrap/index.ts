@@ -128,6 +128,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     fileStorage: options.fileStorage,
     httpRateLimiter: options.httpRateLimiter,
     getActiveSocketCount: () => (ioRef.current ? ioRef.current.sockets.sockets.size : 0),
+    shutdownCoordinator: options.shutdownCoordinator,
   });
 
   const { io, rateLimiter, roomCreateRateLimiter } = setupSocketLayer({
@@ -149,6 +150,9 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     httpRateLimiter: options.httpRateLimiter,
     onExit: options.onExit,
   });
+
+  // Wire ShutdownCoordinator into HealthController for /ready probe degradation during teardown (BLK-01)
+  server.setShutdownCoordinator?.(shutdownCoordinator);
 
   const autoListen = options.autoListen ?? true;
   let boundPort = port;

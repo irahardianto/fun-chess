@@ -451,4 +451,87 @@ test.describe('Progress Sync & Data Portability Journey', () => {
     await expect(confirmModal).not.toBeVisible({ timeout: 5_000 });
     await expect(resignBtn).toBeFocused();
   });
+
+  test('activates camera QR scanner with live video stream and handles permission rejection fallback', async ({ page, context }) => {
+    // 1. Grant camera permission to browser context
+    await context.grantPermissions(['camera']).catch(() => {});
+
+    const lobbyPage = new LobbyPage(page);
+
+    // Open lobby and launch Save & Sync modal
+    await lobbyPage.goto();
+    await lobbyPage.openProgressSync();
+
+    // 2. Switch to Import tab
+    const importTab = page.locator('#tab-import');
+    await expect(importTab).toBeVisible({ timeout: 10_000 });
+    await importTab.click();
+
+    // 3. Assert live camera viewfinder elements are activated
+    const viewportCard = page.locator('.scanner-viewport-card');
+    await expect(viewportCard).toBeVisible({ timeout: 10_000 });
+
+    const reticleOverlay = page.locator('.scanner-reticle-overlay');
+    await expect(reticleOverlay).toBeVisible({ timeout: 10_000 });
+
+    const laserLine = page.locator('.scanner-laser-line');
+    await expect(laserLine).toBeVisible({ timeout: 5_000 });
+
+    const aimHint = page.locator('.scanner-aim-hint');
+    await expect(aimHint).toBeVisible({ timeout: 5_000 });
+    await expect(aimHint).toHaveText('Point camera at QR code');
+
+    // 4. Assert video stream is playing with active track
+    const video = page.locator('.scanner-video-feed');
+    await expect(video).toBeVisible({ timeout: 5_000 });
+    const isStreamActive = await video.evaluate((el: HTMLVideoElement) => {
+      const stream = el.srcObject as MediaStream | null;
+      return Boolean(stream && stream.active && stream.getVideoTracks().length > 0);
+    });
+    expect(isStreamActive).toBe(true);
+
+    // 5. Test error fallback handling when camera access is denied or fails
+    const restrictedContext = await context.browser()!.newContext({
+      permissions: [],
+    });
+    const restrictedPage = await restrictedContext.newPage();
+    // Simulate camera permission rejection via getUserMedia override
+    await restrictedPage.addInitScript(() => {
+      if (navigator.mediaDevices) {
+        navigator.mediaDevices.getUserMedia = () =>
+          Promise.reject(new DOMException('Permission denied', 'NotAllowedError'));
+      }
+    });
+
+    try {
+      const restrictedLobby = new LobbyPage(restrictedPage);
+      await restrictedLobby.goto();
+      await restrictedLobby.openProgressSync();
+
+      const restrictedImportTab = restrictedPage.locator('#tab-import');
+      await expect(restrictedImportTab).toBeVisible({ timeout: 10_000 });
+      await restrictedImportTab.click();
+
+      // Assert error empty state is displayed
+      const emptyState = restrictedPage.locator('.scanner-empty-state');
+      await expect(emptyState).toBeVisible({ timeout: 10_000 });
+
+      const errorText = restrictedPage.locator('.scanner-error-text');
+      await expect(errorText).toBeVisible({ timeout: 5_000 });
+      await expect(errorText).toContainText(/Camera permission.*denied|Camera unavailable/i);
+
+      // Assert retry button is available
+      const retryBtn = restrictedPage.locator('button:has-text("Try Camera Again")');
+      await expect(retryBtn).toBeVisible({ timeout: 5_000 });
+
+      // Assert fallback input options remain accessible
+      const dropzone = restrictedPage.locator('.dropzone-box');
+      await expect(dropzone).toBeVisible({ timeout: 5_000 });
+
+      const manualToggle = restrictedPage.locator('button:has-text("Paste Code / Manual Text Fallback"), .manual-drawer-toggle');
+      await expect(manualToggle).toBeVisible({ timeout: 5_000 });
+    } finally {
+      await restrictedContext.close();
+    }
+  });
 });

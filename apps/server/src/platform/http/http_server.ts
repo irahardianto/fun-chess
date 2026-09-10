@@ -88,12 +88,20 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
       windowMs: config.env?.RATE_LIMIT_WINDOW_MS ?? 10_000,
       pruneIntervalMs: 0,
     }),
+    notFoundRateLimiter = config.notFoundRateLimiter ?? new HttpRateLimiter({
+      maxRequests: 30,
+      windowMs: 10_000,
+      pruneIntervalMs: 0,
+    }),
   } = config;
 
   if (config.lanService && !config.relayAddressService) {
     logger.warn(
       "lanService is deprecated and will be removed in v2.0.0. Use relayAddressService instead.",
-      { operation: "http_server_init" },
+      {
+        operation: "http_server_init",
+        correlationId: config.correlationId ?? sanitizeCorrelationId(),
+      },
     );
   }
 
@@ -122,14 +130,22 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
 
   const fallbackHtml = createFallbackHtml(port);
 
-  const healthController = new HealthController({
-    roomStore,
-    addressService,
-    port,
-    getActiveSocketCount,
-    isProduction,
-    startTime: START_TIME,
-  });
+  const healthController =
+    config.healthController ??
+    new HealthController({
+      roomStore,
+      addressService,
+      port,
+      getActiveSocketCount,
+      isProduction,
+      startTime: START_TIME,
+      shutdownCoordinator: config.shutdownCoordinator,
+      metricsCollector: config.metricsCollector,
+    });
+
+  if (config.shutdownCoordinator) {
+    healthController.setShutdownCoordinator(config.shutdownCoordinator);
+  }
 
   const lanInfoController = new LanInfoController({
     addressService,
@@ -140,6 +156,7 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     fallbackHtml,
     fileStorage,
     trustProxy,
+    notFoundRateLimiter,
   });
 
   if (config.server) {
@@ -157,8 +174,21 @@ export function createHttpServer(config: HttpServerConfig): RequestListener {
     lanInfoController,
     staticController,
     rateLimiter,
+    notFoundRateLimiter,
+    metricsCollector: config.metricsCollector,
   });
 
-  return (req: IncomingMessage, res: ServerResponse): Promise<void> =>
-    router.handleRequest(req, res);
+  const requestHandler = ((req: IncomingMessage, res: ServerResponse): Promise<void> =>
+    router.handleRequest(req, res)) as unknown as RequestListener & {
+      router: HttpRouter;
+      healthController: HealthController;
+      setShutdownCoordinator: (coordinator: { isTerminating?: boolean; isShuttingDown?: boolean }) => void;
+    };
+  requestHandler.router = router;
+  requestHandler.healthController = healthController;
+  requestHandler.setShutdownCoordinator = (coordinator: { isTerminating?: boolean; isShuttingDown?: boolean }) => {
+    healthController.setShutdownCoordinator(coordinator);
+  };
+
+  return requestHandler;
 }

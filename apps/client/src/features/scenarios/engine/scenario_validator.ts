@@ -1,7 +1,5 @@
 import type { Square, TutorialStep, StepMoveConstraint } from '@fun-chess/shared';
-import type { Square as ChessSquare } from 'chess.js';
 import { createSafeChess } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry';
 
 export interface PlayerMoveInput {
   from: Square;
@@ -57,18 +55,14 @@ export function validateStepMove(
     try {
       const testEngine = createSafeChess(fen);
       const res = testEngine.move({
-        from: move.from as ChessSquare,
-        to: move.to as ChessSquare,
+        from: move.from,
+        to: move.to,
         promotion: (normalizedPromotion as 'q' | 'r' | 'b' | 'n' | undefined) ?? 'q',
       });
       if (res && testEngine.isCheckmate()) {
         return { valid: true, reason: 'Delivers sound checkmate' };
       }
-    } catch (err) {
-      logger.debug('Failed to evaluate checkmate move in validateStepMove', {
-        operation: 'validate_step_move',
-        error: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
       return { valid: false, reason: 'Move does not match required step constraints' };
     }
   }
@@ -97,7 +91,7 @@ export function isSourceSquareAllowed(
     try {
       const testEngine = createSafeChess(fen);
       const legalMoves = testEngine.moves({
-        square: from as ChessSquare,
+        square: from,
         verbose: true,
       });
       for (const m of legalMoves) {
@@ -111,11 +105,7 @@ export function isSourceSquareAllowed(
           return true;
         }
       }
-    } catch (err) {
-      logger.debug('Failed to evaluate checkmate in isSourceSquareAllowed', {
-        operation: 'is_source_square_allowed',
-        error: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
       return false;
     }
   }
@@ -149,7 +139,7 @@ export function getAllowedTargetsForSource(
     try {
       const testEngine = createSafeChess(fen);
       const legalMoves = testEngine.moves({
-        square: from as ChessSquare,
+        square: from,
         verbose: true,
       });
       for (const m of legalMoves) {
@@ -164,11 +154,7 @@ export function getAllowedTargetsForSource(
           targets.add(m.to as Square);
         }
       }
-    } catch (err) {
-      logger.debug('Failed to test checkmate moves in getAllowedTargetsForSource', {
-        operation: 'get_allowed_targets_for_source',
-        error: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
       return Array.from(targets);
     }
   }

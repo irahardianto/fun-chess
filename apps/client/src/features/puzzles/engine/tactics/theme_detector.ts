@@ -11,7 +11,6 @@ import {
   isValidFen,
   PIECE_CENTIPAWN_VALUES,
 } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry';
 import { getSquaresAttackedByPiece, findKingSquare } from '../geometry/attack_rays';
 import { PIECE_DISPLAY_NAMES } from '../pedagogy/rules_of_thumb';
 
@@ -251,11 +250,6 @@ export function classifyTacticalMotif(
   readonly explanation: string;
 } {
   if (!isValidFen(fenBefore) || !isValidFen(fenAfter)) {
-    logger.debug('Invalid FEN provided to classifyTacticalMotif', {
-      operation: 'classify_tactical_motif',
-      fenBefore,
-      fenAfter,
-    });
     return {
       theme: 'fork',
       confidence: 0.5,
@@ -268,11 +262,7 @@ export function classifyTacticalMotif(
   try {
     chessBefore = createSafeChess(fenBefore);
     chessAfter = createSafeChess(fenAfter);
-  } catch (err: unknown) {
-    logger.debug('Failed to parse FEN in classifyTacticalMotif', {
-      operation: 'classify_tactical_motif',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return {
       theme: 'fork',
       confidence: 0.5,
@@ -283,7 +273,7 @@ export function classifyTacticalMotif(
   const { from, to, promotion } = parseUciMove(moveUci);
   const moverColor = chessBefore.turn();
   const oppColor: PieceColor = moverColor === 'w' ? 'b' : 'w';
-  const movingPiece = chessBefore.get(from as unknown as import('chess.js').Square);
+  const movingPiece = chessBefore.get(from);
   const pieceType = (promotion ? 'q' : movingPiece?.type ?? 'p') as PieceType;
 
   // 1. Checkmate

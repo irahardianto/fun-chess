@@ -5,6 +5,8 @@ import { serializeError } from "@fun-chess/shared";
 import {
   createSocketServer,
   createSocketRateLimiter,
+  createConcurrentConnectionMiddleware,
+  ConnectionTracker,
   type TypedSocketServer,
   type SocketRateLimiter,
 } from "../platform/socket/index.js";
@@ -28,8 +30,18 @@ export function setupSocketGateway(
   env: ServerEnv,
   logger: Logger,
   roomCreateRateLimiter?: SocketRateLimiter,
+  connectionTracker?: ConnectionTracker,
+  maxConcurrentSocketsPerIp?: number,
 ): void {
   const { roomService, gameService, timerRegistry } = domainServices;
+
+  // Ensure concurrent connection capping is registered if not already configured on io (MAJ-002)
+  if (!io.__hasConnectionCapMiddleware && typeof io.use === "function") {
+    const tracker = connectionTracker ?? io.connectionTracker ?? new ConnectionTracker();
+    const maxConn = maxConcurrentSocketsPerIp ?? 10;
+    io.__hasConnectionCapMiddleware = true;
+    io.use(createConcurrentConnectionMiddleware(tracker, maxConn, env.TRUST_PROXY, logger));
+  }
 
   io.on("connection", (socket) => {
     socket.data = socket.data || {};
@@ -136,25 +148,54 @@ export interface SocketLayerSetupParams {
   bootstrapConfig: ServerBootstrapConfig;
   socketRateLimiter?: SocketRateLimiter;
   roomCreateRateLimiter?: SocketRateLimiter;
+  handshakeRateLimiter?: SocketRateLimiter;
+  connectionTracker?: ConnectionTracker;
+  maxConcurrentSocketsPerIp?: number;
 }
 
 export interface SocketLayer {
   io: TypedSocketServer;
   rateLimiter: SocketRateLimiter;
   roomCreateRateLimiter: SocketRateLimiter;
+  handshakeRateLimiter: SocketRateLimiter;
+  connectionTracker: ConnectionTracker;
 }
 
 /**
- * Sets up Socket.io server, rate limiting instances, and ingress gateways (MAJ-003, MAJ-031).
+ * Sets up Socket.io server, rate limiting instances, and ingress gateways (MAJ-002, MAJ-003, MAJ-031).
  */
 export function setupSocketLayer(params: SocketLayerSetupParams): SocketLayer {
-  const { server, domainServices, bootstrapConfig, socketRateLimiter, roomCreateRateLimiter: optRoomCreateLimiter } = params;
+  const {
+    server,
+    domainServices,
+    bootstrapConfig,
+    socketRateLimiter,
+    roomCreateRateLimiter: optRoomCreateLimiter,
+    handshakeRateLimiter: optHandshakeLimiter,
+    connectionTracker: optConnectionTracker,
+    maxConcurrentSocketsPerIp,
+  } = params;
   const { allowedOrigins, logger, env } = bootstrapConfig;
+
+  const handshakeRateLimiter =
+    optHandshakeLimiter ??
+    createSocketRateLimiter({
+      windowMs: 10_000,
+      maxRequests: 30,
+      maxKeys: 10_000,
+      logger,
+    });
+
+  const connectionTracker = optConnectionTracker ?? new ConnectionTracker();
 
   const io = createSocketServer(server, {
     allowedOrigins,
     logger,
     env,
+    handshakeRateLimiter,
+    connectionTracker,
+    maxConcurrentSocketsPerIp,
+    trustProxy: env.TRUST_PROXY,
   });
 
   const rateLimiter =
@@ -174,7 +215,22 @@ export function setupSocketLayer(params: SocketLayerSetupParams): SocketLayer {
       logger,
     });
 
-  setupSocketGateway(io, domainServices, rateLimiter, env, logger, roomCreateRateLimiter);
+  setupSocketGateway(
+    io,
+    domainServices,
+    rateLimiter,
+    env,
+    logger,
+    roomCreateRateLimiter,
+    connectionTracker,
+    maxConcurrentSocketsPerIp,
+  );
 
-  return { io, rateLimiter, roomCreateRateLimiter };
+  return {
+    io,
+    rateLimiter,
+    roomCreateRateLimiter,
+    handshakeRateLimiter,
+    connectionTracker,
+  };
 }

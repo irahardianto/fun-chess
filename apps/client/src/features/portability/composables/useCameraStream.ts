@@ -51,6 +51,86 @@ export function stopMediaStreamTracks(stream: MediaStream | null, customLogger?:
 }
 
 /**
+ * Formats a user-friendly error message based on camera access errors.
+ */
+export function formatCameraErrorMessage(err: unknown): string {
+  const errName =
+    err instanceof Error ? err.name : (err as { name?: string } | null | undefined)?.name;
+  const errMessage =
+    err instanceof Error ? err.message : (err as { message?: string } | null | undefined)?.message;
+
+  if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+    return 'Camera permission was denied. Allow camera access in browser settings to scan QR codes.';
+  }
+  if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+    return 'No camera found on this device.';
+  }
+  if (errName === 'NotReadableError' || errName === 'TrackStartError') {
+    return 'Camera is already in use by another application.';
+  }
+  return errMessage || 'Unable to access camera.';
+}
+
+/**
+ * Attempts to acquire a MediaStream using ideal constraints with a fallback to basic video constraints.
+ */
+export async function acquireMediaStreamWithFallback(
+  constraints: MediaStreamConstraints,
+  cameraService: ICameraService = defaultCameraService,
+  logger?: ILogger,
+  correlationId?: string
+): Promise<MediaStream> {
+  try {
+    return await cameraService.getUserMedia(constraints);
+  } catch (firstErr: unknown) {
+    const firstErrName =
+      firstErr instanceof Error
+        ? firstErr.name
+        : (firstErr as { name?: string } | null | undefined)?.name;
+
+    if (
+      firstErrName === 'NotAllowedError' ||
+      firstErrName === 'PermissionDeniedError' ||
+      firstErrName === 'NotFoundError'
+    ) {
+      throw firstErr;
+    }
+
+    logger?.warn('Exact camera constraint failed, trying basic video fallback', {
+      operation: 'camera_constraints_fallback',
+      correlationId,
+      error: firstErr instanceof Error ? firstErr.message : String(firstErr),
+    });
+
+    return await cameraService.getUserMedia({ video: true, audio: false });
+  }
+}
+
+/**
+ * Cleans up media stream tracks and clears video element srcObject upon stream acquisition failure.
+ * Remediates CRIT-007.
+ */
+export function cleanupFailedStream(
+  stream: MediaStream | null,
+  videoElement?: HTMLVideoElement | null,
+  logger?: ILogger
+): void {
+  if (stream) {
+    stopMediaStreamTracks(stream, logger);
+  }
+  if (videoElement) {
+    try {
+      videoElement.srcObject = null;
+    } catch (clearErr: unknown) {
+      logger?.warn('Failed to clear videoElement.srcObject in catch', {
+        operation: 'camera_catch_clear_src_object',
+        error: clearErr instanceof Error ? clearErr.message : String(clearErr),
+      });
+    }
+  }
+}
+
+/**
  * Composable dedicated to camera stream acquisition, permission handling, and track cleanup.
  * Part of MIN-027 decomposition from useQrScanner.
  * Injects ICameraService (MAJ-015) and implements structured start/success logging (MIN-014).
@@ -83,7 +163,7 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
 
   function stopStream(): void {
     if (mediaStream.value) {
-      stopMediaStreamTracks(mediaStream.value);
+      stopMediaStreamTracks(mediaStream.value, logger);
       mediaStream.value = null;
     }
 
@@ -144,27 +224,7 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
         audio: false,
       };
 
-      try {
-        acquiredStream = await activeService.getUserMedia(constraints);
-      } catch (firstErr: unknown) {
-        const firstErrName =
-          firstErr instanceof Error
-            ? firstErr.name
-            : (firstErr as { name?: string } | null | undefined)?.name;
-        if (
-          firstErrName === 'NotAllowedError' ||
-          firstErrName === 'PermissionDeniedError' ||
-          firstErrName === 'NotFoundError'
-        ) {
-          throw firstErr;
-        }
-        logger.warn('Exact camera constraint failed, trying basic video fallback', {
-          operation: 'camera_constraints_fallback',
-          correlationId,
-          error: firstErr instanceof Error ? firstErr.message : String(firstErr),
-        });
-        acquiredStream = await activeService.getUserMedia({ video: true, audio: false });
-      }
+      acquiredStream = await acquireMediaStreamWithFallback(constraints, activeService, logger, correlationId);
 
       mediaStream.value = acquiredStream;
       videoElement.srcObject = acquiredStream;
@@ -184,45 +244,16 @@ export function useCameraStream(defaultOptions: UseCameraStreamOptions = {}): Us
 
       return acquiredStream;
     } catch (err: unknown) {
-      // CRIT-007: Unconditionally stop all tracks on stream and nullify video.srcObject
-      if (acquiredStream) {
-        stopMediaStreamTracks(acquiredStream);
-      }
+      cleanupFailedStream(acquiredStream, videoElement, logger);
       if (mediaStream.value) {
-        stopMediaStreamTracks(mediaStream.value);
+        stopMediaStreamTracks(mediaStream.value, logger);
         mediaStream.value = null;
-      }
-      if (videoElement) {
-        try {
-          videoElement.srcObject = null;
-        } catch (clearErr: unknown) {
-          logger.warn('Failed to clear videoElement.srcObject in catch', {
-            operation: 'camera_catch_clear_src_object',
-            error: clearErr instanceof Error ? clearErr.message : String(clearErr),
-          });
-        }
       }
       activeVideoElement = null;
 
       hasCamera.value = false;
       isStreaming.value = false;
-
-      const errName =
-        err instanceof Error ? err.name : (err as { name?: string } | null | undefined)?.name;
-      const errMessage =
-        err instanceof Error
-          ? err.message
-          : (err as { message?: string } | null | undefined)?.message;
-
-      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-        cameraError.value = 'Camera permission was denied. Allow camera access in browser settings to scan QR codes.';
-      } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
-        cameraError.value = 'No camera found on this device.';
-      } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
-        cameraError.value = 'Camera is already in use by another application.';
-      } else {
-        cameraError.value = errMessage || 'Unable to access camera.';
-      }
+      cameraError.value = formatCameraErrorMessage(err);
 
       const durationMs = Math.round(performance.now() - startTime);
       logger.error('Failed to start camera stream', {

@@ -1,10 +1,5 @@
-import type { Square as ChessSquare } from "chess.js";
-
-/**
- * Algebraic chess square notation (a1 through h8).
- * Directly aligned with chess.js Square type.
- */
-export type Square = ChessSquare;
+export type { Square } from "./chess.js";
+export { isSquare, SQUARES } from "./chess.js";
 
 /**
  * Chess piece color identifier ('w' for White, 'b' for Black).

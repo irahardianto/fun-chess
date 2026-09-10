@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { StaticController } from "../static.controller.js";
 import { MemoryFileStorage } from "../../file_storage.js";
+import { HttpRateLimiter } from "../../http_rate_limiter.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 describe("StaticController", () => {
@@ -224,5 +225,59 @@ describe("StaticController", () => {
     expect(served).toBe(true);
     expect(writtenStatus).toBe(500);
     expect(writtenBody).toContain("Internal Server Error");
+  });
+
+  it("throttles repeated missing asset lookups with HTTP 429 when notFoundRateLimiter quota is exceeded (WRN-01)", async () => {
+    const fileStorage = new MemoryFileStorage({});
+    const notFoundRateLimiter = new HttpRateLimiter({
+      maxRequests: 2,
+      windowMs: 10_000,
+      pruneIntervalMs: 0,
+    });
+
+    const controller = new StaticController({
+      distPath: "/mock/dist",
+      fileStorage,
+      notFoundRateLimiter,
+    });
+
+    const makeRequest = async (url: string) => {
+      let status = 0;
+      let body = "";
+      const req = {
+        method: "GET",
+        url,
+        headers: {},
+        socket: { remoteAddress: "192.168.1.50" },
+      } as unknown as IncomingMessage;
+      const res = {
+        writeHead: (s: number) => {
+          status = s;
+          return res;
+        },
+        end: (data?: unknown) => {
+          if (data) body = String(data);
+          return res;
+        },
+      } as unknown as ServerResponse;
+      await controller.serve(req, res);
+      return { status, body: body ? JSON.parse(body) : undefined };
+    };
+
+    // First miss: 404
+    const res1 = await makeRequest("/assets/bundle-1.js");
+    expect(res1.status).toBe(404);
+    expect(res1.body.error.code).toBe("ERR_NOT_FOUND");
+
+    // Second miss: 404 (quota exhausted)
+    const res2 = await makeRequest("/assets/bundle-2.js");
+    expect(res2.status).toBe(404);
+    expect(res2.body.error.code).toBe("ERR_NOT_FOUND");
+
+    // Third miss: 429 Too Many Requests
+    const res3 = await makeRequest("/assets/bundle-3.js");
+    expect(res3.status).toBe(429);
+    expect(res3.body.error.code).toBe("ERR_RATE_LIMITED");
+    expect(res3.body.error.message).toContain("Too many non-existent path requests");
   });
 });

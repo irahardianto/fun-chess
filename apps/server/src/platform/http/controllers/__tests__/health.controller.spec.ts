@@ -129,6 +129,100 @@ describe("HealthController", () => {
     expect(health.activeSockets).toBe(2);
     expect(health.memoryUsageMb.rss).toBeGreaterThan(0);
   });
+
+  describe("Container Readiness & Versioned Health (MAJ-013, MIN-023)", () => {
+    it("returns ready status when shutdownCoordinator is not terminating", () => {
+      const controller = new HealthController({
+        roomStore: mockRoomStore,
+        addressService: mockAddressService,
+        port: 3000,
+        getActiveSocketCount: () => 5,
+        shutdownCoordinator: { isTerminating: false, isShuttingDown: false },
+      });
+
+      const readiness = controller.getReadiness();
+      expect(readiness.ready).toBe(true);
+      expect(readiness.status).toBe("ready");
+      expect(controller.getReady()).toEqual(readiness);
+    });
+
+    it("returns terminating status when shutdownCoordinator is terminating", () => {
+      const controller = new HealthController({
+        roomStore: mockRoomStore,
+        addressService: mockAddressService,
+        port: 3000,
+        getActiveSocketCount: () => 5,
+        shutdownCoordinator: { isTerminating: true },
+      });
+
+      const readiness = controller.getReadiness();
+      expect(readiness.ready).toBe(false);
+      expect(readiness.status).toBe("terminating");
+      expect(controller.getReady()).toEqual(readiness);
+    });
+
+    it("returns terminating status when shutdownCoordinator.isShuttingDown === true (BLK-01)", () => {
+      const coordinator = { isShuttingDown: true, isTerminating: false };
+      const controller = new HealthController({
+        roomStore: mockRoomStore,
+        addressService: mockAddressService,
+        port: 3000,
+        getActiveSocketCount: () => 5,
+        shutdownCoordinator: coordinator,
+      });
+
+      const ready = controller.getReady();
+      expect(ready.ready).toBe(false);
+      expect(ready.status).toBe("terminating");
+    });
+
+    it("dynamically updates readiness via setShutdownCoordinator (BLK-01)", () => {
+      const controller = new HealthController({
+        roomStore: mockRoomStore,
+        addressService: mockAddressService,
+        port: 3000,
+        getActiveSocketCount: () => 5,
+      });
+
+      expect(controller.getReady()).toEqual({ status: "ready", ready: true });
+
+      const coordinator = { isShuttingDown: true };
+      controller.setShutdownCoordinator(coordinator);
+
+      expect(controller.getReady()).toEqual({ status: "terminating", ready: false });
+    });
+
+    it("returns uniform versioned health payload envelope via getApiV1Health", () => {
+      const controller = new HealthController({
+        roomStore: mockRoomStore,
+        addressService: mockAddressService,
+        port: 3000,
+        getActiveSocketCount: () => 5,
+      });
+
+      const v1Health = controller.getApiV1Health();
+      expect(v1Health.data).toBeDefined();
+      expect(v1Health.data.status).toBe("ok");
+      expect(v1Health.data.version).toBe("1.0.0");
+      expect(v1Health.data.uptimeSeconds).toBeGreaterThanOrEqual(0);
+      expect(v1Health.data.timestamp).toBeDefined();
+    });
+
+    it("formats Prometheus metrics including active sockets and rooms", async () => {
+      const controller = new HealthController({
+        roomStore: mockRoomStore,
+        addressService: mockAddressService,
+        port: 3000,
+        getActiveSocketCount: () => 8,
+      });
+
+      const metrics = await controller.getPrometheusMetrics();
+      expect(metrics).toContain("active_rooms 3");
+      expect(metrics).toContain('active_connections{transport="websocket"} 8');
+      expect(metrics).toContain("# HELP http_requests_total");
+      expect(metrics).toContain("# TYPE http_requests_total counter");
+    });
+  });
 });
 
 describe("timingSafeStringEqual (MIN-001)", () => {

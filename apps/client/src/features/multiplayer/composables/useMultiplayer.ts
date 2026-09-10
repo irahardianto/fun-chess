@@ -98,6 +98,8 @@ export function useMultiplayer(injectedSocket?: TypedSocket) {
     // Domain Events
     // ------------------------------------------------------------------------
     onOpponentMove: game.onOpponentMove,
+    onGameCheck: game.onGameCheck,
+    onGameOver: game.onGameOver,
 
     // ------------------------------------------------------------------------
     // Session Utilities

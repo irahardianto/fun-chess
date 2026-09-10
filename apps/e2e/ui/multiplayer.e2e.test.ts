@@ -786,5 +786,62 @@ test.describe('Multiplayer LAN / Online Journey', () => {
       await thirdContext.close();
     }
   });
+
+  test('deep linking via ?join=XXXX pre-fills room code and enables direct game join', async ({ browser }) => {
+    const hostContext = await newIsolatedContext(browser);
+    const guestContext = await newIsolatedContext(browser);
+
+    const hostPage = await hostContext.newPage();
+    const guestPage = await guestContext.newPage();
+
+    try {
+      const hostLobby = new LobbyPage(hostPage);
+      const guestGame = new GamePage(guestPage);
+      const hostGame = new GamePage(hostPage);
+
+      // 1. Host creates room and retrieves 4-character room code
+      await hostLobby.goto();
+      await hostLobby.hostGame('DeepHost', 'w');
+      const roomCode = await hostLobby.getRoomCode();
+      expect(roomCode).toMatch(/^[A-Z0-9]{4}$/);
+
+      // 2. Guest navigates directly to the deep link URL with ?join=${roomCode}
+      await guestPage.goto(`/?join=${roomCode}`);
+      await expect(guestPage.locator('[data-testid="lobby-view"]')).toBeVisible({ timeout: 15_000 });
+
+      // 3. Verify multiplayer LAN panel is active and Join card is visible
+      const lanPanel = guestPage.locator('[data-testid="lan-mode-panel"]');
+      await expect(lanPanel).toBeVisible({ timeout: 10_000 });
+
+      const joinCard = guestPage.locator('[data-testid="join-card"]');
+      await expect(joinCard).toBeVisible({ timeout: 10_000 });
+
+      // 4. Verify room code input is pre-filled with the uppercase roomCode from query params
+      const joinCodeInput = guestPage.locator('[data-testid="join-room-code-input"] input');
+      await expect(joinCodeInput).toBeVisible({ timeout: 5_000 });
+      await expect(joinCodeInput).toHaveValue(roomCode);
+
+      // 5. Guest enters nickname and joins game
+      const nicknameInput = guestPage.locator('[data-testid="join-nickname-input"] input');
+      await nicknameInput.fill('DeepGuest');
+
+      const joinBtn = guestPage.locator('[data-testid="join-game-btn"]');
+      await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
+      await joinBtn.click();
+
+      // 6. Both players transition into game arena
+      await Promise.all([
+        hostGame.waitForArena(),
+        guestGame.waitForArena(),
+      ]);
+
+      await expect(hostPage.locator('[data-testid="game-arena-container"]')).toBeVisible();
+      await expect(guestPage.locator('[data-testid="game-arena-container"]')).toBeVisible();
+      await expect(hostPage.locator('.arena-turn-indicator')).toHaveClass(/is-my-turn/, { timeout: 15_000 });
+    } finally {
+      await hostContext.close();
+      await guestContext.close();
+    }
+  });
 });
 

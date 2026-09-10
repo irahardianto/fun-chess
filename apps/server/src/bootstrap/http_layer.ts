@@ -15,6 +15,7 @@ import {
 } from "../platform/logger/index.js";
 import {
   createHttpServer,
+  HealthController,
   type HttpRateLimiter,
   type IFileStorage,
 } from "../platform/http/index.js";
@@ -105,13 +106,30 @@ export interface HttpLayerSetupParams {
   fileStorage?: IFileStorage;
   httpRateLimiter?: HttpRateLimiter;
   getActiveSocketCount: () => number;
+  shutdownCoordinator?: ShutdownCoordinator | { isTerminating?: boolean; isShuttingDown?: boolean };
+  healthController?: HealthController;
 }
 
+export type HttpServerWithHealth = http.Server & {
+  healthController?: HealthController;
+  setShutdownCoordinator?: (
+    coordinator: ShutdownCoordinator | { isTerminating?: boolean; isShuttingDown?: boolean },
+  ) => void;
+};
+
 /**
- * Configures HTTP server with API routes, rate limiting, and SPA static handling (MAJ-003, MIN-005).
+ * Configures HTTP server with API routes, rate limiting, and SPA static handling (MAJ-003, MIN-005, BLK-01).
  */
-export function setupHttpLayer(params: HttpLayerSetupParams): http.Server {
-  const { domainServices, bootstrapConfig, fileStorage, httpRateLimiter, getActiveSocketCount } = params;
+export function setupHttpLayer(params: HttpLayerSetupParams): HttpServerWithHealth {
+  const {
+    domainServices,
+    bootstrapConfig,
+    fileStorage,
+    httpRateLimiter,
+    getActiveSocketCount,
+    shutdownCoordinator,
+    healthController,
+  } = params;
   const { env, allowedOrigins, logger, port, distPath } = bootstrapConfig;
 
   const httpHandler = createHttpServer({
@@ -126,12 +144,30 @@ export function setupHttpLayer(params: HttpLayerSetupParams): http.Server {
     metricsSecret: env.METRICS_SECRET,
     rateLimiter: httpRateLimiter,
     getActiveSocketCount,
+    shutdownCoordinator,
+    healthController,
   });
 
-  const server = http.createServer(httpHandler);
+  const server = http.createServer(httpHandler) as HttpServerWithHealth;
   server.requestTimeout = 30_000;
   server.headersTimeout = 31_000;
   server.keepAliveTimeout = 5_000;
+
+  const handlerWithHealth = httpHandler as unknown as {
+    healthController?: HealthController;
+    setShutdownCoordinator?: (
+      coordinator: ShutdownCoordinator | { isTerminating?: boolean; isShuttingDown?: boolean },
+    ) => void;
+  };
+
+  if (handlerWithHealth.healthController) {
+    server.healthController = handlerWithHealth.healthController;
+  }
+  if (handlerWithHealth.setShutdownCoordinator) {
+    server.setShutdownCoordinator = (coord) => {
+      handlerWithHealth.setShutdownCoordinator?.(coord);
+    };
+  }
 
   return server;
 }

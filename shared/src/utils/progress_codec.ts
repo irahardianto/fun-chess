@@ -268,8 +268,8 @@ export class DefaultProgressCodec implements ProgressCodec {
     let compactDto: CompactProgressDto;
     try {
       compactDto = JSON.parse(jsonString) as CompactProgressDto;
-    } catch {
-      throw new Error("Failed to parse decompressed JSON payload");
+    } catch (err: unknown) {
+      throw new Error("Failed to parse decompressed JSON payload", { cause: err });
     }
 
     const domainPayload = defaultDictionaryMapper.fromCompact(compactDto);
@@ -323,8 +323,8 @@ export class DefaultProgressCodec implements ProgressCodec {
     let parsed: unknown;
     try {
       parsed = JSON.parse(jsonString);
-    } catch {
-      throw new Error("Invalid envelope JSON: malformed JSON syntax");
+    } catch (err: unknown) {
+      throw new Error("Invalid envelope JSON: malformed JSON syntax", { cause: err });
     }
 
     // MAJ-023: Validate parsed JSON using UnifiedProgressEnvelopeSchema.safeParse(parsed)

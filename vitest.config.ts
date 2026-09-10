@@ -3,10 +3,13 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'node',
-    include: ['apps/server/src/__tests__/integration/**/*.spec.ts'],
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    environment: 'jsdom',
+    include: [
+      'apps/server/src/__tests__/integration/**/*.spec.ts',
+      'apps/client/src/**/__tests__/**/*.integration.spec.ts',
+    ],
+    testTimeout: 15000,
+    hookTimeout: 15000,
     isolate: true,
     coverage: {
       provider: 'v8',
@@ -14,6 +17,7 @@ export default defineConfig({
       reportsDirectory: './coverage',
       include: ['apps/server/src/**/*.ts'],
       thresholds: {
+        perFile: true,
         lines: 85,
         functions: 85,
         branches: 85,

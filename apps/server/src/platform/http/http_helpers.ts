@@ -1,7 +1,6 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
-import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Logger } from "../logger/logger.interface.js";
@@ -18,7 +17,8 @@ import {
   HttpServerConfig,
   HttpErrorEnvelope,
 } from "./http.interface.js";
-import { IFileStorage } from "./file_storage.js";
+import { IFileStorage, NodeFileStorage } from "./file_storage.js";
+import type { HttpMetricsCollector } from "./http_metrics.js";
 
 export const CORRELATION_ID_REGEX = /^[a-zA-Z0-9_-]{8,64}$/;
 
@@ -34,12 +34,93 @@ export function sanitizeCorrelationId(headerValue?: string | string[]): string {
   return randomUUID();
 }
 
+export interface SecurityHeadersOptions {
+  allowedOrigins?: string[];
+  clientUrl?: string;
+  publicUrl?: string;
+  cspReportUri?: string;
+}
+
+/**
+ * Constructs a strict Content Security Policy eliminating wildcard ws: and wss: (MAJ-003, ENH-002).
+ * Restricts connect-src to 'self' and explicitly configured allowed origins.
+ */
+export function buildContentSecurityPolicy(options?: SecurityHeadersOptions): string {
+  const connectSrcs = new Set<string>(["'self'"]);
+
+  if (options?.allowedOrigins) {
+    for (const origin of options.allowedOrigins) {
+      if (origin && origin !== "*") {
+        connectSrcs.add(origin);
+        if (origin.startsWith("http://")) {
+          // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
+          connectSrcs.add(origin.replace(/^http:\/\//, "ws://"));
+        } else if (origin.startsWith("https://")) {
+          connectSrcs.add(origin.replace(/^https:\/\//, "wss://"));
+        }
+      }
+    }
+  }
+
+  if (options?.clientUrl) {
+    try {
+      const parsed = new URL(options.clientUrl);
+      connectSrcs.add(parsed.origin);
+      if (parsed.protocol === "https:") {
+        connectSrcs.add(`wss://${parsed.host}`);
+      } else if (parsed.protocol === "http:") {
+        // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
+        connectSrcs.add(`ws://${parsed.host}`);
+      }
+    } catch (err: unknown) {
+      void err; // Ignored if invalid
+    }
+  }
+
+  if (options?.publicUrl) {
+    try {
+      const parsed = new URL(options.publicUrl);
+      connectSrcs.add(parsed.origin);
+      if (parsed.protocol === "https:") {
+        connectSrcs.add(`wss://${parsed.host}`);
+      } else if (parsed.protocol === "http:") {
+        // nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
+        connectSrcs.add(`ws://${parsed.host}`);
+      }
+    } catch (err: unknown) {
+      void err; // Ignored if invalid
+    }
+  }
+
+  const connectSrcDirective = Array.from(connectSrcs).join(" ");
+  let csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "worker-src 'self' blob:",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
+    `connect-src ${connectSrcDirective}`,
+    "font-src 'self' https://fonts.gstatic.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+
+  if (options?.cspReportUri) {
+    csp += `; report-uri ${options.cspReportUri}; report-to csp-endpoint`;
+  }
+
+  return csp;
+}
+
 /**
  * Security headers for native HTTP responses (SEC-02, MAJ-001, MIN-005).
  */
-const SECURITY_HEADERS: Record<string, string> = {
+export const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss:; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
@@ -108,8 +189,8 @@ export function configureServerTimeouts<
 }
 
 /**
- * Resolves the client dist path by checking configuration and candidate locations (CRIT-003, MIN-001, MIN-009, MAJ-014).
- * Uses provided fileStorage without direct fs probes when available.
+ * Resolves the client dist path by checking configuration and candidate locations (CRIT-003, MIN-001, MIN-009, MAJ-014, ENH-005).
+ * Uses provided fileStorage without direct fs probes.
  */
 export function resolveDistPath(
   config: HttpServerConfig,
@@ -132,43 +213,25 @@ export function resolveDistPath(
   ];
 
   const log = logger ?? config.logger;
-  const storage = fileStorage ?? config.fileStorage;
+  const storage = fileStorage ?? config.fileStorage ?? new NodeFileStorage();
 
-  if (storage) {
-    if (typeof storage.existsSync === "function") {
-      for (const candidate of candidates) {
-        try {
-          if (storage.existsSync(candidate)) {
-            return candidate;
-          }
-        } catch (err) {
-          log?.debug("Failed checking client dist directory candidate via fileStorage", {
-            operation: "resolve_client_dist_dir",
-            candidate,
-            error: serializeError(err),
-          });
+  if (typeof storage.existsSync === "function") {
+    for (const candidate of candidates) {
+      try {
+        if (storage.existsSync(candidate)) {
+          return candidate;
         }
+      } catch (err) {
+        log?.debug("Failed checking client dist directory candidate via fileStorage", {
+          operation: "resolve_client_dist_dir",
+          candidate,
+          error: serializeError(err),
+        });
       }
-    }
-    // When fileStorage is configured, return the standard candidate without direct fs probes
-    return candidates[0] ?? path.resolve(process.cwd(), "apps/client/dist");
-  }
-
-  for (const candidate of candidates) {
-    try {
-      if (fs.existsSync(candidate)) {
-        return candidate;
-      }
-    } catch (err) {
-      log?.debug("Failed checking client dist directory candidate", {
-        operation: "resolve_client_dist_dir",
-        candidate,
-        error: serializeError(err),
-      });
     }
   }
 
-  return path.resolve(process.cwd(), "../client/dist");
+  return candidates[0] ?? path.resolve(process.cwd(), "apps/client/dist");
 }
 
 export function applySecurityHeaders(
@@ -176,20 +239,42 @@ export function applySecurityHeaders(
   correlationId: string,
   req?: IncomingMessage,
   trustProxy = false,
+  options?: SecurityHeadersOptions,
 ): void {
   for (const [headerKey, headerVal] of Object.entries(SECURITY_HEADERS)) {
     if (headerKey === "Strict-Transport-Security") {
-      const isHttps =
-        Boolean(
-          (req?.socket as { encrypted?: boolean } | undefined)?.encrypted,
-        ) ||
-        (trustProxy === true && req?.headers["x-forwarded-proto"] === "https");
+      let isHttps = Boolean(
+        (req?.socket as { encrypted?: boolean } | undefined)?.encrypted,
+      );
+      if (!isHttps && trustProxy === true) {
+        const protoHeader = req?.headers["x-forwarded-proto"];
+        const protoCandidate = Array.isArray(protoHeader)
+          ? protoHeader[0]
+          : protoHeader;
+        if (protoCandidate) {
+          const firstProto = protoCandidate.split(",")[0]?.trim().toLowerCase();
+          if (firstProto === "https") {
+            isHttps = true;
+          }
+        }
+      }
       if (!isHttps) {
         continue;
       }
     }
     res.setHeader(headerKey, headerVal);
   }
+
+  const csp = buildContentSecurityPolicy(options);
+  res.setHeader("Content-Security-Policy", csp);
+
+  if (options?.cspReportUri) {
+    res.setHeader(
+      "Reporting-Endpoints",
+      `csp-endpoint="${options.cspReportUri}"`,
+    );
+  }
+
   res.setHeader("x-correlation-id", correlationId);
 }
 
@@ -218,7 +303,7 @@ export function applyCorsHeaders(
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Correlation-ID",
+    "Content-Type, Authorization, X-Correlation-ID, X-User-ID, X-Player-ID",
   );
 
   return { origin, isOriginPermitted };
@@ -310,12 +395,12 @@ export async function handleHealthRoutes(
   sendJsonResponse: (
     statusCode: number,
     data: unknown,
-    options?: { skipLog?: boolean; operation?: string },
+    options?: { skipLog?: boolean; operation?: string; route?: string },
   ) => void,
   sendTextResponse: (
     statusCode: number,
     text: string,
-    options?: { skipLog?: boolean; operation?: string },
+    options?: { skipLog?: boolean; operation?: string; route?: string },
   ) => void,
   authContext?: HealthRouteAuthContext,
 ): Promise<boolean> {
@@ -324,13 +409,35 @@ export async function handleHealthRoutes(
   }
 
   if (pathname === "/healthz") {
-    sendTextResponse(200, "OK", { operation: "health_readiness" });
+    sendTextResponse(200, "OK", { operation: "health_readiness", route: "health_readiness" });
+    return true;
+  }
+
+  if (pathname === "/ready") {
+    const readiness = healthController.getReadiness();
+    const statusCode = readiness.ready ? 200 : 503;
+    sendJsonResponse(statusCode, readiness, {
+      operation: "health_readiness",
+      route: "ready",
+    });
+    return true;
+  }
+
+  if (pathname === "/api/v1/health") {
+    const health = healthController.getApiV1Health();
+    sendJsonResponse(200, health, {
+      operation: "health_canonical",
+      route: "health_v1",
+    });
     return true;
   }
 
   if (pathname === "/health" || pathname === "/api/health") {
     const liveness = healthController.getLiveness();
-    sendJsonResponse(200, liveness, { operation: "health_liveness" });
+    sendJsonResponse(200, liveness, {
+      operation: "health_liveness",
+      route: "health_liveness",
+    });
     return true;
   }
 
@@ -353,14 +460,36 @@ export async function handleHealthRoutes(
             "Telemetry access restricted to authorized callers or loopback",
             authContext.correlationId,
           ),
-          { operation: "health_telemetry" },
+          { operation: "health_telemetry", route: "health_telemetry" },
         );
         return true;
       }
     }
 
+    if (pathname === "/metrics") {
+      const rawAccept = authContext?.headers?.["accept"];
+      const acceptHeader = Array.isArray(rawAccept) ? rawAccept[0] : rawAccept;
+      const prefersPrometheus =
+        Boolean(
+          acceptHeader?.includes("text/plain") ||
+          acceptHeader?.includes("openmetrics") ||
+          acceptHeader?.includes("text/version"),
+        );
+      if (prefersPrometheus) {
+        const metricsText = await healthController.getPrometheusMetrics();
+        sendTextResponse(200, metricsText, {
+          operation: "health_telemetry",
+          route: "health_telemetry",
+        });
+        return true;
+      }
+    }
+
     const detailed = await healthController.getDetailedHealth();
-    sendJsonResponse(200, detailed, { operation: "health_telemetry" });
+    sendJsonResponse(200, detailed, {
+      operation: "health_telemetry",
+      route: "health_telemetry",
+    });
     return true;
   }
 
@@ -377,6 +506,7 @@ export async function handleStaticRoutes(
   correlationId: string,
   clientIp: string,
   startTime: number,
+  metricsCollector?: HttpMetricsCollector,
 ): Promise<boolean> {
   if (
     (method === "GET" || method === "HEAD") &&
@@ -392,8 +522,15 @@ export async function handleStaticRoutes(
     if (served) {
       const duration = Math.round(performance.now() - startTime);
       const statusCode = res.statusCode || 200;
+      metricsCollector?.recordRequest({
+        method,
+        path: pathname,
+        statusCode,
+        durationMs: duration,
+      });
       const logContext = {
         operation: "http_request",
+        route: "static",
         correlationId,
         clientIp,
         path: pathname,
@@ -482,12 +619,12 @@ export function handleRateLimitCheck(
   sendJsonResponse: (
     statusCode: number,
     data: unknown,
-    options?: { skipLog?: boolean; operation?: string },
+    options?: { skipLog?: boolean; operation?: string; route?: string },
   ) => void,
   startTime?: number,
   userId?: string,
 ): boolean {
-  if (pathname === "/healthz" || pathname === "/api/lan-info") {
+  if (pathname === "/healthz" || pathname === "/ready") {
     return false;
   }
 
@@ -495,6 +632,7 @@ export function handleRateLimitCheck(
     (method === "GET" || method === "HEAD") &&
     !pathname.startsWith("/api/") &&
     pathname !== "/health" &&
+    pathname !== "/ready" &&
     pathname !== "/metrics" &&
     pathname !== "/health/detail" &&
     !isProbingPath(pathname);
@@ -529,7 +667,7 @@ export function handleRateLimitCheck(
     sendJsonResponse(
       429,
       formatHttpError(429, "ERR_RATE_LIMITED", limitDesc, correlationId),
-      { operation: "http_rate_limited" },
+      { operation: "http_rate_limited", route: "rate_limit" },
     );
     return true;
   }
@@ -545,12 +683,12 @@ export function handleLanInfoRoute(
   sendJsonResponse: (
     statusCode: number,
     data: unknown,
-    options?: { skipLog?: boolean; operation?: string },
+    options?: { skipLog?: boolean; operation?: string; route?: string },
   ) => void,
   sendRedirect?: (
     statusCode: number,
     location: string,
-    options?: { skipLog?: boolean; operation?: string },
+    options?: { skipLog?: boolean; operation?: string; route?: string },
   ) => void,
 ): boolean {
   if (method !== "GET" && method !== "HEAD") {
@@ -560,15 +698,15 @@ export function handleLanInfoRoute(
   if (pathname === "/api/v1/lan-info") {
     const requestPort = port || req.socket?.localPort || 3000;
     const lanInfo = lanInfoController.getLanInfo(requestPort);
-    sendJsonResponse(200, lanInfo, { operation: "lan_info" });
+    sendJsonResponse(200, lanInfo, { operation: "lan_info", route: "lan_info" });
     return true;
   }
 
   if (pathname === "/api/lan-info") {
     if (sendRedirect) {
-      sendRedirect(307, "/api/v1/lan-info", { operation: "lan_info_redirect" });
+      sendRedirect(307, "/api/v1/lan-info", { operation: "lan_info_redirect", route: "lan_info_redirect" });
     } else {
-      sendJsonResponse(307, null, { operation: "lan_info_redirect" });
+      sendJsonResponse(307, null, { operation: "lan_info_redirect", route: "lan_info_redirect" });
     }
     return true;
   }
@@ -577,7 +715,7 @@ export function handleLanInfoRoute(
 }
 
 /**
- * Rate limits 404 probing to mitigate automated vulnerability path scanning (ENH-001).
+ * Rate limits 404 probing to mitigate automated vulnerability path scanning (ENH-001, MIN-003, CRIT-003).
  * When repeated 404s from the same IP exceed the threshold, returns 429 Too Many Requests.
  */
 export function handleNotFoundRoute(
@@ -588,13 +726,42 @@ export function handleNotFoundRoute(
   sendJsonResponse: (
     statusCode: number,
     data: unknown,
-    options?: { skipLog?: boolean; operation?: string },
+    options?: { skipLog?: boolean; operation?: string; route?: string },
   ) => void,
   notFoundRateLimiter?: HttpRateLimiter,
   logger?: Logger,
   startTime?: number,
   userId?: string,
+  rateLimiter?: HttpRateLimiter,
 ): void {
+  // 1. Consume from global rate limiter if present so non-existent routes consume limit tokens (CRIT-003, MIN-003)
+  if (rateLimiter && !rateLimiter.consume(clientIp)) {
+    const duration = startTime ? Math.round(performance.now() - startTime) : 0;
+    logger?.warn("HTTP rate limit exceeded on not found route", {
+      operation: "http_rate_limited",
+      correlationId,
+      clientIp,
+      path: pathname,
+      method,
+      duration,
+      durationMs: duration,
+      ...(userId ? { userId } : {}),
+    });
+
+    sendJsonResponse(
+      429,
+      formatHttpError(
+        429,
+        "ERR_RATE_LIMITED",
+        "Rate limit exceeded.",
+        correlationId,
+      ),
+      { operation: "http_rate_limited", route: "rate_limit" },
+    );
+    return;
+  }
+
+  // 2. Consume from specialized 404 probing rate limiter
   if (notFoundRateLimiter && !notFoundRateLimiter.consume(clientIp)) {
     const duration = startTime ? Math.round(performance.now() - startTime) : 0;
     logger?.warn("HTTP 404 probing rate limit exceeded", {
@@ -616,7 +783,7 @@ export function handleNotFoundRoute(
         "Too many non-existent path requests. Please slow down.",
         correlationId,
       ),
-      { operation: "http_rate_limited" },
+      { operation: "http_rate_limited", route: "rate_limit" },
     );
     return;
   }
@@ -629,7 +796,7 @@ export function handleNotFoundRoute(
       `Cannot ${method} ${pathname}`,
       correlationId,
     ),
-    { operation: "http_request" },
+    { operation: "http_request", route: "not_found" },
   );
 }
 

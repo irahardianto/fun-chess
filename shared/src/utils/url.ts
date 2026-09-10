@@ -45,7 +45,13 @@ export function safeNormalizeUrl(input: string | undefined | null): string | und
     const parsed = new URL(normalized);
     if (!parsed.hostname) return undefined;
     return normalized;
-  } catch {
+  } catch (err: unknown) {
+    const debugFn = typeof console !== "undefined" ? console["debug"] : undefined;
+    debugFn?.("safeNormalizeUrl encountered invalid URL syntax", {
+      input,
+      normalized,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return undefined;
   }
 }
@@ -58,13 +64,20 @@ export function safeNormalizeUrl(input: string | undefined | null): string | und
  * @returns Parsed URL instance or undefined
  */
 export function safeParseUrl(input: string | undefined | null): URL | undefined {
-  const normalized = safeNormalizeUrl(input);
-  if (!normalized) return undefined;
+  if (!input || typeof input !== "string") return undefined;
+  const normalized = normalizeUrlString(input);
+  if (!normalized || typeof normalized !== "string") return undefined;
   try {
     const parsed = new URL(normalized);
     if (!parsed.hostname) return undefined;
     return parsed;
-  } catch {
+  } catch (err: unknown) {
+    const debugFn = typeof console !== "undefined" ? console["debug"] : undefined;
+    debugFn?.("safeParseUrl encountered invalid URL syntax", {
+      input,
+      normalized,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return undefined;
   }
 }

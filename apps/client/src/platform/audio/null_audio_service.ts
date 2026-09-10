@@ -1,4 +1,4 @@
-import type { IAudioService } from './audio.interface';
+import type { IAudioService, AudioContextHandle } from './audio.interface';
 
 /**
  * Null Object test double implementation of IAudioService.
@@ -29,7 +29,7 @@ export class NullAudioService implements IAudioService {
     return true;
   }
   setMuted(_muted: boolean): void {}
-  initContext(): AudioContext | null {
+  initContext(): AudioContextHandle | null {
     return null;
   }
   resumeContext(): void {}

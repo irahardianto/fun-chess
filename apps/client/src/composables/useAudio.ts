@@ -2,7 +2,7 @@
  * Reactive sound hook with state, triggers, and decoupled device haptics (MIN-017).
  */
 import { ref, computed, inject, getCurrentInstance, type Ref } from 'vue';
-import type { MoveResult, GameState } from '@fun-chess/shared';
+import type { MoveResult, GameState, GameOverPayload } from '@fun-chess/shared';
 import {
   type IAudioService,
   audioSynthesizer as defaultSynth,
@@ -21,7 +21,7 @@ export function useAudioContext(fallback?: AudioContextValue | null): AudioConte
 export interface GameDomainEventSource {
   onOpponentMove?: (cb: (data: { move: MoveResult; gameState: GameState }) => void) => (() => void);
   onGameCheck?: (cb: () => void) => (() => void);
-  onGameOver?: (cb: (payload: { winner?: string }) => void) => (() => void);
+  onGameOver?: (cb: (payload: GameOverPayload | { winner?: string }) => void) => (() => void);
 }
 
 export type GameDomainEvent =

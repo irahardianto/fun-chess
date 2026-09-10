@@ -73,7 +73,7 @@ variable "cors_origin" {
 
 variable "session_secret" {
   type        = string
-  description = "Cryptographic signing secret for player session HMAC tokens (minimum 16 characters in production)."
+  description = "Cryptographic signing secret for player session HMAC tokens (minimum 16 characters in production). Stored in Google Secret Manager and mounted into Cloud Run."
   sensitive   = true
 
   validation {
@@ -84,7 +84,7 @@ variable "session_secret" {
 
 variable "metrics_secret" {
   type        = string
-  description = "Secret key for telemetry and deep health check endpoint authorization (minimum 8 characters when configured)."
+  description = "Secret key for telemetry and deep health check endpoint authorization (minimum 8 characters when configured). Stored in Google Secret Manager and mounted into Cloud Run."
   sensitive   = true
   default     = ""
 

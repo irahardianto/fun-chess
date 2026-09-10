@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { effectScope } from 'vue';
 import { useNotification } from '../composables/useNotification';
 
 describe('useNotification composable', () => {
@@ -137,5 +138,25 @@ describe('useNotification composable', () => {
 
     vi.advanceTimersByTime(5000);
     expect(activeNotification.value).toBeNull();
+  });
+
+  it('automatically clears active timer when effect scope is disposed (MIN-004)', () => {
+    const scope = effectScope();
+    let notif!: ReturnType<typeof useNotification>;
+
+    scope.run(() => {
+      notif = useNotification();
+      notif.showNotification('Scope cleanup test', 'info', 5000);
+    });
+
+    expect(notif.activeNotification.value).not.toBeNull();
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+    // Dispose effect scope
+    scope.stop();
+
+    // Active timer is cleared, so advancing timers does not trigger dismissNotification
+    vi.advanceTimersByTime(10000);
+    expect(notif.activeNotification.value?.message).toBe('Scope cleanup test');
   });
 });

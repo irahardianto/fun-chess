@@ -9,40 +9,54 @@ import {
   inject,
   type InjectionKey,
 } from 'vue';
-import type { IClock } from '@fun-chess/shared';
+import type { IClock, ITimerService, TimerHandle } from '@fun-chess/shared';
 import { SystemClock } from '@fun-chess/shared';
 import { calculateTimeTick } from '../engine/rush_engine';
 
-export type TimerHandle = number | ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>;
-
-/**
- * Abstract timer service interface for deterministic time-dependent operations (MAJ-014).
- */
-export interface ITimerService {
-  setInterval(handler: () => void, timeoutMs: number): TimerHandle;
-  clearInterval(handle: TimerHandle): void;
-  setTimeout(handler: () => void, timeoutMs: number): TimerHandle;
-  clearTimeout(handle: TimerHandle): void;
-}
+export type { ITimerService, TimerHandle };
 
 /**
  * Production timer service delegating to browser window timer APIs.
  */
 export class SystemTimerService implements ITimerService {
-  setInterval(handler: () => void, timeoutMs: number): TimerHandle {
-    return setInterval(handler, timeoutMs);
+  setInterval(callback: () => void | Promise<void>, intervalMs: number): TimerHandle {
+    const timerId = setInterval(() => {
+      void callback();
+    }, intervalMs);
+    return {
+      id: timerId,
+      unref: () => {
+        clearInterval(timerId);
+      },
+    };
   }
 
-  clearInterval(handle: TimerHandle): void {
-    clearInterval(handle as unknown as number);
+  clearInterval(handle: TimerHandle | unknown): void {
+    if (handle && typeof handle === 'object' && 'id' in handle) {
+      clearInterval((handle as { id: unknown }).id as number);
+    } else {
+      clearInterval(handle as number);
+    }
   }
 
-  setTimeout(handler: () => void, timeoutMs: number): TimerHandle {
-    return setTimeout(handler, timeoutMs);
+  setTimeout(callback: () => void | Promise<void>, delayMs: number): TimerHandle {
+    const timerId = setTimeout(() => {
+      void callback();
+    }, delayMs);
+    return {
+      id: timerId,
+      unref: () => {
+        clearTimeout(timerId);
+      },
+    };
   }
 
-  clearTimeout(handle: TimerHandle): void {
-    clearTimeout(handle as unknown as number);
+  clearTimeout(handle: TimerHandle | unknown): void {
+    if (handle && typeof handle === 'object' && 'id' in handle) {
+      clearTimeout((handle as { id: unknown }).id as number);
+    } else {
+      clearTimeout(handle as number);
+    }
   }
 }
 
@@ -51,35 +65,52 @@ export class SystemTimerService implements ITimerService {
  */
 export class MockTimerService implements ITimerService {
   private nextId = 1;
-  private intervals = new Map<number, { handler: () => void; timeoutMs: number }>();
-  private timeouts = new Map<number, { handler: () => void; timeoutMs: number }>();
+  private intervals = new Map<number, { handler: () => void | Promise<void>; timeoutMs: number }>();
+  private timeouts = new Map<number, { handler: () => void | Promise<void>; timeoutMs: number }>();
 
-  setInterval(handler: () => void, timeoutMs: number): TimerHandle {
+  setInterval(callback: () => void | Promise<void>, intervalMs: number): TimerHandle {
     const id = this.nextId++;
-    this.intervals.set(id, { handler, timeoutMs });
-    return id;
+    this.intervals.set(id, { handler: callback, timeoutMs: intervalMs });
+    return { id };
   }
 
-  clearInterval(handle: TimerHandle): void {
-    this.intervals.delete(handle as number);
+  clearInterval(handle: TimerHandle | unknown): void {
+    const id = this.extractHandleId(handle);
+    if (id !== undefined) {
+      this.intervals.delete(id);
+    }
   }
 
-  setTimeout(handler: () => void, timeoutMs: number): TimerHandle {
+  setTimeout(callback: () => void | Promise<void>, delayMs: number): TimerHandle {
     const id = this.nextId++;
-    this.timeouts.set(id, { handler, timeoutMs });
-    return id;
+    this.timeouts.set(id, { handler: callback, timeoutMs: delayMs });
+    return { id };
   }
 
-  clearTimeout(handle: TimerHandle): void {
-    this.timeouts.delete(handle as number);
+  clearTimeout(handle: TimerHandle | unknown): void {
+    const id = this.extractHandleId(handle);
+    if (id !== undefined) {
+      this.timeouts.delete(id);
+    }
   }
 
-  tickInterval(handle?: TimerHandle): void {
+  private extractHandleId(handle: TimerHandle | unknown): number | undefined {
+    if (typeof handle === 'number') return handle;
+    if (handle && typeof handle === 'object' && 'id' in handle && typeof (handle as { id: unknown }).id === 'number') {
+      return (handle as { id: number }).id;
+    }
+    return undefined;
+  }
+
+  tickInterval(handle?: TimerHandle | unknown): void {
     if (handle !== undefined) {
-      this.intervals.get(handle as number)?.handler();
+      const id = this.extractHandleId(handle);
+      if (id !== undefined) {
+        void this.intervals.get(id)?.handler();
+      }
     } else {
       for (const entry of Array.from(this.intervals.values())) {
-        entry.handler();
+        void entry.handler();
       }
     }
   }
@@ -88,7 +119,7 @@ export class MockTimerService implements ITimerService {
     const pending = Array.from(this.timeouts.entries());
     this.timeouts.clear();
     for (const [, entry] of pending) {
-      entry.handler();
+      void entry.handler();
     }
   }
 

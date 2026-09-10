@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MockLocationProvider } from '@/platform/browser/testing';
 import {
   isCloudRelayMode,
   isLocalhostAddress,
@@ -191,6 +192,57 @@ describe('lobby_url_builder', () => {
         windowLocation: { protocol: 'http:', hostname: 'localhost', port: '3000', origin: 'http://localhost:3000' },
       });
       expect(url).toBe('http://192.168.1.20:3000');
+    });
+  });
+
+  describe('ILocationProvider integration', () => {
+    it('uses locationProvider protocol in isCloudRelayMode', () => {
+      const mockLocation = new MockLocationProvider('https://relay.fun-chess.internal');
+      expect(isCloudRelayMode({ locationProvider: mockLocation })).toBe(true);
+
+      const httpLocation = new MockLocationProvider('http://192.168.1.50:8080');
+      expect(
+        isCloudRelayMode({
+          lanInfo: { lanIp: '192.168.1.50', port: 8080 },
+          locationProvider: httpLocation,
+        })
+      ).toBe(false);
+    });
+
+    it('resolves effective host using locationProvider', () => {
+      const mockLocation = new MockLocationProvider('http://fun-chess.local:4000');
+      const host = resolveEffectiveHost({
+        locationProvider: mockLocation,
+        lanInfo: { lanIp: '192.168.1.5' },
+      });
+      expect(host).toBe('fun-chess.local');
+    });
+
+    it('resolves effective port using locationProvider', () => {
+      const mockLocation = new MockLocationProvider('http://192.168.1.5:8080');
+      const port = resolveEffectivePort({
+        locationProvider: mockLocation,
+      });
+      expect(port).toBe('8080');
+    });
+
+    it('builds lobby join URL with locationProvider', () => {
+      const mockLocation = new MockLocationProvider('http://192.168.1.50:3000');
+      const url = buildLobbyJoinUrl({
+        locationProvider: mockLocation,
+        lanInfo: { lanIp: '192.168.1.50', port: 3000 },
+        roomCode: 'ALPHA',
+      });
+      expect(url).toBe('http://192.168.1.50:3000/?join=ALPHA');
+    });
+
+    it('prioritizes locationProvider over windowLocation', () => {
+      const mockLocation = new MockLocationProvider('https://cloud.chess.org');
+      const isCloud = isCloudRelayMode({
+        locationProvider: mockLocation,
+        windowLocation: { protocol: 'http:' },
+      });
+      expect(isCloud).toBe(true);
     });
   });
 });

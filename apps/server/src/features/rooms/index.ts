@@ -43,4 +43,27 @@ export {
   type ITimerService,
   type TimerHandle,
 } from "./timer_service.js";
+export {
+  RoomCodeGenerator,
+  type IRoomCodeGenerator,
+  ROOM_CODE_CHARSET,
+  ROOM_CODE_LENGTH,
+  DEFAULT_MAX_ATTEMPTS,
+} from "./room_code_generator.js";
+export {
+  RematchCoordinator,
+  type IRematchCoordinator,
+} from "./rematch_coordinator.js";
+export {
+  DrawCoordinator,
+  type IDrawCoordinator,
+} from "./draw_coordinator.js";
+export {
+  RoomLifecycleCoordinator,
+  type IRoomLifecycleCoordinator,
+} from "./room_lifecycle_coordinator.js";
+export {
+  RoomMemberCoordinator,
+  type IRoomMemberCoordinator,
+} from "./room_member_coordinator.js";
 export * from "./room.errors.js";

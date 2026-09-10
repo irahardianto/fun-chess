@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useCameraStream, stopMediaStreamTracks } from '../useCameraStream';
+import {
+  useCameraStream,
+  stopMediaStreamTracks,
+  formatCameraErrorMessage,
+  acquireMediaStreamWithFallback,
+  cleanupFailedStream,
+} from '../useCameraStream';
 
 describe('useCameraStream', () => {
   let mockTrack: { stop: ReturnType<typeof vi.fn> };
@@ -151,5 +157,79 @@ describe('useCameraStream', () => {
     resetCameraError();
 
     expect(cameraError.value).toBeNull();
+  });
+
+  describe('formatCameraErrorMessage', () => {
+    it('handles NotAllowedError', () => {
+      const err = new Error('denied');
+      err.name = 'NotAllowedError';
+      expect(formatCameraErrorMessage(err)).toContain('Camera permission was denied');
+    });
+
+    it('handles NotFoundError', () => {
+      const err = new Error('not found');
+      err.name = 'NotFoundError';
+      expect(formatCameraErrorMessage(err)).toContain('No camera found');
+    });
+
+    it('handles NotReadableError', () => {
+      const err = new Error('in use');
+      err.name = 'NotReadableError';
+      expect(formatCameraErrorMessage(err)).toContain('already in use');
+    });
+
+    it('falls back to generic error message', () => {
+      expect(formatCameraErrorMessage(new Error('Hardware malfunction'))).toBe('Hardware malfunction');
+      expect(formatCameraErrorMessage(null)).toBe('Unable to access camera.');
+    });
+  });
+
+  describe('acquireMediaStreamWithFallback', () => {
+    it('throws immediately on permission errors without retrying fallback', async () => {
+      const permErr = new Error('Denied');
+      permErr.name = 'NotAllowedError';
+      const mockService = {
+        isSupported: vi.fn().mockReturnValue(true),
+        getUserMedia: vi.fn().mockRejectedValue(permErr),
+      };
+
+      await expect(
+        acquireMediaStreamWithFallback({ video: true }, mockService as any)
+      ).rejects.toThrow('Denied');
+      expect(mockService.getUserMedia).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries fallback for other errors', async () => {
+      const fallback = { getTracks: vi.fn().mockReturnValue([]) } as unknown as MediaStream;
+      const mockService = {
+        isSupported: vi.fn().mockReturnValue(true),
+        getUserMedia: vi.fn()
+          .mockRejectedValueOnce(new Error('Overconstrained'))
+          .mockResolvedValueOnce(fallback),
+      };
+
+      const result = await acquireMediaStreamWithFallback({ video: true }, mockService as any);
+      expect(result).toBe(fallback);
+      expect(mockService.getUserMedia).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('cleanupFailedStream', () => {
+    it('stops stream tracks and clears video srcObject safely', () => {
+      const stopFn = vi.fn();
+      const stream = {
+        getTracks: vi.fn().mockReturnValue([{ stop: stopFn }]),
+      } as unknown as MediaStream;
+      const video = { srcObject: stream } as unknown as HTMLVideoElement;
+
+      cleanupFailedStream(stream, video);
+
+      expect(stopFn).toHaveBeenCalledTimes(1);
+      expect(video.srcObject).toBeNull();
+    });
+
+    it('handles null stream and video gracefully', () => {
+      expect(() => cleanupFailedStream(null, null)).not.toThrow();
+    });
   });
 });

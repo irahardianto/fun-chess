@@ -1,6 +1,4 @@
 import type http from "node:http";
-import { randomUUID } from "node:crypto";
-import { serializeError } from "@fun-chess/shared";
 import {
   ShutdownCoordinator,
   type ShutdownCoordinatorOptions,
@@ -44,12 +42,10 @@ export function setupBackgroundJobs(
           );
           return { cleanedCount: count };
         });
-      } catch (err) {
-        logger.error("Scheduled room_cleanup caught rejection", {
-          operation: "room_cleanup",
-          correlationId: randomUUID(),
-          error: serializeError(err),
-        });
+      } catch (err: unknown) {
+        // Prevent unhandled rejection in setInterval callback.
+        // runLoggedJob already logged the failure with the job's correlationId and duration (MAJ-015).
+        void err;
       }
     },
     5 * 60 * 1000,

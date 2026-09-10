@@ -16,7 +16,6 @@ import {
   isValidFen,
   PIECE_CENTIPAWN_VALUES,
 } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry';
 
 /**
  * Human-readable piece display names.
@@ -166,11 +165,7 @@ export function generateMistakeRefutation(
   let chess: Chess;
   try {
     chess = createSafeChess(fen);
-  } catch (err) {
-    logger.debug('Failed to parse FEN in generateMistakeRefutation', {
-      operation: 'generate_mistake_refutation',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return null;
   }
 
@@ -179,15 +174,11 @@ export function generateMistakeRefutation(
   let playerResult: Move | null;
   try {
     playerResult = chess.move({
-      from: playerMove.from as unknown as import('chess.js').Square,
-      to: playerMove.to as unknown as import('chess.js').Square,
+      from: playerMove.from,
+      to: playerMove.to,
       promotion: playerMove.promotion,
     });
-  } catch (err) {
-    logger.debug('Failed to execute playerMove in generateMistakeRefutation', {
-      operation: 'generate_mistake_refutation',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return null;
   }
 
@@ -284,22 +275,17 @@ export function generateStepBreakdowns(puzzle: Puzzle): readonly PuzzleStepExpla
     const actor: PieceColor = chess.turn();
     const isPlayer = actor === puzzle.playerColor;
     const { from, to, promotion } = parseUciMove(moveUci);
-    const movingPiece = chess.get(from as unknown as import('chess.js').Square);
+    const movingPiece = chess.get(from);
     const pieceName = movingPiece ? PIECE_DISPLAY_NAMES[movingPiece.type as PieceType] : 'Piece';
 
     let moveRes: Move | null;
     try {
       moveRes = chess.move({
-        from: from as unknown as import('chess.js').Square,
-        to: to as unknown as import('chess.js').Square,
+        from,
+        to,
         promotion,
       });
-    } catch (err) {
-      logger.debug('Failed to execute move in generateStepBreakdowns', {
-        operation: 'generate_step_breakdowns',
-        moveUci,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
       moveRes = null;
     }
 

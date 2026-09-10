@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import App from './App.vue';
 import './assets/design-tokens.css';
 import {
@@ -16,6 +17,9 @@ import {
   WEBRTC_DISCOVERY_KEY,
   CLIPBOARD_SERVICE_KEY,
   CAMERA_SERVICE_KEY,
+  LOCATION_PROVIDER_KEY,
+  NETWORK_MONITOR_KEY,
+  TIMER_SERVICE_KEY,
   registerDefaultDomainStores,
 } from './platform/di';
 import { apiClient } from './platform/api';
@@ -23,6 +27,7 @@ import { safeLocalStorage, safeSessionStorage, migrateStorageV1ToV2 } from './pl
 import { audioSynthesizer } from './platform/audio';
 import { logger, generateCorrelationId } from './platform/telemetry';
 import { SystemClock } from './platform/time';
+import { BrowserLocationProvider, BrowserNetworkMonitor } from './platform/browser';
 import {
   defaultFileDownloader,
   defaultHapticsService,
@@ -31,16 +36,24 @@ import {
   defaultCameraService,
 } from './platform/hardware';
 import { defaultLocalStorageProgressStore } from './features/scenarios';
-import { defaultLocalStoragePuzzleProgressStore } from './features/puzzles';
+import {
+  defaultLocalStoragePuzzleProgressStore,
+  SystemTimerService,
+  TIMER_SERVICE_KEY as PUZZLE_TIMER_SERVICE_KEY,
+} from './features/puzzles';
 import { LocalStorageUnifiedStore } from './features/portability';
 
-// Storage Migration: Execute V1 to V2 schema migration prior to store mounting (CRIT-001)
-migrateStorageV1ToV2(safeLocalStorage);
-
 export function createFunChessApp() {
+  // Storage Migration: Execute V1 to V2 schema migration prior to store mounting during bootstrap (CRIT-001, MIN-010)
+  migrateStorageV1ToV2(safeLocalStorage);
+
   const app = createApp(App);
+  app.use(createPinia());
 
   const defaultClock = new SystemClock();
+  const defaultLocationProvider = new BrowserLocationProvider();
+  const defaultNetworkMonitor = new BrowserNetworkMonitor();
+  const defaultTimerService = new SystemTimerService();
   const unifiedProgressStore = new LocalStorageUnifiedStore(
     defaultLocalStorageProgressStore,
     defaultLocalStoragePuzzleProgressStore,
@@ -53,13 +66,17 @@ export function createFunChessApp() {
     progressStorage: unifiedProgressStore,
   });
 
-  // Composition Root: Wire Infrastructure & Stores via app.provide (MAJ-009, MAJ-012, MAJ-014, MAJ-015, MAJ-019)
+  // Composition Root: Wire Infrastructure & Stores via app.provide (MAJ-009, MAJ-012, MAJ-014, MAJ-015, MAJ-019, WRN-03)
   app.provide(API_CLIENT_KEY, apiClient);
   app.provide(STORAGE_KEY, safeLocalStorage);
   app.provide(SESSION_STORAGE_KEY, safeSessionStorage);
   app.provide(AUDIO_SERVICE_KEY, audioSynthesizer);
   app.provide(LOGGER_KEY, logger);
   app.provide(CLOCK_KEY, defaultClock);
+  app.provide(LOCATION_PROVIDER_KEY, defaultLocationProvider);
+  app.provide(NETWORK_MONITOR_KEY, defaultNetworkMonitor);
+  app.provide(TIMER_SERVICE_KEY, defaultTimerService);
+  app.provide(PUZZLE_TIMER_SERVICE_KEY, defaultTimerService);
   app.provide(SCENARIO_STORE_KEY, defaultLocalStorageProgressStore);
   app.provide(PUZZLE_STORE_KEY, defaultLocalStoragePuzzleProgressStore);
   app.provide(PROGRESS_STORAGE_KEY, unifiedProgressStore);

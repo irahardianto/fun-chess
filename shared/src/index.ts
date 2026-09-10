@@ -1,5 +1,6 @@
 // Domain Contracts
 export { z } from "zod";
+export * from "./contracts/chess.js";
 export * from "./contracts/models.js";
 export * from "./contracts/schemas.js";
 export * from "./contracts/errors.js";
@@ -31,6 +32,7 @@ export * from "./utils/game_over.js";
 export * from "./utils/star_calculator.js";
 export * from "./utils/coordinates.js";
 export * from "./utils/system_clock.js";
+export * from "./utils/clock.js";
 export * from "./utils/normalization.js";
 export * from "./utils/session_token.js";
 export * from "./utils/error_utils.js";

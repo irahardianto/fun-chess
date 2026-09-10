@@ -4,13 +4,13 @@ import QRCode from 'qrcode';
 import type { LanInfoResponse } from '@fun-chess/shared';
 import BaseModal from '../../components/base/BaseModal.vue';
 import BaseButton from '../../components/base/BaseButton.vue';
+import { QrCodeCanvas, LanConfigSection } from './components';
 import { useLanDiscovery, isValidIPv4 } from './useLanDiscovery';
 import {
   isCloudRelayMode,
   resolveEffectiveHost,
   resolveEffectivePort,
   buildLobbyJoinUrl,
-  isLocalhostAddress,
 } from './lobby_url_builder';
 import { useInjectLogger, useInjectClipboard, useInjectLocationProvider } from '@/platform/di';
 
@@ -47,7 +47,6 @@ const copied = ref(false);
 let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 const copyError = ref(false);
 let copyErrorTimeout: ReturnType<typeof setTimeout> | null = null;
-const showIpGuide = ref(false);
 
 // Composable for persistent LAN discovery and WebRTC detection
 const { serverLanInfo, activeLanIp, setLanIp } = useLanDiscovery();
@@ -121,11 +120,6 @@ const effectiveJoinUrl = computed(() =>
   })
 );
 
-const isLocalhost = computed(() => {
-  if (isCloudMode.value) return false;
-  return isLocalhostAddress(effectiveHost.value);
-});
-
 async function generateQr() {
   qrStatus.value = 'generating';
   try {
@@ -159,13 +153,12 @@ watch(
   { immediate: true }
 );
 
-function onIpInput(e: Event) {
-  const target = e.target as HTMLInputElement;
-  const val = target.value.trim();
+function onIpInput(val: string) {
   customIpInput.value = val;
   ipError.value = '';
-  if (isValidIPv4(val)) {
-    setLanIp(val);
+  const trimmed = val.trim();
+  if (isValidIPv4(trimmed)) {
+    setLanIp(trimmed);
     generateQr();
   }
 }
@@ -188,11 +181,6 @@ function selectInterface(ip: string) {
   ipError.value = '';
   setLanIp(ip);
   generateQr();
-}
-
-function prefillPrefix(prefix: string) {
-  customIpInput.value = prefix;
-  ipError.value = '';
 }
 
 async function copyLink() {
@@ -272,44 +260,12 @@ function handleClose() {
       </div>
 
       <!-- QR Code Image Frame & Error Fallback -->
-      <div v-if="qrStatus === 'ready'" class="qr-canvas-card">
-        <img
-          v-if="qrDataUrl"
-          :src="qrDataUrl"
-          alt="QR Code to join chess match"
-          class="qr-image"
-        />
-      </div>
-
-      <div
-        v-else-if="qrStatus === 'error'"
-        class="qr-canvas-card--error"
-        role="alert"
-        aria-live="assertive"
-      >
-        <span class="qr-error-icon" aria-hidden="true">⚠️</span>
-        <div class="qr-error-title">Failed to create QR Code canvas</div>
-        <p class="qr-error-desc">
-          Your device browser couldn't draw the QR code. You can still join instantly using the 4-letter code or link!
-        </p>
-        <button
-          type="button"
-          class="qr-retry-btn"
-          aria-label="Retry generating QR code"
-          @click="generateQr"
-        >
-          🔄 Retry QR Code
-        </button>
-        <div class="qr-loading-placeholder" style="display: none">
-          Generating QR Code...
-        </div>
-      </div>
-
-      <div v-else class="qr-canvas-card">
-        <div class="qr-loading-placeholder">
-          Generating QR Code...
-        </div>
-      </div>
+      <QrCodeCanvas
+        :qr-data-url="qrDataUrl"
+        :is-generating="qrStatus === 'generating'"
+        :error="qrStatus === 'error' ? 'Failed to create QR Code canvas' : null"
+        @retry="generateQr"
+      />
 
       <!-- Cloud Relay Status Banner -->
       <div v-if="isCloudMode" class="cloud-relay-card" data-testid="qr-cloud-status">
@@ -323,132 +279,19 @@ function handleClose() {
       </div>
 
       <!-- IP Configuration & Localhost Notice (LAN Mode) -->
-      <div v-else class="lan-config-section" :class="{ 'is-warning-mode': isLocalhost }">
-        <div class="lan-status-header">
-          <span class="lan-status-icon">{{ isLocalhost ? '⚠️' : '📡' }}</span>
-          <div class="lan-status-text">
-            <strong>{{ isLocalhost ? 'Localhost Detected' : 'Connecting via LAN IP' }}</strong>
-            <p v-if="isLocalhost" class="status-tip">
-              Phones cannot connect to <code>localhost</code>. Enter your computer's Wi-Fi IP so kids can scan and join:
-            </p>
-            <p v-else class="status-tip">
-              Active host IP: <code>{{ effectiveHost }}</code>
-            </p>
-          </div>
-        </div>
-
-        <!-- Available Network Interfaces Pills -->
-        <div v-if="availableInterfaces.length > 0" class="interface-group">
-          <span class="sub-label">Discovered IPs:</span>
-          <div class="interface-pills">
-            <button
-              v-for="ip in availableInterfaces"
-              :key="ip"
-              type="button"
-              class="pill-btn"
-              :class="{ 'is-selected': effectiveHost === ip }"
-              @click="selectInterface(ip)"
-            >
-              {{ ip }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Manual IP Input Row (Defensive Controls: ENH-002) -->
-        <div class="ip-input-container">
-          <!-- Semantic Screen Reader Label -->
-          <label for="qr-custom-ip-input" class="sr-only">
-            Enter host Wi-Fi IP address
-          </label>
-
-          <div class="ip-input-row">
-            <input
-              id="qr-custom-ip-input"
-              :value="customIpInput"
-              type="text"
-              inputmode="decimal"
-              maxlength="15"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="e.g. 192.168.1.15"
-              class="ip-text-input"
-              :class="{ 'has-error': Boolean(ipError) }"
-              :aria-invalid="Boolean(ipError)"
-              :aria-describedby="ipError ? 'ip-inline-error' : undefined"
-              aria-label="Enter host Wi-Fi IP address"
-              data-testid="qr-custom-ip-input"
-              @input="onIpInput"
-              @keyup.enter="applyCustomIp"
-            />
-            <BaseButton
-              variant="accent"
-              size="sm"
-              data-testid="apply-custom-ip-btn"
-              @click="applyCustomIp"
-            >
-              Apply IP
-            </BaseButton>
-          </div>
-
-          <!-- Accessible Inline Error Message -->
-          <p
-            v-if="ipError"
-            id="ip-inline-error"
-            class="ip-inline-error"
-            role="alert"
-            aria-live="polite"
-            data-testid="qr-ip-error"
-          >
-            ⚠️ {{ ipError }}
-          </p>
-
-          <!-- Quick Prefill Subnet Buttons (when empty and on localhost) -->
-          <div v-if="isLocalhost && !customIpInput" class="prefill-helpers">
-            <span class="prefill-label">Quick prefill:</span>
-            <button
-              type="button"
-              class="prefill-tag"
-              :aria-label="'Prefill subnet prefix 192.168.1.'"
-              @click="prefillPrefix('192.168.1.')"
-            >
-              192.168.1._
-            </button>
-            <button
-              type="button"
-              class="prefill-tag"
-              :aria-label="'Prefill subnet prefix 192.168.0.'"
-              @click="prefillPrefix('192.168.0.')"
-            >
-              192.168.0._
-            </button>
-            <button
-              type="button"
-              class="prefill-tag"
-              :aria-label="'Prefill subnet prefix 10.0.0.'"
-              @click="prefillPrefix('10.0.0.')"
-            >
-              10.0.0._
-            </button>
-          </div>
-
-          <!-- Collapsible Help Guide -->
-          <div class="ip-help-wrapper">
-            <button
-              type="button"
-              class="help-toggle-btn"
-              :aria-expanded="showIpGuide"
-              @click="showIpGuide = !showIpGuide"
-            >
-              {{ showIpGuide ? '▲ Hide IP help' : '❓ How to find your computer IP' }}
-            </button>
-            <div v-if="showIpGuide" class="ip-guide-box">
-              <p><strong>Windows:</strong> Press <kbd>Win+R</kbd>, type <code>cmd</code>, run <code>ipconfig</code> (look for IPv4 Address).</p>
-              <p><strong>Mac:</strong> System Settings → Wi-Fi → Details → IP Address.</p>
-              <p><strong>Linux:</strong> Run <code>hostname -I</code> or <code>ip addr</code>.</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <LanConfigSection
+        v-else
+        :interfaces="availableInterfaces"
+        :active-ip="effectiveHost"
+        :is-cloud-relay="isCloudMode"
+        :custom-ip-input="customIpInput"
+        :ip-validation-error="ipError"
+        :copied="copied"
+        @select-ip="selectInterface"
+        @update:custom-ip-input="onIpInput"
+        @apply-custom-ip="applyCustomIp"
+        @copy-link="copyLink"
+      />
 
       <!-- URL Preview and Copy Action -->
       <div class="qr-actions">

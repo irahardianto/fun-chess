@@ -5,6 +5,7 @@ export type ErrorCode =
   | "ERR_ROOM_NOT_FOUND"
   | "ERR_ROOM_FULL"
   | "ERR_ROOM_ALREADY_EXISTS"
+  | "ERR_ROOM_CAPACITY_EXCEEDED"
   | "ERR_INVALID_ROOM_CODE"
   | "ERR_INVALID_MOVE"
   | "ERR_NOT_YOUR_TURN"
@@ -102,6 +103,26 @@ export class RoomFullError extends AppError {
       409,
       { roomCode },
     );
+  }
+}
+
+/**
+ * Error thrown when the server has reached its configured maximum active room capacity.
+ * Maps to HTTP 429 Too Many Requests (CRIT-002).
+ */
+export class RoomCapacityExceededError extends AppError {
+  public readonly maxRooms: number;
+
+  constructor(maxRooms: number) {
+    super(
+      "ERR_ROOM_CAPACITY_EXCEEDED",
+      `Maximum room capacity reached (${maxRooms})`,
+      429,
+      { maxRooms },
+    );
+    this.name = "RoomCapacityExceededError";
+    this.maxRooms = maxRooms;
+    Object.setPrototypeOf(this, RoomCapacityExceededError.prototype);
   }
 }
 

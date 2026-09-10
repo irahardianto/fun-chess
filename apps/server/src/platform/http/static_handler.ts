@@ -4,6 +4,7 @@ import { serializeError } from "@fun-chess/shared";
 import { Logger } from "../logger/logger.interface.js";
 import { IFileStorage, NodeFileStorage } from "./file_storage.js";
 import { extractClientIp } from "./ip_utils.js";
+import type { HttpRateLimiter } from "./http_rate_limiter.js";
 
 export const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -33,6 +34,7 @@ export interface StaticFileHandlerOptions {
   fileStorage?: IFileStorage;
   trustProxy?: boolean;
   correlationId?: string;
+  notFoundRateLimiter?: HttpRateLimiter;
 }
 
 // --- Decomposed Helper Functions (MIN-022) ---
@@ -156,13 +158,27 @@ export function sendAssetResponse(
 function handleForbidden(
   res: ServerResponse,
   isHead: boolean,
-  message = "Forbidden",
+  message = "Access to requested resource is forbidden",
+  correlationId?: string,
 ): boolean {
-  res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+  const errorEnvelope = {
+    status: "error",
+    code: 403,
+    error: {
+      code: "ERR_UNAUTHORIZED",
+      message,
+      ...(correlationId ? { correlationId } : {}),
+    },
+  };
+  const body = JSON.stringify(errorEnvelope);
+  res.writeHead(403, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(body),
+  });
   if (isHead) {
     res.end();
   } else {
-    res.end(message);
+    res.end(body);
   }
   return true;
 }
@@ -171,13 +187,27 @@ function handleServerError(
   res: ServerResponse,
   isHead: boolean,
   message = "Internal Server Error",
+  correlationId?: string,
 ): boolean {
   if (!res.headersSent) {
-    res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+    const errorEnvelope = {
+      status: "error",
+      code: 500,
+      error: {
+        code: "ERR_INTERNAL_SERVER",
+        message,
+        ...(correlationId ? { correlationId } : {}),
+      },
+    };
+    const body = JSON.stringify(errorEnvelope);
+    res.writeHead(500, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": Buffer.byteLength(body),
+    });
     if (isHead) {
       res.end();
     } else {
-      res.end(message);
+      res.end(body);
     }
   }
   return true;
@@ -200,6 +230,34 @@ function handleNotFound(
   };
   const body = JSON.stringify(errorEnvelope);
   res.writeHead(404, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(body),
+  });
+  if (isHead) {
+    res.end();
+  } else {
+    res.end(body);
+  }
+  return true;
+}
+
+function handleRateLimited(
+  res: ServerResponse,
+  isHead: boolean,
+  message = "Too many non-existent path requests. Please slow down.",
+  correlationId?: string,
+): boolean {
+  const errorEnvelope = {
+    status: "error",
+    code: 429,
+    error: {
+      code: "ERR_RATE_LIMITED",
+      message,
+      ...(correlationId ? { correlationId } : {}),
+    },
+  };
+  const body = JSON.stringify(errorEnvelope);
+  res.writeHead(429, {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(body),
   });
@@ -339,7 +397,7 @@ function sendFallbackOrMiss(
         durationMs: duration,
         error: serializeError(fallbackErr),
       });
-      return handleServerError(res, isHead);
+      return handleServerError(res, isHead, undefined, correlationId);
     }
   }
 
@@ -391,7 +449,7 @@ async function readAndSendStaticFile(
         durationMs: duration,
         error: serializeError(sendErr),
       });
-      return handleServerError(res, isHead);
+      return handleServerError(res, isHead, undefined, correlationId);
     }
   } catch (err: unknown) {
     const errCode = (err as { code?: string })?.code;
@@ -406,7 +464,7 @@ async function readAndSendStaticFile(
         durationMs: duration,
         error: serializeError(err),
       });
-      return handleServerError(res, isHead);
+      return handleServerError(res, isHead, undefined, correlationId);
     }
 
     return sendFallbackOrMiss(
@@ -462,7 +520,7 @@ export async function serveStaticFile(
       duration,
       durationMs: duration,
     });
-    return handleForbidden(res, isHead);
+    return handleForbidden(res, isHead, undefined, correlationId);
   }
 
   const acceptHeader = (req.headers?.["accept"] as string) || "";
@@ -487,10 +545,28 @@ export async function serveStaticFile(
       durationMs: duration,
       error: serializeError(statResult.error),
     });
-    return handleServerError(res, isHead);
+    return handleServerError(res, isHead, undefined, correlationId);
   }
 
   if (statResult.status === "not_found") {
+    if (options.notFoundRateLimiter && !options.notFoundRateLimiter.consume(clientIp)) {
+      const duration = Math.round(performance.now() - startTime);
+      logger?.warn("HTTP 404 probing rate limit exceeded", {
+        operation: "http_rate_limited",
+        correlationId,
+        clientIp,
+        path: urlPath,
+        method: req.method?.toUpperCase() || "GET",
+        duration,
+        durationMs: duration,
+      });
+      return handleRateLimited(
+        res,
+        isHead,
+        "Too many non-existent path requests. Please slow down.",
+        correlationId,
+      );
+    }
     return handleNotFound(res, isHead, "Not Found", correlationId);
   }
 
@@ -515,7 +591,7 @@ export async function serveStaticFile(
       duration,
       durationMs: duration,
     });
-    return handleForbidden(res, isHead);
+    return handleForbidden(res, isHead, undefined, correlationId);
   }
 
   if (canonicalResult.status === "error") {
@@ -529,7 +605,7 @@ export async function serveStaticFile(
       durationMs: duration,
       error: serializeError(canonicalResult.error),
     });
-    return handleServerError(res, isHead);
+    return handleServerError(res, isHead, undefined, correlationId);
   }
 
   // 4. Read and Send File Content

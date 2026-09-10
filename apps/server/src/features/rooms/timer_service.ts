@@ -1,37 +1,11 @@
-import type { IClock } from "@fun-chess/shared";
+import type {
+  IClock,
+  ITimerService,
+  TimerHandle,
+} from "@fun-chess/shared";
 
-/**
- * Opaque handle representing an active scheduled timer (MAJ-014).
- */
-export interface TimerHandle {
-  /** Prevents the Node.js event loop from exiting while timer is active */
-  ref?(): void;
-  /** Allows the Node.js event loop to exit even if timer is active */
-  unref?(): void;
-  /** Opaque underlying runtime identifier */
-  readonly id?: unknown;
-}
+export type { ITimerService, TimerHandle };
 
-/**
- * Interface contract isolating timer scheduling behind an abstract boundary (MAJ-014).
- * Enables deterministic fast-forwarding in unit tests without global mock pollution.
- */
-export interface ITimerService {
-  /** Schedules a one-shot timer after delayMs */
-  setTimeout(
-    callback: () => void | Promise<void>,
-    delayMs: number,
-  ): TimerHandle;
-  /** Cancels an active one-shot timer */
-  clearTimeout(handle: TimerHandle | unknown): void;
-  /** Schedules a recurring periodic timer */
-  setInterval(
-    callback: () => void | Promise<void>,
-    intervalMs: number,
-  ): TimerHandle;
-  /** Cancels an active recurring periodic timer */
-  clearInterval(handle: TimerHandle | unknown): void;
-}
 
 /**
  * Production implementation backed by Node.js global timers.

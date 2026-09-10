@@ -10,6 +10,7 @@ export * from "./progress_merger.js";
 export * from "./schema_validator.js";
 export * from "./star_calculator.js";
 export * from "./system_clock.js";
+export * from "./clock.js";
 export * from "./uci.js";
 export * from "./normalization.js";
 export * from "./session_token.js";

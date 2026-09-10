@@ -209,6 +209,160 @@ describe('AudioSynthesizer', () => {
     vi.unstubAllGlobals();
   });
 
+  it('attaches onended cleanup to disconnect oscillator and intermediate gain node across all sound synthesis methods (MAJ-004)', () => {
+    const createdOscs: Array<{
+      connect: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+      stop: ReturnType<typeof vi.fn>;
+      disconnect: ReturnType<typeof vi.fn>;
+      onended: (() => void) | null;
+      frequency: {
+        setValueAtTime: ReturnType<typeof vi.fn>;
+        exponentialRampToValueAtTime: ReturnType<typeof vi.fn>;
+        linearRampToValueAtTime: ReturnType<typeof vi.fn>;
+      };
+    }> = [];
+
+    const createdGains: Array<{
+      connect: ReturnType<typeof vi.fn>;
+      disconnect: ReturnType<typeof vi.fn>;
+      gain: {
+        setValueAtTime: ReturnType<typeof vi.fn>;
+        exponentialRampToValueAtTime: ReturnType<typeof vi.fn>;
+        linearRampToValueAtTime: ReturnType<typeof vi.fn>;
+      };
+    }> = [];
+
+    const mockAudioContext = {
+      currentTime: 10,
+      state: 'running',
+      destination: {},
+      createOscillator: vi.fn(() => {
+        const osc = {
+          type: 'sine',
+          connect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          disconnect: vi.fn(),
+          onended: null,
+          frequency: {
+            setValueAtTime: vi.fn(),
+            exponentialRampToValueAtTime: vi.fn(),
+            linearRampToValueAtTime: vi.fn(),
+          },
+        };
+        createdOscs.push(osc);
+        return osc;
+      }),
+      createGain: vi.fn(() => {
+        const g = {
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          gain: {
+            setValueAtTime: vi.fn(),
+            exponentialRampToValueAtTime: vi.fn(),
+            linearRampToValueAtTime: vi.fn(),
+          },
+        };
+        createdGains.push(g);
+        return g;
+      }),
+      resume: vi.fn().mockResolvedValue(undefined),
+    };
+
+    vi.stubGlobal('AudioContext', vi.fn(function () { return mockAudioContext; }));
+
+    const audioSynth = new AudioSynthesizer({ muted: false });
+    audioSynth.initContext();
+    createdGains.length = 0;
+    createdOscs.length = 0;
+
+    const methods: Array<() => void> = [
+      () => audioSynth.playClick(),
+      () => audioSynth.playMove(),
+      () => audioSynth.playCapture(),
+      () => audioSynth.playCheck(),
+      () => audioSynth.playVictory(),
+      () => audioSynth.playDraw(),
+      () => audioSynth.playStart(),
+      () => audioSynth.playError(),
+      () => audioSynth.playStarEarned(),
+      () => audioSynth.playDefeat(),
+      () => audioSynth.playCheckmate(),
+      () => audioSynth.playTurnNotification(),
+      () => audioSynth.playHint(),
+      () => audioSynth.playMascotHappy(),
+      () => audioSynth.playMascotBlunder(),
+      () => audioSynth.playStepComplete(),
+    ];
+
+    methods.forEach((fn) => {
+      const oscCountBefore = createdOscs.length;
+      fn();
+      const oscCountAfter = createdOscs.length;
+      expect(oscCountAfter).toBeGreaterThan(oscCountBefore);
+
+      for (let i = oscCountBefore; i < oscCountAfter; i++) {
+        const osc = createdOscs[i]!;
+        const gain = createdGains[i]!;
+        expect(typeof osc.onended).toBe('function');
+
+        osc.onended?.();
+        expect(osc.disconnect).toHaveBeenCalledTimes(1);
+        expect(gain.disconnect).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it('safely catches errors in osc.onended without throwing (MAJ-004 error resilience)', () => {
+    const mockOsc = {
+      type: 'sine',
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      disconnect: vi.fn(() => {
+        throw new Error('Already disconnected');
+      }),
+      onended: null as (() => void) | null,
+      frequency: {
+        setValueAtTime: vi.fn(),
+        exponentialRampToValueAtTime: vi.fn(),
+      },
+    };
+    const mockGain = {
+      connect: vi.fn(),
+      disconnect: vi.fn(() => {
+        throw new Error('Gain already disconnected');
+      }),
+      gain: {
+        setValueAtTime: vi.fn(),
+        exponentialRampToValueAtTime: vi.fn(),
+      },
+    };
+
+    const mockAudioContext = {
+      currentTime: 10,
+      state: 'running',
+      destination: {},
+      createOscillator: vi.fn(() => mockOsc),
+      createGain: vi.fn(() => mockGain),
+      resume: vi.fn().mockResolvedValue(undefined),
+    };
+
+    vi.stubGlobal('AudioContext', vi.fn(function () { return mockAudioContext; }));
+
+    const audioSynth = new AudioSynthesizer({ muted: false });
+    audioSynth.initContext();
+    audioSynth.playMove();
+
+    expect(typeof mockOsc.onended).toBe('function');
+    expect(() => mockOsc.onended?.()).not.toThrow();
+
+    vi.unstubAllGlobals();
+  });
+
   it('supports initContext, resumeContext, and explicit bootstrap methods without DOM side-effects', () => {
     const mockAudioContext = {
       currentTime: 0,

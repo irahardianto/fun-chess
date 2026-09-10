@@ -1,5 +1,6 @@
 import type { LanInfoResponse } from '@fun-chess/shared';
 import { logger } from '@/platform/telemetry';
+import type { ILocationProvider } from '@/platform/browser';
 
 export interface WindowLocationContext {
   protocol?: string;
@@ -8,27 +9,44 @@ export interface WindowLocationContext {
   origin?: string;
 }
 
+export type LocationContextInput = WindowLocationContext | ILocationProvider | null;
+
 export interface LobbyUrlBuilderOptions {
   lanInfo?: Partial<LanInfoResponse> | null;
   activeLanIp?: string | null;
-  windowLocation?: WindowLocationContext | null;
+  windowLocation?: LocationContextInput;
+  locationProvider?: ILocationProvider | null;
   roomCode?: string;
   joinUrl?: string;
 }
 
-function resolveWindowLocation(
-  override?: WindowLocationContext | null
+export function resolveWindowLocation(
+  override?: LocationContextInput,
+  provider?: ILocationProvider | null
 ): WindowLocationContext | null {
-  if (override !== undefined) {
-    return override;
+  const target = provider ?? override;
+  if (target) {
+    return {
+      protocol: target.protocol || undefined,
+      hostname: target.hostname || undefined,
+      port: target.port || undefined,
+      origin: target.origin || undefined,
+    };
+  }
+  if (target === null) {
+    return null;
   }
   if (typeof window !== 'undefined' && window.location) {
-    return {
-      protocol: window.location.protocol,
-      hostname: window.location.hostname,
-      port: window.location.port,
-      origin: window.location.origin,
-    };
+    try {
+      return {
+        protocol: window.location.protocol,
+        hostname: window.location.hostname,
+        port: window.location.port,
+        origin: window.location.origin,
+      };
+    } catch {
+      return null;
+    }
   }
   return null;
 }
@@ -37,10 +55,10 @@ function resolveWindowLocation(
  * Determines whether cloud relay/mode is currently active.
  */
 export function isCloudRelayMode(
-  options?: Pick<LobbyUrlBuilderOptions, 'lanInfo' | 'windowLocation'>
+  options?: Pick<LobbyUrlBuilderOptions, 'lanInfo' | 'windowLocation' | 'locationProvider'>
 ): boolean {
   const info = options?.lanInfo;
-  const winLoc = resolveWindowLocation(options?.windowLocation);
+  const winLoc = resolveWindowLocation(options?.windowLocation, options?.locationProvider);
 
   return Boolean(
     info?.isCloudRelay ||
@@ -63,7 +81,7 @@ export function isLocalhostAddress(host: string): boolean {
 export function resolveEffectiveHost(
   options?: LobbyUrlBuilderOptions & { isCloud?: boolean }
 ): string {
-  const winLoc = resolveWindowLocation(options?.windowLocation);
+  const winLoc = resolveWindowLocation(options?.windowLocation, options?.locationProvider);
   const info = options?.lanInfo;
   const isCloud = options?.isCloud ?? isCloudRelayMode(options);
 
@@ -117,7 +135,7 @@ export function resolveEffectiveHost(
 export function resolveEffectivePort(
   options?: LobbyUrlBuilderOptions & { isCloud?: boolean }
 ): string {
-  const winLoc = resolveWindowLocation(options?.windowLocation);
+  const winLoc = resolveWindowLocation(options?.windowLocation, options?.locationProvider);
   const info = options?.lanInfo;
   const isCloud = options?.isCloud ?? isCloudRelayMode(options);
 
@@ -149,7 +167,7 @@ export function resolveEffectivePort(
  * Deterministically builds the base URL for the lobby.
  */
 export function buildLobbyBaseUrl(options?: LobbyUrlBuilderOptions): string {
-  const winLoc = resolveWindowLocation(options?.windowLocation);
+  const winLoc = resolveWindowLocation(options?.windowLocation, options?.locationProvider);
   const info = options?.lanInfo;
   const isCloud = isCloudRelayMode(options);
 

@@ -3,8 +3,11 @@ import type {
   PuzzleTheme,
   PuzzleDifficultyTier,
   PuzzlePackMetadata,
+  TacticalReward,
+  MascotId,
+  Square,
 } from "@fun-chess/shared";
-import { parseUciMove, formatPlayerMoveToUci } from "@fun-chess/shared";
+import { parseUciMove, formatPlayerMoveToUci, z } from "@fun-chess/shared";
 export { parseUciMove, formatPlayerMoveToUci };
 
 // Import raw JSON puzzle packs
@@ -20,26 +23,61 @@ import anastasiaHookJson from "./anastasia_hook.json";
 import smotheredJson from "./smothered.json";
 import endgameConversionJson from "./endgame_conversion.json";
 
-export const FORK_PUZZLES: readonly Puzzle[] = forksJson as unknown as Puzzle[];
-export const PIN_PUZZLES: readonly Puzzle[] = pinsJson as unknown as Puzzle[];
-export const SKEWER_PUZZLES: readonly Puzzle[] =
-  skewersJson as unknown as Puzzle[];
-export const DISCOVERED_CHECK_PUZZLES: readonly Puzzle[] =
-  discoveredChecksJson as unknown as Puzzle[];
-export const DEFLECTION_DECOY_PUZZLES: readonly Puzzle[] =
-  deflectionDecoyJson as unknown as Puzzle[];
-export const GREEK_GIFT_PUZZLES: readonly Puzzle[] =
-  greekGiftJson as unknown as Puzzle[];
-export const WINDMILL_PUZZLES: readonly Puzzle[] =
-  windmillJson as unknown as Puzzle[];
-export const BACK_RANK_PUZZLES: readonly Puzzle[] =
-  backRankJson as unknown as Puzzle[];
-export const ANASTASIA_HOOK_PUZZLES: readonly Puzzle[] =
-  anastasiaHookJson as unknown as Puzzle[];
-export const SMOTHERED_PUZZLES: readonly Puzzle[] =
-  smotheredJson as unknown as Puzzle[];
-export const ENDGAME_CONVERSION_PUZZLES: readonly Puzzle[] =
-  endgameConversionJson as unknown as Puzzle[];
+export const PuzzleStepExplanationSchema = z.object({
+  plyIndex: z.number(),
+  moveSan: z.string(),
+  moveUci: z.string(),
+  actor: z.enum(['w', 'b']),
+  explanation: z.string(),
+});
+
+export const PuzzleSchema: z.ZodType<Puzzle> = z.object({
+  id: z.string(),
+  fen: z.string(),
+  moves: z.array(z.string()),
+  rating: z.number(),
+  ratingDeviation: z.number().optional(),
+  themes: z.array(z.custom<PuzzleTheme>()),
+  primaryTheme: z.custom<PuzzleTheme>(),
+  difficulty: z.enum(['novice', 'easy', 'medium', 'hard', 'expert']),
+  title: z.string(),
+  subtitle: z.string().optional(),
+  playerColor: z.enum(['w', 'b']).optional(),
+  solutionPlies: z.number().optional(),
+  tacticalGoal: z.string().optional(),
+  tacticalReward: z.custom<TacticalReward>().optional(),
+  outcomeAdvantage: z.string().optional(),
+  description: z.string().optional(),
+  tacticalPayoff: z.string().optional(),
+  visualHintSquares: z.array(z.custom<Square>()).optional(),
+  pieceMascot: z.custom<MascotId>().optional(),
+  learningSummary: z.string().optional(),
+  keyTakeaway: z.string().optional(),
+  stepExplanations: z.array(PuzzleStepExplanationSchema).optional(),
+  metadata: z.object({
+    openingTags: z.array(z.string()).optional(),
+    sourceGameUrl: z.string().optional(),
+    author: z.string().optional(),
+  }).passthrough().optional(),
+}).passthrough() as z.ZodType<Puzzle>;
+
+const PuzzlePackSchema = z.array(PuzzleSchema);
+
+export function loadValidatedPuzzlePack(rawJson: unknown): readonly Puzzle[] {
+  return PuzzlePackSchema.parse(rawJson);
+}
+
+export const FORK_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(forksJson);
+export const PIN_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(pinsJson);
+export const SKEWER_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(skewersJson);
+export const DISCOVERED_CHECK_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(discoveredChecksJson);
+export const DEFLECTION_DECOY_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(deflectionDecoyJson);
+export const GREEK_GIFT_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(greekGiftJson);
+export const WINDMILL_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(windmillJson);
+export const BACK_RANK_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(backRankJson);
+export const ANASTASIA_HOOK_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(anastasiaHookJson);
+export const SMOTHERED_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(smotheredJson);
+export const ENDGAME_CONVERSION_PUZZLES: readonly Puzzle[] = loadValidatedPuzzlePack(endgameConversionJson);
 
 /**
  * Aggregated catalog of all curated offline CC0 puzzles.
@@ -62,7 +100,7 @@ export const ALL_PUZZLES: readonly Puzzle[] = [
  * Index map by puzzle ID for O(1) lookups (internal per MIN-014).
  */
 const PUZZLES_BY_ID: ReadonlyMap<string, Puzzle> = new Map(
-  ALL_PUZZLES.map((p) => [p.id, p]),
+  ALL_PUZZLES.map((puzzle) => [puzzle.id, puzzle]),
 );
 
 /**
@@ -296,8 +334,8 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
   {
     name: 'hanging_piece',
     matches: (ctx) => {
-      const p = ctx.puzzle;
-      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      const puzzle = ctx.puzzle;
+      const text = `${puzzle.title} ${puzzle.subtitle ?? ''} ${puzzle.tacticalGoal} ${puzzle.learningSummary} ${puzzle.keyTakeaway}`.toLowerCase();
       return (
         ctx.primaryThemeStr === 'hanging_piece' ||
         ctx.currentThemes.has('hanging_piece') ||
@@ -327,8 +365,8 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
   {
     name: 'trapped_piece',
     matches: (ctx) => {
-      const p = ctx.puzzle;
-      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      const puzzle = ctx.puzzle;
+      const text = `${puzzle.title} ${puzzle.subtitle ?? ''} ${puzzle.tacticalGoal} ${puzzle.learningSummary} ${puzzle.keyTakeaway}`.toLowerCase();
       return (
         ctx.primaryThemeStr === 'trapped_piece' ||
         ctx.currentThemes.has('trapped_piece') ||
@@ -354,8 +392,8 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
   {
     name: 'clearance',
     matches: (ctx) => {
-      const p = ctx.puzzle;
-      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      const puzzle = ctx.puzzle;
+      const text = `${puzzle.title} ${puzzle.subtitle ?? ''} ${puzzle.tacticalGoal} ${puzzle.learningSummary} ${puzzle.keyTakeaway}`.toLowerCase();
       return (
         ctx.primaryThemeStr === 'clearance' ||
         ctx.currentThemes.has('clearance') ||
@@ -369,7 +407,7 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
         text.includes('opens the h-file') ||
         ANASTASIA_MATE_PUZZLE_IDS.has(ctx.id) ||
         (ctx.id.startsWith('puz_gg') && (text.includes('sacrifice') || text.includes('assault') || text.includes('open'))) ||
-        (ctx.id.startsWith('puz_br') && (p.solutionPlies ?? p.moves.length) >= 3)
+        (ctx.id.startsWith('puz_br') && (puzzle.solutionPlies ?? puzzle.moves.length) >= 3)
       );
     },
     apply: (_ctx, themes) => {
@@ -381,8 +419,8 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
   {
     name: 'battery',
     matches: (ctx) => {
-      const p = ctx.puzzle;
-      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      const puzzle = ctx.puzzle;
+      const text = `${puzzle.title} ${puzzle.subtitle ?? ''} ${puzzle.tacticalGoal} ${puzzle.learningSummary} ${puzzle.keyTakeaway}`.toLowerCase();
       return (
         ctx.primaryThemeStr === 'battery' ||
         ctx.currentThemes.has('battery') ||
@@ -390,7 +428,7 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
         text.includes('batteries') ||
         text.includes('doubled') ||
         ctx.id.startsWith('puz_wm') ||
-        (ctx.id.startsWith('puz_br') && (text.includes('overpower') || text.includes('crush') || (p.solutionPlies ?? p.moves.length) >= 3)) ||
+        (ctx.id.startsWith('puz_br') && (text.includes('overpower') || text.includes('crush') || (puzzle.solutionPlies ?? puzzle.moves.length) >= 3)) ||
         ctx.id === 'puz_sm_007' ||
         ctx.id === 'puz_sm_018'
       );
@@ -404,9 +442,9 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
   {
     name: 'scholars_mate',
     matches: (ctx) => {
-      const p = ctx.puzzle;
-      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
-      const targetsF7orF2 = p.moves.some((m) => m.endsWith('f7') || m.endsWith('f2')) || text.includes('f7') || text.includes('f2');
+      const puzzle = ctx.puzzle;
+      const text = `${puzzle.title} ${puzzle.subtitle ?? ''} ${puzzle.tacticalGoal} ${puzzle.learningSummary} ${puzzle.keyTakeaway}`.toLowerCase();
+      const targetsF7orF2 = puzzle.moves.some((m) => m.endsWith('f7') || m.endsWith('f2')) || text.includes('f7') || text.includes('f2');
       const involvesQueenOrBishop = text.includes('queen') || text.includes('bishop') || text.includes('bxf7') || text.includes('qxf7');
       return (
         ctx.primaryThemeStr === 'scholars_mate' ||
@@ -420,7 +458,7 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
           text.includes('bishop strike on f7') ||
           text.includes('bishop decoy on f7') ||
           text.includes('king deflection on f7') ||
-          (p.tacticalReward === 'checkmate' && targetsF7orF2)
+          (puzzle.tacticalReward === 'checkmate' && targetsF7orF2)
         ))
       );
     },
@@ -433,9 +471,9 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
   {
     name: 'fried_liver',
     matches: (ctx) => {
-      const p = ctx.puzzle;
-      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
-      const targetsF7orF2 = p.moves.some((m) => m.endsWith('f7') || m.endsWith('f2')) || text.includes('f7') || text.includes('f2');
+      const puzzle = ctx.puzzle;
+      const text = `${puzzle.title} ${puzzle.subtitle ?? ''} ${puzzle.tacticalGoal} ${puzzle.learningSummary} ${puzzle.keyTakeaway}`.toLowerCase();
+      const targetsF7orF2 = puzzle.moves.some((m) => m.endsWith('f7') || m.endsWith('f2')) || text.includes('f7') || text.includes('f2');
       const involvesKnight = text.includes('knight') || text.includes('nxf7') || text.includes('nc7');
       return (
         ctx.primaryThemeStr === 'fried_liver' ||
@@ -460,8 +498,8 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
   {
     name: 'legals_trap',
     matches: (ctx) => {
-      const p = ctx.puzzle;
-      const text = `${p.title} ${p.subtitle ?? ''} ${p.tacticalGoal} ${p.learningSummary} ${p.keyTakeaway}`.toLowerCase();
+      const puzzle = ctx.puzzle;
+      const text = `${puzzle.title} ${puzzle.subtitle ?? ''} ${puzzle.tacticalGoal} ${puzzle.learningSummary} ${puzzle.keyTakeaway}`.toLowerCase();
       return (
         ctx.primaryThemeStr === 'legals_trap' ||
         ctx.currentThemes.has('legals_trap') ||
@@ -489,17 +527,17 @@ const PUZZLE_THEME_RULES: readonly PuzzleThemeMappingRule[] = [
  * Extracts and enriches tactical themes for a puzzle to ensure bidirectional mapping.
  * Uses declarative rule definitions (MAJ-037).
  */
-export function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
-  const themes = new Set<PuzzleTheme>(p.themes);
-  if (p.primaryTheme) {
-    themes.add(p.primaryTheme);
+export function extractPuzzleThemes(puzzle: Puzzle): Set<PuzzleTheme> {
+  const themes = new Set<PuzzleTheme>(puzzle.themes);
+  if (puzzle.primaryTheme) {
+    themes.add(puzzle.primaryTheme);
   }
 
   const ctx: PuzzleRuleContext = {
-    puzzle: p,
-    id: p.id,
-    title: p.title.toLowerCase(),
-    primaryThemeStr: (p.primaryTheme as string) ?? '',
+    puzzle,
+    id: puzzle.id,
+    title: puzzle.title.toLowerCase(),
+    primaryThemeStr: (puzzle.primaryTheme as string) ?? '',
     currentThemes: themes,
   };
 
@@ -518,32 +556,32 @@ export function extractPuzzleThemes(p: Puzzle): Set<PuzzleTheme> {
 const _puzzlesByTheme = new Map<PuzzleTheme, Puzzle[]>();
 
 // 1. Index enriched themes and calibrate difficulty for all puzzles
-for (const p of ALL_PUZZLES) {
+for (const puzzle of ALL_PUZZLES) {
   // Calibrate difficulty tag according to canonical rating band (SC-5 / MIN-014)
   let calibratedDifficulty: PuzzleDifficultyTier;
-  if (p.rating < 900) {
+  if (puzzle.rating < 900) {
     calibratedDifficulty = 'novice';
-  } else if (p.rating < 1200) {
+  } else if (puzzle.rating < 1200) {
     calibratedDifficulty = 'easy';
-  } else if (p.rating < 1500) {
+  } else if (puzzle.rating < 1500) {
     calibratedDifficulty = 'medium';
-  } else if (p.rating < 1800) {
+  } else if (puzzle.rating < 1800) {
     calibratedDifficulty = 'hard';
   } else {
     calibratedDifficulty = 'expert';
   }
-  (p as { difficulty: PuzzleDifficultyTier }).difficulty = calibratedDifficulty;
+  (puzzle as { difficulty: PuzzleDifficultyTier }).difficulty = calibratedDifficulty;
 
-  const enrichedThemes = extractPuzzleThemes(p);
-  const currentThemes = new Set(p.themes);
+  const enrichedThemes = extractPuzzleThemes(puzzle);
+  const currentThemes = new Set(puzzle.themes);
   for (const t of enrichedThemes) {
     currentThemes.add(t);
   }
-  (p as { themes: readonly PuzzleTheme[] }).themes = Array.from(currentThemes);
+  (puzzle as { themes: readonly PuzzleTheme[] }).themes = Array.from(currentThemes);
 
   for (const theme of enrichedThemes) {
     const list = _puzzlesByTheme.get(theme) ?? [];
-    list.push(p);
+    list.push(puzzle);
     _puzzlesByTheme.set(theme, list);
   }
 }
@@ -557,10 +595,10 @@ for (const [theme, aliases] of Object.entries(THEME_ALIASES)) {
     const seen = new Set<string>();
     for (const alt of aliases) {
       const altList = _puzzlesByTheme.get(alt) ?? [];
-      for (const p of altList) {
-        if (!seen.has(p.id)) {
-          seen.add(p.id);
-          combined.push(p);
+      for (const puzzle of altList) {
+        if (!seen.has(puzzle.id)) {
+          seen.add(puzzle.id);
+          combined.push(puzzle);
         }
       }
     }
@@ -577,10 +615,10 @@ const PUZZLES_BY_THEME: ReadonlyMap<PuzzleTheme, readonly Puzzle[]> =
  * Index map grouping puzzles by difficulty tier (internal).
  */
 const _puzzlesByDiff = new Map<PuzzleDifficultyTier, Puzzle[]>();
-for (const p of ALL_PUZZLES) {
-  const list = _puzzlesByDiff.get(p.difficulty) ?? [];
-  list.push(p);
-  _puzzlesByDiff.set(p.difficulty, list);
+for (const puzzle of ALL_PUZZLES) {
+  const list = _puzzlesByDiff.get(puzzle.difficulty) ?? [];
+  list.push(puzzle);
+  _puzzlesByDiff.set(puzzle.difficulty, list);
 }
 
 const PUZZLES_BY_DIFFICULTY: ReadonlyMap<
@@ -611,10 +649,10 @@ export function getPuzzlesByTheme(theme: PuzzleTheme): readonly Puzzle[] {
     const seen = new Set<string>();
     for (const alt of aliases) {
       const list = PUZZLES_BY_THEME.get(alt) ?? [];
-      for (const p of list) {
-        if (!seen.has(p.id)) {
-          seen.add(p.id);
-          combined.push(p);
+      for (const puzzle of list) {
+        if (!seen.has(puzzle.id)) {
+          seen.add(puzzle.id);
+          combined.push(puzzle);
         }
       }
     }
@@ -643,7 +681,7 @@ export function getPuzzlesByRatingBand(
   maxRating: number,
 ): readonly Puzzle[] {
   return ALL_PUZZLES.filter(
-    (p) => p.rating >= minRating && p.rating <= maxRating,
+    (puzzle) => puzzle.rating >= minRating && puzzle.rating <= maxRating,
   );
 }
 
@@ -655,7 +693,7 @@ export function getClosestPuzzleToRating(
   excludeIds: readonly string[] = [],
 ): Puzzle | null {
   const excludedSet = new Set(excludeIds);
-  const candidates = ALL_PUZZLES.filter((p) => !excludedSet.has(p.id));
+  const candidates = ALL_PUZZLES.filter((puzzle) => !excludedSet.has(puzzle.id));
 
   type ArrayWithToSorted<T> = readonly T[] & {
     toSorted(compareFn?: (a: T, b: T) => number): T[];
@@ -712,9 +750,9 @@ export function getRandomPuzzle(
  */
 export function getPuzzlePackMetadata(): PuzzlePackMetadata {
   const themeDistribution: Record<string, number> = {};
-  for (const p of ALL_PUZZLES) {
-    themeDistribution[p.primaryTheme] =
-      (themeDistribution[p.primaryTheme] ?? 0) + 1;
+  for (const puzzle of ALL_PUZZLES) {
+    themeDistribution[puzzle.primaryTheme] =
+      (themeDistribution[puzzle.primaryTheme] ?? 0) + 1;
   }
 
   // Also include canonical mapped counts for standard themes

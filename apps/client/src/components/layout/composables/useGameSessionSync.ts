@@ -5,7 +5,7 @@
 
 import { computed, watch, type Ref } from 'vue';
 import type { Square, RoomState, RoomStatus, GameOverPayload } from '@fun-chess/shared';
-import type { AppAudioProvider } from '@/components/layout';
+import type AppAudioProvider from '../AppAudioProvider.vue';
 import type { useModalManager } from './useModalManager';
 import type { useAppNavigation } from './useAppNavigation';
 import type { useSocket, useChessGame } from '@/composables';

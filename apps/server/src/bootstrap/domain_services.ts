@@ -34,6 +34,7 @@ import {
 import type { ServerEnv } from "../platform/config/index.js";
 import type { IFileStorage, HttpRateLimiter } from "../platform/http/index.js";
 import type { SocketRateLimiter } from "../platform/socket/index.js";
+import type { ShutdownCoordinator } from "../platform/lifecycle/index.js";
 
 export interface StartServerOptions {
   config?: Partial<ServerEnv>;
@@ -55,6 +56,7 @@ export interface StartServerOptions {
   httpRateLimiter?: HttpRateLimiter;
   socketRateLimiter?: SocketRateLimiter;
   roomCreateRateLimiter?: SocketRateLimiter;
+  shutdownCoordinator?: ShutdownCoordinator;
 }
 
 export interface DomainServices {

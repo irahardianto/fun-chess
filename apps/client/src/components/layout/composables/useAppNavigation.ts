@@ -61,6 +61,10 @@ export function useAppNavigation(options: AppNavigationOptions) {
   const { storage, apiClient, logger, onLeaveRoom, playStart } = options;
 
   function getInitialLobbyMode(): AppGameMode {
+    const roomParam = parseRoomCodeFromUrl(undefined, logger);
+    if (roomParam) {
+      return 'multiplayer_lan';
+    }
     try {
       const raw = storage.getItem(STORAGE_KEYS.SCENARIO_PROGRESS);
       if (!raw) return 'academy';
@@ -145,7 +149,10 @@ export function useAppNavigation(options: AppNavigationOptions) {
   }
 
   async function loadInitialNetworkAndProgress(defaultProgressStore?: { getProgressMap: () => Promise<Record<string, { starsEarned?: number }>> }): Promise<void> {
-    syncRoomCodeFromUrl();
+    const roomParam = syncRoomCodeFromUrl();
+    if (roomParam) {
+      lobbyActiveMode.value = 'multiplayer_lan';
+    }
     await loadLanInfo();
     await syncScenarioProgress(defaultProgressStore);
   }

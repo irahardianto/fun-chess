@@ -5,7 +5,7 @@ import type { IAudioService } from '../audio/audio.interface';
 import type { ILogger } from '../telemetry';
 import type { IFileDownloader, IHapticsService, IWebRtcDiscovery, IClipboardService, ICameraService, INetworkMonitor } from '../hardware';
 import type { TypedSocket } from '../socket/socket_client';
-import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage, IClock } from '@fun-chess/shared';
+import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage, IClock, ITimerService } from '@fun-chess/shared';
 
 export interface AudioContextValue {
   isMuted: Ref<boolean>;
@@ -35,6 +35,7 @@ export type {
   INetworkMonitor,
   TypedSocket,
   IClock,
+  ITimerService,
 };
 
 export const API_CLIENT_KEY: InjectionKey<IApiClient> = Symbol('API_CLIENT');
@@ -56,4 +57,5 @@ export const CLIPBOARD_SERVICE_KEY: InjectionKey<IClipboardService> = Symbol('CL
 export const CAMERA_SERVICE_KEY: InjectionKey<ICameraService> = Symbol('CAMERA_SERVICE');
 export { NETWORK_MONITOR_KEY, LOCATION_PROVIDER_KEY } from '../browser/tokens';
 export const SOCKET_CLIENT_KEY: InjectionKey<TypedSocket> = Symbol('SOCKET_CLIENT');
+export const TIMER_SERVICE_KEY: InjectionKey<ITimerService> = Symbol('TIMER_SERVICE');
 

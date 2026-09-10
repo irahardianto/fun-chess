@@ -5,6 +5,8 @@ import {
   resolveAllowedOrigins,
   isOriginAllowed,
   safeParseUrl,
+  env,
+  getServerEnv,
   type ServerEnv,
 } from "../index.js";
 
@@ -559,6 +561,59 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       const allowed = ["https://fun-chess.com", "http://localhost:5173"];
       expect(isOriginAllowed("https://evil-attacker.com", allowed)).toBe(false);
       expect(isOriginAllowed("http://localhost:3000", allowed)).toBe(false);
+    });
+
+    it("matches origins with explicit default ports (:443, :80) (MIN-002)", () => {
+      const allowed = ["https://fun-chess.com", "http://example.com"];
+      // Origin has explicit default port :443 for https
+      expect(isOriginAllowed("https://fun-chess.com:443", allowed)).toBe(true);
+      // Origin has explicit default port :80 for http
+      expect(isOriginAllowed("http://example.com:80", allowed)).toBe(true);
+
+      // Allowed list has explicit port :443, incoming origin does not
+      const allowedWithPort = ["https://fun-chess.com:443"];
+      expect(isOriginAllowed("https://fun-chess.com", allowedWithPort)).toBe(true);
+    });
+  });
+
+  describe("safeParseUrl diagnostics (MAJ-006)", () => {
+    it("logs debug diagnostics when URL parsing fails with a logger", () => {
+      const debugLogs: Array<{ msg: string; ctx?: Record<string, unknown> }> = [];
+      const mockLogger = {
+        debug: (msg: string, ctx?: Record<string, unknown>) => {
+          debugLogs.push({ msg, ctx });
+        },
+      };
+
+      const result = safeParseUrl("http://:invalid", mockLogger);
+      expect(result).toBeUndefined();
+      expect(debugLogs.length).toBeGreaterThan(0);
+      expect(debugLogs[0]?.msg).toContain("safeParseUrl rejected");
+      expect(debugLogs[0]?.ctx?.["operation"]).toBe("safe_parse_url");
+    });
+  });
+
+  describe("ServerEnv proxy traps and reflection (MIN-021)", () => {
+    it("supports Object.keys(env) and property reflection via proxy traps", () => {
+      const keys = Object.keys(env);
+      expect(keys.length).toBeGreaterThan(0);
+      expect(keys).toContain("PORT");
+      expect(keys).toContain("NODE_ENV");
+      expect(keys).toContain("HOST");
+
+      expect("PORT" in env).toBe(true);
+      expect("NON_EXISTENT_PROP" in env).toBe(false);
+
+      const descriptor = Object.getOwnPropertyDescriptor(env, "PORT");
+      expect(descriptor).toBeDefined();
+      expect(descriptor?.configurable).toBe(true);
+    });
+
+    it("returns ServerEnv instance directly from getServerEnv()", () => {
+      const serverEnv = getServerEnv();
+      expect(serverEnv).toBeDefined();
+      expect(typeof serverEnv.PORT).toBe("number");
+      expect(serverEnv.NODE_ENV).toBeDefined();
     });
   });
 });

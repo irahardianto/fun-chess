@@ -428,13 +428,13 @@ describe("HTTP API Contracts", () => {
 
     it("should allow requests up to the configured limit", async () => {
       for (let i = 0; i < 3; i++) {
-        const res = await fetch(`${rateLimitedServerInstance.url}/api/lan-info`);
+        const res = await fetch(`${rateLimitedServerInstance.url}/api/v1/lan-info`);
         expect(res.status).toBe(200);
       }
     });
 
     it("should return 429 with standardized error envelope once limit is exceeded (MAJ-028, MAJ-033)", async () => {
-      const res = await fetch(`${rateLimitedServerInstance.url}/api/lan-info`);
+      const res = await fetch(`${rateLimitedServerInstance.url}/api/v1/lan-info`);
       expect(res.status).toBe(429);
       expect(res.headers.get("content-type")).toContain("application/json");
 

@@ -19,15 +19,14 @@ services:
       - CLIENT_DIST_PATH=${CLIENT_DIST_PATH:-/app/apps/client/dist}
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      # Security & Secrets Configuration (MIN-002):
-      # SESSION_SECRET is strictly required when NODE_ENV=production (minimum 16 characters).
-      # For production deployments, supply a cryptographically secure random secret:
+      # Security & Secrets Configuration (CRIT-001):
+      # SESSION_SECRET and METRICS_SECRET must be explicitly supplied in the environment.
+      # Default fallback secrets have been eliminated to prevent insecure deployments.
+      # Example:
       #   export SESSION_SECRET=$(openssl rand -base64 32)
-      # A development fallback is provided below so local compose testing starts cleanly out-of-the-box.
-      - SESSION_SECRET=${SESSION_SECRET:-dev-insecure-docker-compose-session-secret-min16chars}
-      # METRICS_SECRET authorizes telemetry (/metrics) and deep health probes (/health/detail).
-      # Optional in development; recommended in production (minimum 8 characters when set).
-      - METRICS_SECRET=${METRICS_SECRET:-dev-metrics-secret-min8chars}
+      #   export METRICS_SECRET=$(openssl rand -hex 16)
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - METRICS_SECRET=${METRICS_SECRET:?METRICS_SECRET must be set}
       - MAX_ROOMS=${MAX_ROOMS:-10000}
       - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-10000}
       - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-60}

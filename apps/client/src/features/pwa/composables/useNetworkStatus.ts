@@ -1,89 +1,19 @@
-import { ref, computed, getCurrentScope, onScopeDispose, getCurrentInstance, hasInjectionContext, inject } from 'vue';
+import {
+  ref,
+  computed,
+  getCurrentScope,
+  onScopeDispose,
+  hasInjectionContext,
+  inject,
+} from 'vue';
 import { apiClient as defaultApiClient, type IApiClient } from '@/platform/api';
 import { useInjectLogger, useInjectApiClient, NETWORK_MONITOR_KEY } from '@/platform/di';
 import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 import type { INetworkMonitor } from '@/platform/hardware';
+import { BrowserNetworkMonitor } from '@/platform/browser';
 
 export type { INetworkMonitor };
-export { NETWORK_MONITOR_KEY };
-
-/**
- * Production implementation of INetworkMonitor using browser window/navigator.
- */
-export class BrowserNetworkMonitor implements INetworkMonitor {
-  private _listeners = new Set<(isOnline: boolean) => void>();
-  private _initialized = false;
-
-  private _onOnline = () => {
-    this._listeners.forEach((cb) => cb(true));
-  };
-
-  private _onOffline = () => {
-    this._listeners.forEach((cb) => cb(false));
-  };
-
-  isOnline(): boolean {
-    return typeof navigator !== 'undefined' ? navigator.onLine : true;
-  }
-
-  addListener(listener: (isOnline: boolean) => void): () => void {
-    this._listeners.add(listener);
-    if (typeof window !== 'undefined' && !this._initialized) {
-      window.addEventListener('online', this._onOnline);
-      window.addEventListener('offline', this._onOffline);
-      this._initialized = true;
-    }
-    return () => {
-      this._listeners.delete(listener);
-      if (this._listeners.size === 0 && typeof window !== 'undefined' && this._initialized) {
-        window.removeEventListener('online', this._onOnline);
-        window.removeEventListener('offline', this._onOffline);
-        this._initialized = false;
-      }
-    };
-  }
-
-  reset(): void {
-    if (typeof window !== 'undefined' && this._initialized) {
-      window.removeEventListener('online', this._onOnline);
-      window.removeEventListener('offline', this._onOffline);
-    }
-    this._listeners.clear();
-    this._initialized = false;
-  }
-}
-
-/**
- * Mock implementation of INetworkMonitor for deterministic unit and integration testing (MAJ-011).
- */
-export class MockNetworkMonitor implements INetworkMonitor {
-  private _isOnline: boolean;
-  private _listeners = new Set<(isOnline: boolean) => void>();
-
-  constructor(initialOnline = true) {
-    this._isOnline = initialOnline;
-  }
-
-  isOnline(): boolean {
-    return this._isOnline;
-  }
-
-  setOnlineStatus(isOnline: boolean): void {
-    this._isOnline = isOnline;
-    this._listeners.forEach((cb) => cb(isOnline));
-  }
-
-  addListener(listener: (isOnline: boolean) => void): () => void {
-    this._listeners.add(listener);
-    return () => {
-      this._listeners.delete(listener);
-    };
-  }
-
-  reset(): void {
-    this._listeners.clear();
-  }
-}
+export { NETWORK_MONITOR_KEY, BrowserNetworkMonitor };
 
 const defaultBrowserNetworkMonitor = new BrowserNetworkMonitor();
 
@@ -91,27 +21,24 @@ const isOnlineState = ref<boolean>(
   defaultBrowserNetworkMonitor.isOnline()
 );
 
-let customLogger: ILogger | null = null;
-let customNetworkMonitor: INetworkMonitor | null = null;
-
-export function setNetworkStatusLogger(logger: ILogger | null): void {
-  customLogger = logger;
-}
-
-export function setNetworkMonitor(monitor: INetworkMonitor | null): void {
-  customNetworkMonitor = monitor;
-}
-
-function getEffectiveLogger(custom?: ILogger): ILogger {
-  return custom ?? customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
-}
-
-interface ResettableMonitor {
-  reset: () => void;
-}
-
 interface MutableNetworkMonitor {
   setOnlineStatus: (status: boolean) => void;
+}
+
+/**
+ * Options configuration for {@link useNetworkStatus}.
+ */
+export interface UseNetworkStatusOptions {
+  client?: IApiClient;
+  logger?: ILogger;
+  monitor?: INetworkMonitor;
+}
+
+/**
+ * Type guard to detect legacy positional IApiClient parameter.
+ */
+function isApiClient(value: unknown): value is IApiClient {
+  return typeof value === 'object' && value !== null && 'checkConnectivity' in value;
 }
 
 /**
@@ -120,32 +47,42 @@ interface MutableNetworkMonitor {
  */
 export function resetNetworkStatusState(): void {
   defaultBrowserNetworkMonitor.reset();
-  if (customNetworkMonitor && 'reset' in customNetworkMonitor && typeof (customNetworkMonitor as ResettableMonitor).reset === 'function') {
-    (customNetworkMonitor as ResettableMonitor).reset();
-  }
-  isOnlineState.value = (customNetworkMonitor ?? defaultBrowserNetworkMonitor).isOnline();
-  customLogger = null;
-  customNetworkMonitor = null;
+  isOnlineState.value = defaultBrowserNetworkMonitor.isOnline();
 }
 
 /**
  * Composable to observe network status with kid-friendly reassurance messages.
  * Uses centralized IApiClient for connectivity probing per MAJ-007.
  * Uses INetworkMonitor abstraction per MAJ-011.
+ *
+ * @param optionsOrClient - Options object or legacy IApiClient instance.
+ * @param legacyLogger - Legacy positional ILogger instance.
+ * @param legacyMonitor - Legacy positional INetworkMonitor instance.
  */
 export function useNetworkStatus(
-  client?: IApiClient,
-  customLoggerInstance?: ILogger,
-  networkMonitor?: INetworkMonitor
+  optionsOrClient?: UseNetworkStatusOptions | IApiClient,
+  legacyLogger?: ILogger,
+  legacyMonitor?: INetworkMonitor
 ) {
-  if (customLoggerInstance) {
-    customLogger = customLoggerInstance;
-  }
-  const resolvedClient = client ?? (getCurrentInstance() ? useInjectApiClient() : defaultApiClient);
-  const logger = getEffectiveLogger(customLoggerInstance);
+  const options: UseNetworkStatusOptions = isApiClient(optionsOrClient)
+    ? { client: optionsOrClient, logger: legacyLogger, monitor: legacyMonitor }
+    : {
+        ...optionsOrClient,
+        ...(legacyLogger && !optionsOrClient?.logger ? { logger: legacyLogger } : {}),
+        ...(legacyMonitor && !optionsOrClient?.monitor ? { monitor: legacyMonitor } : {}),
+      };
 
-  const diMonitor = !networkMonitor && hasInjectionContext() ? inject(NETWORK_MONITOR_KEY, null) : null;
-  const effectiveMonitor = networkMonitor ?? customNetworkMonitor ?? diMonitor ?? defaultBrowserNetworkMonitor;
+  const resolvedClient =
+    options.client ?? (hasInjectionContext() ? useInjectApiClient() : defaultApiClient);
+
+  const logger =
+    options.logger ?? (hasInjectionContext() ? useInjectLogger() : defaultLogger);
+
+  const effectiveMonitor =
+    options.monitor ??
+    (hasInjectionContext()
+      ? inject(NETWORK_MONITOR_KEY, () => new BrowserNetworkMonitor(), true)
+      : defaultBrowserNetworkMonitor);
 
   isOnlineState.value = effectiveMonitor.isOnline();
 

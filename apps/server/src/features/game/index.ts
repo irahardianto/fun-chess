@@ -13,3 +13,15 @@ export type {
 export type { IGameService, MoveApplicationResult } from "./game.interface.js";
 export { GameService } from "./game.service.js";
 export { registerGameSocketHandlers } from "./game.socket_handler.js";
+export {
+  type IGamePlayerResolver,
+  GamePlayerResolver,
+} from "./game_player_resolver.js";
+export {
+  type IGameMoveCoordinator,
+  GameMoveCoordinator,
+} from "./game_move_coordinator.js";
+export {
+  type IGameActionCoordinator,
+  GameActionCoordinator,
+} from "./game_action_coordinator.js";

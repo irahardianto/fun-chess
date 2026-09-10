@@ -21,23 +21,16 @@ import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
 import {
   type Logger,
   defaultLogger,
-  runLoggedJob,
 } from "../../platform/logger/index.js";
 import {
   type IDisconnectTimerRegistry,
   DisconnectTimerRegistry,
-  DISCONNECT_GRACE_PERIOD_MS,
 } from "./disconnect_timer_registry.js";
 import {
   type ITimerService,
-  type TimerHandle,
   SystemTimerService,
 } from "./timer_service.js";
 import {
-  RoomNotFoundError,
-  InvalidRoomCodeError,
-  UnauthorizedError,
-  PlayerNotInRoomError,
   InvalidPayloadError,
   RoomAlreadyExistsError,
   OptimisticLockConflictError,
@@ -45,52 +38,126 @@ import {
   RoomCapacityExceededError,
 } from "./room.errors.js";
 import {
+  type IRoomCodeGenerator,
+  RoomCodeGenerator,
+  DEFAULT_MAX_ATTEMPTS,
+} from "./room_code_generator.js";
+import {
+  type IRematchCoordinator,
+  RematchCoordinator,
+} from "./rematch_coordinator.js";
+import {
+  type IDrawCoordinator,
+  DrawCoordinator,
+} from "./draw_coordinator.js";
+import {
+  type IRoomLifecycleCoordinator,
+  RoomLifecycleCoordinator,
+} from "./room_lifecycle_coordinator.js";
+import {
+  type IRoomMemberCoordinator,
+  RoomMemberCoordinator,
+} from "./room_member_coordinator.js";
+import {
   createInitialRoomState,
   assignPlayerColors,
-  addPlayerToRoom,
-  disconnectPlayerTransition,
-  reconnectPlayerTransition,
-  leaveRoomTransition,
   applyGameMoveTransition,
   finalizeGameTransition,
   updateDrawOfferTransition,
   updateRematchTransition,
-  abandonmentForfeitTransition,
 } from "./room.logic.js";
-
-const ROOM_CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Excludes 0, O, 1, I
-const ROOM_CODE_LENGTH = 4;
 
 /**
  * Service coordinating room creation, player joining, reconnection, and session lifecycle.
  * Implements IRoomService for socket/HTTP ingress and IRoomGameAdapter for game engine integration (MAJ-016, MAJ-017).
  * Pure state transitions are delegated to room.logic.ts (MAJ-015).
+ * Subdomain lifecycle and membership operations are delegated to dedicated coordinators.
  */
 export class RoomService implements IRoomService, IRoomGameAdapter {
   private readonly logger: Logger;
   private readonly timerService: ITimerService;
+  private readonly clock: IClock;
+  private readonly idGenerator: IIdGenerator;
+  private readonly timerRegistry: IDisconnectTimerRegistry;
+  public readonly codeGenerator: IRoomCodeGenerator;
+  public readonly rematchCoordinator: IRematchCoordinator;
+  public readonly drawCoordinator: IDrawCoordinator;
+  public readonly lifecycleCoordinator: IRoomLifecycleCoordinator;
+  public readonly memberCoordinator: IRoomMemberCoordinator;
 
   constructor(
     private readonly store: IRoomStore,
     private readonly sessionRegistry: ISessionRegistry,
-    private readonly clock: IClock,
-    private readonly idGenerator: IIdGenerator,
-    private readonly timerRegistry: IDisconnectTimerRegistry,
+    clock?: IClock,
+    idGenerator?: IIdGenerator,
+    timerRegistry?: IDisconnectTimerRegistry,
     logger?: Logger,
     timerService?: ITimerService,
+    codeGenerator?: IRoomCodeGenerator,
+    rematchCoordinator?: IRematchCoordinator,
+    drawCoordinator?: IDrawCoordinator,
+    lifecycleCoordinator?: IRoomLifecycleCoordinator,
+    memberCoordinator?: IRoomMemberCoordinator,
   ) {
     this.logger = logger ?? defaultLogger;
     this.timerService = timerService ?? new SystemTimerService();
-    // Zero fallback instantiation in types per API contract MAJ-005.
-    // Defensively ensure non-null if legacy test callers pass undefined at runtime.
-    if (!this.clock) {
-      this.clock = new SystemClock();
-    }
-    if (!this.idGenerator) {
-      this.idGenerator = new UuidGenerator();
-    }
-    if (!this.timerRegistry) {
-      this.timerRegistry = new DisconnectTimerRegistry();
+    this.clock = clock ?? new SystemClock();
+    this.idGenerator = idGenerator ?? new UuidGenerator();
+    this.timerRegistry = timerRegistry ?? new DisconnectTimerRegistry();
+    this.codeGenerator =
+      codeGenerator ?? new RoomCodeGenerator(this.idGenerator);
+    this.rematchCoordinator =
+      rematchCoordinator ??
+      new RematchCoordinator(this.store, this.sessionRegistry, this.clock);
+    this.drawCoordinator =
+      drawCoordinator ?? new DrawCoordinator(this.store, this.clock);
+    this.lifecycleCoordinator =
+      lifecycleCoordinator ??
+      new RoomLifecycleCoordinator(
+        this.store,
+        this.sessionRegistry,
+        this.clock,
+        this.timerRegistry,
+        this.timerService,
+        this.logger,
+      );
+    this.memberCoordinator =
+      memberCoordinator ??
+      new RoomMemberCoordinator(
+        this.store,
+        this.sessionRegistry,
+        this.clock,
+        this.timerRegistry,
+        this.logger,
+        this.idGenerator,
+      );
+  }
+
+  /**
+   * Helper to log service failures with 4xx demotion to warn (MAJ-012).
+   */
+  private logServiceFailure(
+    operation: string,
+    actionName: string,
+    startTime: number,
+    correlationId: string | undefined,
+    err: unknown,
+    metadata?: Record<string, unknown>,
+  ): void {
+    const duration = this.clock.now() - startTime;
+    const isClientError = err instanceof AppError && err.statusCode < 500;
+    const logContext = {
+      operation,
+      duration,
+      durationMs: duration,
+      error: serializeError(err),
+      ...(metadata ?? {}),
+      ...(correlationId ? { correlationId } : {}),
+    };
+    if (isClientError) {
+      this.logger.warn(`${actionName} rejected`, logContext);
+    } else {
+      this.logger.error(`${actionName} failed`, logContext);
     }
   }
 
@@ -145,11 +212,10 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       };
 
       let createdRoom!: RoomState;
-      const MAX_CODE_ATTEMPTS = 100;
       let created = false;
 
-      for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
-        const roomCode = this.generateRoomCodeCandidate();
+      for (let attempt = 0; attempt < DEFAULT_MAX_ATTEMPTS; attempt++) {
+        const roomCode = this.codeGenerator.generateCandidate();
         const candidateRoom = createInitialRoomState({
           roomCode,
           hostPlayer,
@@ -220,262 +286,44 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         sessionToken: sessionRecord.sessionToken,
       };
     } catch (err) {
-      const duration = this.clock.now() - startTime;
-      const isClientError = err instanceof AppError && err.statusCode < 500;
-      const logContext = {
-        operation: "room_create",
-        duration,
-        durationMs: duration,
-        error: serializeError(err),
-        ...(correlationId ? { correlationId } : {}),
-      };
-      if (isClientError) {
-        this.logger.warn("Room creation rejected", logContext);
-      } else {
-        this.logger.error("Room creation failed", logContext);
-      }
+      this.logServiceFailure(
+        "room_create",
+        "Room creation",
+        startTime,
+        correlationId,
+        err,
+      );
       throw err;
     }
   }
 
   /**
    * Joins an existing room by 4-letter room code.
+   * Delegated to RoomMemberCoordinator.
    */
   public async joinRoom(
     req: JoinRoomRequest,
     socketId: string,
     correlationId?: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }> {
-    const startTime = this.clock.now();
-    const normalizedCode = normalizeRoomCode(req.roomCode || "");
-    let rawName: string | undefined;
-
-    try {
-      if (!normalizedCode || normalizedCode.length !== ROOM_CODE_LENGTH) {
-        throw new InvalidRoomCodeError(req.roomCode || "");
-      }
-
-      try {
-        rawName = validatePlayerName(req.playerName);
-      } catch (err) {
-        throw new InvalidPayloadError(
-          "playerName",
-          toErrorMessage(err),
-        );
-      }
-
-      this.logger.info("Joining room", {
-        operation: "room_join",
-        roomCode: normalizedCode,
-        playerName: rawName,
-        ...(correlationId ? { correlationId } : {}),
-      });
-
-      const playerId = this.idGenerator.generateId();
-      const now = this.clock.now();
-
-      const playerCandidate: Player = {
-        id: playerId,
-        socketId,
-        name: rawName,
-        avatar: req.avatar || "🦁",
-        color: "b", // assigned by addPlayerToRoom
-        isHost: false,
-        isConnected: true,
-        connectedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const result = await this.store.mutate(
-        normalizedCode,
-        async (room) => {
-          const { nextRoom, assignedColor } = addPlayerToRoom(
-            room,
-            playerCandidate,
-            false,
-            this.clock.now(),
-          );
-
-          const assignedPlayer =
-            assignedColor === "w" ? nextRoom.whitePlayer! : nextRoom.blackPlayer!;
-
-          return {
-            updatedRoom: nextRoom,
-            result: {
-              room: nextRoom,
-              player: assignedPlayer,
-              assignedColor: assignedColor!,
-            },
-          };
-        },
-        correlationId,
-      );
-
-      const sessionRecord = await this.sessionRegistry.createSession(
-        {
-          playerId,
-          roomCode: normalizedCode,
-          color: result.assignedColor,
-          isHost: false,
-          socketId,
-        },
-        { correlationId },
-      );
-
-      const duration = this.clock.now() - startTime;
-      this.logger.info("Room joined", {
-        operation: "room_join",
-        roomCode: normalizedCode,
-        playerId: result.player.id,
-        role: "player",
-        duration,
-        durationMs: duration,
-        ...(correlationId ? { correlationId } : {}),
-      });
-
-      return {
-        room: result.room,
-        player: result.player,
-        sessionToken: sessionRecord.sessionToken,
-      };
-    } catch (err) {
-      const duration = this.clock.now() - startTime;
-      const isClientError = err instanceof AppError && err.statusCode < 500;
-      const logContext = {
-        operation: "room_join",
-        roomCode: normalizedCode,
-        playerName: rawName,
-        duration,
-        durationMs: duration,
-        error: serializeError(err),
-        ...(correlationId ? { correlationId } : {}),
-      };
-      if (isClientError) {
-        this.logger.warn("Room join rejected", logContext);
-      } else {
-        this.logger.error("Room join failed", logContext);
-      }
-      throw err;
-    }
+    return this.memberCoordinator.joinRoom(req, socketId, correlationId);
   }
 
   /**
    * Restores a dropped player session after network glitch or page refresh.
+   * Delegated to RoomMemberCoordinator.
    */
   public async reconnect(
     req: ReconnectRequest,
     socketId: string,
     correlationId?: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }> {
-    const startTime = this.clock.now();
-
-    if (!req.roomCode || req.roomCode.trim().length === 0) {
-      throw new InvalidPayloadError("roomCode", "Room code cannot be empty");
-    }
-    if (!req.playerId || req.playerId.trim().length === 0) {
-      throw new InvalidPayloadError("playerId", "Player ID cannot be empty");
-    }
-    if (!req.sessionToken || req.sessionToken.trim().length === 0) {
-      throw new InvalidPayloadError(
-        "sessionToken",
-        "Session token cannot be empty",
-      );
-    }
-
-    const normalizedCode = normalizeRoomCode(req.roomCode);
-    if (normalizedCode.length !== ROOM_CODE_LENGTH) {
-      throw new InvalidRoomCodeError(req.roomCode);
-    }
-
-    this.logger.info("Reconnecting player", {
-      operation: "room_reconnect",
-      roomCode: normalizedCode,
-      playerId: req.playerId,
-      ...(correlationId ? { correlationId } : {}),
-    });
-
-    try {
-      const existing = await this.store.findByCode(normalizedCode);
-      if (!existing) {
-        throw new RoomNotFoundError(normalizedCode);
-      }
-
-      const session = await this.sessionRegistry.validateSession(
-        req.sessionToken,
-        normalizedCode,
-        req.playerId,
-        { signal: undefined },
-      );
-      if (!session) {
-        throw new UnauthorizedError("Invalid session token");
-      }
-
-      const result = await this.store.mutate(
-        normalizedCode,
-        async (room) => {
-          // Cancel disconnect timer under room lock (MAJ-028)
-          this.timerRegistry.cancel(normalizedCode, req.playerId);
-
-          const { nextRoom, player } = reconnectPlayerTransition(
-            room,
-            req.playerId,
-            socketId,
-            this.clock.now(),
-          );
-
-          return {
-            updatedRoom: nextRoom,
-            result: { room: nextRoom, player },
-          };
-        },
-        correlationId,
-      );
-
-      await this.sessionRegistry.touchSession(
-        req.sessionToken,
-        socketId,
-        undefined,
-        { correlationId },
-      );
-
-      const duration = this.clock.now() - startTime;
-      this.logger.info("Player reconnected", {
-        operation: "room_reconnect",
-        roomCode: normalizedCode,
-        playerId: req.playerId,
-        duration,
-        durationMs: duration,
-        ...(correlationId ? { correlationId } : {}),
-      });
-
-      return {
-        ...result,
-        sessionToken: session.sessionToken,
-      };
-    } catch (err) {
-      const duration = this.clock.now() - startTime;
-      const isClientError = err instanceof AppError && err.statusCode < 500;
-      const logContext = {
-        operation: "room_reconnect",
-        roomCode: normalizedCode,
-        playerId: req.playerId,
-        duration,
-        durationMs: duration,
-        error: serializeError(err),
-        ...(correlationId ? { correlationId } : {}),
-      };
-      if (isClientError) {
-        this.logger.warn("Player reconnect rejected", logContext);
-      } else {
-        this.logger.error("Player reconnect failed", logContext);
-      }
-      throw err;
-    }
+    return this.memberCoordinator.reconnect(req, socketId, correlationId);
   }
 
   /**
    * Removes or updates a player when they intentionally leave a room.
+   * Delegated to RoomMemberCoordinator.
    */
   public async leaveRoom(
     roomCode: string,
@@ -487,186 +335,22 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     shouldDelete: boolean;
     gameOverPayload?: GameOverPayload;
   }> {
-    const startTime = this.clock.now();
-    const normalizedCode = normalizeRoomCode(roomCode);
-
-    this.logger.info("Leaving room", {
-      operation: "room_leave",
-      roomCode: normalizedCode,
+    const result = await this.memberCoordinator.leaveRoom(
+      roomCode,
       socketId,
-      ...(correlationId ? { correlationId } : {}),
-    });
-
-    try {
-      const result = await this.store.withLock(
-        normalizedCode,
-        async () => {
-          const room = await this.store.findByCode(normalizedCode);
-          if (!room) {
-            throw new RoomNotFoundError(normalizedCode);
-          }
-
-          let leavingPlayer: Player | null;
-          if (room.whitePlayer?.socketId === socketId) {
-            leavingPlayer = room.whitePlayer;
-          } else if (room.blackPlayer?.socketId === socketId) {
-            leavingPlayer = room.blackPlayer;
-          } else {
-            leavingPlayer =
-              room.spectators.find((s) => s.socketId === socketId) ?? null;
-          }
-
-          if (!leavingPlayer) {
-            throw new PlayerNotInRoomError(socketId);
-          }
-
-          // Cancel disconnect timer for leaving player under room lock (MAJ-028)
-          this.timerRegistry.cancel(normalizedCode, leavingPlayer.id);
-
-          const now = this.clock.now();
-          const { nextRoom, shouldDelete, gameOverPayload } = leaveRoomTransition(
-            room,
-            leavingPlayer.id,
-            now,
-          );
-
-          if (shouldDelete || gameOverPayload) {
-            this.timerRegistry.cancelAllForRoom(normalizedCode);
-          }
-
-          if (shouldDelete) {
-            await this.store.delete(normalizedCode, { correlationId });
-            await this.sessionRegistry.deleteSessionsForRoom(normalizedCode, {
-              correlationId,
-            });
-          } else {
-            await this.store.save(nextRoom, undefined, { correlationId });
-            await this.sessionRegistry.deleteSessionForPlayer(
-              normalizedCode,
-              leavingPlayer.id,
-              { correlationId },
-            );
-          }
-
-          return {
-            room: nextRoom,
-            player: leavingPlayer,
-            shouldDelete,
-            gameOverPayload,
-          };
-        },
-        correlationId,
-      );
-
-      const duration = this.clock.now() - startTime;
-      this.logger.info("Room left", {
-        operation: "room_leave",
-        roomCode: normalizedCode,
-        playerId: result.player.id,
-        shouldDelete: result.shouldDelete,
-        duration,
-        durationMs: duration,
-        ...(correlationId ? { correlationId } : {}),
-      });
-
-      return result;
-    } catch (err) {
-      const duration = this.clock.now() - startTime;
-      const isClientError = err instanceof AppError && err.statusCode < 500;
-      const logContext = {
-        operation: "room_leave",
-        roomCode: normalizedCode,
-        duration,
-        durationMs: duration,
-        error: serializeError(err),
-        ...(correlationId ? { correlationId } : {}),
-      };
-      if (isClientError) {
-        this.logger.warn("Room leave rejected", logContext);
-      } else {
-        this.logger.error("Room leave failed", logContext);
-      }
-      throw err;
-    }
-  }
-
-  /**
-   * Helper to synchronize timer operations across target and primary registries (MAJ-012).
-   */
-  private syncTimerRegistries(
-    action: (registry: IDisconnectTimerRegistry) => void,
-    targetRegistry: IDisconnectTimerRegistry,
-  ): void {
-    action(targetRegistry);
-    if (targetRegistry !== this.timerRegistry) {
-      action(this.timerRegistry);
-    }
-  }
-
-  /**
-   * Schedules disconnect abandonment forfeit timer with structured logging and error capture (MAJ-004, MAJ-012).
-   */
-  private scheduleAbandonmentTimer(
-    roomCode: string,
-    playerId: string,
-    gracePeriodMs: number,
-    onForfeit?: (
-      room: RoomState,
-      gameOverPayload: GameOverPayload,
-      correlationId?: string,
-      playerId?: string,
-    ) => void | Promise<void>,
-    targetTimerRegistry: IDisconnectTimerRegistry = this.timerRegistry,
-  ): NodeJS.Timeout | TimerHandle {
-    const timer = this.timerService.setTimeout(async () => {
-      try {
-        await runLoggedJob(
-          this.logger,
-          "disconnect_grace_period_abandonment",
-          async (jobCorrelationId) => {
-            this.syncTimerRegistries(
-              (reg) => reg.cancel(roomCode, playerId),
-              targetTimerRegistry,
-            );
-            const forfeitResult = await this.handleAbandonmentForfeit(
-              roomCode,
-              playerId,
-              jobCorrelationId,
-            );
-            if (forfeitResult && onForfeit) {
-              await onForfeit(
-                forfeitResult.room,
-                forfeitResult.gameOverPayload,
-                jobCorrelationId,
-                playerId,
-              );
-            }
-            return {
-              roomCode,
-              playerId,
-              forfeited: Boolean(forfeitResult),
-            };
-          },
-        );
-      } catch (err) {
-        // MAJ-004: Catch and log error explicitly with full room and player context
-        this.logger.error("Disconnect grace-period forfeiture job failed", {
-          operation: "disconnect_grace_period_abandonment",
-          roomCode,
-          playerId,
-          error: serializeError(err),
-        });
-      }
-    }, gracePeriodMs);
-
-    timer.unref?.();
-    return timer;
+      correlationId,
+    );
+    return result as {
+      room: RoomState;
+      player: Player;
+      shouldDelete: boolean;
+      gameOverPayload?: GameOverPayload;
+    };
   }
 
   /**
    * Handles unexpected socket drop. Marks player disconnected and pauses active match.
-   * Manages disconnect grace timer under the room lock to eliminate race with immediate reconnect (MAJ-028).
-   * Decomposed into focused helpers per MAJ-012.
+   * Delegated to RoomLifecycleCoordinator.
    */
   public async handleDisconnect(
     socketId: string,
@@ -676,7 +360,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       correlationId?: string,
       playerId?: string,
     ) => void | Promise<void>,
-    gracePeriodMs = DISCONNECT_GRACE_PERIOD_MS,
+    gracePeriodMs?: number,
     timerRegistry?: IDisconnectTimerRegistry,
     correlationId?: string,
   ): Promise<{
@@ -684,180 +368,29 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     player: Player;
     wasActiveGame: boolean;
   } | null> {
-    const match = await this.store.findBySocketId(socketId);
-    if (!match) return null;
-
-    const { room: matchedRoom, playerId } = match;
-    const targetTimerRegistry = timerRegistry ?? this.timerRegistry;
-
-    return this.store.withLock(
-      matchedRoom.roomCode,
-      async () => {
-        const room = await this.store.findByCode(matchedRoom.roomCode);
-        if (!room) return null;
-
-        // CRIT-001: verify under lock that player's current socket matches the disconnecting socket
-        const currentPlayer =
-          room.whitePlayer?.id === playerId
-            ? room.whitePlayer
-            : room.blackPlayer?.id === playerId
-              ? room.blackPlayer
-              : (room.spectators.find((s) => s.id === playerId) ?? null);
-
-        if (!currentPlayer) return null;
-
-        if (currentPlayer.socketId !== socketId) {
-          this.logger.debug("Stale disconnect event ignored", {
-            operation: "handle_disconnect",
-            roomCode: matchedRoom.roomCode,
-            playerId,
-            expectedSocketId: currentPlayer.socketId,
-            actualSocketId: socketId,
-            ...(correlationId ? { correlationId } : {}),
-          });
-          return null;
-        }
-
-        const now = this.clock.now();
-        const { nextRoom, paused, droppedPlayer } = disconnectPlayerTransition(
-          room,
-          playerId,
-          now,
-        );
-
-        if (!droppedPlayer) return null;
-
-        await this.store.save(nextRoom, undefined, { correlationId });
-
-        if (paused) {
-          // Clear any previous timer under lock and install new timer under lock (MAJ-028, MAJ-012)
-          this.syncTimerRegistries(
-            (reg) => reg.cancel(matchedRoom.roomCode, playerId),
-            targetTimerRegistry,
-          );
-
-          const timer = this.scheduleAbandonmentTimer(
-            matchedRoom.roomCode,
-            playerId,
-            gracePeriodMs,
-            onForfeit,
-            targetTimerRegistry,
-          );
-
-          this.syncTimerRegistries(
-            (reg) => reg.set(matchedRoom.roomCode, playerId, timer),
-            targetTimerRegistry,
-          );
-        }
-
-        return { room: nextRoom, player: droppedPlayer, wasActiveGame: paused };
-      },
+    return this.lifecycleCoordinator.handleDisconnect(
+      socketId,
+      onForfeit,
+      gracePeriodMs,
+      timerRegistry,
       correlationId,
     );
   }
 
   /**
-   * Handles disconnect grace period expiration. If player has not reconnected,
-   * forfeits the match by abandonment and awards the win to the opponent.
-   * Remediated to use store.mutate() with pure state transition, CAS version guards,
-   * and structured logging per CRIT-001.
+   * Handles disconnect grace period expiration.
+   * Delegated to RoomLifecycleCoordinator.
    */
   public async handleAbandonmentForfeit(
     roomCode: string,
     disconnectedPlayerId: string,
     correlationId?: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload } | null> {
-    const normalizedCode = normalizeRoomCode(roomCode);
-    const startTime = this.clock.now();
-
-    this.logger.info("Processing abandonment forfeit", {
-      operation: "room_abandonment_forfeit",
-      roomCode: normalizedCode,
+    return this.lifecycleCoordinator.handleAbandonmentForfeit(
+      roomCode,
       disconnectedPlayerId,
-      ...(correlationId ? { correlationId } : {}),
-    });
-
-    try {
-      const outcome = await this.store.mutate(
-        normalizedCode,
-        (current) => {
-          const transition = abandonmentForfeitTransition(
-            current,
-            disconnectedPlayerId,
-            this.clock.now(),
-          );
-          if (!transition) {
-            return { updatedRoom: current, result: null };
-          }
-          return {
-            updatedRoom: transition.nextRoom,
-            result: {
-              room: transition.nextRoom,
-              gameOverPayload: transition.gameOverPayload,
-            },
-          };
-        },
-        correlationId,
-      );
-
-      const duration = this.clock.now() - startTime;
-      if (outcome) {
-        this.logger.info("Abandonment forfeit completed successfully", {
-          operation: "room_abandonment_forfeit",
-          roomCode: normalizedCode,
-          disconnectedPlayerId,
-          winner: outcome.gameOverPayload.winner,
-          duration,
-          durationMs: duration,
-          ...(correlationId ? { correlationId } : {}),
-        });
-      } else {
-        this.logger.info(
-          "Abandonment forfeit skipped: player reconnected or room state changed",
-          {
-            operation: "room_abandonment_forfeit",
-            roomCode: normalizedCode,
-            disconnectedPlayerId,
-            duration,
-            durationMs: duration,
-            ...(correlationId ? { correlationId } : {}),
-          },
-        );
-      }
-
-      return outcome;
-    } catch (error) {
-      if (error instanceof RoomNotFoundError) {
-        const duration = this.clock.now() - startTime;
-        this.logger.info("Abandonment forfeit skipped: room not found", {
-          operation: "room_abandonment_forfeit",
-          roomCode: normalizedCode,
-          disconnectedPlayerId,
-          duration,
-          durationMs: duration,
-          ...(correlationId ? { correlationId } : {}),
-        });
-        return null;
-      }
-
-      const duration = this.clock.now() - startTime;
-      const isClientError = error instanceof AppError && error.statusCode < 500;
-      const logContext = {
-        operation: "room_abandonment_forfeit",
-        roomCode: normalizedCode,
-        disconnectedPlayerId,
-        duration,
-        durationMs: duration,
-        error: serializeError(error),
-        ...(correlationId ? { correlationId } : {}),
-      };
-      if (isClientError) {
-        this.logger.warn("Abandonment forfeit processing rejected", logContext);
-      } else {
-        this.logger.error("Abandonment forfeit processing failed", logContext);
-      }
-      throw error;
-    }
+      correlationId,
+    );
   }
 
   /**
@@ -872,49 +405,24 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
 
   /**
    * Cleans up stale rooms inactive for longer than maxAgeMs (default 10 minutes).
+   * Delegated to RoomLifecycleCoordinator.
    */
   public async cleanupAbandonedRooms(
-    maxAgeMs = 10 * 60 * 1000,
+    maxAgeMs?: number,
     jobCorrelationId?: string,
   ): Promise<number> {
-    const correlationId = jobCorrelationId;
-    // PERF: Also evict expired sessions across all rooms to prevent memory leaks
-    await this.sessionRegistry.cleanupExpiredSessions({ correlationId });
-
-    const rooms = await this.store.listActiveRooms();
-    const now = this.clock.now();
-    let cleaned = 0;
-
-    for (const room of rooms) {
-      if (now - room.lastActivityAt > maxAgeMs) {
-        try {
-          // MIN-006: Cancel disconnect timers when cleaning up abandoned rooms
-          this.timerRegistry.cancelAllForRoom(room.roomCode);
-          await this.store.delete(room.roomCode, { correlationId });
-          await this.sessionRegistry.deleteSessionsForRoom(room.roomCode, {
-            correlationId,
-          });
-          cleaned++;
-        } catch (error) {
-          this.logger.error("Failed to cleanup abandoned room", {
-            operation: "room_cleanup_abandoned_error",
-            roomCode: room.roomCode,
-            error: serializeError(error),
-            ...(correlationId ? { correlationId } : {}),
-          });
-        }
-      }
-    }
-
-    return cleaned;
+    return this.lifecycleCoordinator.cleanupAbandonedRooms(
+      maxAgeMs,
+      jobCorrelationId,
+    );
   }
 
   /**
    * Cleans up expired sessions in the session registry.
-   * PERF: Prevents unbounded memory growth in long-running deployments.
+   * Delegated to RoomLifecycleCoordinator.
    */
   public async cleanupExpiredSessions(): Promise<number> {
-    return this.sessionRegistry.cleanupExpiredSessions();
+    return this.lifecycleCoordinator.cleanupExpiredSessions();
   }
 
   // --- IRoomGameAdapter Implementation (MAJ-016 & MAJ-017) ---
@@ -929,6 +437,12 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     correlationId?: string,
   ): Promise<RoomState> {
     const code = normalizeRoomCode(roomCode);
+    this.logger.debug("Applying game move", {
+      operation: "room_apply_game_move",
+      roomCode: code,
+      moveCount: nextGameState.moveCount,
+      ...(correlationId ? { correlationId } : {}),
+    });
     return this.store.mutate(
       code,
       async (room) => {
@@ -964,6 +478,13 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     correlationId?: string,
   ): Promise<RoomState> {
     const code = normalizeRoomCode(roomCode);
+    this.logger.debug("Finalizing game", {
+      operation: "room_finalize_game",
+      roomCode: code,
+      reason: gameOverPayload.reason,
+      winner: gameOverPayload.winner,
+      ...(correlationId ? { correlationId } : {}),
+    });
     return this.store.mutate(
       code,
       async (room) => {
@@ -990,6 +511,11 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     correlationId?: string,
   ): Promise<RoomState> {
     const code = normalizeRoomCode(roomCode);
+    this.logger.debug("Updating draw offer", {
+      operation: "room_update_draw_offer",
+      roomCode: code,
+      ...(correlationId ? { correlationId } : {}),
+    });
     return this.store.mutate(
       code,
       async (room) => {
@@ -1012,6 +538,11 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     correlationId?: string,
   ): Promise<RoomState> {
     const code = normalizeRoomCode(roomCode);
+    this.logger.debug("Updating rematch", {
+      operation: "room_update_rematch",
+      roomCode: code,
+      ...(correlationId ? { correlationId } : {}),
+    });
     const result = await this.store.mutate(
       code,
       async (room) => {
@@ -1052,6 +583,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
 
   /**
    * Updates a player's socket ID in the room state under lock (MAJ-007 socket auto-healing).
+   * Delegated to RoomMemberCoordinator.
    */
   public async updatePlayerSocket(
     roomCode: string,
@@ -1059,59 +591,11 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     newSocketId: string,
     correlationId?: string,
   ): Promise<RoomState> {
-    const code = normalizeRoomCode(roomCode);
-    return this.store.mutate(
-      code,
-      async (room) => {
-        let whitePlayer = room.whitePlayer;
-        let blackPlayer = room.blackPlayer;
-        let spectators = room.spectators;
-        let found = false;
-
-        if (whitePlayer?.id === playerId) {
-          whitePlayer = { ...whitePlayer, socketId: newSocketId, isConnected: true };
-          found = true;
-        } else if (blackPlayer?.id === playerId) {
-          blackPlayer = { ...blackPlayer, socketId: newSocketId, isConnected: true };
-          found = true;
-        } else if (spectators.some((s) => s.id === playerId)) {
-          spectators = spectators.map((s) =>
-            s.id === playerId ? { ...s, socketId: newSocketId, isConnected: true } : s,
-          );
-          found = true;
-        }
-
-        if (!found) {
-          throw new PlayerNotInRoomError(playerId);
-        }
-
-        const now = this.clock.now();
-        const updatedRoom: RoomState = {
-          ...room,
-          whitePlayer,
-          blackPlayer,
-          spectators,
-          lastActivityAt: now,
-        };
-
-        return { updatedRoom, result: updatedRoom };
-      },
+    return this.memberCoordinator.updatePlayerSocket(
+      roomCode,
+      playerId,
+      newSocketId,
       correlationId,
     );
-  }
-
-  /**
-   * Generates a 4-letter uppercase room code candidate.
-   */
-  private generateRoomCodeCandidate(): string {
-    let code = "";
-    for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
-      const idx = this.idGenerator.generateRandomInt(
-        0,
-        ROOM_CODE_CHARSET.length,
-      );
-      code += ROOM_CODE_CHARSET.charAt(idx);
-    }
-    return code;
   }
 }

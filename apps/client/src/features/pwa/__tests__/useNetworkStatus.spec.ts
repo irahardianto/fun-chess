@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { effectScope } from 'vue';
+import { MockNetworkMonitor } from '@/platform/browser/testing';
 import { useNetworkStatus, resetNetworkStatusState } from '../composables/useNetworkStatus';
 
 describe('useNetworkStatus Composable', () => {
@@ -158,8 +159,19 @@ describe('useNetworkStatus Composable', () => {
   });
 
   describe('MockNetworkMonitor & DI abstraction [MAJ-011]', () => {
-    it('supports injected MockNetworkMonitor without touching browser globals', async () => {
-      const { MockNetworkMonitor } = await import('../composables/useNetworkStatus');
+    it('supports injected MockNetworkMonitor without touching browser globals', () => {
+      const mockMonitor = new MockNetworkMonitor(false);
+      const status = useNetworkStatus({ monitor: mockMonitor });
+
+      expect(status.isOnline.value).toBe(false);
+      expect(status.isOffline.value).toBe(true);
+
+      mockMonitor.setOnlineStatus(true);
+      expect(status.isOnline.value).toBe(true);
+      expect(status.isOffline.value).toBe(false);
+    });
+
+    it('supports legacy positional arguments for backwards compatibility', () => {
       const mockMonitor = new MockNetworkMonitor(false);
       const status = useNetworkStatus(undefined, undefined, mockMonitor);
 
@@ -169,6 +181,45 @@ describe('useNetworkStatus Composable', () => {
       mockMonitor.setOnlineStatus(true);
       expect(status.isOnline.value).toBe(true);
       expect(status.isOffline.value).toBe(false);
+    });
+
+    it('supports custom logger via options', () => {
+      const mockMonitor = new MockNetworkMonitor(false);
+      const mockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        fatal: vi.fn(),
+        child: vi.fn(),
+      };
+      useNetworkStatus({ monitor: mockMonitor, logger: mockLogger as any });
+      mockMonitor.setOnlineStatus(true);
+      expect(mockLogger.info).toHaveBeenCalledWith('Network status changed to online', {
+        operation: 'network_status_change',
+        isOnline: true,
+      });
+    });
+
+    it('supports custom client via options', async () => {
+      const mockClient = {
+        get: vi.fn(),
+        getLanInfo: vi.fn(),
+        checkHealth: vi.fn(),
+        checkConnectivity: vi.fn().mockResolvedValue(true),
+      };
+      const status = useNetworkStatus({ client: mockClient as any });
+      const online = await status.checkConnectivity('/test');
+      expect(online).toBe(true);
+      expect(mockClient.checkConnectivity).toHaveBeenCalledWith('/test');
+    });
+
+    it('setOnlineStatus delegates to mutable monitor', () => {
+      const mockMonitor = new MockNetworkMonitor(true);
+      const status = useNetworkStatus({ monitor: mockMonitor });
+      status.setOnlineStatus(false);
+      expect(status.isOnline.value).toBe(false);
+      expect(mockMonitor.isOnline()).toBe(false);
     });
   });
 });

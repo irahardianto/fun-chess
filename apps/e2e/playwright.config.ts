@@ -40,6 +40,12 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}),
+        launchOptions: {
+          args: [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
+          ],
+        },
       },
     },
     {
@@ -49,6 +55,12 @@ export default defineConfig({
       use: {
         ...devices['Pixel 5'],
         ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}),
+        launchOptions: {
+          args: [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
+          ],
+        },
       },
     },
   ],

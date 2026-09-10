@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { serializeError } from "@fun-chess/shared";
 import { PinoLogger } from "./platform/logger/index.js";
 import {
@@ -16,7 +17,9 @@ const isMain =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]!);
 
 if (isMain) {
+  const bootstrapStartTime = performance.now();
   startServer().catch((err) => {
+    const bootstrapDuration = Math.round(performance.now() - bootstrapStartTime);
     const bootstrapCorrelationId = randomUUID();
     const safeLogLevel = parseFallbackLogLevel(process.env.LOG_LEVEL);
     const fallbackLogger = new PinoLogger({
@@ -25,6 +28,8 @@ if (isMain) {
     fallbackLogger.fatal("Fatal bootstrap error during server startup", {
       operation: "server_bootstrap_fatal",
       correlationId: bootstrapCorrelationId,
+      duration: bootstrapDuration,
+      durationMs: bootstrapDuration,
       error: serializeError(err),
     });
     process.exit(1);

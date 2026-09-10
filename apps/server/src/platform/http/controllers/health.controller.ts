@@ -5,6 +5,23 @@ import {
 } from "@fun-chess/shared";
 import { IRoomCountProvider, IAddressingInfoProvider } from "../http.interface.js";
 import { normalizeIp } from "../ip_utils.js";
+import {
+  HttpMetricsCollector,
+  globalMetricsCollector,
+} from "../http_metrics.js";
+
+export interface ReadinessResponse {
+  readonly status: "ready" | "terminating" | "unhealthy";
+  readonly ready: boolean;
+  readonly reason?: string;
+}
+
+export interface HealthPayload {
+  readonly status: "ok" | "degraded" | "terminating";
+  readonly uptimeSeconds: number;
+  readonly timestamp: string;
+  readonly version?: string;
+}
 
 export interface HealthControllerOptions {
   roomStore: IRoomCountProvider;
@@ -13,6 +30,8 @@ export interface HealthControllerOptions {
   getActiveSocketCount: () => number;
   isProduction?: boolean;
   startTime?: number;
+  shutdownCoordinator?: { isTerminating?: boolean; isShuttingDown?: boolean };
+  metricsCollector?: HttpMetricsCollector;
 }
 
 export interface TelemetryAuthParams {
@@ -101,6 +120,7 @@ export function isTelemetryAuthorized(params: TelemetryAuthParams): boolean {
 
 /**
  * Controller for container health checks and operational telemetry (MIN-029).
+ * Exposes /ready, /api/v1/health, and Prometheus format /metrics (MAJ-013, MAJ-014, MIN-023).
  * Redacts process memory metrics in production to prevent information disclosure (MIN-001).
  */
 export class HealthController {
@@ -110,6 +130,8 @@ export class HealthController {
   private readonly getActiveSocketCount: () => number;
   private readonly isProduction: boolean;
   private readonly startTime: number;
+  private shutdownCoordinator?: { isTerminating?: boolean; isShuttingDown?: boolean };
+  private readonly metricsCollector: HttpMetricsCollector;
 
   constructor(options: HealthControllerOptions) {
     this.roomStore = options.roomStore;
@@ -118,6 +140,55 @@ export class HealthController {
     this.getActiveSocketCount = options.getActiveSocketCount;
     this.isProduction = options.isProduction ?? false;
     this.startTime = options.startTime ?? Date.now();
+    this.shutdownCoordinator = options.shutdownCoordinator;
+    this.metricsCollector = options.metricsCollector ?? globalMetricsCollector;
+  }
+
+  /**
+   * Updates or wires the shutdown coordinator handle dynamically (BLK-01).
+   */
+  public setShutdownCoordinator(
+    coordinator?: { isTerminating?: boolean; isShuttingDown?: boolean },
+  ): void {
+    this.shutdownCoordinator = coordinator;
+  }
+
+  /**
+   * Evaluates container readiness for Kubernetes / Cloud Run /ready probe (MAJ-013, BLK-01).
+   * Degrades to 503 terminating when shutdown sequence is initiated.
+   */
+  public getReadiness(): ReadinessResponse {
+    const isTerminating =
+      this.shutdownCoordinator?.isShuttingDown === true ||
+      this.shutdownCoordinator?.isTerminating === true;
+    if (isTerminating) {
+      return { status: "terminating", ready: false };
+    }
+    return { status: "ready", ready: true };
+  }
+
+  /**
+   * Alias for getReadiness() matching standard /ready probe controller convention (BLK-01).
+   */
+  public getReady(): ReadinessResponse {
+    return this.getReadiness();
+  }
+
+  /**
+   * Returns canonical versioned application health inside uniform { data: HealthPayload } envelope (MIN-023).
+   */
+  public getApiV1Health(): { data: HealthPayload } {
+    const isTerminating =
+      this.shutdownCoordinator?.isShuttingDown === true ||
+      this.shutdownCoordinator?.isTerminating === true;
+    return {
+      data: {
+        status: isTerminating ? "terminating" : "ok",
+        uptimeSeconds: Math.round((Date.now() - this.startTime) / 100) / 10,
+        timestamp: new Date().toISOString(),
+        version: "1.0.0",
+      },
+    };
   }
 
   public getLiveness(): LivenessHealthResponse {
@@ -126,6 +197,18 @@ export class HealthController {
       uptimeSeconds: Math.round((Date.now() - this.startTime) / 100) / 10,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Generates OpenMetrics / Prometheus text representation for GET /metrics (MAJ-014).
+   */
+  public async getPrometheusMetrics(): Promise<string> {
+    const activeRooms = await this.roomStore.count();
+    const activeSockets = this.getActiveSocketCount();
+    return this.metricsCollector.toPrometheusFormat({
+      activeRooms,
+      activeSockets,
+    });
   }
 
   public async getDetailedHealth(): Promise<DetailedHealthResponse> {

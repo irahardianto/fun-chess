@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { serveStaticFile, checkPathTraversal } from "../static_handler.js";
+import { HttpRateLimiter } from "../http_rate_limiter.js";
 import { Logger } from "../../logger/logger.interface.js";
 import { defaultLogger } from "../../logger/index.js";
 import { NullLogger } from "../../logger/null_logger.js";
@@ -214,7 +215,11 @@ describe("serveStaticFile", () => {
 
       expect(handled).toBe(true);
       expect(statusCode).toBe(403);
-      expect(responseBody).toBe("Forbidden");
+      expect(JSON.parse(responseBody)).toMatchObject({
+        status: "error",
+        code: 403,
+        error: { code: "ERR_UNAUTHORIZED" },
+      });
       expect(loggedWarnings).toHaveLength(1);
       expect(loggedWarnings[0]?.msg).toBe("Directory traversal attempt detected");
       expect(loggedWarnings[0]?.meta).toMatchObject({
@@ -267,7 +272,11 @@ describe("serveStaticFile", () => {
 
         expect(handled).toBe(true);
         expect(statusCode).toBe(403);
-        expect(responseBody).toBe("Forbidden");
+        expect(JSON.parse(responseBody)).toMatchObject({
+          status: "error",
+          code: 403,
+          error: { code: "ERR_UNAUTHORIZED" },
+        });
         expect(warned).toBe(true);
       }
     });
@@ -310,7 +319,11 @@ describe("serveStaticFile", () => {
 
       expect(handled).toBe(true);
       expect(statusCode).toBe(403);
-      expect(responseBody).toBe("Forbidden");
+      expect(JSON.parse(responseBody)).toMatchObject({
+        status: "error",
+        code: 403,
+        error: { code: "ERR_UNAUTHORIZED" },
+      });
       expect(loggedWarnings.length).toBeGreaterThan(0);
       expect(loggedWarnings[0]?.meta?.["operation"]).toBe("security_violation");
       expect(loggedWarnings[0]?.meta?.["clientIp"]).toBe("172.16.0.22");
@@ -343,7 +356,11 @@ describe("serveStaticFile", () => {
 
         expect(handled).toBe(true);
         expect(statusCode).toBe(403);
-        expect(responseBody).toBe("Forbidden");
+        expect(JSON.parse(responseBody)).toMatchObject({
+          status: "error",
+          code: 403,
+          error: { code: "ERR_UNAUTHORIZED" },
+        });
       }
     });
 
@@ -447,7 +464,11 @@ describe("serveStaticFile", () => {
 
         expect(handled).toBe(true);
         expect(statusCode).toBe(403);
-        expect(responseBody).toBe("Forbidden");
+        expect(JSON.parse(responseBody)).toMatchObject({
+          status: "error",
+          code: 403,
+          error: { code: "ERR_UNAUTHORIZED" },
+        });
       } finally {
         await fs.unlink(symlinkPath).catch(() => {});
         await fs.unlink(outsideFile).catch(() => {});
@@ -576,6 +597,62 @@ describe("serveStaticFile", () => {
         });
       }
     });
+
+    it("throttles brute-force missing static asset scans with HTTP 429 when notFoundRateLimiter threshold is exceeded (WRN-01)", async () => {
+      const notFoundRateLimiter = new HttpRateLimiter({
+        maxRequests: 2,
+        windowMs: 10_000,
+        pruneIntervalMs: 0,
+      });
+
+      const makeRequest = async (assetPath: string) => {
+        let statusCode = 0;
+        let responseBody = "";
+        const mockReq = {
+          method: "GET",
+          url: assetPath,
+          headers: {},
+          socket: { remoteAddress: "192.168.1.101" },
+        } as unknown as IncomingMessage;
+        const mockRes = {
+          writeHead: (status: number) => {
+            statusCode = status;
+            return mockRes;
+          },
+          end: (body?: string) => {
+            responseBody = body || "";
+            return mockRes;
+          },
+        } as unknown as ServerResponse;
+
+        const handled = await serveStaticFile(mockReq, mockRes, {
+          distPath: tempDir,
+          notFoundRateLimiter,
+        });
+
+        return { handled, statusCode, body: responseBody ? JSON.parse(responseBody) : undefined };
+      };
+
+      // Attempt 1: 404
+      const res1 = await makeRequest("/missing-1.js");
+      expect(res1.handled).toBe(true);
+      expect(res1.statusCode).toBe(404);
+      expect(res1.body.error.code).toBe("ERR_NOT_FOUND");
+
+      // Attempt 2: 404 (limit reached)
+      const res2 = await makeRequest("/missing-2.js");
+      expect(res2.handled).toBe(true);
+      expect(res2.statusCode).toBe(404);
+      expect(res2.body.error.code).toBe("ERR_NOT_FOUND");
+
+      // Attempt 3: 429 Too Many Requests
+      const res3 = await makeRequest("/missing-3.js");
+      expect(res3.handled).toBe(true);
+      expect(res3.statusCode).toBe(429);
+      expect(res3.body.status).toBe("error");
+      expect(res3.body.error.code).toBe("ERR_RATE_LIMITED");
+      expect(res3.body.error.message).toContain("Too many non-existent path requests");
+    });
   });
 
   describe("IFileStorage & Non-ENOENT Error Handling (MAJ-014, MAJ-016)", () => {
@@ -662,7 +739,11 @@ describe("serveStaticFile", () => {
 
       expect(handled).toBe(true);
       expect(statusCode).toBe(500);
-      expect(body).toBe("Internal Server Error");
+      expect(JSON.parse(body)).toMatchObject({
+        status: "error",
+        code: 500,
+        error: { code: "ERR_INTERNAL_SERVER" },
+      });
     });
 
     it("returns 500 on non-ENOENT readFile errors like EMFILE (MAJ-014)", async () => {
@@ -708,7 +789,11 @@ describe("serveStaticFile", () => {
 
       expect(handled).toBe(true);
       expect(statusCode).toBe(500);
-      expect(body).toBe("Internal Server Error");
+      expect(JSON.parse(body)).toMatchObject({
+        status: "error",
+        code: 500,
+        error: { code: "ERR_INTERNAL_SERVER" },
+      });
     });
 
     it("returns 500 on non-ENOENT realpath errors (MAJ-014)", async () => {
@@ -754,7 +839,11 @@ describe("serveStaticFile", () => {
 
       expect(handled).toBe(true);
       expect(statusCode).toBe(500);
-      expect(body).toBe("Internal Server Error");
+      expect(JSON.parse(body)).toMatchObject({
+        status: "error",
+        code: 500,
+        error: { code: "ERR_INTERNAL_SERVER" },
+      });
     });
 
     it("returns 500 when sending static asset response throws (CRIT-005)", async () => {
@@ -798,7 +887,11 @@ describe("serveStaticFile", () => {
 
       expect(handled).toBe(true);
       expect(statusCode).toBe(500);
-      expect(body).toBe("Internal Server Error");
+      expect(JSON.parse(body)).toMatchObject({
+        status: "error",
+        code: 500,
+        error: { code: "ERR_INTERNAL_SERVER" },
+      });
     });
 
     it("returns 500 when sending fallback HTML response throws (CRIT-005)", async () => {
@@ -841,7 +934,11 @@ describe("serveStaticFile", () => {
 
       expect(handled).toBe(true);
       expect(statusCode).toBe(500);
-      expect(body).toBe("Internal Server Error");
+      expect(JSON.parse(body)).toMatchObject({
+        status: "error",
+        code: 500,
+        error: { code: "ERR_INTERNAL_SERVER" },
+      });
     });
 
     it("handles malformed URI decoding during traversal check safely without logging side-effects (MIN-005)", async () => {

@@ -1,9 +1,13 @@
-import { AppError, type ErrorCode } from "@fun-chess/shared";
+import {
+  AppError,
+  UnauthorizedError,
+} from "@fun-chess/shared";
 
 export {
   AppError,
   RoomNotFoundError,
   RoomFullError,
+  RoomCapacityExceededError,
   InvalidRoomCodeError,
   InvalidMoveError,
   NotYourTurnError,
@@ -38,7 +42,7 @@ export class RoomAlreadyExistsError extends AppError {
 export class StaleLockExecutionError extends AppError {
   constructor(roomCode: string, ticket: number) {
     super(
-      "ERR_STALE_LOCK_EXECUTION" as unknown as ErrorCode,
+      "ERR_STALE_LOCK_EXECUTION",
       `Stale lock execution detected for room '${roomCode}' (ticket #${ticket}). Operation cancelled or expired.`,
       409,
       { roomCode, ticket },
@@ -62,6 +66,11 @@ export class LockTimeoutError extends AppError {
 }
 
 /**
+ * Alias for LockTimeoutError so both names can be referenced interchangeably (MAJ-022).
+ */
+export { LockTimeoutError as RoomLockTimeoutError };
+
+/**
  * Thrown when an operation times out while actively executing inside a room's exclusive lock.
  * Addresses MAJ-005: Prevents hung actions from blocking room operations indefinitely.
  */
@@ -74,22 +83,6 @@ export class LockExecutionTimeoutError extends AppError {
       { roomCode, timeoutMs, phase: "execution" },
     );
     this.name = "LockExecutionTimeoutError";
-  }
-}
-
-/**
- * Thrown when maximum server room capacity is reached.
- */
-export class RoomCapacityExceededError extends AppError {
-  constructor(maxRooms: number) {
-    super(
-      "ERR_ROOM_CAPACITY_EXCEEDED" as unknown as ErrorCode,
-      `Maximum room capacity reached (${maxRooms})`,
-      429,
-      { maxRooms },
-    );
-    this.name = "RoomCapacityExceededError";
-    Object.setPrototypeOf(this, RoomCapacityExceededError.prototype);
   }
 }
 
@@ -127,13 +120,11 @@ export class SessionGenerationError extends AppError {
 
 /**
  * Thrown when an unauthenticated or invalid session token is provided for player actions (MAJ-007).
+ * Extends UnauthorizedError for backwards compatibility with existing error handlers (MIN-026).
  */
-export class InvalidSessionError extends AppError {
-  constructor(
-    message = "Invalid or expired session token",
-    details?: Record<string, unknown>,
-  ) {
-    super("ERR_UNAUTHORIZED", message, 401, details);
+export class InvalidSessionError extends UnauthorizedError {
+  constructor(message = "Invalid or expired session token") {
+    super(message);
     this.name = "InvalidSessionError";
     Object.setPrototypeOf(this, InvalidSessionError.prototype);
   }

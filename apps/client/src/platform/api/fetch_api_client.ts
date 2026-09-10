@@ -330,11 +330,11 @@ export class FetchApiClient implements IApiClient {
 
     let payload = raw;
     if (raw && typeof raw === 'object') {
-      const p = { ...(raw as Record<string, unknown>) };
-      if (!p.relayMode && typeof p.isCloudRelay === 'boolean') {
-        p.relayMode = p.isCloudRelay ? 'cloud' : 'lan';
+      const lanPayload = { ...(raw as Record<string, unknown>) };
+      if (!lanPayload.relayMode && typeof lanPayload.isCloudRelay === 'boolean') {
+        lanPayload.relayMode = lanPayload.isCloudRelay ? 'cloud' : 'lan';
       }
-      payload = p;
+      payload = lanPayload;
     }
 
     return LanInfoResponseSchema.parse(payload);

@@ -226,6 +226,174 @@ function quiescenceSearch(
 }
 
 /**
+ * Look up transposition table entry if available.
+ */
+function lookupTranspositionTable(
+  state: SearchState,
+  fenKey: string,
+  depth: number,
+  alpha: number,
+  beta: number,
+): number | null {
+  if (!state.tt || !fenKey) return null;
+  const entry = state.tt.get(fenKey);
+  if (entry && entry.depth >= depth) {
+    if (entry.flag === 'exact') return entry.score;
+    if (entry.flag === 'lower' && entry.score >= beta) return entry.score;
+    if (entry.flag === 'upper' && entry.score <= alpha) return entry.score;
+  }
+  return null;
+}
+
+/**
+ * Evaluates leaf node using quiescence search or static PST evaluation.
+ */
+function evaluateLeafNode(
+  chess: Chess,
+  alpha: number,
+  beta: number,
+  isMaximizing: boolean,
+  config: AiSearchConfig,
+  state: SearchState,
+): number {
+  if (config.useQuiescence) {
+    return quiescenceSearch(
+      chess,
+      alpha,
+      beta,
+      isMaximizing,
+      config.usePst,
+      state,
+      DEFAULT_QUIESCENCE_MAX_DEPTH,
+    );
+  }
+  return evaluateBoard(chess, config.usePst);
+}
+
+/**
+ * Evaluates terminal position (checkmate, stalemate, or draw).
+ */
+function evaluateTerminalPosition(
+  chess: Chess,
+  hasLegalMoves: boolean,
+  depth: number,
+): number | null {
+  if (!hasLegalMoves) {
+    if (chess.inCheck()) {
+      return chess.turn() === 'w'
+        ? -CHECKMATE_SCORE - depth
+        : CHECKMATE_SCORE + depth;
+    }
+    return STALEMATE_SCORE;
+  }
+  if (chess.isDraw()) {
+    return STALEMATE_SCORE;
+  }
+  return null;
+}
+
+/**
+ * Searches maximizing branch in minimax.
+ */
+function searchMaximizing(
+  chess: Chess,
+  legalMoves: Move[],
+  depth: number,
+  alpha: number,
+  beta: number,
+  config: AiSearchConfig,
+  state: SearchState,
+): number {
+  let maxEval = -Infinity;
+  let localAlpha = alpha;
+
+  for (const move of legalMoves) {
+    chess.move(move);
+    const evaluation = minimax(
+      chess,
+      depth - 1,
+      localAlpha,
+      beta,
+      false,
+      config,
+      state,
+    );
+    chess.undo();
+
+    if (state.aborted) {
+      break;
+    }
+
+    maxEval = Math.max(maxEval, evaluation);
+    localAlpha = Math.max(localAlpha, evaluation);
+    if (beta <= localAlpha) {
+      break; // Beta cutoff
+    }
+  }
+  return maxEval;
+}
+
+/**
+ * Searches minimizing branch in minimax.
+ */
+function searchMinimizing(
+  chess: Chess,
+  legalMoves: Move[],
+  depth: number,
+  alpha: number,
+  beta: number,
+  config: AiSearchConfig,
+  state: SearchState,
+): number {
+  let minEval = Infinity;
+  let localBeta = beta;
+
+  for (const move of legalMoves) {
+    chess.move(move);
+    const evaluation = minimax(
+      chess,
+      depth - 1,
+      alpha,
+      localBeta,
+      true,
+      config,
+      state,
+    );
+    chess.undo();
+
+    if (state.aborted) {
+      break;
+    }
+
+    minEval = Math.min(minEval, evaluation);
+    localBeta = Math.min(localBeta, evaluation);
+    if (localBeta <= alpha) {
+      break; // Alpha cutoff
+    }
+  }
+  return minEval;
+}
+
+/**
+ * Stores position evaluation in bounded transposition table.
+ */
+function storeTransposition(
+  state: SearchState,
+  fenKey: string,
+  depth: number,
+  bestScore: number,
+  alpha: number,
+  beta: number,
+): void {
+  if (state.tt && fenKey && state.tt.size < 100000) {
+    let flag: 'exact' | 'lower' | 'upper' = 'exact';
+    if (bestScore <= alpha) flag = 'upper';
+    else if (bestScore >= beta) flag = 'lower';
+    state.tt.set(fenKey, { depth, score: bestScore, flag });
+  }
+}
+
+/**
  * Minimax recursive search with Alpha-Beta pruning and Transposition Table.
  */
 function minimax(
@@ -238,122 +406,25 @@ function minimax(
   state: SearchState,
 ): number {
   state.nodesEvaluated++;
+  if (checkSearchAborted(state)) return evaluateBoard(chess, config.usePst);
 
-  if (checkSearchAborted(state)) {
-    return evaluateBoard(chess, config.usePst);
-  }
-
-  // PERF: Transposition table lookup
   const fenKey = state.tt ? chess.fen() : '';
-  if (state.tt && fenKey) {
-    const entry = state.tt.get(fenKey);
-    if (entry && entry.depth >= depth) {
-      if (entry.flag === 'exact') return entry.score;
-      if (entry.flag === 'lower' && entry.score >= beta) return entry.score;
-      if (entry.flag === 'upper' && entry.score <= alpha) return entry.score;
-    }
-  }
+  const cached = lookupTranspositionTable(state, fenKey, depth, alpha, beta);
+  if (cached !== null) return cached;
 
-  // PERF: At leaf depth, evaluate directly without generating moves or checkmate tests
   if (depth <= 0) {
-    if (config.useQuiescence) {
-      return quiescenceSearch(
-        chess,
-        alpha,
-        beta,
-        isMaximizing,
-        config.usePst,
-        state,
-        DEFAULT_QUIESCENCE_MAX_DEPTH,
-      );
-    }
-    return evaluateBoard(chess, config.usePst);
+    return evaluateLeafNode(chess, alpha, beta, isMaximizing, config, state);
   }
 
   const legalMoves = orderMoves(chess.moves({ verbose: true }));
+  const terminalScore = evaluateTerminalPosition(chess, legalMoves.length > 0, depth);
+  if (terminalScore !== null) return terminalScore;
 
-  // PERF: If no legal moves, check inCheck once to distinguish checkmate from stalemate in O(1)
-  if (legalMoves.length === 0) {
-    if (chess.inCheck()) {
-      return chess.turn() === 'w'
-        ? -CHECKMATE_SCORE - depth
-        : CHECKMATE_SCORE + depth;
-    }
-    return STALEMATE_SCORE;
-  }
+  const bestScore = isMaximizing
+    ? searchMaximizing(chess, legalMoves, depth, alpha, beta, config, state)
+    : searchMinimizing(chess, legalMoves, depth, alpha, beta, config, state);
 
-  if (chess.isDraw()) {
-    return STALEMATE_SCORE;
-  }
-
-  let bestScore: number;
-
-  if (isMaximizing) {
-    let maxEval = -Infinity;
-    let localAlpha = alpha;
-
-    for (const move of legalMoves) {
-      chess.move(move);
-      const evaluation = minimax(
-        chess,
-        depth - 1,
-        localAlpha,
-        beta,
-        false,
-        config,
-        state,
-      );
-      chess.undo();
-
-      if (state.aborted) {
-        break;
-      }
-
-      maxEval = Math.max(maxEval, evaluation);
-      localAlpha = Math.max(localAlpha, evaluation);
-      if (beta <= localAlpha) {
-        break; // Beta cutoff
-      }
-    }
-    bestScore = maxEval;
-  } else {
-    let minEval = Infinity;
-    let localBeta = beta;
-
-    for (const move of legalMoves) {
-      chess.move(move);
-      const evaluation = minimax(
-        chess,
-        depth - 1,
-        alpha,
-        localBeta,
-        true,
-        config,
-        state,
-      );
-      chess.undo();
-
-      if (state.aborted) {
-        break;
-      }
-
-      minEval = Math.min(minEval, evaluation);
-      localBeta = Math.min(localBeta, evaluation);
-      if (localBeta <= alpha) {
-        break; // Alpha cutoff
-      }
-    }
-    bestScore = minEval;
-  }
-
-  // PERF: Store position evaluation in bounded Transposition Table
-  if (state.tt && fenKey && state.tt.size < 100000) {
-    let flag: 'exact' | 'lower' | 'upper' = 'exact';
-    if (bestScore <= alpha) flag = 'upper';
-    else if (bestScore >= beta) flag = 'lower';
-    state.tt.set(fenKey, { depth, score: bestScore, flag });
-  }
-
+  storeTransposition(state, fenKey, depth, bestScore, alpha, beta);
   return bestScore;
 }
 

@@ -1,4 +1,10 @@
 /**
+ * Opaque handle representing the underlying audio context environment.
+ * Decouples browser DOM AudioContext from the architectural interface contract (ENH-004).
+ */
+export type AudioContextHandle = unknown;
+
+/**
  * Audio Service interface contract.
  * Adheres to Architectural Patterns Rule 1: I/O Isolation.
  */
@@ -43,8 +49,8 @@ export interface IAudioService {
   isMuted(): boolean;
   /** Sets audio mute state explicitly */
   setMuted(muted: boolean): void;
-  /** Initializes AudioContext if supported */
-  initContext(): AudioContext | null;
+  /** Initializes AudioContext if supported, returning an opaque context handle or null */
+  initContext(): AudioContextHandle | null;
   /** Resumes suspended AudioContext on user gesture */
   resumeContext(): void;
   /** Releases AudioContext resources and unbinds event listeners */

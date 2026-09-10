@@ -1,5 +1,5 @@
 import { computed } from 'vue';
-import type { Move, Square as ChessSquare } from 'chess.js';
+import type { Move } from 'chess.js';
 import type {
   Square,
   PieceType,
@@ -46,7 +46,7 @@ export function useScenarioMoveExecution(options: UseScenarioMoveExecutionOption
   function getLegalMovesForSquare(sq: Square): Square[] {
     try {
       const moves = chess.moves({
-        square: sq as unknown as ChessSquare,
+        square: sq,
         verbose: true,
       });
       return moves.map((m) => m.to as Square);
@@ -81,8 +81,8 @@ export function useScenarioMoveExecution(options: UseScenarioMoveExecutionOption
 
     try {
       res = chess.move({
-        from: move.from as unknown as ChessSquare,
-        to: move.to as unknown as ChessSquare,
+        from: move.from,
+        to: move.to,
         promotion: isPromo ? promoChar : undefined,
       });
     } catch (err) {
@@ -95,12 +95,12 @@ export function useScenarioMoveExecution(options: UseScenarioMoveExecutionOption
     }
 
     if (!res) {
-      const p = chess.get(move.from as unknown as ChessSquare);
+      const p = chess.get(move.from);
       if (p) {
-        chess.remove(move.from as unknown as ChessSquare);
+        chess.remove(move.from);
         chess.put(
           { type: isPromo ? (promoChar as PieceType) : p.type, color: p.color },
-          move.to as unknown as ChessSquare
+          move.to
         );
       }
     }
@@ -155,7 +155,7 @@ export function useScenarioMoveExecution(options: UseScenarioMoveExecutionOption
   const boardSelection = useBoardSelection({
     getPieceAt: (sq) => {
       try {
-        const piece = chess.get(sq as unknown as ChessSquare);
+        const piece = chess.get(sq);
         if (!piece) return null;
         return { type: piece.type, color: piece.color as 'w' | 'b' };
       } catch (err) {
@@ -182,7 +182,7 @@ export function useScenarioMoveExecution(options: UseScenarioMoveExecutionOption
     }
 
     try {
-      const piece = chess.get(sq as unknown as ChessSquare);
+      const piece = chess.get(sq);
       const isPieceOfPlayer = piece && piece.color === nav.playerColor.value;
       const stepAllowedSource = nav.currentStep.value
         ? isSourceSquareAllowed(nav.currentStep.value, sq, chess)

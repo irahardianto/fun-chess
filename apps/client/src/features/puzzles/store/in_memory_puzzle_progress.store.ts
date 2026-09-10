@@ -8,7 +8,7 @@ import type {
   IClock,
 } from '@fun-chess/shared';
 import {
-  DEFAULT_PUZZLE_PROGRESS,
+  createDefaultPuzzleProgress,
   DEFAULT_ADAPTIVE_RATING,
 } from './puzzle_progress.store';
 import { systemClock } from './local_storage_puzzle_progress.store';
@@ -20,9 +20,10 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
 
   constructor(initialProgress?: Partial<PuzzleProgress>, clock: IClock = systemClock) {
     this.clock = clock;
+    const defaultProgress = createDefaultPuzzleProgress(this.clock);
     const now = this.clock.now();
     this.progress = {
-      ...DEFAULT_PUZZLE_PROGRESS,
+      ...defaultProgress,
       ...initialProgress,
       ratingProfile: {
         ...DEFAULT_ADAPTIVE_RATING,
@@ -30,7 +31,7 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
       },
       themeMastery: { ...(initialProgress?.themeMastery || {}) },
       arcadeStats: {
-        ...DEFAULT_PUZZLE_PROGRESS.arcadeStats,
+        ...defaultProgress.arcadeStats,
         ...(initialProgress?.arcadeStats || {}),
       },
       solvedPuzzles: { ...(initialProgress?.solvedPuzzles || {}) },
@@ -150,9 +151,10 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
   }
 
   public async restoreProgress(progress: PuzzleProgress): Promise<void> {
+    const defaultProgress = createDefaultPuzzleProgress(this.clock);
     const now = this.clock.now();
     this.progress = {
-      ...DEFAULT_PUZZLE_PROGRESS,
+      ...defaultProgress,
       ...progress,
       ratingProfile: {
         ...DEFAULT_ADAPTIVE_RATING,
@@ -160,7 +162,7 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
       },
       themeMastery: { ...(progress?.themeMastery || {}) },
       arcadeStats: {
-        ...DEFAULT_PUZZLE_PROGRESS.arcadeStats,
+        ...defaultProgress.arcadeStats,
         ...(progress?.arcadeStats || {}),
       },
       solvedPuzzles: { ...(progress?.solvedPuzzles || {}) },
@@ -170,15 +172,6 @@ export class InMemoryPuzzleProgressStore implements PuzzleProgressStore {
   }
 
   public async resetAll(): Promise<void> {
-    const now = this.clock.now();
-    this.progress = {
-      ...DEFAULT_PUZZLE_PROGRESS,
-      ratingProfile: { ...DEFAULT_ADAPTIVE_RATING },
-      themeMastery: {},
-      arcadeStats: { ...DEFAULT_PUZZLE_PROGRESS.arcadeStats },
-      solvedPuzzles: {},
-      createdAt: now,
-      lastActiveAt: now,
-    };
+    this.progress = createDefaultPuzzleProgress(this.clock);
   }
 }

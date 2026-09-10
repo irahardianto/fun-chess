@@ -13,6 +13,11 @@ import {
 } from "./http.interface.js";
 import { HttpRateLimiter } from "./http_rate_limiter.js";
 import {
+  HttpMetricsCollector,
+  globalMetricsCollector,
+  normalizeMetricPath,
+} from "./http_metrics.js";
+import {
   sanitizeCorrelationId,
   applySecurityHeaders,
   applyCorsHeaders,
@@ -39,6 +44,7 @@ export interface HttpRouterOptions {
   staticController: StaticController;
   rateLimiter?: HttpRateLimiter;
   notFoundRateLimiter?: HttpRateLimiter;
+  metricsCollector?: HttpMetricsCollector;
 }
 
 /**
@@ -59,11 +65,12 @@ export class HttpRouter {
   private readonly effectiveAllowedOrigins: string[];
   private readonly trustProxy: boolean;
   private readonly isProduction: boolean;
-  private readonly healthController: HealthController;
-  private readonly lanInfoController: LanInfoController;
-  private readonly staticController: StaticController;
+  public readonly healthController: HealthController;
+  public readonly lanInfoController: LanInfoController;
+  public readonly staticController: StaticController;
   private readonly rateLimiter?: HttpRateLimiter;
   private readonly notFoundRateLimiter?: HttpRateLimiter;
+  private readonly metricsCollector: HttpMetricsCollector;
 
   constructor(options: HttpRouterOptions) {
     this.config = options.config;
@@ -77,6 +84,18 @@ export class HttpRouter {
     this.staticController = options.staticController;
     this.rateLimiter = options.rateLimiter;
     this.notFoundRateLimiter = options.notFoundRateLimiter;
+    this.metricsCollector =
+      options.metricsCollector ??
+      options.config.metricsCollector ??
+      globalMetricsCollector;
+
+    if (this.notFoundRateLimiter) {
+      this.staticController.setNotFoundRateLimiter?.(this.notFoundRateLimiter);
+    }
+  }
+
+  public setShutdownCoordinator(coordinator: { isTerminating?: boolean; isShuttingDown?: boolean }): void {
+    this.healthController.setShutdownCoordinator(coordinator);
   }
 
   public async handleRequest(
@@ -93,8 +112,13 @@ export class HttpRouter {
     const clientIp = extractClientIp(req, this.trustProxy);
     const userId = extractHttpUserId(req, url, this.logger);
 
-    // 1. Security Headers (SEC-02, MAJ-001)
-    applySecurityHeaders(res, correlationId, req, this.trustProxy);
+    // 1. Security Headers (SEC-02, MAJ-001, MAJ-003, ENH-002)
+    applySecurityHeaders(res, correlationId, req, this.trustProxy, {
+      allowedOrigins: this.effectiveAllowedOrigins,
+      clientUrl: this.config.env?.CLIENT_URL,
+      publicUrl: this.config.env?.PUBLIC_URL,
+      cspReportUri: this.config.cspReportUri ?? this.config.env?.CSP_REPORT_URI,
+    });
 
     // 2. CORS Handling (MAJ-005)
     const { origin, isOriginPermitted } = applyCorsHeaders(
@@ -194,23 +218,23 @@ export class HttpRouter {
     sendJsonResponse: (
       statusCode: number,
       data: unknown,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => void;
     sendTextResponse: (
       statusCode: number,
       text: string,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => void;
     sendRedirect: (
       statusCode: number,
       location: string,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => void;
   } {
     const sendJsonResponse = (
       statusCode: number,
       data: unknown,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => {
       const body = JSON.stringify(data);
       res.writeHead(statusCode, {
@@ -225,13 +249,13 @@ export class HttpRouter {
       if (!options?.skipLog) {
         this.logResponse(
           statusCode,
-          options?.operation || "http_request",
           correlationId,
           clientIp,
           method,
           pathname,
           startTime,
           userId,
+          options?.route ?? options?.operation,
         );
       }
     };
@@ -239,7 +263,7 @@ export class HttpRouter {
     const sendTextResponse = (
       statusCode: number,
       text: string,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => {
       res.writeHead(statusCode, {
         "Content-Type": "text/plain; charset=utf-8",
@@ -253,13 +277,13 @@ export class HttpRouter {
       if (!options?.skipLog) {
         this.logResponse(
           statusCode,
-          options?.operation || "http_request",
           correlationId,
           clientIp,
           method,
           pathname,
           startTime,
           userId,
+          options?.route ?? options?.operation,
         );
       }
     };
@@ -267,7 +291,7 @@ export class HttpRouter {
     const sendRedirect = (
       statusCode: number,
       location: string,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => {
       res.writeHead(statusCode, {
         Location: location,
@@ -276,13 +300,13 @@ export class HttpRouter {
       if (!options?.skipLog) {
         this.logResponse(
           statusCode,
-          options?.operation || "http_request",
           correlationId,
           clientIp,
           method,
           pathname,
           startTime,
           userId,
+          options?.route ?? options?.operation,
         );
       }
     };
@@ -292,17 +316,26 @@ export class HttpRouter {
 
   private logResponse(
     statusCode: number,
-    operation: string,
     correlationId: string,
     clientIp: string,
     method: string,
     pathname: string,
     startTime: number,
     userId?: string,
+    routeTag?: string,
   ): void {
     const duration = Math.round(performance.now() - startTime);
+    const route = routeTag ?? normalizeMetricPath(pathname);
+    this.metricsCollector.recordRequest({
+      method,
+      path: pathname,
+      statusCode,
+      durationMs: duration,
+    });
+
     const logContext = {
-      operation: operation || "http_request",
+      operation: "http_request",
+      route,
       correlationId,
       clientIp,
       method,
@@ -333,17 +366,17 @@ export class HttpRouter {
     sendJsonResponse: (
       statusCode: number,
       data: unknown,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => void,
     sendTextResponse: (
       statusCode: number,
       text: string,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => void,
     sendRedirect: (
       statusCode: number,
       location: string,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => void,
   ): Promise<void> {
     // 5. Rate Limiting Check
@@ -400,6 +433,7 @@ export class HttpRouter {
         correlationId,
         clientIp,
         startTime,
+        this.metricsCollector,
       )
     ) {
       return;
@@ -420,7 +454,7 @@ export class HttpRouter {
       return;
     }
 
-    // 9. Unhandled 404 Route (MIN-007, ENH-001)
+    // 9. Unhandled 404 Route (MIN-007, ENH-001, MIN-003, CRIT-003)
     handleNotFoundRoute(
       clientIp,
       pathname,
@@ -431,6 +465,7 @@ export class HttpRouter {
       this.logger,
       startTime,
       userId,
+      this.rateLimiter,
     );
   }
 
@@ -446,7 +481,7 @@ export class HttpRouter {
     sendJsonResponse: (
       statusCode: number,
       data: unknown,
-      options?: { skipLog?: boolean; operation?: string },
+      options?: { skipLog?: boolean; operation?: string; route?: string },
     ) => void,
   ): void {
     const duration = Math.round(performance.now() - startTime);
@@ -456,8 +491,17 @@ export class HttpRouter {
       correlationId,
     );
 
+    const route = normalizeMetricPath(pathname);
+    this.metricsCollector.recordRequest({
+      method,
+      path: pathname,
+      statusCode,
+      durationMs: duration,
+    });
+
     const logContext = {
       operation: "http_request",
+      route,
       correlationId,
       clientIp,
       method,

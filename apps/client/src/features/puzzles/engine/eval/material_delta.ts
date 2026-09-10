@@ -13,7 +13,6 @@ import {
   STANDARD_PIECE_POINTS,
   PIECE_STANDARD_POINTS,
 } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry';
 
 export {
   calculateBoardMaterial,
@@ -39,11 +38,7 @@ export function calculateColorMaterial(fen: string, color: PieceColor, _customLo
       }
     }
     return total;
-  } catch (err) {
-    logger.debug('Failed to calculate color material from FEN', {
-      operation: 'calculate_color_material',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return 0;
   }
 }
@@ -58,11 +53,7 @@ export function getPieceCounts(fen: string, color: PieceColor, _customLogger?: u
     const chess = createSafeChess(fen);
     const summary = calculateBoardMaterial(chess);
     return { ...(color === 'w' ? summary.whiteCounts : summary.blackCounts) };
-  } catch (err) {
-    logger.debug('Failed to get piece counts from FEN', {
-      operation: 'get_piece_counts',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return counts;
   }
 }
@@ -218,11 +209,7 @@ export function calculateMaterialDelta(
   try {
     chessInit = createSafeChess(initialFen);
     chessFinal = createSafeChess(finalFen);
-  } catch (err) {
-    logger.debug('Failed to parse FEN in calculateMaterialDelta', {
-      operation: 'calculate_material_delta',
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return {
       netCentipawns: 0,
       netPoints: 0,

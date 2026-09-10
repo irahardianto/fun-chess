@@ -11,8 +11,7 @@ import {
 } from '@fun-chess/shared';
 import {
   PUZZLE_PROGRESS_STORAGE_KEY,
-  DEFAULT_ADAPTIVE_RATING,
-  DEFAULT_PUZZLE_PROGRESS,
+  createDefaultPuzzleProgress,
 } from './puzzle_progress.store';
 import { isQuotaExceededError, storageAlertDispatcher } from '@/platform/storage/storage_alert';
 import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
@@ -52,20 +51,12 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
     this.storage = storage;
     this.clock = clock;
     this.logger = logger;
-    this.memoryCache = {
-      ...DEFAULT_PUZZLE_PROGRESS,
-      ratingProfile: { ...DEFAULT_ADAPTIVE_RATING },
-      themeMastery: {},
-      arcadeStats: { ...DEFAULT_PUZZLE_PROGRESS.arcadeStats },
-      solvedPuzzles: {},
-      createdAt: this.clock.now(),
-      lastActiveAt: this.clock.now(),
-    };
+    this.memoryCache = createDefaultPuzzleProgress(this.clock);
   }
 
   private sanitizeProgress(raw: unknown): PuzzleProgress {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      return { ...DEFAULT_PUZZLE_PROGRESS };
+      return createDefaultPuzzleProgress(this.clock);
     }
 
     const rawObj = raw as Record<string, unknown>;
@@ -102,7 +93,7 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
       return sanitized;
     }
 
-    return { ...DEFAULT_PUZZLE_PROGRESS };
+    return createDefaultPuzzleProgress(this.clock);
   }
 
   public async getProgress(): Promise<PuzzleProgress> {
@@ -236,16 +227,7 @@ export class LocalStoragePuzzleProgressStore implements PuzzleProgressStore {
   }
 
   public async resetAll(): Promise<void> {
-    const now = this.clock.now();
-    this.memoryCache = {
-      ...DEFAULT_PUZZLE_PROGRESS,
-      ratingProfile: { ...DEFAULT_ADAPTIVE_RATING },
-      themeMastery: {},
-      arcadeStats: { ...DEFAULT_PUZZLE_PROGRESS.arcadeStats },
-      solvedPuzzles: {},
-      createdAt: now,
-      lastActiveAt: now,
-    };
+    this.memoryCache = createDefaultPuzzleProgress(this.clock);
 
     if (this.storage.isAvailable()) {
       try {

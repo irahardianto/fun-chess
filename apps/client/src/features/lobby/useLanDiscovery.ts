@@ -50,9 +50,11 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
   const activeLanIp = ref<string>('');
   const detectedWebRtcIp = ref<string>('');
   const isLoaded = ref(false);
+  const discoveryError = ref<string | null>(null);
 
   // Initialize from storage or fetch from server / WebRTC
   async function init() {
+    discoveryError.value = null;
     // 1. Check storage first
     try {
       const saved = storage.getItem(STORAGE_KEY);
@@ -124,7 +126,13 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
 
   if (getCurrentInstance()) {
     onMounted(() => {
-      init();
+      init().catch((err: unknown) => {
+        discoveryError.value = err instanceof Error ? err.message : String(err);
+        log.warn('Unhandled error during LAN discovery initialization', {
+          operation: 'lan_init',
+          error: discoveryError.value,
+        });
+      });
     });
   }
 
@@ -133,6 +141,8 @@ export function useLanDiscovery(options: LanDiscoveryOptions = {}) {
     activeLanIp,
     detectedWebRtcIp,
     isLoaded,
+    error: discoveryError,
+    discoveryError,
     init,
     setLanIp,
   };

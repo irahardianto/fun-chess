@@ -10,6 +10,7 @@ import {
   getSavedSession,
 } from '../composables/useRoomSession';
 import type { GameState, GameOverPayload, MovePayload, MoveResult, Player, RoomState } from '@fun-chess/shared';
+import type { GameDomainEventSource } from '@/composables/useAudio';
 
 describe('useMultiplayer composable', () => {
   let mockSocket: any;
@@ -163,6 +164,8 @@ describe('useMultiplayer composable', () => {
       expect(multiplayer.kingInCheck).toBeDefined();
       expect(multiplayer.lastMoveEvent).toBeDefined();
       expect(typeof multiplayer.onOpponentMove).toBe('function');
+      expect(typeof multiplayer.onGameCheck).toBe('function');
+      expect(typeof multiplayer.onGameOver).toBe('function');
       expect(typeof multiplayer.makeMove).toBe('function');
       expect(typeof multiplayer.resign).toBe('function');
       expect(typeof multiplayer.offerDraw).toBe('function');
@@ -366,6 +369,47 @@ describe('useMultiplayer composable', () => {
       useMultiplayer(connectedSocket as any);
 
       expect(reconnected).toBe(true);
+    });
+
+    it('satisfies GameDomainEventSource with onOpponentMove, onGameCheck, and onGameOver (MIN-005)', () => {
+      const multiplayer = useMultiplayer(mockSocket);
+      const eventSource: GameDomainEventSource = multiplayer;
+      expect(typeof eventSource.onOpponentMove).toBe('function');
+      expect(typeof eventSource.onGameCheck).toBe('function');
+      expect(typeof eventSource.onGameOver).toBe('function');
+
+      const checkCb = vi.fn();
+      const unsubCheck = multiplayer.onGameCheck(checkCb);
+
+      const gameOverCb = vi.fn();
+      const unsubGameOver = multiplayer.onGameOver(gameOverCb);
+
+      // Trigger socket events via mock socket handlers
+      eventHandlers['game:check']?.({ inCheck: 'w', kingSquare: 'e1' });
+      expect(checkCb).toHaveBeenCalledTimes(1);
+
+      eventHandlers['game:over']?.({
+        winner: 'w',
+        reason: 'checkmate',
+        finalFen: '8/8/8/8/8/8/8/8 w - - 0 1',
+      });
+      expect(gameOverCb).toHaveBeenCalledTimes(1);
+      expect(gameOverCb).toHaveBeenCalledWith(
+        expect.objectContaining({ winner: 'w', reason: 'checkmate' })
+      );
+
+      // Unsubscribe cleanup
+      unsubCheck();
+      unsubGameOver();
+
+      eventHandlers['game:check']?.({ inCheck: 'b', kingSquare: 'e8' });
+      eventHandlers['game:over']?.({
+        winner: 'b',
+        reason: 'resignation',
+        finalFen: '8/8/8/8/8/8/8/8 w - - 0 1',
+      });
+      expect(checkCb).toHaveBeenCalledTimes(1);
+      expect(gameOverCb).toHaveBeenCalledTimes(1);
     });
   });
 });

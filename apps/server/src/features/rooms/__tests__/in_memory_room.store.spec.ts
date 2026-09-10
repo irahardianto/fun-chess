@@ -5,6 +5,7 @@ import {
   RoomNotFoundError,
   OptimisticLockConflictError,
   LockTimeoutError,
+  RoomLockTimeoutError,
   LockExecutionTimeoutError,
   RoomCapacityExceededError,
   RoomBusyError,
@@ -235,6 +236,35 @@ describe("InMemoryRoomStore", () => {
       expect(res1).toBe("p1");
       expect(res2).toBe("p2");
       expect(order).toEqual([1, 2]); // p1 must finish before p2 starts despite p2 having shorter timeout
+    });
+
+    it("rejects waiting action with RoomLockTimeoutError when lock acquisition times out (MAJ-022)", async () => {
+      const code = "TO_RACE";
+      const customStore = new InMemoryRoomStore(undefined, undefined, {
+        lockTimeoutMs: 25,
+      });
+
+      let unblockHolder!: () => void;
+      const holderBlocker = new Promise<void>((resolve) => {
+        unblockHolder = resolve;
+      });
+
+      // Acquire lock and hold it longer than the waiter's lockTimeoutMs
+      const holder = customStore.withLock(code, async () => {
+        await holderBlocker;
+        return "holder_done";
+      });
+
+      // Attempt to acquire lock while holder is active
+      const waiter = customStore.withLock(code, async () => {
+        return "waiter_done";
+      });
+
+      await expect(waiter).rejects.toThrow(RoomLockTimeoutError);
+
+      unblockHolder();
+      const holderResult = await holder;
+      expect(holderResult).toBe("holder_done");
     });
 
     it("allows independent rooms to execute concurrently without blocking", async () => {

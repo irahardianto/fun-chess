@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createApp } from 'vue';
 import {
   BrowserLocationProvider,
-  MockLocationProvider,
   BrowserNetworkMonitor,
-  MockNetworkMonitor,
   LOCATION_PROVIDER_KEY,
   NETWORK_MONITOR_KEY,
 } from '../index';
+import {
+  MockLocationProvider,
+  MockNetworkMonitor,
+} from '../testing';
 import { useInjectLocationProvider, useInjectNetworkMonitor } from '../../di';
 
 describe('Browser Capability Providers (MAJ-015)', () => {
@@ -215,6 +218,20 @@ describe('Browser Capability Providers (MAJ-015)', () => {
       const customMockNet = new MockNetworkMonitor(false);
       const resolvedCustomNet = useInjectNetworkMonitor(customMockNet);
       expect(resolvedCustomNet).toBe(customMockNet);
+    });
+
+    it('resolves provided capability providers in Vue injection context (WRN-03)', () => {
+      const customLoc = new MockLocationProvider('http://provided.test/');
+      const customNet = new MockNetworkMonitor(false);
+
+      const app = createApp({});
+      app.provide(LOCATION_PROVIDER_KEY, customLoc);
+      app.provide(NETWORK_MONITOR_KEY, customNet);
+
+      app.runWithContext(() => {
+        expect(useInjectLocationProvider()).toBe(customLoc);
+        expect(useInjectNetworkMonitor()).toBe(customNet);
+      });
     });
   });
 });

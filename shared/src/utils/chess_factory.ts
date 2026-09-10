@@ -111,7 +111,12 @@ export function isValidFen(fen: unknown): fen is string {
   try {
     const result = validateFen(trimmed);
     return result.ok === true;
-  } catch {
+  } catch (err: unknown) {
+    const debugFn = typeof console !== "undefined" ? console["debug"] : undefined;
+    debugFn?.("isValidFen encountered exception during FEN validation", {
+      fen: trimmed,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return false;
   }
 }

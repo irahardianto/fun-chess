@@ -763,19 +763,25 @@ describe("createHttpServer", () => {
       try {
         await fetch(`http://127.0.0.1:${opPort}/healthz`);
         const healthzLog = opLogger.infoLogs.find(
-          (l) => l.context?.["operation"] === "health_readiness",
+          (l) =>
+            l.context?.["operation"] === "http_request" &&
+            l.context?.["route"] === "health_readiness",
         );
         expect(healthzLog).toBeDefined();
 
         await fetch(`http://127.0.0.1:${opPort}/health`);
         const healthLog = opLogger.infoLogs.find(
-          (l) => l.context?.["operation"] === "health_liveness",
+          (l) =>
+            l.context?.["operation"] === "http_request" &&
+            l.context?.["route"] === "health_liveness",
         );
         expect(healthLog).toBeDefined();
 
         await fetch(`http://127.0.0.1:${opPort}/metrics`);
         const telemetryLog = opLogger.infoLogs.find(
-          (l) => l.context?.["operation"] === "health_telemetry",
+          (l) =>
+            l.context?.["operation"] === "http_request" &&
+            l.context?.["route"] === "health_telemetry",
         );
         expect(telemetryLog).toBeDefined();
       } finally {

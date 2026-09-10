@@ -1,17 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { Chess, type Square } from 'chess.js';
-import { ALL_SCENARIOS, SCENARIOS_MAP } from '../features/scenarios/data';
-import { useScenarioRunner } from '../features/scenarios/composables/useScenarioRunner';
-import { LocalStorageProgressStore } from '../features/scenarios/store/local_storage_progress.store';
-import { ALL_PUZZLES } from '../features/puzzles/data/puzzle_catalog';
-import { usePuzzleRunner } from '../features/puzzles/composables/usePuzzleRunner';
-import { useProgressiveHint } from '../features/puzzles/composables/useProgressiveHint';
-import { useAdaptiveLadder } from '../features/puzzles/composables/useAdaptiveLadder';
-import { useThemedDrills } from '../features/puzzles/composables/useThemedDrills';
-import { validatePuzzleMove, parseUciMove, formatPlayerMoveToUci } from '../features/puzzles/engine/puzzle_validator';
-import { generateMistakeRefutation } from '../features/puzzles/engine/puzzle_analysis_engine';
-import { LocalStoragePuzzleProgressStore } from '../features/puzzles/store/local_storage_puzzle_progress.store';
-import { InMemoryPuzzleProgressStore } from '../features/puzzles/store/in_memory_puzzle_progress.store';
+import {
+  ALL_SCENARIOS,
+  SCENARIOS_MAP,
+  useScenarioRunner,
+  LocalStorageProgressStore,
+} from '@/features/scenarios';
+import {
+  ALL_PUZZLES,
+  usePuzzleRunner,
+  useProgressiveHint,
+  useAdaptiveLadder,
+  useThemedDrills,
+  validatePuzzleMove,
+  parseUciMove,
+  formatPlayerMoveToUci,
+  generateMistakeRefutation,
+  LocalStoragePuzzleProgressStore,
+  InMemoryPuzzleProgressStore,
+} from '@/features/puzzles';
 
 describe('Deep Interaction & State Machine Verification', () => {
   describe('Chess Academy: 43 Scenarios Comprehensive Verification', () => {

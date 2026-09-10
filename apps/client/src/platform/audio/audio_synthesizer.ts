@@ -209,6 +209,30 @@ export class AudioSynthesizer implements IAudioService {
   }
 
   /**
+   * Attaches an onended event handler to transient oscillator nodes to cleanly disconnect
+   * both the oscillator and intermediate gain node from the master audio graph (MAJ-004).
+   * Prevents memory leaks and audio thread node accumulation during rapid moves.
+   */
+  private bindNodeCleanup(osc: OscillatorNode, gain: GainNode): void {
+    osc.onended = () => {
+      try {
+        if (typeof osc.disconnect === 'function') {
+          osc.disconnect();
+        }
+      } catch (err: unknown) {
+        void err; // Safe no-op on teardown or if already disconnected
+      }
+      try {
+        if (typeof gain.disconnect === 'function') {
+          gain.disconnect();
+        }
+      } catch (err: unknown) {
+        void err; // Safe no-op on teardown or if already disconnected
+      }
+    };
+  }
+
+  /**
    * Piece pickup / click: Sine wave 440 Hz (A4), 30ms click.
    */
   public playClick(): void {
@@ -231,6 +255,8 @@ export class AudioSynthesizer implements IAudioService {
 
       osc.connect(gain);
       gain.connect(masterGain);
+
+      this.bindNodeCleanup(osc, gain);
 
       osc.start(now);
       osc.stop(now + 0.035);
@@ -270,6 +296,8 @@ export class AudioSynthesizer implements IAudioService {
 
       osc.connect(gain);
       gain.connect(masterGain);
+
+      this.bindNodeCleanup(osc, gain);
 
       osc.start(now);
       osc.stop(now + 0.08);
@@ -315,6 +343,9 @@ export class AudioSynthesizer implements IAudioService {
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
       osc2.connect(gain2);
       gain2.connect(masterGain);
+
+      this.bindNodeCleanup(osc1, gain1);
+      this.bindNodeCleanup(osc2, gain2);
 
       osc1.start(now);
       osc2.start(now);
@@ -362,6 +393,9 @@ export class AudioSynthesizer implements IAudioService {
       osc2.connect(gain2);
       gain2.connect(masterGain);
 
+      this.bindNodeCleanup(osc1, gain1);
+      this.bindNodeCleanup(osc2, gain2);
+
       osc1.start(now);
       osc1.stop(now + 0.095);
       osc2.start(now + 0.08);
@@ -406,6 +440,8 @@ export class AudioSynthesizer implements IAudioService {
         osc.connect(gain);
         gain.connect(masterGain);
 
+        this.bindNodeCleanup(osc, gain);
+
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
       });
@@ -449,6 +485,8 @@ export class AudioSynthesizer implements IAudioService {
         osc.connect(gain);
         gain.connect(masterGain);
 
+        this.bindNodeCleanup(osc, gain);
+
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
       });
@@ -491,6 +529,8 @@ export class AudioSynthesizer implements IAudioService {
         osc.connect(gain);
         gain.connect(masterGain);
 
+        this.bindNodeCleanup(osc, gain);
+
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
       });
@@ -527,6 +567,8 @@ export class AudioSynthesizer implements IAudioService {
       osc.connect(gain);
       gain.connect(masterGain);
 
+      this.bindNodeCleanup(osc, gain);
+
       osc.start(now);
       osc.stop(now + 0.33);
     } catch (err) {
@@ -562,6 +604,8 @@ export class AudioSynthesizer implements IAudioService {
       osc.connect(gain);
       gain.connect(masterGain);
 
+      this.bindNodeCleanup(osc, gain);
+
       osc.start(now);
       osc.stop(now + 0.15);
     } catch (err) {
@@ -595,6 +639,8 @@ export class AudioSynthesizer implements IAudioService {
 
       osc.connect(gain);
       gain.connect(masterGain);
+
+      this.bindNodeCleanup(osc, gain);
 
       osc.start(now);
       osc.stop(now + 0.2);
@@ -631,6 +677,8 @@ export class AudioSynthesizer implements IAudioService {
 
         osc.connect(gain);
         gain.connect(masterGain);
+
+        this.bindNodeCleanup(osc, gain);
 
         osc.start(now);
         osc.stop(now + 0.36);
@@ -674,6 +722,8 @@ export class AudioSynthesizer implements IAudioService {
         osc.connect(gain);
         gain.connect(masterGain);
 
+        this.bindNodeCleanup(osc, gain);
+
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
       });
@@ -716,6 +766,8 @@ export class AudioSynthesizer implements IAudioService {
         osc.connect(gain);
         gain.connect(masterGain);
 
+        this.bindNodeCleanup(osc, gain);
+
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
       });
@@ -753,6 +805,8 @@ export class AudioSynthesizer implements IAudioService {
       osc.connect(gain);
       gain.connect(masterGain);
 
+      this.bindNodeCleanup(osc, gain);
+
       osc.start(now);
       osc.stop(now + 0.24);
     } catch (err) {
@@ -787,6 +841,8 @@ export class AudioSynthesizer implements IAudioService {
 
       osc.connect(gain);
       gain.connect(masterGain);
+
+      this.bindNodeCleanup(osc, gain);
 
       osc.start(now);
       osc.stop(now + 0.36);
@@ -827,6 +883,9 @@ export class AudioSynthesizer implements IAudioService {
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
       osc2.connect(gain2);
       gain2.connect(masterGain);
+
+      this.bindNodeCleanup(osc1, gain1);
+      this.bindNodeCleanup(osc2, gain2);
 
       osc1.start(now);
       osc2.start(now);

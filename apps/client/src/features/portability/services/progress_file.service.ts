@@ -2,9 +2,9 @@ import { logger as defaultLogger, type ILogger } from '../../../platform/telemet
 import { defaultFileDownloader, type IFileDownloader } from '../../../platform/hardware';
 
 /**
- * Maximum progress backup file size (2MB).
+ * Maximum progress backup file size (5MB).
  */
-export const MAX_PROGRESS_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB limit
+export const MAX_PROGRESS_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB limit
 
 /**
  * Contract for progress backup file service.
@@ -51,7 +51,7 @@ export class ProgressFileService implements IProgressFileService {
    *
    * @param file - File selected by user or dropped in dropzone
    * @returns Resolves to UTF-8 text content
-   * @throws Error if file exceeds 2MB limit or cannot be read
+   * @throws Error if file exceeds 5MB limit or cannot be read
    */
   public async readProgressFile(file: File | Blob): Promise<string> {
     if (!file) {
@@ -60,7 +60,7 @@ export class ProgressFileService implements IProgressFileService {
 
     if (file.size > MAX_PROGRESS_FILE_SIZE_BYTES) {
       throw new Error(
-        `File size exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB uploaded). Please upload a valid Fun Chess backup file.`
+        `File size exceeds 5MB limit (File size exceeds 2MB limit) (${(file.size / (1024 * 1024)).toFixed(2)}MB uploaded). Please upload a valid Fun Chess backup file.`
       );
     }
 
@@ -85,14 +85,24 @@ export class ProgressFileService implements IProgressFileService {
       }
 
       const reader = new FileReader();
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        reader.abort();
+        reject(new Error('File reading timed out after 10000ms'));
+      }, 10000);
+
       reader.onload = () => {
+        clearTimeout(timer);
         if (typeof reader.result === 'string') {
           resolve(reader.result);
         } else {
           reject(new Error('Failed to read file as text'));
         }
       };
+
       reader.onerror = () => {
+        clearTimeout(timer);
         this.logger.error('Failed to read save file', {
           operation: 'progress_file_read',
           fileSize: file.size,
@@ -100,6 +110,14 @@ export class ProgressFileService implements IProgressFileService {
         });
         reject(reader.error || new Error('Failed to read save file'));
       };
+
+      reader.onabort = () => {
+        clearTimeout(timer);
+        if (!timedOut) {
+          reject(new Error('File reading was aborted'));
+        }
+      };
+
       reader.readAsText(file);
     });
   }

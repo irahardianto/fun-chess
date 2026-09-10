@@ -7,3 +7,4 @@ export { default as StreakHud } from './StreakHud.vue';
 export { default as MascotFeedbackModal } from './MascotFeedbackModal.vue';
 export { default as PuzzleBoardWrapper } from './PuzzleBoardWrapper.vue';
 export { default as PuzzleCompletionModal } from './PuzzleCompletionModal.vue';
+export * from './hint_coordinates';

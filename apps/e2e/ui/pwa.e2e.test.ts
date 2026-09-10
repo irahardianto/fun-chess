@@ -190,4 +190,59 @@ test.describe('PWA Offline Capabilities and Transitions', () => {
       await page.context().setOffline(false);
     }
   });
+
+  test('triggers PWA install prompt, displays floating banner, snoozes prompt, and opens install modal guide', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+    await lobbyPage.goto();
+
+    // 1. Dispatch beforeinstallprompt event with mock prompt() and userChoice
+    await page.evaluate(() => {
+      const event = new Event('beforeinstallprompt', { cancelable: true });
+      Object.assign(event, {
+        prompt: () => Promise.resolve(),
+        userChoice: Promise.resolve({ outcome: 'dismissed', platform: 'web' }),
+      });
+      window.dispatchEvent(event);
+    });
+
+    // 2. Assert floating install banner becomes visible
+    const banner = page.locator('[data-testid="app-modal-container"] [data-testid="pwa-install-banner"]');
+    await expect(banner).toBeVisible({ timeout: 10_000 });
+    await expect(banner.locator('.banner-title')).toContainText('Install Fun Chess');
+
+    // 3. Click "Remind me later" to snooze install prompt
+    const dismissBtn = banner.locator('[data-testid="pwa-banner-dismiss-btn"]');
+    await expect(dismissBtn).toBeVisible({ timeout: 5_000 });
+    await dismissBtn.click();
+
+    // 4. Assert banner disappears and snooze timestamp is persisted
+    await expect(banner).not.toBeVisible({ timeout: 5_000 });
+    const snoozedUntil = await page.evaluate(() =>
+      localStorage.getItem('fun_chess_pwa_install_snoozed_until'),
+    );
+    expect(Number(snoozedUntil)).toBeGreaterThan(Date.now());
+
+    // 5. Open PWA install guide modal via lobby header button
+    const lobbyInstallBtn = page.locator('[data-testid="lobby-install-btn"]');
+    await expect(lobbyInstallBtn).toBeVisible({ timeout: 5_000 });
+    // First click consumes deferred prompt event
+    await lobbyInstallBtn.click();
+
+    // Second click triggers fallback modal guide
+    const modal = page.locator('[data-testid="pwa-install-modal"]');
+    if (!(await modal.isVisible())) {
+      await lobbyInstallBtn.click();
+    }
+
+    // 6. Assert install modal opens with platform guidance cards
+    await expect(modal).toBeVisible({ timeout: 5_000 });
+    await expect(modal.locator('.platform-tips-list')).toBeVisible();
+    await expect(modal.locator('.platform-tip-card')).toHaveCount(2);
+
+    // 7. Close modal via footer action button
+    const closeBtn = modal.locator('[data-testid="install-modal-close-btn"]');
+    await expect(closeBtn).toBeVisible({ timeout: 5_000 });
+    await closeBtn.click();
+    await expect(modal).not.toBeVisible({ timeout: 5_000 });
+  });
 });

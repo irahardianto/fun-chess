@@ -4,6 +4,8 @@ import type { ServerEnv } from "../config/env.js";
 import type { Logger } from "../logger/logger.interface.js";
 import type { IFileStorage } from "./file_storage.js";
 import type { HttpRateLimiter } from "./http_rate_limiter.js";
+import type { HttpMetricsCollector } from "./http_metrics.js";
+import type { HealthController } from "./controllers/health.controller.js";
 
 /**
  * Storage count provider contract for health checks (MAJ-011).
@@ -64,6 +66,12 @@ export interface HttpServerConfig {
   fileStorage?: IFileStorage;
   getActiveSocketCount?: () => number;
   rateLimiter?: HttpRateLimiter;
+  notFoundRateLimiter?: HttpRateLimiter;
+  healthController?: HealthController;
+  shutdownCoordinator?: { isTerminating?: boolean; isShuttingDown?: boolean };
+  cspReportUri?: string;
+  correlationId?: string;
+  metricsCollector?: HttpMetricsCollector;
   server?: NodeHttpServer;
   metricsSecret?: string;
 }

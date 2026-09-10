@@ -32,14 +32,29 @@ const {
   },
 });
 
+const cameraInitError = ref<string | null>(null);
+
 async function initCamera() {
+  cameraInitError.value = null;
   if (videoRef.value) {
     await startScanner(videoRef.value, canvasRef.value || undefined);
   }
 }
 
+function handleRetryCamera() {
+  initCamera().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    cameraInitError.value = msg;
+    cameraError.value = msg;
+  });
+}
+
 onMounted(() => {
-  initCamera();
+  initCamera().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    cameraInitError.value = msg;
+    cameraError.value = msg;
+  });
 });
 
 onUnmounted(() => {
@@ -94,6 +109,7 @@ function handleManualSubmit() {
       <!-- Live Video Feed -->
       <video
         ref="videoElement"
+        v-show="!cameraError && hasCamera"
         class="scanner-video-feed"
         autoplay
         muted
@@ -120,7 +136,7 @@ function handleManualSubmit() {
         <BaseButton
           variant="ghost"
           size="sm"
-          @click="initCamera"
+          @click="handleRetryCamera"
         >
           🔄 Try Camera Again
         </BaseButton>
@@ -319,12 +335,19 @@ function handleManualSubmit() {
 }
 
 .scanner-empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
+  width: 100%;
+  min-height: 200px;
   padding: var(--space-4, 16px);
+  box-sizing: border-box;
+  background-color: var(--qr-scanner-bg, #000000);
   text-align: center;
   color: var(--text-muted);
   gap: var(--space-2, 8px);

@@ -83,6 +83,31 @@ describe("Modular Server Bootstrap Architecture (MAJ-027)", () => {
       expect(server.headersTimeout).toBe(31_000);
       expect(server.keepAliveTimeout).toBe(5_000);
     });
+
+    it("exposes setShutdownCoordinator on server handle and degrades readiness (BLK-01)", () => {
+      const logger = new NullLogger();
+      const config = resolveServerBootstrapConfig({ port: 0, logger });
+      const domainServices = setupDomainServices({}, config.env, 0, logger);
+
+      const server = setupHttpLayer({
+        domainServices,
+        bootstrapConfig: config,
+        getActiveSocketCount: () => 0,
+      });
+
+      expect(server.healthController).toBeDefined();
+      expect(typeof server.setShutdownCoordinator).toBe("function");
+
+      const readyBefore = server.healthController?.getReady();
+      expect(readyBefore?.ready).toBe(true);
+      expect(readyBefore?.status).toBe("ready");
+
+      server.setShutdownCoordinator?.({ isShuttingDown: true });
+
+      const readyAfter = server.healthController?.getReady();
+      expect(readyAfter?.ready).toBe(false);
+      expect(readyAfter?.status).toBe("terminating");
+    });
   });
 
   describe("setupSocketLayer and setupSocketGateway", () => {
@@ -214,6 +239,47 @@ describe("Modular Server Bootstrap Architecture (MAJ-027)", () => {
       expect(instance.timerService).toBeDefined();
       expect(instance.shutdownCoordinator).toBeDefined();
       expect(typeof instance.close).toBe("function");
+    });
+
+    it("wires ShutdownCoordinator to HealthController and degrades GET /ready from 200 to 503 during teardown (BLK-01)", async () => {
+      instance = await startServer({
+        port: 0,
+        logger: new NullLogger(),
+        autoListen: true,
+      });
+
+      // 1. Initial healthy state: GET /ready returns 200 OK
+      const resInitial = await fetch(`${instance.url}/ready`);
+      expect(resInitial.status).toBe(200);
+      const dataInitial = (await resInitial.json()) as { ready: boolean; status: string };
+      expect(dataInitial.ready).toBe(true);
+      expect(dataInitial.status).toBe("ready");
+
+      // 2. Wire degradation signal to coordinator
+      (instance.server as any).setShutdownCoordinator?.({ isShuttingDown: true });
+
+      // 3. Degraded terminating state: GET /ready returns 503 Service Unavailable
+      const resDegraded = await fetch(`${instance.url}/ready`);
+      expect(resDegraded.status).toBe(503);
+      const dataDegraded = (await resDegraded.json()) as { ready: boolean; status: string };
+      expect(dataDegraded.ready).toBe(false);
+      expect(dataDegraded.status).toBe("terminating");
+
+      // 4. Verify actual ShutdownCoordinator instance is wired and drives HealthController degradation
+      const coordinator = instance.shutdownCoordinator;
+      (instance.server as any).setShutdownCoordinator?.(coordinator);
+      expect(coordinator.isShuttingDown).toBe(false);
+      const resLive = await fetch(`${instance.url}/ready`);
+      expect(resLive.status).toBe(200);
+
+      // Trigger shutdown: coordinator.isShuttingDown becomes true
+      const shutdownPromise = coordinator.shutdown("SIGTERM");
+      expect(coordinator.isShuttingDown).toBe(true);
+      const readyState = (instance.server as any).healthController?.getReady();
+      expect(readyState).toEqual({ status: "terminating", ready: false });
+
+      await shutdownPromise;
+      instance = undefined; // Already closed by shutdownCoordinator
     });
   });
 });

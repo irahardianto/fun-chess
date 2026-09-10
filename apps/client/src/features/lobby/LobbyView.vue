@@ -102,6 +102,9 @@ const { isOffline } = useNetworkStatus();
 const { canInstall, isStandalone, promptInstall } = usePwaInstall();
 
 function resolveInitialMode(): AppGameMode {
+  if (props.initialRoomCode) {
+    return 'multiplayer_lan';
+  }
   if (props.initialMode && props.initialMode !== 'lobby') {
     return props.initialMode;
   }

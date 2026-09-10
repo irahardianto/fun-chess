@@ -1,16 +1,8 @@
 import { randomUUID, randomInt } from "node:crypto";
-import type { IClock, IIdGenerator } from "@fun-chess/shared";
+import { SystemClock, type IClock, type IIdGenerator } from "@fun-chess/shared";
 
+export { SystemClock };
 export type { IClock, IIdGenerator };
-
-/**
- * Production clock adapter using Date.now().
- */
-export class SystemClock implements IClock {
-  public now(): number {
-    return Date.now();
-  }
-}
 
 /**
  * Production ID generator adapter using node:crypto.

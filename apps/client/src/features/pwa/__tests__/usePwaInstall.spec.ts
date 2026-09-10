@@ -412,4 +412,84 @@ describe('usePwaInstall Composable', () => {
       expect(freshPwa.hasInstallPrompt.value).toBe(false);
     });
   });
+
+  describe('options parameter injection [MAJ-019]', () => {
+    it('injects custom storage via options and snoozes to custom storage', () => {
+      const customStore: Record<string, string> = {};
+      const injectedStorage = {
+        getItem: vi.fn((key: string) => customStore[key] ?? null),
+        setItem: vi.fn((key: string, value: string) => {
+          customStore[key] = value;
+        }),
+        removeItem: vi.fn((key: string) => {
+          delete customStore[key];
+        }),
+        clear: vi.fn(),
+      };
+
+      const pwa = usePwaInstall({ storage: injectedStorage as any });
+      pwa.snoozePrompt(3);
+
+      expect(injectedStorage.setItem).toHaveBeenCalledWith(
+        SNOOZE_STORAGE_KEY,
+        expect.any(String)
+      );
+      expect(pwa.isSnoozed.value).toBe(true);
+
+      pwa.resetSnooze();
+      expect(injectedStorage.removeItem).toHaveBeenCalledWith(SNOOZE_STORAGE_KEY);
+      expect(pwa.isSnoozed.value).toBe(false);
+    });
+
+    it('injects custom clock via options to evaluate snooze expiration accurately', () => {
+      const mockStorageInstance: Record<string, string> = {};
+      const injectedStorage = {
+        getItem: vi.fn((key: string) => mockStorageInstance[key] ?? null),
+        setItem: vi.fn((key: string, val: string) => {
+          mockStorageInstance[key] = val;
+        }),
+        removeItem: vi.fn((key: string) => {
+          delete mockStorageInstance[key];
+        }),
+        clear: vi.fn(),
+      };
+
+      const injectedClock = {
+        now: () => 20_000_000,
+      };
+
+      // Snooze expired relative to injected clock
+      mockStorageInstance[SNOOZE_STORAGE_KEY] = '10000000';
+
+      const pwa = usePwaInstall({ storage: injectedStorage as any, clock: injectedClock });
+      expect(pwa.isSnoozed.value).toBe(false);
+
+      // Snooze active relative to injected clock
+      pwa.snoozePrompt(1);
+      expect(pwa.isSnoozed.value).toBe(true);
+      expect(mockStorageInstance[SNOOZE_STORAGE_KEY]).toBe(
+        String(20_000_000 + 24 * 60 * 60 * 1000)
+      );
+    });
+
+    it('injects custom logger via options and logs snooze and install lifecycle events', () => {
+      const injectedLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+      };
+
+      const pwa = usePwaInstall({ logger: injectedLogger as any });
+      pwa.snoozePrompt(5);
+
+      expect(injectedLogger.info).toHaveBeenCalledWith(
+        'Install prompt snoozed',
+        expect.objectContaining({
+          operation: 'pwa_snooze_prompt',
+          days: 5,
+        })
+      );
+    });
+  });
 });

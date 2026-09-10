@@ -263,7 +263,12 @@ export function isPawnPromotion(
   if (pieceOrChess && typeof (pieceOrChess as Chess).get === "function") {
     try {
       piece = (pieceOrChess as Chess).get(from as Square);
-    } catch {
+    } catch (err: unknown) {
+      const debugFn = typeof console !== "undefined" ? console["debug"] : undefined;
+      debugFn?.("isPawnPromotion failed to get piece at square", {
+        from,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return false;
     }
   } else if (pieceOrChess && typeof pieceOrChess === "object") {

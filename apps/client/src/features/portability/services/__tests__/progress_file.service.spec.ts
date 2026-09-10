@@ -95,15 +95,127 @@ describe('ProgressFileService', () => {
     );
   });
 
-  it('rejects files larger than 2MB with explicit user error message', async () => {
+  it('rejects files larger than 5MB with explicit user error message', async () => {
     const oversizedFile = {
-      size: 2 * 1024 * 1024 + 1024, // 2MB + 1KB
+      size: 5 * 1024 * 1024 + 1024, // 5MB + 1KB
       text: vi.fn().mockResolvedValue('{"large": true}'),
     } as unknown as File;
 
     await expect(service.readProgressFile(oversizedFile)).rejects.toThrow(
-      'File size exceeds 2MB limit'
+      'File size exceeds 5MB limit'
     );
     expect(oversizedFile.text).not.toHaveBeenCalled();
+  });
+
+  it('reads file content using FileReader fallback when file.text throws', async () => {
+    const mockFile = {
+      size: 100,
+      text: vi.fn().mockRejectedValue(new Error('text() not supported')),
+    } as unknown as File;
+
+    class MockFileReader {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onabort: (() => void) | null = null;
+      result: string | null = '{"fallback": true}';
+      error: Error | null = null;
+      abort = vi.fn();
+      readAsText() {
+        setTimeout(() => {
+          this.onload?.();
+        }, 10);
+      }
+    }
+
+    vi.stubGlobal('FileReader', MockFileReader);
+
+    const result = await service.readProgressFile(mockFile);
+    expect(result).toBe('{"fallback": true}');
+  });
+
+  it('handles FileReader onabort event and rejects with abort error', async () => {
+    const mockFile = {
+      size: 100,
+      text: vi.fn().mockRejectedValue(new Error('text() failed')),
+    } as unknown as File;
+
+    class MockFileReader {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onabort: (() => void) | null = null;
+      result: string | null = null;
+      error: Error | null = null;
+      abort = vi.fn();
+      readAsText() {
+        setTimeout(() => {
+          this.onabort?.();
+        }, 10);
+      }
+    }
+
+    vi.stubGlobal('FileReader', MockFileReader);
+
+    await expect(service.readProgressFile(mockFile)).rejects.toThrow(
+      'File reading was aborted'
+    );
+  });
+
+  it('handles FileReader timeout by calling abort() and rejecting', async () => {
+    vi.useFakeTimers();
+
+    const mockFile = {
+      size: 100,
+      // no text() method so it enters FileReader directly
+    } as unknown as File;
+
+    let aborted = false;
+    class MockFileReader {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onabort: (() => void) | null = null;
+      result: string | null = null;
+      error: Error | null = null;
+      abort = vi.fn(() => {
+        aborted = true;
+      });
+      readAsText = vi.fn();
+    }
+
+    vi.stubGlobal('FileReader', MockFileReader);
+
+    const readPromise = service.readProgressFile(mockFile);
+    vi.advanceTimersByTime(10000);
+
+    await expect(readPromise).rejects.toThrow(
+      'File reading timed out after 10000ms'
+    );
+    expect(aborted).toBe(true);
+  });
+
+  it('handles FileReader onerror and rejects with file reader error', async () => {
+    const mockFile = {
+      size: 100,
+      text: vi.fn().mockRejectedValue(new Error('text() failed')),
+    } as unknown as File;
+
+    class MockFileReader {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onabort: (() => void) | null = null;
+      result: string | null = null;
+      error = new Error('Disk read error');
+      abort = vi.fn();
+      readAsText() {
+        setTimeout(() => {
+          this.onerror?.();
+        }, 10);
+      }
+    }
+
+    vi.stubGlobal('FileReader', MockFileReader);
+
+    await expect(service.readProgressFile(mockFile)).rejects.toThrow(
+      'Disk read error'
+    );
   });
 });
