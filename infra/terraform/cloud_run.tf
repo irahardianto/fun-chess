@@ -35,6 +35,22 @@ resource "google_secret_manager_secret_version" "metrics_secret" {
   secret_data = var.metrics_secret
 }
 
+data "google_project" "current" {
+  project_id = var.gcp_project_id
+}
+
+resource "google_secret_manager_secret_iam_member" "session_secret_accessor" {
+  secret_id = google_secret_manager_secret.session_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
+resource "google_secret_manager_secret_iam_member" "metrics_secret_accessor" {
+  secret_id = google_secret_manager_secret.metrics_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
 # -----------------------------------------------------------------------------
 # Cloud Run v2 Service
 # -----------------------------------------------------------------------------
@@ -43,6 +59,13 @@ resource "google_cloud_run_v2_service" "default" {
   name     = var.service_name
   location = var.gcp_region
   ingress  = "INGRESS_TRAFFIC_ALL"
+
+  depends_on = [
+    google_secret_manager_secret_version.session_secret,
+    google_secret_manager_secret_version.metrics_secret,
+    google_secret_manager_secret_iam_member.session_secret_accessor,
+    google_secret_manager_secret_iam_member.metrics_secret_accessor,
+  ]
 
   template {
     timeout          = "3600s"
