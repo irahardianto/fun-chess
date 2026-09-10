@@ -12,10 +12,11 @@ import {
   buildLobbyJoinUrl,
   isLocalhostAddress,
 } from './lobby_url_builder';
-import { useInjectLogger, useInjectClipboard } from '@/platform/di';
+import { useInjectLogger, useInjectClipboard, useInjectLocationProvider } from '@/platform/di';
 
 const logger = useInjectLogger();
 const clipboard = useInjectClipboard();
+const locationProvider = useInjectLocationProvider();
 
 type QrGenerationStatus = 'generating' | 'ready' | 'error';
 
@@ -83,13 +84,9 @@ const availableInterfaces = computed(() => {
   if (activeLanIp.value && activeLanIp.value !== '127.0.0.1' && activeLanIp.value !== 'localhost') {
     list.add(activeLanIp.value);
   }
-  if (
-    typeof window !== 'undefined' &&
-    window.location.hostname &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1'
-  ) {
-    list.add(window.location.hostname);
+  const host = locationProvider.hostname;
+  if (host && host !== 'localhost' && host !== '127.0.0.1') {
+    list.add(host);
   }
   return Array.from(list);
 });

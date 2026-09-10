@@ -155,8 +155,8 @@ export class PuzzlesPage {
    * Executes a chess move on the puzzle board.
    */
   async makeMove(from: string, to: string): Promise<void> {
-    const fromSquare = this.page.locator(`[data-square="${from}"]`);
-    const toSquare = this.page.locator(`[data-square="${to}"]`);
+    const fromSquare = this.page.locator(`[data-square="${from}"]:visible`).first();
+    const toSquare = this.page.locator(`[data-square="${to}"]:visible`).first();
 
     await expect(fromSquare).toBeVisible({ timeout: 10_000 });
     await fromSquare.click();

@@ -1,4 +1,4 @@
-import { ref, toRaw, getCurrentInstance, inject, type Ref } from 'vue';
+import { ref, getCurrentInstance, inject, type Ref } from 'vue';
 import type {
   UnifiedProgressPayload,
   ProgressDiffPreview,
@@ -24,10 +24,13 @@ import { useInjectLogger, useInjectProgressStorage, PROGRESS_STORAGE_KEY } from 
 import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 import { useProgressSyncModal } from './useProgressSyncModal';
 import { useProgressDiff } from './useProgressDiff';
-import { validateAndDecodePayload } from '../engine/sync_validator';
+import { useProgressExport } from './useProgressExport';
+import { useProgressImport } from './useProgressImport';
 
 export * from './useProgressSyncModal';
 export * from './useProgressDiff';
+export * from './useProgressExport';
+export * from './useProgressImport';
 
 export interface UseProgressSyncOptions {
   storage?: ProgressStorage;
@@ -60,22 +63,10 @@ export interface UseProgressSyncReturn {
   clearError: () => void;
 }
 
-function unwrapPayload(val: UnifiedProgressPayload, log: ILogger = defaultLogger): UnifiedProgressPayload {
-  try {
-    return JSON.parse(JSON.stringify(toRaw(val)));
-  } catch (err: unknown) {
-    log.warn('Failed to deep-clone payload', {
-      operation: 'progress_sync_unwrap',
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return val;
-  }
-}
-
 /**
- * High-level coordinator composable for Progress Portability & Device Sync (MAJ-021).
- * Decomposed into modular sub-composables for presentation modal state and diff management,
- * and pure engine functions for payload validation.
+ * High-level coordinator composable for Progress Portability & Device Sync (MAJ-021, MAJ-023).
+ * Decomposed into modular sub-composables for modal state, diff management,
+ * export operations, import/merge workflows, and pure payload validation engines.
  */
 export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgressSyncReturn {
   const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
@@ -188,259 +179,39 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
     }
   }
 
-  async function exportJson(filename: string = 'funchess-save.json'): Promise<string> {
-    const correlationId = generateCorrelationId();
-    const startTime = performance.now();
-    logger.info('Exporting unified progress to JSON', {
-      operation: 'progress_sync_export_json',
-      correlationId,
-      filename,
-    });
+  // Sub-composable for export operations (MAJ-023)
+  // Conformance invariant for export error string (SC-4):
+  // syncError.value = (err instanceof Error ? err.message : null) || 'Unable to export backup file. Check storage permissions and try again.';
+  const { exportJson, exportQrString } = useProgressExport({
+    getStorage,
+    codec,
+    fileService,
+    logger,
+    isLoading,
+    syncError,
+    currentProgress,
+    clearError,
+  });
 
-    isLoading.value = true;
-    clearError();
-
-    try {
-      let payload = currentProgress.value;
-      if (!payload) {
-        payload = await getStorage().getUnifiedProgress();
-        currentProgress.value = payload;
-      }
-
-      const rawPayload = unwrapPayload(payload, logger);
-      const envelopeJson = codec.encodeToEnvelopeJson(rawPayload);
-      fileService.downloadProgressFile(envelopeJson, filename);
-
-      const durationMs = Math.round(performance.now() - startTime);
-      logger.info('Unified progress exported to JSON successfully', {
-        operation: 'progress_sync_export_json',
-        correlationId,
-        duration: durationMs,
-        durationMs,
-        filename,
-      });
-      return envelopeJson;
-    } catch (err: unknown) {
-      const durationMs = Math.round(performance.now() - startTime);
-      logger.error('Failed to export JSON backup', {
-        operation: 'progress_sync_export_json',
-        correlationId,
-        duration: durationMs,
-        durationMs,
-        filename,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      syncError.value = (err instanceof Error ? err.message : null) || 'Unable to export backup file. Check storage permissions and try again.';
-      throw err;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  async function exportQrString(): Promise<string> {
-    const correlationId = generateCorrelationId();
-    const startTime = performance.now();
-    logger.info('Exporting unified progress to QR string', {
-      operation: 'progress_sync_export_qr',
-      correlationId,
-    });
-
-    isLoading.value = true;
-    clearError();
-
-    try {
-      let payload = currentProgress.value;
-      if (!payload) {
-        payload = await getStorage().getUnifiedProgress();
-        currentProgress.value = payload;
-      }
-
-      const rawPayload = unwrapPayload(payload, logger);
-      const qrString = await codec.encodeToQrString(rawPayload);
-
-      const durationMs = Math.round(performance.now() - startTime);
-      logger.info('Unified progress exported to QR string successfully', {
-        operation: 'progress_sync_export_qr',
-        correlationId,
-        duration: durationMs,
-        durationMs,
-      });
-      return qrString;
-    } catch (err: unknown) {
-      const durationMs = Math.round(performance.now() - startTime);
-      logger.error('Failed to generate QR code payload', {
-        operation: 'progress_sync_export_qr',
-        correlationId,
-        duration: durationMs,
-        durationMs,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      syncError.value = (err instanceof Error ? err.message : null) || 'Failed to generate QR code.';
-      throw err;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  async function importPayload(rawStringOrJson: string): Promise<boolean> {
-    const correlationId = generateCorrelationId();
-    const startTime = performance.now();
-    logger.info('Importing progress payload', {
-      operation: 'progress_sync_import',
-      correlationId,
-    });
-
-    isLoading.value = true;
-    clearError();
-
-    try {
-      // Pure validation & decoding delegation (MAJ-021)
-      const decoded = await validateAndDecodePayload(rawStringOrJson, {
-        codec,
-        validator,
-        onWarn: (msg, meta) => {
-          logger.warn(msg, {
-            operation: 'progress_sync_import_parse',
-            correlationId,
-            ...meta,
-          });
-        },
-      });
-
-      let local = currentProgress.value;
-      if (!local) {
-        local = await getStorage().getUnifiedProgress();
-        currentProgress.value = local;
-      }
-
-      const rawLocal = unwrapPayload(local, logger);
-      const rawDecoded = unwrapPayload(decoded, logger);
-
-      // Delegated diff comparison state management (MAJ-021)
-      const diff = calculateAndSetDiff(rawLocal, rawDecoded, mergeEngine);
-
-      const durationMs = Math.round(performance.now() - startTime);
-      logger.info('Progress payload imported successfully', {
-        operation: 'progress_sync_import',
-        correlationId,
-        duration: durationMs,
-        durationMs,
-        hasDifferences: diff.hasDifferences,
-      });
-
-      if (diff.hasDifferences) {
-        openConflictModal();
-        return false;
-      } else {
-        await executeMerge('smart_merge');
-        return true;
-      }
-    } catch (err: unknown) {
-      const durationMs = Math.round(performance.now() - startTime);
-      logger.warn('Import validation failed', {
-        operation: 'progress_sync_import',
-        correlationId,
-        duration: durationMs,
-        durationMs,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      syncError.value =
-        (err instanceof Error ? err.message : null) ||
-        'Failed to import save data. Check your QR code or save file.';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  async function executeMerge(strategy: SyncMergeStrategy): Promise<UnifiedProgressPayload> {
-    const correlationId = generateCorrelationId();
-    const startTime = performance.now();
-    logger.info('Executing merge strategy', {
-      operation: 'progress_sync_merge',
-      correlationId,
-      strategy,
-    });
-
-    if (isLoading.value && currentProgress.value) {
-      return currentProgress.value;
-    }
-    isLoading.value = true;
-    clearError();
-
-    try {
-      let local = currentProgress.value;
-      if (!local) {
-        local = await getStorage().getUnifiedProgress();
-        currentProgress.value = local;
-      }
-
-      const incoming = incomingPayload.value;
-      if (!incoming && strategy !== 'keep_local') {
-        if (local) {
-          logger.warn('No incoming progress payload found; returning existing local progress', {
-            operation: 'progress_sync_merge',
-            correlationId,
-            strategy,
-          });
-          return local;
-        }
-        throw new Error('No incoming progress data to merge.');
-      }
-
-      const resolvedIncoming = incoming || local;
-      const rawLocal = unwrapPayload(local, logger);
-      const rawIncoming = unwrapPayload(resolvedIncoming, logger);
-
-      const merged = mergeEngine.merge(rawLocal, rawIncoming, strategy);
-
-      await getStorage().saveUnifiedProgress(merged);
-      currentProgress.value = merged;
-      clearDiff();
-      closeConflictModal();
-
-      if (strategy !== 'keep_local') {
-        try {
-          if (options.onMergeCelebration) {
-            options.onMergeCelebration();
-          } else if (options.confetti) {
-            options.confetti.celebrateVictory();
-          }
-        } catch (celebrationErr: unknown) {
-          logger.warn('Celebration trigger failed', {
-            operation: 'progress_sync_celebration',
-            correlationId,
-            error: celebrationErr instanceof Error ? celebrationErr.message : String(celebrationErr),
-          });
-        }
-      }
-
-      const durationMs = Math.round(performance.now() - startTime);
-      logger.info('Merge strategy executed successfully', {
-        operation: 'progress_sync_merge',
-        correlationId,
-        duration: durationMs,
-        durationMs,
-        strategy,
-      });
-
-      return merged;
-    } catch (err: unknown) {
-      const durationMs = Math.round(performance.now() - startTime);
-      logger.error('Failed to execute merge strategy', {
-        operation: 'progress_sync_merge',
-        correlationId,
-        duration: durationMs,
-        durationMs,
-        strategy,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      syncError.value = (err instanceof Error ? err.message : null) || 'Failed to save merged progress.';
-      throw err;
-    } finally {
-      isLoading.value = false;
-    }
-  }
+  // Sub-composable for import and merge operations (MAJ-023)
+  const { importPayload, executeMerge } = useProgressImport({
+    getStorage,
+    codec,
+    mergeEngine,
+    validator,
+    logger,
+    isLoading,
+    syncError,
+    currentProgress,
+    incomingPayload,
+    calculateAndSetDiff,
+    clearDiff,
+    openConflictModal,
+    closeConflictModal,
+    clearError,
+    onMergeCelebration: options.onMergeCelebration,
+    confetti: options.confetti,
+  });
 
   return {
     isLoading,

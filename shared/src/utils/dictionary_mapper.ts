@@ -24,6 +24,15 @@ import {
 } from "../contracts/puzzle.js";
 
 /**
+ * Forbidden prototype keys to prevent prototype pollution attacks (MAJ-006).
+ */
+export const FORBIDDEN_PROTOTYPE_KEYS: ReadonlySet<string> = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
+
+/**
  * Default implementation of DictionaryMapper for bidirectional transformation between
  * domain UnifiedProgressPayload and compact tokenized CompactProgressDto.
  */
@@ -212,7 +221,7 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
   private restoreScenarios(
     compactScenarios: readonly CompactScenarioTuple[] | undefined,
   ): ScenarioProgressMap {
-    const scenarios: ScenarioProgressMap = {};
+    const scenarios: ScenarioProgressMap = Object.create(null);
     if (!Array.isArray(compactScenarios)) {
       return scenarios;
     }
@@ -221,19 +230,24 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
       const [id, stars, attempts, hints, firstSec, lastSec] = tuple;
       if (!id || typeof id !== "string") continue;
 
+      const cleanId = id.trim();
+      if (FORBIDDEN_PROTOTYPE_KEYS.has(cleanId)) {
+        continue;
+      }
+
       const starsEarned: StarRating = stars === 3 ? 3 : stars === 2 ? 2 : 1;
       const firstCompletedAt = Math.max(0, Math.floor((firstSec ?? 0) * 1000));
       const lastCompletedAt = Math.max(0, Math.floor((lastSec ?? 0) * 1000));
 
       const scRecord: ScenarioProgress = {
-        scenarioId: id.trim(),
+        scenarioId: cleanId,
         starsEarned,
         attemptsCount: Math.max(0, Math.floor(attempts ?? 0)),
         hintsUsedTotal: Math.max(0, Math.floor(hints ?? 0)),
         firstCompletedAt,
         lastCompletedAt: Math.max(firstCompletedAt, lastCompletedAt),
       };
-      scenarios[id.trim()] = scRecord;
+      scenarios[cleanId] = scRecord;
     }
     return scenarios;
   }
@@ -278,7 +292,7 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
   private restoreThemeMastery(
     tmTuples: readonly CompactThemeMasteryTuple[] | undefined,
   ): Record<string, ThemeMasteryProgress> {
-    const themeMastery: Record<string, ThemeMasteryProgress> = {};
+    const themeMastery: Record<string, ThemeMasteryProgress> = Object.create(null);
     if (!Array.isArray(tmTuples)) {
       return themeMastery;
     }
@@ -287,6 +301,11 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
       const [themeKey, attempted, solved, starsEarned, lastPracticedSec] =
         tuple;
       if (!themeKey || typeof themeKey !== "string") continue;
+
+      const cleanTheme = themeKey.trim();
+      if (FORBIDDEN_PROTOTYPE_KEYS.has(cleanTheme)) {
+        continue;
+      }
 
       const safeAttempted = Math.max(0, Math.floor(attempted ?? 0));
       const safeSolved = Math.max(
@@ -299,8 +318,8 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
         Math.floor((lastPracticedSec ?? 0) * 1000),
       );
 
-      themeMastery[themeKey] = {
-        theme: themeKey as PuzzleTheme,
+      themeMastery[cleanTheme] = {
+        theme: cleanTheme as PuzzleTheme,
         attempted: safeAttempted,
         solved: safeSolved,
         starsEarned: safeStars,
@@ -332,7 +351,7 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
   private restoreSolvedPuzzles(
     spTuples: readonly CompactSolvedPuzzleTuple[] | undefined,
   ): Record<string, SolvedPuzzleRecord> {
-    const solvedPuzzles: Record<string, SolvedPuzzleRecord> = {};
+    const solvedPuzzles: Record<string, SolvedPuzzleRecord> = Object.create(null);
     if (!Array.isArray(spTuples)) {
       return solvedPuzzles;
     }
@@ -341,8 +360,13 @@ export class DefaultDictionaryMapper implements DictionaryMapper {
       const [puzId, stars, solvedSec] = tuple;
       if (!puzId || typeof puzId !== "string") continue;
 
+      const cleanPuzId = puzId.trim();
+      if (FORBIDDEN_PROTOTYPE_KEYS.has(cleanPuzId)) {
+        continue;
+      }
+
       const starRating: StarRating = stars === 3 ? 3 : stars === 2 ? 2 : 1;
-      solvedPuzzles[puzId.trim()] = {
+      solvedPuzzles[cleanPuzId] = {
         stars: starRating,
         solvedAt: Math.max(0, Math.floor((solvedSec ?? 0) * 1000)),
       };

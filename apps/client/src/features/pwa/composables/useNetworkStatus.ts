@@ -88,7 +88,7 @@ export class MockNetworkMonitor implements INetworkMonitor {
 const defaultBrowserNetworkMonitor = new BrowserNetworkMonitor();
 
 const isOnlineState = ref<boolean>(
-  typeof navigator !== 'undefined' ? navigator.onLine : true
+  defaultBrowserNetworkMonitor.isOnline()
 );
 
 let customLogger: ILogger | null = null;
@@ -123,7 +123,7 @@ export function resetNetworkStatusState(): void {
   if (customNetworkMonitor && 'reset' in customNetworkMonitor && typeof (customNetworkMonitor as ResettableMonitor).reset === 'function') {
     (customNetworkMonitor as ResettableMonitor).reset();
   }
-  isOnlineState.value = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  isOnlineState.value = (customNetworkMonitor ?? defaultBrowserNetworkMonitor).isOnline();
   customLogger = null;
   customNetworkMonitor = null;
 }

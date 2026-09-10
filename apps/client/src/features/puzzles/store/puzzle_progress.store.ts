@@ -9,8 +9,9 @@ import type {
   PuzzleArcadeStats,
   SolvedPuzzleRecord,
 } from '@fun-chess/shared';
+import { STORAGE_KEYS } from '@/platform/storage';
 
-export const PUZZLE_PROGRESS_STORAGE_KEY = 'fun_chess_puzzle_progress_v2';
+export const PUZZLE_PROGRESS_STORAGE_KEY = STORAGE_KEYS.PUZZLE_PROGRESS_V2;
 
 export const DEFAULT_ADAPTIVE_RATING: AdaptiveRatingState = {
   rating: 800,

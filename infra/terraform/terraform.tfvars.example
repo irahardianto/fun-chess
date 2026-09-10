@@ -8,6 +8,15 @@ gcp_project_id = "your-gcp-project-id"
 # Required: Container image URI in Artifact Registry or Container Registry
 container_image = "asia-southeast1-docker.pkg.dev/your-gcp-project-id/fun-chess-repo/fun-chess:latest"
 
+# Required: Cryptographic HMAC session signing secret (minimum 16 characters in production)
+# Generate a secure secret using: openssl rand -base64 32
+session_secret = "change-me-to-a-secure-random-secret-min-16-chars"
+
+# Optional: Bearer authorization secret for /metrics and /health/detail telemetry endpoints (minimum 8 characters)
+# Generate a secure secret using: openssl rand -hex 16
+metrics_secret = "change-me-to-metrics-secret-min-8-chars"
+
+
 # Optional: Deployment region (default: "asia-southeast1")
 gcp_region = "asia-southeast1"
 

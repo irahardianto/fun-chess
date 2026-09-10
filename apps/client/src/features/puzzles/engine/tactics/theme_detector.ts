@@ -11,6 +11,7 @@ import {
   isValidFen,
   PIECE_CENTIPAWN_VALUES,
 } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 import { getSquaresAttackedByPiece, findKingSquare } from '../geometry/attack_rays';
 import { PIECE_DISPLAY_NAMES } from '../pedagogy/rules_of_thumb';
 
@@ -250,6 +251,11 @@ export function classifyTacticalMotif(
   readonly explanation: string;
 } {
   if (!isValidFen(fenBefore) || !isValidFen(fenAfter)) {
+    logger.debug('Invalid FEN provided to classifyTacticalMotif', {
+      operation: 'classify_tactical_motif',
+      fenBefore,
+      fenAfter,
+    });
     return {
       theme: 'fork',
       confidence: 0.5,
@@ -262,7 +268,11 @@ export function classifyTacticalMotif(
   try {
     chessBefore = createSafeChess(fenBefore);
     chessAfter = createSafeChess(fenAfter);
-  } catch (_err: unknown) {
+  } catch (err: unknown) {
+    logger.debug('Failed to parse FEN in classifyTacticalMotif', {
+      operation: 'classify_tactical_motif',
+      error: err instanceof Error ? err.message : String(err),
+    });
     return {
       theme: 'fork',
       confidence: 0.5,

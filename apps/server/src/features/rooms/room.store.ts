@@ -15,7 +15,12 @@ export interface StorageQueryOptions {
   correlationId?: string;
 }
 
-export interface StorageMutationOptions extends StorageQueryOptions {}
+export interface StorageMutationOptions extends StorageQueryOptions {
+  /** Explicit lock ticket when executing under active lock (MIN-009) */
+  ticket?: number;
+  /** Explicitly bypass active lock ticket assertion for un-locked administrative saves (MIN-009) */
+  allowUnlocked?: boolean;
+}
 
 /**
  * Storage boundary abstraction for room persistence.

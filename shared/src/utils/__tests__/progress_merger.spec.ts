@@ -539,7 +539,12 @@ describe("Progress Merger (Pure Mathematical Smart Merge & Diff Engine)", () => 
       const incoming = createIncomingPayload();
 
       // Act
-      const merged = mergeUnifiedProgress(local, incoming, "smart_merge");
+      const merged = mergeUnifiedProgress(
+        local,
+        incoming,
+        "smart_merge",
+        1700000000000,
+      );
       const diff = calculateProgressDiff(local, incoming);
 
       // Assert

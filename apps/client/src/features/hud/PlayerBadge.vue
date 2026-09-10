@@ -242,7 +242,9 @@ const turnText = computed(() => {
   }
 
   .turn-badge--active {
-    display: none;
+    display: inline-flex;
+    font-size: var(--text-xs);
+    padding: 2px 6px;
   }
 }
 </style>

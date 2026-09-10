@@ -4,6 +4,7 @@ import { performance } from "node:perf_hooks";
 import { serializeError } from "@fun-chess/shared";
 import { TypedSocketServer } from "../socket/socket_server.js";
 import { Logger } from "../logger/logger.interface.js";
+import type { ITimerService, TimerHandle } from "../../features/rooms/index.js";
 
 export interface HttpServerWithConnectionControl {
   closeIdleConnections?: () => void;
@@ -14,7 +15,8 @@ export interface ShutdownCoordinatorOptions {
   server: HttpServer;
   io: TypedSocketServer;
   logger: Logger;
-  cleanupInterval?: NodeJS.Timeout;
+  cleanupInterval?: NodeJS.Timeout | TimerHandle;
+  timerService?: ITimerService;
   timeoutMs?: number;
   onExit?: (code: number) => void;
   additionalCleanups?: Array<() => void | Promise<void>>;
@@ -31,7 +33,8 @@ export class ShutdownCoordinator {
   private readonly server: HttpServer;
   private readonly io: TypedSocketServer;
   private readonly logger: Logger;
-  private cleanupInterval?: NodeJS.Timeout;
+  private cleanupInterval?: NodeJS.Timeout | TimerHandle;
+  private readonly timerService?: ITimerService;
   private readonly timeoutMs: number;
   private readonly onExit: (code: number) => void;
   private readonly additionalCleanups: Array<() => void | Promise<void>>;
@@ -48,6 +51,7 @@ export class ShutdownCoordinator {
     this.io = options.io;
     this.logger = options.logger;
     this.cleanupInterval = options.cleanupInterval;
+    this.timerService = options.timerService;
     this.timeoutMs = options.timeoutMs ?? 5000;
     this.onExit = options.onExit ?? ((code: number) => process.exit(code));
     this.additionalCleanups = options.additionalCleanups ? [...options.additionalCleanups] : [];
@@ -61,7 +65,7 @@ export class ShutdownCoordinator {
     }
   }
 
-  public setCleanupInterval(interval: NodeJS.Timeout): void {
+  public setCleanupInterval(interval: NodeJS.Timeout | TimerHandle): void {
     this.cleanupInterval = interval;
   }
 
@@ -100,7 +104,13 @@ export class ShutdownCoordinator {
     try {
       // 1. Clear background interval
       if (this.cleanupInterval) {
-        clearInterval(this.cleanupInterval);
+        if (this.timerService) {
+          this.timerService.clearInterval(this.cleanupInterval);
+        } else if (typeof this.cleanupInterval === "object" && "id" in this.cleanupInterval) {
+          clearInterval((this.cleanupInterval as TimerHandle).id as NodeJS.Timeout);
+        } else {
+          clearInterval(this.cleanupInterval as NodeJS.Timeout);
+        }
         this.cleanupInterval = undefined;
       }
 
@@ -204,10 +214,7 @@ export class ShutdownCoordinator {
         correlationId: corrId,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
       });
     } finally {
       if (this.forceExitTimer) {
@@ -238,10 +245,7 @@ export class ShutdownCoordinator {
       this.logger.error("Unhandled promise rejection", {
         operation: "unhandled_rejection",
         correlationId,
-        error:
-          reason instanceof Error
-            ? { name: reason.name, message: reason.message, stack: reason.stack }
-            : { raw: reason },
+        error: serializeError(reason),
       });
       void this.shutdown("unhandledRejection", correlationId);
     };
@@ -251,7 +255,7 @@ export class ShutdownCoordinator {
       this.logFatal("Uncaught exception, initiating emergency shutdown", {
         operation: "uncaught_exception",
         correlationId,
-        error: { name: err.name, message: err.message, stack: err.stack },
+        error: serializeError(err),
       });
       void this.shutdown("uncaughtException", correlationId);
     };
@@ -309,7 +313,13 @@ export class ShutdownCoordinator {
     this.uninstallProcessHandlers();
 
     if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
+      if (this.timerService) {
+        this.timerService.clearInterval(this.cleanupInterval);
+      } else if (typeof this.cleanupInterval === "object" && "id" in this.cleanupInterval) {
+        clearInterval((this.cleanupInterval as TimerHandle).id as NodeJS.Timeout);
+      } else {
+        clearInterval(this.cleanupInterval as NodeJS.Timeout);
+      }
       this.cleanupInterval = undefined;
     }
 

@@ -24,7 +24,7 @@ test.describe('Solo AI Match Journey', () => {
     await gamePage.waitForArena();
     await expect(page.locator('[data-testid="solo-ai-arena"]')).toBeVisible({ timeout: 15_000 });
 
-    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"], .bottom-player-section .player-badge.is-active-turn').first();
     const chess = new Chess();
 
     const PIECE_VALUES: Record<string, number> = {
@@ -145,7 +145,7 @@ test.describe('Solo AI Match Journey', () => {
     await lobbyPage.startSoloAi('peanut', 'w');
 
     await gamePage.waitForArena();
-    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"], .bottom-player-section .player-badge.is-active-turn').first();
     await expect(myTurn).toBeVisible({ timeout: 15_000 });
 
     const chess = new Chess();
@@ -212,7 +212,7 @@ test.describe('Solo AI Match Journey', () => {
     await expect(page.locator('.chess-square.is-last-move')).toHaveCount(2, { timeout: 15_000 });
 
     // Verify turn transfers to user (Black's turn to move)
-    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"], .bottom-player-section .player-badge.is-active-turn').first();
     await expect(myTurn).toBeVisible({ timeout: 10_000 });
   });
 
@@ -224,7 +224,7 @@ test.describe('Solo AI Match Journey', () => {
     await lobbyPage.startSoloAi('peanut', 'w');
 
     await gamePage.waitForArena();
-    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+    const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"], .bottom-player-section .player-badge.is-active-turn').first();
     await expect(myTurn).toBeVisible({ timeout: 15_000 });
 
     // 1. White plays 1. e2 -> e4

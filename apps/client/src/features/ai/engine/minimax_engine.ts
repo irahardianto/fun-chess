@@ -4,8 +4,9 @@ import type {
   AiSearchConfig,
   AiMoveEvaluation,
   ChessAiEngine,
+  IClock,
 } from '@fun-chess/shared';
-import { createSafeChess } from '@fun-chess/shared';
+import { createSafeChess, SystemClock } from '@fun-chess/shared';
 import { PIECE_VALUES } from './piece_square_tables.js';
 import {
   evaluateBoard,
@@ -38,6 +39,7 @@ interface SearchState {
   deadline?: number;
   maxNodes?: number;
   aborted?: boolean;
+  clock: IClock;
 }
 
 /**
@@ -52,9 +54,9 @@ function checkSearchAborted(state: SearchState): boolean {
     return true;
   }
   if (state.deadline !== undefined) {
-    // Check periodically every 32 nodes or on the initial node to bound performance.now() overhead
+    // Check periodically every 32 nodes or on the initial node to bound clock.now() overhead
     if ((state.nodesEvaluated & 31) === 0 || state.nodesEvaluated === 1) {
-      if (performance.now() >= state.deadline) {
+      if (state.clock.now() >= state.deadline) {
         state.aborted = true;
         return true;
       }
@@ -359,6 +361,14 @@ function minimax(
  * Pure Minimax / Alpha-Beta Chess AI Engine.
  */
 export class MinimaxEngine implements ChessAiEngine {
+  private readonly clock: IClock;
+  private readonly prng?: () => number;
+
+  constructor(clock: IClock = new SystemClock(), prng?: () => number) {
+    this.clock = clock;
+    this.prng = prng;
+  }
+
   /**
    * Evaluates the current FEN position statically in centipawns.
    */
@@ -370,7 +380,7 @@ export class MinimaxEngine implements ChessAiEngine {
    * Finds the best move from the given FEN position applying calibrated depth, blunder chance, and noise.
    */
   async findBestMove(fen: string, config: AiSearchConfig): Promise<AiMoveEvaluation> {
-    const startTime = performance.now();
+    const startTime = this.clock.now();
     const deadline =
       config.deadlineMs !== undefined
         ? config.deadlineMs
@@ -385,6 +395,7 @@ export class MinimaxEngine implements ChessAiEngine {
       deadline,
       maxNodes: config.maxNodes,
       aborted: false,
+      clock: this.clock,
     };
     const turn = chess.turn(); // 'w' or 'b'
     const isMaximizing = turn === 'w';
@@ -429,9 +440,9 @@ export class MinimaxEngine implements ChessAiEngine {
       }
     }
 
-    const { selected, isBlunder } = chooseFinalMove(candidateMoves, config);
+    const { selected, isBlunder } = chooseFinalMove(candidateMoves, config, this.prng);
 
-    const calculationDuration = performance.now() - startTime;
+    const calculationDuration = this.clock.now() - startTime;
 
     return {
       move: selected.move,
@@ -442,6 +453,13 @@ export class MinimaxEngine implements ChessAiEngine {
       searchDurationMs: Math.round(calculationDuration),
     };
   }
+}
+
+/**
+ * Factory creating a MinimaxEngine with custom clock and PRNG (MAJ-017).
+ */
+export function createMinimaxEngine(clock?: IClock, prng?: () => number): MinimaxEngine {
+  return new MinimaxEngine(clock, prng);
 }
 
 /**

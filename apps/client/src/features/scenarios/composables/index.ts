@@ -4,3 +4,4 @@ export * from './useScenarioStepNavigation';
 export * from './useScenarioBot';
 export * from './useScenarioHints';
 export * from './useScenarioFeedback';
+export * from './useScenarioMoveExecution';

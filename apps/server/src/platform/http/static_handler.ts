@@ -67,7 +67,7 @@ export function checkPathTraversal(
         path: urlPath,
         clientIp,
         correlationId,
-        error: secErr instanceof Error ? secErr.message : String(secErr),
+        error: serializeError(secErr),
       });
     }
     decodedPath = decoded;
@@ -77,7 +77,7 @@ export function checkPathTraversal(
       path: urlPath,
       clientIp,
       correlationId,
-      error: err instanceof Error ? err.message : String(err),
+      error: serializeError(err),
     });
     decodedPath = urlPath;
   }

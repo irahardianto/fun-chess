@@ -46,6 +46,17 @@ resource "google_cloud_run_v2_service" "default" {
         value = "true"
       }
 
+      env {
+        name  = "SESSION_SECRET"
+        value = var.session_secret
+      }
+
+      env {
+        name  = "METRICS_SECRET"
+        value = var.metrics_secret
+      }
+
+
       startup_probe {
         http_get {
           path = "/healthz"

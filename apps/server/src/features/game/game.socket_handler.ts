@@ -28,6 +28,14 @@ import {
   sanitizePublicRoom,
 } from "../rooms/index.js";
 
+function getSessionToken(socket: Socket, req?: unknown): string | undefined {
+  return (
+    (req as { sessionToken?: string } | undefined)?.sessionToken ??
+    (socket.data as { sessionToken?: string } | undefined)?.sessionToken ??
+    (socket.handshake.auth as { token?: string } | undefined)?.token
+  );
+}
+
 /**
  * Registers gameplay Socket.io event listeners.
  */
@@ -59,11 +67,16 @@ export function registerGameSocketHandlers(
     },
     async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.makeMove(
-        req,
-        socket.id,
-        context.correlationId,
-      );
+      const sessionToken = getSessionToken(socket, req);
+      const result =
+        sessionToken !== undefined
+          ? await gameService.makeMove(
+              req,
+              socket.id,
+              context.correlationId,
+              sessionToken,
+            )
+          : await gameService.makeMove(req, socket.id, context.correlationId);
 
       io.to(roomCode).emit("game:moved", {
         move: result.moveResult,
@@ -103,11 +116,20 @@ export function registerGameSocketHandlers(
     },
     async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.resign(
-        roomCode,
-        socket.id,
-        context.correlationId,
-      );
+      const sessionToken = getSessionToken(socket, req);
+      const result =
+        sessionToken !== undefined
+          ? await gameService.resign(
+              roomCode,
+              socket.id,
+              context.correlationId,
+              sessionToken,
+            )
+          : await gameService.resign(
+              roomCode,
+              socket.id,
+              context.correlationId,
+            );
       timerRegistry.cancelAllForRoom(roomCode);
       io.to(roomCode).emit("game:over", result.gameOverPayload);
       return { success: true };
@@ -131,11 +153,20 @@ export function registerGameSocketHandlers(
     },
     async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.offerDraw(
-        roomCode,
-        socket.id,
-        context.correlationId,
-      );
+      const sessionToken = getSessionToken(socket, req);
+      const result =
+        sessionToken !== undefined
+          ? await gameService.offerDraw(
+              roomCode,
+              socket.id,
+              context.correlationId,
+              sessionToken,
+            )
+          : await gameService.offerDraw(
+              roomCode,
+              socket.id,
+              context.correlationId,
+            );
       if (result.opponentPlayer?.socketId) {
         io.to(result.opponentPlayer.socketId).emit("game:draw_offered", {
           fromPlayerId: result.fromPlayer.id,
@@ -163,12 +194,22 @@ export function registerGameSocketHandlers(
     },
     async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.respondDraw(
-        roomCode,
-        socket.id,
-        req.accept,
-        context.correlationId,
-      );
+      const sessionToken = getSessionToken(socket, req);
+      const result =
+        sessionToken !== undefined
+          ? await gameService.respondDraw(
+              roomCode,
+              socket.id,
+              req.accept,
+              context.correlationId,
+              sessionToken,
+            )
+          : await gameService.respondDraw(
+              roomCode,
+              socket.id,
+              req.accept,
+              context.correlationId,
+            );
 
       if (result.accept && result.gameOverPayload) {
         timerRegistry.cancelAllForRoom(roomCode);
@@ -200,11 +241,20 @@ export function registerGameSocketHandlers(
     },
     async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.requestRematch(
-        roomCode,
-        socket.id,
-        context.correlationId,
-      );
+      const sessionToken = getSessionToken(socket, req);
+      const result =
+        sessionToken !== undefined
+          ? await gameService.requestRematch(
+              roomCode,
+              socket.id,
+              context.correlationId,
+              sessionToken,
+            )
+          : await gameService.requestRematch(
+              roomCode,
+              socket.id,
+              context.correlationId,
+            );
 
       io.to(roomCode).emit("game:rematch_requested", {
         requestedBy: result.requestedBy,
@@ -232,12 +282,22 @@ export function registerGameSocketHandlers(
     },
     async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.respondRematch(
-        roomCode,
-        socket.id,
-        req.accept,
-        context.correlationId,
-      );
+      const sessionToken = getSessionToken(socket, req);
+      const result =
+        sessionToken !== undefined
+          ? await gameService.respondRematch(
+              roomCode,
+              socket.id,
+              req.accept,
+              context.correlationId,
+              sessionToken,
+            )
+          : await gameService.respondRematch(
+              roomCode,
+              socket.id,
+              req.accept,
+              context.correlationId,
+            );
 
       if (result.accept && result.nextGameState) {
         timerRegistry.cancelAllForRoom(roomCode);

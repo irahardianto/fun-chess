@@ -91,7 +91,8 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
 
-    const data = (await res.json()) as LanInfoResponse;
+    const body = (await res.json()) as { data?: LanInfoResponse } & LanInfoResponse;
+    const data = body.data ?? body;
     expect(data.port).toBe(instance.port);
     expect(data.localUrl).toBe(`http://localhost:${instance.port}`);
     expect(data.joinUrl).toBeDefined();
@@ -310,10 +311,15 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     expect(services.gameService).toBeDefined();
     expect(services.relayAddressService).toBeDefined();
     expect(services.timerRegistry).toBeDefined();
+    expect(services.timerService).toBeDefined();
 
-    const interval = setupBackgroundJobs(services.roomService, new NullLogger());
+    const interval = setupBackgroundJobs(
+      services.roomService,
+      new NullLogger(),
+      services.timerService,
+    );
     expect(interval).toBeDefined();
-    clearInterval(interval);
+    services.timerService.clearInterval(interval);
   });
 
   it("propagates error when server.close yields an error during close() (MAJ-008)", async () => {

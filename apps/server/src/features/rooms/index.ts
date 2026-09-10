@@ -37,4 +37,10 @@ export {
   abandonmentForfeitTransition,
 } from "./room.logic.js";
 export type { IClock, IIdGenerator } from "@fun-chess/shared";
+export {
+  SystemTimerService,
+  MockTimerService,
+  type ITimerService,
+  type TimerHandle,
+} from "./timer_service.js";
 export * from "./room.errors.js";

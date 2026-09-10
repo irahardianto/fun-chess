@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Chess } from "chess.js";
 import type { MoveResult, Square } from "@fun-chess/shared";
 import { ChessEngine } from "../chess_engine.js";
+import { NullLogger } from "../../../platform/logger/null_logger.js";
 
 describe("ChessEngine", () => {
   it("extracts correct initial game state from a fresh chess board", () => {
@@ -369,7 +370,7 @@ describe("ChessEngine", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Invalid board FEN string");
+        expect(result.error).toContain("Invalid board FEN string");
       }
     });
 
@@ -556,7 +557,7 @@ describe("ChessEngine", () => {
 
       expect(outcome.success).toBe(false);
       if (!outcome.success) {
-        expect(outcome.error).toBe("Invalid board FEN string");
+        expect(outcome.error).toContain("Invalid board FEN string");
       }
     });
 
@@ -571,7 +572,7 @@ describe("ChessEngine", () => {
 
       expect(outcome.success).toBe(false);
       if (!outcome.success) {
-        expect(outcome.error).toBe("Invalid board FEN string");
+        expect(outcome.error).toContain("Invalid board FEN string");
       }
     });
   });
@@ -610,6 +611,13 @@ describe("ChessEngine", () => {
       expect(ChessEngine.findKingSquare(fen, "b")).toBe("e8");
 
       expect(ChessEngine.findKingSquare("invalid-fen", "w")).toBeNull();
+
+      const logger = new NullLogger();
+      expect(ChessEngine.findKingSquare("invalid-fen", "w", logger)).toBeNull();
+      const debugLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "find_king_square_fen_error",
+      );
+      expect(debugLogs.length).toBe(1);
     });
 
     it("returns pure validation failure outcome without side effects when validateMove catches errors", () => {
@@ -621,7 +629,7 @@ describe("ChessEngine", () => {
 
       expect(outcome.success).toBe(false);
       if (!outcome.success) {
-        expect(outcome.error).toBe("Invalid board FEN string");
+        expect(outcome.error).toContain("Invalid board FEN string");
       }
     });
   });

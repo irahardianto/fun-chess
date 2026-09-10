@@ -57,7 +57,6 @@ import {
   useSocketTransport,
   registerSocketEventListener,
 } from './useSocketTransport';
-import { useNotification } from '@/components/layout';
 import {
   currentRoom,
   currentPlayer,
@@ -66,9 +65,49 @@ import {
   getSavedSession,
   saveSession,
   registerSessionResetHook,
+  registerRoomReconnectedHook,
 } from './room_session_state';
 
 export type OpponentMoveCallback = (data: { move: MoveResult; gameState: GameState }) => void;
+export type NotificationType = 'info' | 'success' | 'warn' | 'error';
+export type NotificationHandler = (message: string, type: NotificationType) => void;
+
+let customNotificationHandler: NotificationHandler | null = null;
+const notificationListeners = new Set<NotificationHandler>();
+
+export function setGameActionsNotificationHandler(handler: NotificationHandler | null): void {
+  customNotificationHandler = handler;
+}
+
+export function onGameActionNotification(handler: NotificationHandler): () => void {
+  notificationListeners.add(handler);
+  return () => {
+    notificationListeners.delete(handler);
+  };
+}
+
+export function notifyGameAction(message: string, type: NotificationType = 'info'): void {
+  if (customNotificationHandler) {
+    try {
+      customNotificationHandler(message, type);
+    } catch (err) {
+      logger.warn('Error in custom notification handler', {
+        operation: 'game_actions_notification',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  notificationListeners.forEach((handler) => {
+    try {
+      handler(message, type);
+    } catch (err) {
+      logger.warn('Error in notification listener', {
+        operation: 'game_actions_notification',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+}
 
 // ----------------------------------------------------------------------------
 // Module-Singleton In-Game Reactive State (MAJ-013)
@@ -158,7 +197,7 @@ function handleGameDrawOffered(data: { fromPlayerId: string; fromPlayerName: str
 
 function handleGameDrawDeclined() {
   drawOfferedBy.value = null;
-  useNotification().showNotification('Opponent declined your draw offer', 'info');
+  notifyGameAction('Opponent declined your draw offer', 'info');
 }
 
 function handleGameRematchRequested(data: { requestedBy: string; requesterName: string }) {
@@ -209,8 +248,8 @@ function handleGameRematchDeclined() {
   rematchRequestedBy.value = null;
 }
 
-function handleRoomReconnected(data: { room: RoomState; player: Player }) {
-  // Re-hydrate draw offer and rematch request state upon reconnection
+export function handleRoomReconnected(data: { room: RoomState; player: Player; roomStatus?: string }): void {
+  // Re-hydrate draw offer and rematch request state upon reconnection (MAJ-003)
   if (data?.room && data?.player) {
     const opponent =
       data.room.whitePlayer?.id === data.player.id
@@ -253,6 +292,7 @@ export function initGameActionsListeners(): void {
   registerSocketEventListener('game:rematch_started', handleGameRematchStarted);
   registerSocketEventListener('game:rematch_declined', handleGameRematchDeclined);
   registerSocketEventListener('room:reconnected', handleRoomReconnected);
+  registerRoomReconnectedHook(handleRoomReconnected);
 }
 
 // Initial registration on module load
@@ -394,15 +434,21 @@ export async function executeSocketAction<
 
 /**
  * Executes a chess move with optional monotonic sequence validation and idempotency tokens.
+ * Automatically attaches sessionToken when present (MAJ-007).
  */
 export async function makeMove(
   roomCode: string,
   move: MovePayload,
   expectedMoveNumber?: number,
   idempotencyKey?: string,
-  callback?: (res: { success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): Promise<{ success: true; moveResult: MoveResult } | { success: false; error: SocketErrorPayload }> {
   const payload: Record<string, unknown> = { roomCode, move };
+  const effectiveToken = token || sessionToken.value || getSavedSession()?.sessionToken;
+  if (effectiveToken) {
+    payload.sessionToken = effectiveToken;
+  }
   if (expectedMoveNumber !== undefined) {
     payload.expectedMoveNumber = expectedMoveNumber;
   }
@@ -421,7 +467,7 @@ export async function makeMove(
     timeoutMs: 8000,
     timeoutMessage: 'Move submission timed out.',
     startLogMessage: 'Making move',
-    startLogContext: { roomCode, move, expectedMoveNumber, idempotencyKey },
+    startLogContext: { roomCode, move, expectedMoveNumber, idempotencyKey, hasSessionToken: !!effectiveToken },
     validationErrorMessage: 'Make move validation failed',
     notConnectedErrorMessage: 'Make move failed: socket not connected',
     alwaysAwaitAck: true,
@@ -431,20 +477,28 @@ export async function makeMove(
 
 /**
  * Resigns from the active game.
+ * Automatically attaches sessionToken when present (MAJ-007).
  */
 export function resign(
   roomCode: string,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
+  const effectiveToken = token || sessionToken.value || getSavedSession()?.sessionToken;
+  const rawPayload: Record<string, unknown> = { roomCode };
+  if (effectiveToken) {
+    rawPayload.sessionToken = effectiveToken;
+  }
+
   void executeSocketAction<ResignRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_resign',
     event: 'game:resign',
     schema: ResignRequestSchema,
-    rawPayload: { roomCode },
+    rawPayload,
     timeoutMs: 8000,
     timeoutMessage: 'Resign timed out.',
     startLogMessage: 'Resigning game',
-    startLogContext: { roomCode },
+    startLogContext: { roomCode, hasSessionToken: !!effectiveToken },
     validationErrorMessage: 'Resign validation failed',
     dispatchedLogMessage: 'Resign dispatched',
     callback,
@@ -453,20 +507,28 @@ export function resign(
 
 /**
  * Offers a draw to the opponent.
+ * Automatically attaches sessionToken when present (MAJ-007).
  */
 export function offerDraw(
   roomCode: string,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
+  const effectiveToken = token || sessionToken.value || getSavedSession()?.sessionToken;
+  const rawPayload: Record<string, unknown> = { roomCode };
+  if (effectiveToken) {
+    rawPayload.sessionToken = effectiveToken;
+  }
+
   void executeSocketAction<OfferDrawRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_offer_draw',
     event: 'game:offer_draw',
     schema: OfferDrawRequestSchema,
-    rawPayload: { roomCode },
+    rawPayload,
     timeoutMs: 8000,
     timeoutMessage: 'Draw offer timed out.',
     startLogMessage: 'Offering draw',
-    startLogContext: { roomCode },
+    startLogContext: { roomCode, hasSessionToken: !!effectiveToken },
     validationErrorMessage: 'Offer draw validation failed',
     dispatchedLogMessage: 'Offer draw dispatched',
     callback,
@@ -475,22 +537,30 @@ export function offerDraw(
 
 /**
  * Responds to an opponent's draw offer.
+ * Automatically attaches sessionToken when present (MAJ-007).
  */
 export function respondDraw(
   roomCode: string,
   accept: boolean,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
   drawOfferedBy.value = null;
+  const effectiveToken = token || sessionToken.value || getSavedSession()?.sessionToken;
+  const rawPayload: Record<string, unknown> = { roomCode, accept };
+  if (effectiveToken) {
+    rawPayload.sessionToken = effectiveToken;
+  }
+
   void executeSocketAction<RespondDrawRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_respond_draw',
     event: 'game:respond_draw',
     schema: RespondDrawRequestSchema,
-    rawPayload: { roomCode, accept },
+    rawPayload,
     timeoutMs: 8000,
     timeoutMessage: 'Draw response timed out.',
     startLogMessage: 'Responding to draw offer',
-    startLogContext: { roomCode, accept },
+    startLogContext: { roomCode, accept, hasSessionToken: !!effectiveToken },
     validationErrorMessage: 'Respond draw validation failed',
     dispatchedLogMessage: 'Respond draw dispatched',
     callback,
@@ -505,9 +575,10 @@ export function respondDraw(
  */
 export function acceptDraw(
   roomCode: string,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
-  respondDraw(roomCode, true, callback);
+  respondDraw(roomCode, true, callback, token);
 }
 
 /**
@@ -515,27 +586,36 @@ export function acceptDraw(
  */
 export function declineDraw(
   roomCode: string,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
-  respondDraw(roomCode, false, callback);
+  respondDraw(roomCode, false, callback, token);
 }
 
 /**
  * Requests a rematch after match conclusion.
+ * Automatically attaches sessionToken when present (MAJ-007).
  */
 export function requestRematch(
   roomCode: string,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
+  const effectiveToken = token || sessionToken.value || getSavedSession()?.sessionToken;
+  const rawPayload: Record<string, unknown> = { roomCode };
+  if (effectiveToken) {
+    rawPayload.sessionToken = effectiveToken;
+  }
+
   void executeSocketAction<RequestRematchRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_request_rematch',
     event: 'game:request_rematch',
     schema: RequestRematchRequestSchema,
-    rawPayload: { roomCode },
+    rawPayload,
     timeoutMs: 8000,
     timeoutMessage: 'Rematch request timed out.',
     startLogMessage: 'Requesting rematch',
-    startLogContext: { roomCode },
+    startLogContext: { roomCode, hasSessionToken: !!effectiveToken },
     validationErrorMessage: 'Request rematch validation failed',
     dispatchedLogMessage: 'Request rematch dispatched',
     callback,
@@ -544,22 +624,30 @@ export function requestRematch(
 
 /**
  * Responds to a received rematch request.
+ * Automatically attaches sessionToken when present (MAJ-007).
  */
 export function respondRematch(
   roomCode: string,
   accept: boolean,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
   rematchRequestedBy.value = null;
+  const effectiveToken = token || sessionToken.value || getSavedSession()?.sessionToken;
+  const rawPayload: Record<string, unknown> = { roomCode, accept };
+  if (effectiveToken) {
+    rawPayload.sessionToken = effectiveToken;
+  }
+
   void executeSocketAction<RespondRematchRequest, { success: true } | { success: false; error: SocketErrorPayload }>({
     operation: 'socket_game_respond_rematch',
     event: 'game:respond_rematch',
     schema: RespondRematchRequestSchema,
-    rawPayload: { roomCode, accept },
+    rawPayload,
     timeoutMs: 8000,
     timeoutMessage: 'Rematch response timed out.',
     startLogMessage: 'Responding to rematch request',
-    startLogContext: { roomCode, accept },
+    startLogContext: { roomCode, accept, hasSessionToken: !!effectiveToken },
     validationErrorMessage: 'Respond rematch validation failed',
     dispatchedLogMessage: 'Respond rematch dispatched',
     callback,
@@ -574,9 +662,10 @@ export function respondRematch(
  */
 export function acceptRematch(
   roomCode: string,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
-  respondRematch(roomCode, true, callback);
+  respondRematch(roomCode, true, callback, token);
 }
 
 /**
@@ -584,9 +673,10 @@ export function acceptRematch(
  */
 export function declineRematch(
   roomCode: string,
-  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void
+  callback?: (res: { success: true } | { success: false; error: SocketErrorPayload }) => void,
+  token?: string
 ): void {
-  respondRematch(roomCode, false, callback);
+  respondRematch(roomCode, false, callback, token);
 }
 
 /**
@@ -602,6 +692,8 @@ export function resetGameActionsState(preserveSubscribers = true): void {
   lastMoveEvent.value = null;
   if (!preserveSubscribers) {
     opponentMoveListeners.clear();
+    customNotificationHandler = null;
+    notificationListeners.clear();
   }
   customLogger = null;
   initGameActionsListeners();
@@ -613,10 +705,16 @@ registerSessionResetHook(resetGameActionsState);
 /**
  * Primary composable exposing game action controls and in-game state.
  */
-export function useGameActions(options?: { logger?: ILogger }) {
+export function useGameActions(options?: {
+  logger?: ILogger;
+  onNotification?: NotificationHandler;
+}) {
   initGameActionsListeners();
   if (options?.logger) {
     customLogger = options.logger;
+  }
+  if (options?.onNotification) {
+    onGameActionNotification(options.onNotification);
   }
   return {
     gameState,
@@ -641,5 +739,8 @@ export function useGameActions(options?: { logger?: ILogger }) {
     declineRematch,
     resetGameActionsState,
     initGameActionsListeners,
+    handleRoomReconnected,
+    onGameActionNotification,
+    setGameActionsNotificationHandler,
   };
 }

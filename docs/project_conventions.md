@@ -1,43 +1,43 @@
-# Project Conventions & Architectural Standards: Fun Chess Audit Remediation
+# Project Conventions & Architectural Standards: Fun Chess Remediation
 
-> **Status: FROZEN ARCHITECTURAL CONVENTIONS**
-> **Phase: DESIGN (Remediation)**
-> **Author: System Architect (@architect)**
-> **Audience: All Builders (@backend-engineer, @frontend-engineer, @tech-lead, @test-automation-engineer)**
-> **Scope: Project-wide Conventions & Standardization (MAJ-011, MAJ-012, MAJ-015, MAJ-017, MAJ-018, MAJ-022, ENH-005, MIN-005)**
-> **Compliance: Mandatory across all workspace packages (`@fun-chess/shared`, `apps/server`, `apps/client`, `apps/e2e`).**
+> **Status:** FROZEN ARCHITECTURAL CONVENTIONS
+> **Phase:** Wave 0 (Design Phase)
+> **Author:** System Architect (`@architect`)
+> **Audience:** All Domain Implementers (`@backend-engineer`, `@frontend-engineer`, `@tech-lead`, `@test-automation-engineer`, `@reviewer`)
+> **Authority:** Preempts all individual builder decisions. Any deviation requires formal ADR and Architect approval.
+> **Audit Findings Addressed:** CRIT-002, CRIT-003, MAJ-004, MAJ-005, MAJ-006, MAJ-010, MAJ-011, MAJ-012, MAJ-013, MAJ-014, MAJ-015, MAJ-016, MAJ-017, MAJ-018, MAJ-019, MAJ-020, MAJ-025, MAJ-027, MAJ-028, MIN-003, MIN-004, MIN-005, MIN-006, MIN-007, MIN-008, MIN-009, MIN-010, MIN-011, MIN-012, MIN-013, MIN-014, ENH-001, ENH-002, ENH-003, ENH-005, ENH-006, ENH-008
 
 ---
 
-## 1. Feature Directory Layout & Module Boundaries (`project-structure.md`)
+## 1. Monorepo Architecture & Feature Directory Layout (`project-structure.md`)
 
-### 1.1 Universal Architecture Philosophy: Context → Feature → Layer
-Fun Chess organizes code **by vertical business feature slices**, never by technical layer at the module root.
-- **Top Level:** Monorepo apps (`apps/server`, `apps/client`, `apps/e2e`) and shared library (`shared/`).
-- **Feature Level:** Each business capability is isolated in its own feature directory (e.g., `rooms/`, `game/`, `lan/` in server; `multiplayer/`, `puzzles/`, `scenarios/`, `ai/`, `pwa/` in client).
-- **Layer Level:** Storage, domain services, socket gateways, and UI components reside within their respective feature folder.
+### 1.1 Universal Architectural Philosophy: Context → Feature → Layer
+Fun Chess organizes code strictly **by vertical business feature slices**, never by technical layer at the package root.
+- **Context (Monorepo Root):** Independent deployable applications (`apps/server`, `apps/client`, `apps/e2e`), common libraries (`shared/`), and infrastructure (`infra/terraform/`).
+- **Feature Level:** Each business domain is self-contained in its feature directory (e.g., `rooms/`, `game/`, `lan/` in server; `multiplayer/`, `puzzles/`, `scenarios/`, `ai/`, `hud/`, `lobby/`, `pwa/` in client).
+- **Layer Level:** Storage, domain services, socket gateways, controllers, and UI components reside within their respective feature folder.
 
-### 1.2 Public API Barrel Export & Strict Boundary Enforcement (MIN-005)
-1. **The Rule:** Every feature directory MUST expose a single entry point `index.ts`. Only symbols exported from `index.ts` form the public API of that feature.
-2. **Private Internal Files:** Files such as `room.service.ts`, `room.socket_handler.ts`, `in_memory_room.store.ts` are strictly private to the feature module.
-3. **Cross-Feature Imports:** Other features and integration test suites MUST import exclusively from the feature barrel:
+### 1.2 Module Boundaries & Public API Barrel Export Enforcement (MAJ-019)
+1. **Single Entry Point:** Every feature directory MUST expose an `index.ts`. Only symbols exported from `index.ts` form the public API of that feature.
+2. **Encapsulation:** Internal files (`*.service.ts`, `*.socket_handler.ts`, `*.store.ts`, private composables) are strictly private to the feature.
+3. **Cross-Feature Imports:** Other features, platform layers, and test suites MUST import exclusively from the feature barrel:
    - **Correct:** `import { RoomService, InMemoryRoomStore } from "../features/rooms/index.js";`
-   - **Prohibited:** `import { RoomService } from "../features/rooms/room.service.js";` (Violates module boundary)
-4. **No Circular Feature Coupling (MAJ-009):** If feature A requires feature B, and feature B requires feature A, extract the shared contract to `@fun-chess/shared` or create an explicit domain adapter interface (e.g. `IRoomGameAdapter`).
+   - **Prohibited:** `import { RoomService } from "../features/rooms/room.service.js";` (MAJ-019 violation)
+4. **Acyclic Dependency Invariant:** Dependencies point inward toward business logic. If feature A requires feature B, and feature B requires feature A, extract the shared contract to `@fun-chess/shared` or inject an interface contract at the composition root.
 
-### 1.3 Canonical Server Feature Skeleton (`apps/server/src/features/{feature}/`)
+### 1.3 Complete Reference Skeleton: Server Feature Directory (`apps/server/src/features/rooms/`)
 ```
 apps/server/src/features/rooms/
 ├── index.ts                     # Public API barrel export ONLY
 ├── room.interface.ts            # Domain interfaces, options, and error contracts
-├── room.service.ts              # Pure business logic orchestrator
-├── room.logic.ts                # Referentially transparent calculation rules
-├── room.socket_handler.ts       # Socket.IO ingress controller (thin adapter)
+├── room.service.ts              # Business logic orchestrator (constructor-injected dependencies)
+├── room.logic.ts                # Pure domain functions (zero I/O, mandatory `now: number` parameter)
+├── room.socket_handler.ts       # Socket.IO ingress controller (thin pipeline adapter)
 ├── room.store.ts                # Storage abstraction contract & constants (MAX_ROOMS)
 ├── in_memory_room.store.ts      # In-memory production storage implementation
 ├── mock_room.store.ts           # Test double storage implementation
 ├── session_registry.ts          # Session storage abstraction contract
-├── in_memory_session_registry.ts# Session storage implementation
+├── in_memory_session_registry.ts# Session storage implementation (injected secret & isProduction)
 ├── disconnect_timer_registry.ts # Timer grace period manager
 └── __tests__/                   # Co-located unit and contract test suites
     ├── room.service.spec.ts
@@ -48,19 +48,19 @@ apps/server/src/features/rooms/
     └── disconnect_timer_registry.spec.ts
 ```
 
-### 1.4 Canonical Client Feature Skeleton (`apps/client/src/features/{feature}/`)
+### 1.4 Complete Reference Skeleton: Client Feature Directory (`apps/client/src/features/multiplayer/`)
 ```
 apps/client/src/features/multiplayer/
 ├── index.ts                     # Public API barrel export ONLY
 ├── components/                  # Feature UI components (Vue SFCs)
-│   ├── MultiplayerLobby.vue
-│   └── RoomCard.vue
+│   ├── MultiplayerArena.vue
+│   └── RoomLobby.vue
 ├── composables/                 # Single-purpose composables (CC < 10, lines 10–50)
-│   ├── useRoomSession.ts        # Session lifecycle and auto-reconnection
-│   ├── useGameActions.ts        # In-game actions (moves, draw, resign)
+│   ├── useRoomSession.ts        # Session lifecycle & reconnection
+│   ├── useGameActions.ts        # Game actions (moves, resign, draw, rematch)
 │   ├── useSocketTransport.ts    # Transport-level socket emitter and listener
-│   └── room_session_state.ts    # Reactive state container
-├── engine/                      # Pure calculation engines (zero I/O, zero loggers)
+│   └── room_session_state.ts    # Reactive state container (factory/DI scoped)
+├── engine/                      # Pure calculation engines (zero I/O, deterministic)
 └── __tests__/                   # Co-located unit test suites
     ├── useRoomSession.spec.ts
     ├── useGameActions.spec.ts
@@ -69,436 +69,617 @@ apps/client/src/features/multiplayer/
 
 ---
 
-## 2. Error Handling & Serialization Pattern (MAJ-022)
+## 2. File Naming & Code Idiom Conventions
 
-### 2.1 Problem & Mandate
-Previously, a 3-line error serialization snippet:
-`error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err }`
-was duplicated verbatim across 33 distinct files.
+### 2.1 File Postfixes & Responsibility Table
+Every TypeScript source file in the monorepo MUST adhere to this naming taxonomy:
 
-All error serialization, normalization, and logging across the entire codebase MUST use the canonical utility functions exported from `@fun-chess/shared/utils`:
-1. `serializeError(err: unknown): SerializedError`
-2. `toErrorMessage(err: unknown, fallback?: string): string`
-
-### 2.2 Canonical Type Definitions & Implementations (`shared/src/utils/error_utils.ts`)
-```typescript
-export interface SerializedError {
-  name?: string;
-  message: string;
-  stack?: string;
-  code?: string | number;
-  raw?: unknown;
-}
-
-/**
- * Standardizes an unknown error into a structured object suitable for JSON serialization and logging.
- * Replaces duplicated 3-line pattern across 33 files per MAJ-022.
- */
-export function serializeError(err: unknown): SerializedError {
-  if (err instanceof Error) {
-    const serialized: SerializedError = {
-      name: err.name,
-      message: err.message,
-    };
-    if (err.stack) {
-      serialized.stack = err.stack;
-    }
-    if ("code" in err && (typeof err.code === "string" || typeof err.code === "number")) {
-      serialized.code = err.code;
-    }
-    return serialized;
-  }
-
-  if (typeof err === "string") {
-    return {
-      message: err,
-      raw: err,
-    };
-  }
-
-  if (typeof err === "object" && err !== null) {
-    const candidate = err as Record<string, unknown>;
-    const message =
-      typeof candidate.message === "string"
-        ? candidate.message
-        : typeof candidate.error === "string"
-          ? candidate.error
-          : JSON.stringify(err);
-    return {
-      message,
-      raw: err,
-    };
-  }
-
-  return {
-    message: String(err),
-    raw: err,
-  };
-}
-
-/**
- * Extracts a human-readable error message string from an unknown error instance.
- */
-export function toErrorMessage(
-  err: unknown,
-  fallback = "An unexpected error occurred",
-): string {
-  if (err instanceof Error && err.message) {
-    return err.message;
-  }
-  if (typeof err === "string" && err.trim().length > 0) {
-    return err.trim();
-  }
-  if (typeof err === "object" && err !== null) {
-    const candidate = err as Record<string, unknown>;
-    if (typeof candidate.message === "string" && candidate.message.trim().length > 0) {
-      return candidate.message.trim();
-    }
-  }
-  return fallback;
-}
-```
-
-### 2.3 Usage Conventions
-- **In Structured Logging:**
-  ```typescript
-  import { serializeError } from "@fun-chess/shared";
-
-  logger.error("Database operation failed", {
-    operation: "room_save",
-    correlationId,
-    roomCode,
-    duration,
-    error: serializeError(err),
-  });
-  ```
-- **In Client UI Notifications:**
-  ```typescript
-  import { toErrorMessage } from "@fun-chess/shared";
-
-  notificationStore.showError(toErrorMessage(err, "Failed to connect to game room"));
-  ```
+| File Postfix | Purpose / Content | Permitted Dependencies | Prohibited Content |
+|---|---|---|---|
+| `*.interface.ts` | TypeScript types, interfaces, options, domain errors | None or `@fun-chess/shared` | Implementations, side effects |
+| `*.service.ts` | Domain orchestration & workflow logic | Injected interfaces, pure logic | Native timers, global `process.env` |
+| `*.logic.ts` | Pure calculation functions, state transforms | Domain types | Native timers, `Date.now()`, I/O |
+| `*.store.ts` | Storage abstraction contract & constants | Domain types, `StorageOptions` | In-memory maps, DB drivers |
+| `in_memory_*.store.ts` | In-memory production storage implementation | `*.store.ts`, `IClock`, `Logger` | Un-isolated global state |
+| `mock_*.store.ts` | Test double for unit testing | `*.store.ts` | External network or disk I/O |
+| `*.socket_handler.ts` | Socket.IO event ingress adapter | Feature service, socket middleware | Direct database/store queries |
+| `*.controller.ts` | HTTP endpoint ingress adapter | Feature service, HTTP helpers | Inline business logic |
+| `*.spec.ts` | Unit or contract test suite | Target unit, test doubles | Live network servers, real timeouts |
+| `*.integration.spec.ts` | Live integration test against in-memory stack | Real HTTP/socket loopback | Heavy external cloud infrastructure |
+| `*.e2e.test.ts` | Playwright browser E2E test | Playwright test fixtures | Private server internals |
 
 ---
 
-## 3. Clock & Time Abstraction Pattern (MAJ-012, ENH-005)
+## 3. Modular Server Bootstrap Architecture (MAJ-027)
 
-### 3.1 I/O Isolation Principle for Time
-In accordance with `architectural-pattern.md` (Rule 1: I/O Isolation), business logic, rate limiters, timeout checkers, and expiration registries MUST NOT call `Date.now()`, `new Date()`, or global `setTimeout` directly. Time must be injected via the `IClock` abstraction to enable 100% deterministic testing without sleep delays.
+### 3.1 Problem & Architectural Decomposition
+`apps/server/src/index.ts` previously spanned 846 lines, bundling configuration validation, domain storage instantiation, Socket.IO gateway listeners, HTTP route registration, graceful shutdown coordination, and periodic cron jobs inline. This made testing server bootstrap difficult without triggering cascading side effects.
 
-### 3.2 Canonical Interface & Implementations
-Located in `@fun-chess/shared`:
+Under **MAJ-027**, bootstrap is decomposed into four modular files under `apps/server/src/bootstrap/`:
+
+```
+apps/server/src/
+├── index.ts                     # Lean Composition Root & CLI Entry Point (< 80 lines)
+└── bootstrap/
+    ├── index.ts                 # Bootstrap module barrel
+    ├── domain_services.ts       # Storage, registries, clocks, and domain service wiring
+    ├── socket_gateway.ts        # Socket.IO connection handling & feature handler registration
+    ├── http_layer.ts            # Node HTTP server, controllers, routing & static assets
+    └── lifecycle.ts             # ShutdownCoordinator, signal handling & background jobs
+```
+
+### 3.2 Module Specifications
+
+#### 3.2.1 `apps/server/src/bootstrap/domain_services.ts`
+- **Purpose:** Pure dependency injection wiring of domain services and storage adapters.
+- **Responsibilities:**
+  - Instantiates `IClock`, `IIdGenerator`, `ITimerService`.
+  - Instantiates `InMemorySessionRegistry` passing `sessionSecret` and `isProduction` directly into the constructor (remediating MAJ-005).
+  - Instantiates `InMemoryRoomStore`, `RoomService`, `GameService`, `RelayAddressService`.
+- **Contract:**
 ```typescript
-/**
- * Time abstraction interface for isolating system clock I/O.
- */
-export interface IClock {
-  /** Returns current milliseconds since Unix epoch */
-  now(): number;
+export interface DomainServices {
+  clock: IClock;
+  idGenerator: IIdGenerator;
+  timerService: ITimerService;
+  timerRegistry: IDisconnectTimerRegistry;
+  sessionRegistry: SessionRegistry;
+  roomStore: RoomStore;
+  roomService: IRoomService;
+  gameService: IGameService;
+  relayAddressService: IRelayAddressService;
+}
+
+export function setupDomainServices(
+  options: StartServerOptions,
+  env: ServerEnv,
+  port: number,
+  logger: Logger,
+): DomainServices;
+```
+
+#### 3.2.2 `apps/server/src/bootstrap/socket_gateway.ts`
+- **Purpose:** Socket.IO gateway configuration, ingress rate limiting, and event registration.
+- **Responsibilities:**
+  - Sets up the `connection` listener on `TypedSocketServer`.
+  - Attaches correlation tracing, socket rate limiting, and transport error listeners.
+  - Registers room socket handlers (`registerRoomSocketHandlers`) and game socket handlers (`registerGameSocketHandlers`).
+  - Implements socket disconnection handling with structured logging and duration tracking.
+- **Contract:**
+```typescript
+export function setupSocketGateway(
+  io: TypedSocketServer,
+  domainServices: DomainServices,
+  rateLimiter: SocketRateLimiter,
+  env: ServerEnv,
+  logger: Logger,
+  roomCreateRateLimiter?: SocketRateLimiter,
+): void;
+```
+
+#### 3.2.3 `apps/server/src/bootstrap/http_layer.ts`
+- **Purpose:** HTTP transport layer, REST controllers, and SPA static delivery.
+- **Responsibilities:**
+  - Configures native Node `http.Server` with request and headers timeout limits (`configureServerTimeouts`).
+  - Instantiates `HealthController`, `LanInfoController`, and `StaticController`.
+  - Configures route handling via `HttpRouter` (`/health`, `/health/detail`, `/api/v1/lan-info`, `/api/lan-info` 307 redirect, static assets).
+  - Configures security headers, HTTP rate limiting, and 404 scanning defense (ENH-001).
+- **Contract:**
+```typescript
+export interface HttpLayerSetupParams {
+  domainServices: DomainServices;
+  bootstrapConfig: ServerBootstrapConfig;
+  fileStorage?: IFileStorage;
+  httpRateLimiter?: HttpRateLimiter;
+  getActiveSocketCount: () => number;
+}
+
+export function setupHttpLayer(params: HttpLayerSetupParams): http.Server;
+```
+
+#### 3.2.4 `apps/server/src/bootstrap/lifecycle.ts`
+- **Purpose:** Process lifecycle, signal traps, background jobs, and graceful shutdown.
+- **Responsibilities:**
+  - Configures `ShutdownCoordinator` with phase-ordered shutdown hooks (1. stop ingress, 2. drain connections, 3. flush logs, 4. close storage).
+  - Registers `SIGINT`, `SIGTERM`, `uncaughtException`, and `unhandledRejection` traps.
+  - Schedules background cleanup jobs (`setupBackgroundJobs`) using `ITimerService`, propagating `jobCorrelationId` to `roomService.cleanupAbandonedRooms(ttl, jobCorrelationId)` (MAJ-010).
+- **Contract:**
+```typescript
+export function setupLifecycle(
+  server: http.Server,
+  io: TypedSocketServer,
+  domainServices: DomainServices,
+  cleanupInterval: TimerHandle,
+  logger: Logger,
+  onExit?: (code: number) => void,
+): ShutdownCoordinator;
+
+export function setupBackgroundJobs(
+  roomService: IRoomService,
+  timerService: ITimerService,
+  logger: Logger,
+): TimerHandle;
+```
+
+#### 3.2.5 Lean Composition Root (`apps/server/src/index.ts`)
+`apps/server/src/index.ts` is strictly a composition root wiring the bootstrap modules together:
+
+```typescript
+import { fileURLToPath } from "node:url";
+import {
+  resolveServerBootstrapConfig,
+  setupDomainServices,
+  setupSocketGateway,
+  setupHttpLayer,
+  setupBackgroundJobs,
+  setupLifecycle,
+  type StartServerOptions,
+  type ServerInstance,
+} from "./bootstrap/index.js";
+
+export async function startServer(options: StartServerOptions = {}): Promise<ServerInstance> {
+  const config = resolveServerBootstrapConfig(options);
+  const domainServices = setupDomainServices(options, config.env, config.port, config.logger);
+  const server = setupHttpLayer({ domainServices, bootstrapConfig: config, ... });
+  const io = createSocketServer(server, { ... });
+  setupSocketGateway(io, domainServices, rateLimiter, config.env, config.logger);
+  const cleanupJob = setupBackgroundJobs(domainServices.roomService, domainServices.timerService, config.logger);
+  const shutdownCoordinator = setupLifecycle(server, io, domainServices, cleanupJob, config.logger, options.onExit);
+
+  if (options.autoListen !== false) {
+    await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve));
+  }
+
+  return { server, io, shutdownCoordinator, ...domainServices, close: () => shutdownCoordinator.shutdown() };
+}
+
+// Direct CLI execution
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  startServer().catch((err) => {
+    console.error("Fatal startup error:", err);
+    process.exit(1);
+  });
 }
 ```
 
-Exported implementations in `@fun-chess/shared/utils/system_clock.ts`:
+---
+
+## 4. Timer & Clock Abstraction Conventions (MAJ-014, ENH-008)
+
+### 4.1 Canonical Clock Consolidation (ENH-008)
+All time-querying code MUST depend on the canonical `IClock` contract in `@fun-chess/shared`.
+- **Interface:** `IClock` (`now(): number`) in `shared/src/contracts/system.ts`.
+- **Implementations:** `SystemClock` and `MockClock` in `shared/src/utils/system_clock.ts`.
+- **Rule:** Triplicated implementations in `apps/server/src/platform/time/clock.ts` and `apps/client/src/platform/time/clock.ts` are DEPRECATED and MUST re-export or consume `@fun-chess/shared`.
+
+### 4.2 Timer Service Contract (`ITimerService`, MAJ-014)
+Native `setTimeout`, `clearTimeout`, `setInterval`, and `clearInterval` violate Rule 1 (I/O Isolation) when invoked directly in business services or composables. They MUST be abstracted behind `ITimerService`:
+
 ```typescript
 /**
- * Production system clock using Date.now().
+ * Opaque handle representing an active scheduled timer.
  */
-export class SystemClock implements IClock {
-  public now(): number {
-    return Date.now();
-  }
+export interface TimerHandle {
+  /** Prevents the Node.js event loop from exiting while timer is active */
+  ref?(): void;
+  /** Allows the Node.js event loop to exit even if timer is active */
+  unref?(): void;
+  /** Opaque underlying runtime identifier */
+  readonly id?: unknown;
 }
 
-export const systemClock = new SystemClock();
-
 /**
- * Deterministic test clock for unit and integration testing.
+ * Interface contract isolating timer scheduling behind an abstract boundary (MAJ-014).
+ * Enables deterministic fast-forwarding in unit tests without global mock pollution.
  */
-export class MockClock implements IClock {
-  constructor(private currentTime = 0) {}
-
-  public now(): number {
-    return this.currentTime;
-  }
-
-  public advance(ms: number): void {
-    this.currentTime += ms;
-  }
-
-  public setTime(ms: number): void {
-    this.currentTime = ms;
-  }
+export interface ITimerService {
+  /** Schedules a one-shot timer after delayMs */
+  setTimeout(callback: () => void | Promise<void>, delayMs: number): TimerHandle;
+  /** Cancels an active one-shot timer */
+  clearTimeout(handle: TimerHandle | unknown): void;
+  /** Schedules a recurring periodic timer */
+  setInterval(callback: () => void | Promise<void>, intervalMs: number): TimerHandle;
+  /** Cancels an active recurring periodic timer */
+  clearInterval(handle: TimerHandle | unknown): void;
 }
 ```
 
-### 3.3 Injection Conventions
-1. **Server Services & Stores (`RoomService`, `InMemoryRoomStore`, `InMemorySessionRegistry`):**
-   - Inject via constructor parameter: `clock: IClock = systemClock`.
-   - Never call `Date.now()`. Use `this.clock.now()`.
-2. **Rate Limiters (`HttpRateLimiter`, `SocketRateLimiter`, `SlidingWindowRateLimiter`):**
-   - Accept `clock?: IClock` in options: `this.clock = options?.clock ?? systemClock`.
-3. **Client Composables (`usePuzzleRush`, `usePwaInstall`):**
-   - Accept optional parameter or resolve from Vue DI via `CLOCK_KEY`:
+### 4.3 Implementations in Shared / Platform Layers
+1. **`SystemTimerService` (Production):**
+   ```typescript
+   export class SystemTimerService implements ITimerService {
+     public setTimeout(callback: () => void | Promise<void>, delayMs: number): TimerHandle {
+       const timer = setTimeout(callback, delayMs);
+       return { ref: () => timer.ref?.(), unref: () => timer.unref?.(), id: timer };
+     }
+     public clearTimeout(handle: TimerHandle | unknown): void {
+       const timer = handle && typeof handle === 'object' && 'id' in handle ? handle.id : handle;
+       clearTimeout(timer as NodeJS.Timeout);
+     }
+     public setInterval(callback: () => void | Promise<void>, intervalMs: number): TimerHandle {
+       const timer = setInterval(callback, intervalMs);
+       return { ref: () => timer.ref?.(), unref: () => timer.unref?.(), id: timer };
+     }
+     public clearInterval(handle: TimerHandle | unknown): void {
+       const timer = handle && typeof handle === 'object' && 'id' in handle ? handle.id : handle;
+       clearInterval(timer as NodeJS.Timeout);
+     }
+   }
+   ```
+2. **`MockTimerService` (Testing):**
+   Maintains a virtual queue of scheduled tasks, ordered by execution timestamp, and allows tests to advance time deterministically via `mockTimerService.advance(ms)` without real-world waiting or flaky timeouts.
+
+### 4.4 Mandatory Refactoring Sites:
+- **Server:**
+  - `RoomService.scheduleAbandonmentTimer` (remediates MAJ-014).
+  - `setupBackgroundJobs` (remediates MAJ-014, MAJ-010).
+- **Client:**
+  - `usePuzzleRushTimer.ts` (remediates MAJ-014).
+  - `useSocketTransport.ts` (reconnection countdowns).
+
+---
+
+## 5. Platform DOM Provider Abstractions in Vue DI (MAJ-015)
+
+### 5.1 Problem Statement
+Direct references to `window.location`, `window.matchMedia`, and `navigator.onLine` in Vue components (`QrCodeModal.vue`) and composables (`useNetworkStatus.ts`) violate Rule 1 (I/O Isolation). They prevent unit testing in headless environments and require brittle global window stubs.
+
+### 5.2 Contracts (`apps/client/src/platform/browser/`)
+
+#### 5.2.1 `ILocationProvider`
+```typescript
+/**
+ * Interface contract isolating browser location and URL navigation (MAJ-015).
+ */
+export interface ILocationProvider {
+  readonly href: string;
+  readonly origin: string;
+  readonly host: string;
+  readonly hostname: string;
+  readonly port: string;
+  readonly pathname: string;
+  readonly protocol: string;
+  assign(url: string): void;
+  replace(url: string): void;
+  reload(): void;
+}
+
+export class BrowserLocationProvider implements ILocationProvider {
+  get href(): string { return window.location.href; }
+  get origin(): string { return window.location.origin; }
+  get host(): string { return window.location.host; }
+  get hostname(): string { return window.location.hostname; }
+  get port(): string { return window.location.port; }
+  get pathname(): string { return window.location.pathname; }
+  get protocol(): string { return window.location.protocol; }
+  assign(url: string): void { window.location.assign(url); }
+  replace(url: string): void { window.location.replace(url); }
+  reload(): void { window.location.reload(); }
+}
+
+export class MockLocationProvider implements ILocationProvider {
+  private url: URL;
+  constructor(initialUrl = "http://localhost:3000/") {
+    this.url = new URL(initialUrl);
+  }
+  get href(): string { return this.url.href; }
+  get origin(): string { return this.url.origin; }
+  get host(): string { return this.url.host; }
+  get hostname(): string { return this.url.hostname; }
+  get port(): string { return this.url.port; }
+  get pathname(): string { return this.url.pathname; }
+  get protocol(): string { return this.url.protocol; }
+  assign(url: string): void { this.url = new URL(url, this.url.origin); }
+  replace(url: string): void { this.url = new URL(url, this.url.origin); }
+  reload(): void { /* no-op in tests */ }
+}
+```
+
+#### 5.2.2 `INetworkMonitor`
+Formalized in `apps/client/src/platform/hardware/network_monitor.interface.ts`:
+```typescript
+export interface INetworkMonitor {
+  isOnline(): boolean;
+  addListener(listener: (isOnline: boolean) => void): () => void;
+  setOnlineStatus?(isOnline: boolean): void;
+}
+```
+
+### 5.3 Vue Dependency Injection Tokens (`apps/client/src/platform/di/`)
+Add the new capability token to `apps/client/src/platform/di/tokens.ts`:
+```typescript
+export const LOCATION_PROVIDER_KEY: InjectionKey<ILocationProvider> = Symbol('LOCATION_PROVIDER');
+export const NETWORK_MONITOR_KEY: InjectionKey<INetworkMonitor> = Symbol('NETWORK_MONITOR');
+```
+
+Add resolution helpers to `apps/client/src/platform/di/resolvers.ts`:
+```typescript
+export function useInjectLocationProvider(): ILocationProvider {
+  return inject(LOCATION_PROVIDER_KEY, () => new BrowserLocationProvider(), true);
+}
+
+export function useInjectNetworkMonitor(): INetworkMonitor {
+  return inject(NETWORK_MONITOR_KEY, () => new BrowserNetworkMonitor(), true);
+}
+```
+
+### 5.4 Component & Composable Migration:
+- **`QrCodeModal.vue`:** Inject `locationProvider = useInjectLocationProvider()`. Replace `window.location.hostname` with `locationProvider.hostname`.
+- **`useNetworkStatus.ts`:** Inject `networkMonitor = useInjectNetworkMonitor()`. Eliminate direct `navigator.onLine` reads and window listener attachments.
+
+---
+
+## 6. Service Logging & Error Level Conventions (MAJ-004)
+
+### 6.1 Logging Level Hierarchy & Semantic Meaning
+All structured logs across the monorepo MUST follow strict severity semantics:
+
+| Level | When to Use | Examples | Alerting Policy |
+|---|---|---|---|
+| `DEBUG` | Low-level developer tracing, masked token fingerprints, cache hits | `session_storage_create`, `minimax_leaf_eval` | Ignored by SRE alerts |
+| `INFO` | Operation entry points and successful completions | `room_created`, `game_move_completed`, `client_connected` | Aggregated for KPI metrics |
+| `WARN` | Expected client rejections (4xx errors), rate limiting, degraded state | `RoomNotFoundError` (404), `GameNotActiveError` (400), `InvalidPayloadError` (400), rate limit hit | Dashboard warning, no paging |
+| `ERROR` | Unexpected internal server faults (500 errors), crashes, corrupted state | Database storage failure, crypto exception, stream corruption | Immediate SRE page / alert |
+
+### 6.2 Service vs. Transport Layer Logging Separation (MAJ-004)
+- **The Anti-Pattern (MAJ-004):** `GameService` and `RoomService` catch blocks logged expected domain exceptions at `this.logger.error()` before rethrowing. The transport layer middleware caught the rethrown error and logged it again as `this.logger.warn()`, creating false-positive SRE alerts for every user typo or invalid move.
+- **The Mandate:**
+  1. **Transport Layer Owns Error Logging:** Transport ingress middleware (`createFeatureSocketHandler`, `HttpRouter`) is the designated operation boundary that logs client rejections at `warn` and unhandled exceptions at `error`.
+  2. **Service Layer Rethrow Rule:** Domain services (`GameService`, `RoomService`) should generally NOT catch-and-log expected domain errors before rethrowing.
+  3. **Conditional Service Logging:** If a service MUST log upon catch, it MUST inspect the error type:
      ```typescript
-     const clock = injectedClock ?? (getCurrentInstance() ? inject(CLOCK_KEY, systemClock) : systemClock);
+     // apps/server/src/features/rooms/room.service.ts
+     } catch (err: unknown) {
+       const duration = this.clock.now() - startTime;
+       if (err instanceof AppError && err.statusCode < 500) {
+         this.logger.warn("Room operation rejected by domain rule", {
+           operation: "room_create",
+           duration,
+           durationMs: duration,
+           statusCode: err.statusCode,
+           errorCode: err.code,
+           ...(correlationId ? { correlationId } : {}),
+         });
+       } else {
+         this.logger.error("Room operation failed unexpectedly", {
+           operation: "room_create",
+           duration,
+           durationMs: duration,
+           error: serializeError(err),
+           ...(correlationId ? { correlationId } : {}),
+         });
+       }
+       throw err;
+     }
      ```
 
 ---
 
-## 4. Network Status Abstraction Pattern (MAJ-011)
+## 7. Error Serialization Standard (MAJ-028)
 
-### 4.1 Strict Prohibition of Browser Monkey-Patching
-- **Anti-Pattern Remediated:** `useNetworkStatus.ts` previously mutated `Object.defineProperty(navigator, 'onLine', ...)` and dispatched synthetic events to `window`. This contaminated global test runner environments and created unpredictable behavior.
-- **Architectural Mandate:** Abstract network connectivity detection behind `INetworkMonitor`. Zero direct mutation of `window` or `navigator` in production or test code.
+### 7.1 Canonical Serialization Standard
+All logging statements, error responses, and audit trails across all monorepo packages MUST use the canonical serialization utility exported from `@fun-chess/shared`:
 
-### 4.2 Canonical Interface & Implementations (`apps/client/src/platform/network/`)
 ```typescript
-export interface INetworkMonitor {
-  /** Current reactive connectivity status */
-  readonly isOnline: boolean;
-  /** Registers a listener callback invoked when network status transitions */
-  addListener(callback: (isOnline: boolean) => void): () => void;
-  /** Actively probes connectivity against an endpoint */
-  checkConnectivity(probeUrl?: string): Promise<boolean>;
-  /** Tears down event listeners */
-  destroy(): void;
-}
+import { serializeError } from "@fun-chess/shared";
 ```
 
-1. **`BrowserNetworkMonitor` (Production Implementation):**
-   - Reads `navigator.onLine` safely (with fallback to `true` if undefined).
-   - Binds `window.addEventListener('online', ...)` and `window.addEventListener('offline', ...)`.
-   - Returns an unsubscribe function from `addListener`.
-2. **`MockNetworkMonitor` (Test Implementation):**
-   - Backed by an internal `_isOnline: boolean` (default `true`).
-   - Exposes `setOnline(status: boolean): void` which triggers registered listeners synchronously.
-   - Zero interactions with browser global objects.
-
-### 4.3 Composable Consumption Contract
+### 7.2 Prohibited Anti-Pattern
+The 3-line inline ternary pattern is strictly banned across all workspaces:
 ```typescript
-export function useNetworkStatus(
-  customMonitor?: INetworkMonitor,
-  apiClient?: IApiClient,
-  logger?: ILogger,
-) {
-  const monitor = customMonitor ?? useInjectNetworkMonitor();
-  const isOnline = ref(monitor.isOnline);
+// ❌ PROHIBITED (MAJ-028 Violation)
+error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err }
 
-  const unsubscribe = monitor.addListener((online) => {
-    isOnline.value = online;
-  });
+// ❌ PROHIBITED (Swallows stack trace and error properties)
+error: err instanceof Error ? err.message : String(err)
 
-  onScopeDispose(() => {
-    unsubscribe();
-  });
-
-  return {
-    isOnline: computed(() => isOnline.value),
-    isOffline: computed(() => !isOnline.value),
-    // ...
-  };
-}
+// ✅ MANDATORY (Complies with MAJ-028)
+error: serializeError(err)
 ```
+
+### 7.3 Remediated Files (14 Identified Call Sites):
+1. `apps/server/src/features/rooms/in_memory_room.store.ts`
+2. `apps/server/src/features/rooms/room.socket_handler.ts`
+3. `apps/server/src/platform/http/http_router.ts`
+4. `apps/server/src/platform/http/static_handler.ts`
+5. `apps/server/src/platform/http/http_helpers.ts`
+6. `apps/server/src/platform/lifecycle/shutdown_coordinator.ts`
+7. `apps/server/src/platform/logger/job_runner.ts`
+8. `apps/server/src/features/lan/relay_address.service.ts`
+9. `apps/server/src/platform/socket/socket_logging_middleware.ts`
+10. `apps/server/src/bootstrap/lifecycle.ts`
+11. `apps/server/src/bootstrap/socket_gateway.ts`
+12. `apps/client/src/platform/api/fetch_api_client.ts`
+13. `apps/client/src/platform/socket/socket_client.ts`
+14. `apps/client/src/features/puzzles/engine/puzzle_analysis_engine.ts`
 
 ---
 
-## 5. Vue Dependency Injection Tokens & Wiring (MAJ-015)
+## 8. Defense-in-Depth Conventions
 
-### 5.1 Problem Statement & Architectural Rule
-Stateful singletons exported at module scope (e.g., singleton `socket`, `networkStatus`, `localStorageProgressStore`) cause state leakage across test cases and prevent hosting multiple isolated client instances.
-In accordance with Rule 3 (Dependency Direction), infrastructure services must be wired at the application composition root (`createFunChessApp` in `apps/client/src/main.ts`) and injected via Vue Dependency Injection.
+### 8.1 Fail-Closed Session Token Creation (CRIT-002)
+- **Defect:** `InMemorySessionRegistry.createSession()` silently caught cryptographic exceptions and returned an un-signed raw UUID.
+- **Mandate:** Empty catch blocks and insecure fallbacks are strictly prohibited (`rugged-software-constitution.md`). If token signing fails, the registry MUST log an error and throw an exception to fail closed:
 
-### 5.2 Authoritative DI Tokens (`apps/client/src/platform/di/tokens.ts`)
 ```typescript
-import type { InjectionKey } from 'vue';
-import type { Socket } from 'socket.io-client';
-import type { INetworkMonitor } from '../network/network_monitor.interface';
-import type { IClock } from '@fun-chess/shared';
+// apps/server/src/features/rooms/in_memory_session_registry.ts
+public async createSession(
+  params: { playerId: string; roomCode: string; color: PieceColor; isHost: boolean; socketId: string; ttlMs?: number },
+  options?: StorageMutationOptions,
+): Promise<SessionRecord> {
+  this.assertNotAborted(options?.signal);
 
-// Core Ingress & Transport Tokens (MAJ-011, MAJ-015)
-export const SOCKET_CLIENT_KEY: InjectionKey<Socket> = Symbol('SOCKET_CLIENT');
-export const NETWORK_MONITOR_KEY: InjectionKey<INetworkMonitor> = Symbol('NETWORK_MONITOR');
-export const CLOCK_KEY: InjectionKey<IClock> = Symbol('CLOCK');
-```
+  const code = params.roomCode.toUpperCase();
+  const rawId = this.idGenerator.generateId();
 
-### 5.3 Injection Resolvers (`apps/client/src/platform/di/resolvers.ts`)
-```typescript
-export function useInjectSocketClient(fallback?: Socket): Socket {
-  if (hasInjectionContext()) {
-    const injected = inject(SOCKET_CLIENT_KEY, fallback);
-    if (injected) return injected;
-  }
-  if (fallback) return fallback;
-  throw new Error("Socket client requested outside injection context without fallback.");
-}
-
-export function useInjectNetworkMonitor(fallback?: INetworkMonitor): INetworkMonitor {
-  if (hasInjectionContext()) {
-    const injected = inject(NETWORK_MONITOR_KEY, fallback);
-    if (injected) return injected;
-  }
-  return fallback ?? defaultBrowserNetworkMonitor;
-}
-```
-
-### 5.4 Composition Root Wiring (`apps/client/src/main.ts`)
-```typescript
-export function createFunChessApp(options?: AppBootstrapOptions) {
-  const app = createApp(App);
-
-  const socket = options?.socket ?? defaultSocketInstance;
-  const networkMonitor = options?.networkMonitor ?? new BrowserNetworkMonitor();
-  const clock = options?.clock ?? new SystemClock();
-
-  app.provide(SOCKET_CLIENT_KEY, socket);
-  app.provide(NETWORK_MONITOR_KEY, networkMonitor);
-  app.provide(CLOCK_KEY, clock);
-  // ...
-  return app;
-}
-```
-
----
-
-## 6. Distributed Tracing & CorrelationId Propagation Pattern (MAJ-017, MAJ-018)
-
-### 6.1 End-to-End Tracing Mandate
-Every external request entering the system (HTTP request or WebSocket event) is assigned a `correlationId`. This `correlationId` MUST be propagated across all layer boundaries:
-```
-Client Request (HTTP Header / Socket Payload)
-       │
-       ▼
-Platform Gateway Middleware (withCorrelation)
-  [Extracts or generates correlationId]
-       │
-       ▼
-Feature Socket Controller (room.socket_handler.ts / game.socket_handler.ts)
-  [Extracts context.correlationId from middleware wrapper]
-       │
-       ▼
-Domain Service (RoomService / GameService)
-  [Receives correlationId as parameter; binds to all logs and storage operations]
-```
-
-### 6.2 Forwarding Contract from Socket Handlers to Domain Services
-1. **Controller Handler Wrapper:**
-   The socket handler receives `SocketHandlerContext` containing `correlationId`:
-   ```typescript
-   const handleCreate = createRoomHandler<CreateRoomRequest, CreateRoomResponse>(
-     logger,
-     "room:create",
-     socket,
-     options,
-     async (req, context) => {
-       // context.correlationId MUST be passed to roomService
-       const result = await roomService.createRoom(req, socket.id, context.correlationId);
-       return result;
-     }
-   );
-   ```
-2. **Domain Service Method Signatures:**
-   All domain methods in `IRoomService` and `IGameService` MUST accept an optional `correlationId?: string`:
-   ```typescript
-   export interface IRoomService {
-     createRoom(req: CreateRoomRequest, socketId: string, correlationId?: string): Promise<CreateRoomResult>;
-     joinRoom(req: JoinRoomRequest, socketId: string, correlationId?: string): Promise<JoinRoomResult>;
-     reconnect(req: ReconnectRequest, socketId: string, correlationId?: string): Promise<ReconnectResult>;
-     leaveRoom(req: LeaveRoomRequest, socketId: string, correlationId?: string): Promise<LeaveRoomResult>;
-   }
-
-   export interface IGameService {
-     makeMove(roomCode: string, playerId: string, move: MovePayload, correlationId?: string): Promise<MakeMoveResult>;
-     resign(roomCode: string, playerId: string, correlationId?: string): Promise<ResignResult>;
-     offerDraw(roomCode: string, playerId: string, correlationId?: string): Promise<DrawResult>;
-     respondDraw(roomCode: string, playerId: string, accept: boolean, correlationId?: string): Promise<DrawResult>;
-   }
-   ```
-
-### 6.3 Mandatory 3-Point Lifecycle Logging Mandate (MAJ-018)
-Every domain and operational entry point MUST log exactly three lifecycle events:
-1. **Operation Start (Entry Point):**
-   - Log Level: `info` (or `debug` for high-frequency move calculations)
-   - Mandatory Fields: `operation`, `correlationId`, plus relevant entity identifiers (`roomCode`, `playerId`).
-2. **Operation Success (Exit Point):**
-   - Log Level: `info`
-   - Mandatory Fields: `operation`, `correlationId`, `duration` (integer ms), `durationMs` (integer ms), `status: "success"`.
-3. **Operation Failure (Catch Block):**
-   - Log Level: `error`
-   - Mandatory Fields: `operation`, `correlationId`, `duration` (integer ms), `durationMs` (integer ms), `error: serializeError(err)`.
-
-### 6.4 Abandonment Forfeiture Remediation Specification (MAJ-018)
-- **Defect Remediated:** Disconnect grace period forfeiture in `room.socket_handler.ts:395-433` lacked an entry start log, omitted `duration`, and used conflicting operation names (`game_abandoned` on success vs `disconnect_grace_period_abandonment` on error).
-- **Unified Operation Name:** `"game_abandoned"`.
-- **Authoritative Implementation:**
-  ```typescript
-  const onForfeit = async (
-    room: RoomState,
-    gameOverPayload: GameOverPayload,
-    jobCorrelationId?: string,
-    forfeitedPlayerId?: string,
-  ): Promise<void> => {
-    const activeCorrelationId = jobCorrelationId ?? randomUUID();
-    const startTime = performance.now();
-    const disconnectedPlayerId =
-      forfeitedPlayerId ??
-      (gameOverPayload.winner === "w"
-        ? room.blackPlayer?.id
-        : gameOverPayload.winner === "b"
-          ? room.whitePlayer?.id
-          : undefined);
-
-    // Point 1: Operation Start
-    logger.info("Processing game abandonment forfeit", {
-      operation: "game_abandoned",
-      correlationId: activeCorrelationId,
-      roomCode: room.roomCode,
-      disconnectedPlayerId,
-      winnerColor: gameOverPayload.winner,
+  let sessionToken: string;
+  try {
+    sessionToken = generateSessionToken(rawId, this.sessionSecret);
+  } catch (cryptoErr) {
+    this.logger.error("Cryptographic session token generation failed", {
+      operation: "session_storage_create",
+      roomCode: code,
+      playerId: params.playerId,
+      error: serializeError(cryptoErr),
+      ...(options?.correlationId ? { correlationId: options.correlationId } : {}),
     });
+    throw new AppError(500, "ERR_SESSION_GENERATION_FAILED", "Failed to securely initialize player session token");
+  }
 
+  // Proceed with validated signed token...
+```
+
+### 8.2 Safe Stream Reading in Fetch API Client (CRIT-003)
+- **Defect:** `FetchApiClient.parseResponseBody` called `response.json()` and on error called `(response as any).text()`. Because `.json()` consumes the stream (`bodyUsed = true`), the secondary `.text()` threw `TypeError: body stream already read`, caught by an empty catch block that returned `null`.
+- **Mandate:** The response body MUST be read exactly once as raw text, and subsequently parsed in memory. Zero empty catch blocks:
+
+```typescript
+// apps/client/src/platform/api/fetch_api_client.ts
+private async parseResponseBody<T>(response: Response): Promise<T> {
+  if (!response || response.status === 204 || response.status === 205) {
+    return null as T;
+  }
+
+  let text: string;
+  try {
+    text = await response.text();
+  } catch (streamErr) {
+    this.logger.error("Failed to read HTTP response stream", {
+      operation: "http_parse_body",
+      error: serializeError(streamErr),
+    });
+    throw streamErr;
+  }
+
+  if (!text || text.trim().length === 0) {
+    return null as T;
+  }
+
+  const contentType = response.headers?.get?.('content-type') ?? '';
+  const isJson = !contentType || contentType.includes('json');
+
+  if (isJson) {
     try {
-      io.to(room.roomCode).emit("game:over", gameOverPayload);
-      const duration = Math.round(performance.now() - startTime);
-
-      // Point 2: Operation Success
-      logger.info("Game forfeited by abandonment", {
-        operation: "game_abandoned",
-        correlationId: activeCorrelationId,
-        roomCode: room.roomCode,
-        disconnectedPlayerId,
-        winnerColor: gameOverPayload.winner,
-        duration,
-        durationMs: duration,
-        status: "success",
+      return JSON.parse(text) as T;
+    } catch (parseErr) {
+      this.logger.warn("Failed to parse JSON response body, returning raw text", {
+        operation: "http_parse_body",
+        error: serializeError(parseErr),
       });
-    } catch (err) {
-      const duration = Math.round(performance.now() - startTime);
-
-      // Point 3: Operation Failure
-      logger.error("Failed to process disconnect grace period abandonment", {
-        operation: "game_abandoned",
-        correlationId: activeCorrelationId,
-        roomCode: room.roomCode,
-        disconnectedPlayerId,
-        duration,
-        durationMs: duration,
-        error: serializeError(err),
-      });
-      throw err;
+      return text as unknown as T;
     }
+  }
+
+  return text as unknown as T;
+}
+```
+
+### 8.3 Prototype Pollution Protection in Compact Decoding (MAJ-006)
+- **Defect:** `DefaultDictionaryMapper.fromCompact` populated scenario maps with untrusted keys from imported QR codes / files without checking for dangerous prototype keys.
+- **Mandate:** All deserializers decoding untrusted key-value dictionaries MUST:
+  1. Initialize maps using `Object.create(null)` to eliminate prototype inheritance.
+  2. Filter keys against a forbidden key allowlist before assignment.
+
+```typescript
+// shared/src/utils/dictionary_mapper.ts
+const FORBIDDEN_PROTOTYPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+public fromCompact(compact: CompactProgress): DecodedProgress {
+  const scenarios: ScenarioProgressMap = Object.create(null);
+
+  if (Array.isArray(compact.scenarios)) {
+    for (const tuple of compact.scenarios) {
+      if (!Array.isArray(tuple) || tuple.length < 6) continue;
+      const [id, stars, attempts, hints, firstSec, lastSec] = tuple;
+      if (!id || typeof id !== "string") continue;
+
+      const cleanId = id.trim();
+      if (FORBIDDEN_PROTOTYPE_KEYS.has(cleanId)) {
+        continue; // Discard prototype poisoning attempt (MAJ-006)
+      }
+
+      scenarios[cleanId] = {
+        scenarioId: cleanId,
+        starsEarned: stars === 3 ? 3 : stars === 2 ? 2 : 1,
+        attemptsCount: Math.max(0, Math.floor(attempts ?? 0)),
+        hintsUsedTotal: Math.max(0, Math.floor(hints ?? 0)),
+        firstCompletedAt: Math.max(0, Math.floor((firstSec ?? 0) * 1000)),
+        lastCompletedAt: Math.max(0, Math.floor((lastSec ?? 0) * 1000)),
+      };
+    }
+  }
+  return { scenarios, ... };
+}
+```
+
+### 8.4 Functional Socket Middleware Pipeline (MAJ-025)
+- **Defect:** `wrapSocketHandler` spanned 179 lines with 5 overloaded positional parameters, cyclomatic complexity of 31, doing IP parsing, rate limiting, logging, Zod validation, and ack serialization in one monolithic function.
+- **Mandate:** Refactor into a clean, functional middleware pipeline:
+
+```typescript
+// apps/server/src/platform/socket/socket_middleware_pipeline.ts
+
+export type SocketMiddlewareContext = {
+  socket: Socket;
+  operationName: string;
+  correlationId: string;
+  clientIp: string;
+  startTime: number;
+  logger: Logger;
+  trustProxy?: boolean;
+};
+
+export type SocketMiddleware<TReq = unknown, TRes = unknown> = (
+  req: TReq,
+  context: SocketMiddlewareContext,
+  next: (req: TReq) => Promise<TRes>,
+) => Promise<TRes>;
+
+/**
+ * Composes socket middleware functions into a single pipeline executor (MAJ-025).
+ */
+export function composeSocketMiddleware<TReq, TRes>(
+  ...middlewares: SocketMiddleware<TReq, TRes>[]
+): (
+  handler: (req: TReq, context: SocketMiddlewareContext) => Promise<TRes>,
+) => (req: TReq, context: SocketMiddlewareContext) => Promise<TRes> {
+  return (handler) => {
+    return (initialReq, context) => {
+      let index = -1;
+      const dispatch = async (i: number, currentReq: TReq): Promise<TRes> => {
+        if (i <= index) throw new Error("next() called multiple times");
+        index = i;
+        if (i === middlewares.length) {
+          return handler(currentReq, context);
+        }
+        const fn = middlewares[i];
+        return fn(currentReq, context, (nextReq) => dispatch(i + 1, nextReq));
+      };
+      return dispatch(0, initialReq);
+    };
   };
-  ```
+}
+```
+
+#### Individual Focused Middleware Units (CC < 8 each):
+1. **`withLogging(logger)`:** Logs entry, measures duration, logs completion/failure with `serializeError`.
+2. **`withRateLimit(rateLimiter)`:** Checks client IP rate limiter and rejects with 429 when throttled.
+3. **`withValidation(schema)`:** Parses request against Zod schema and throws `InvalidPayloadError` (400) on validation failure.
+4. **`withErrorMapping`:** Catches domain exceptions and maps them to standard `{ success: false, error: ... }` ack responses.
 
 ---
 
-## 7. Quality Gate Checklist for Implementers
+## 9. Verification & Compliance Checklist for Builders
 
-Before submitting any code changes for verification, builders MUST verify:
-- [ ] No direct calls to `Date.now()`, `new Date()`, or `Math.random()` in pure logic or controllers without injected `IClock` or `randomFn`.
-- [ ] No calls to `serializeError` were hand-rolled with ternary chains; all 33 instances migrated to `@fun-chess/shared`.
-- [ ] No monkey-patching of `navigator.onLine` or `window` in client code.
-- [ ] `correlationId` passed from socket middleware through socket handler into domain services.
-- [ ] Every operation emits consistent 3-point lifecycle logs with `duration` and matching `operation` identifier.
-- [ ] Cross-module imports target feature `index.ts` exclusively.
-- [ ] `pnpm run lint` reports 0 errors and 0 warnings.
-- [ ] `pnpm run test:coverage` in `apps/server` meets or exceeds the mandatory 85.00% branch threshold.
+Before reporting handoff, each domain builder MUST verify compliance with these frozen conventions:
+
+- [ ] **Zero unabstracted timers:** No `setTimeout` / `setInterval` in business services or composables (must use `ITimerService` or `IClock`).
+- [ ] **Zero `Date.now()` fallbacks in pure domain logic:** Mandatory `now: number` parameter supplied by callers (MAJ-016).
+- [ ] **Zero empty catch blocks:** All caught errors are logged or rethrown (CRIT-002, CRIT-003, MIN-003, MIN-004, MIN-006).
+- [ ] **Zero direct `process.env` in domain classes:** Injected via constructor from composition root (MAJ-005).
+- [ ] **Zero inline error ternary duplication:** All logging sites use `serializeError(err)` (MAJ-028).
+- [ ] **Zero deep module imports:** Cross-feature imports consume `index.ts` barrels only (MAJ-019).
+- [ ] **Server bootstrap files decomposed:** `apps/server/src/index.ts` delegates to `bootstrap/` modules (MAJ-027).
+- [ ] **HTTP API endpoints aligned:** `/api/v1/lan-info` returns `{ data: LanInfoResponse }`, legacy redirect configured (MAJ-009, MIN-010).
+- [ ] **Mid-game actions accept `sessionToken`:** Verification and auto-healing in `GameService` (MAJ-007).
+- [ ] **`room:reconnected` emitted and parsed:** Restores pending draw and rematch state upon reconnect (MAJ-003).

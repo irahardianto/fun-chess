@@ -8,6 +8,7 @@ import {
   defaultDictionaryMapper,
   toCompactProgress,
   fromCompactProgress,
+  FORBIDDEN_PROTOTYPE_KEYS,
 } from "../dictionary_mapper.js";
 
 describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => {
@@ -830,5 +831,111 @@ describe("Dictionary Mapper (Compact DTO Tokenization & Reconstitution)", () => 
       expect(restored.scenarios["sc1"]?.hintsUsedTotal).toBe(0);
     });
   });
-});
 
+  describe("Prototype Pollution Protection (MAJ-006)", () => {
+    it("exports the set of forbidden prototype keys containing __proto__, constructor, and prototype", () => {
+      expect(FORBIDDEN_PROTOTYPE_KEYS.has("__proto__")).toBe(true);
+      expect(FORBIDDEN_PROTOTYPE_KEYS.has("constructor")).toBe(true);
+      expect(FORBIDDEN_PROTOTYPE_KEYS.has("prototype")).toBe(true);
+    });
+
+    it("initializes scenario, themeMastery, and solvedPuzzles maps with null prototype", () => {
+      const emptyDto: CompactProgressDto = {
+        v: 1,
+        t: 1700000000,
+        sc: [],
+        pz: {
+          r: [800, 350, 800, 0, 0, 0],
+          tm: [],
+          ac: [0, 0, 0, 0],
+          sp: [],
+          ca: 1700000000,
+          la: 1700000000,
+        },
+      };
+
+      const restored = defaultDictionaryMapper.fromCompact(emptyDto);
+      expect(Object.getPrototypeOf(restored.scenarios)).toBeNull();
+      expect(Object.getPrototypeOf(restored.puzzles.themeMastery)).toBeNull();
+      expect(Object.getPrototypeOf(restored.puzzles.solvedPuzzles)).toBeNull();
+    });
+
+    it("filters out __proto__, constructor, and prototype from scenarios without polluting Object prototype", () => {
+      const maliciousDto: CompactProgressDto = {
+        v: 1,
+        t: 1700000000,
+        sc: [
+          ["__proto__", 3, 1, 0, 1700000000, 1700000000],
+          ["  __proto__  ", 3, 1, 0, 1700000000, 1700000000],
+          ["constructor", 2, 1, 0, 1700000000, 1700000000],
+          ["prototype", 1, 1, 0, 1700000000, 1700000000],
+          ["legitimate-scenario", 3, 2, 1, 1700000000, 1700000000],
+        ],
+        pz: {
+          r: [800, 350, 800, 0, 0, 0],
+          tm: [],
+          ac: [0, 0, 0, 0],
+          sp: [],
+          ca: 1700000000,
+          la: 1700000000,
+        },
+      };
+
+      const restored = defaultDictionaryMapper.fromCompact(maliciousDto);
+
+      // Verify forbidden keys were dropped
+      expect(Object.keys(restored.scenarios)).toEqual(["legitimate-scenario"]);
+      expect(restored.scenarios["legitimate-scenario"]?.starsEarned).toBe(3);
+      expect((restored.scenarios as any)["__proto__"]).toBeUndefined();
+      expect((restored.scenarios as any)["constructor"]).toBeUndefined();
+      expect((restored.scenarios as any)["prototype"]).toBeUndefined();
+
+      // Verify global Object.prototype is clean
+      const plainObj: any = {};
+      expect(plainObj.starsEarned).toBeUndefined();
+      expect(plainObj.scenarioId).toBeUndefined();
+      expect(plainObj.attemptsCount).toBeUndefined();
+    });
+
+    it("filters out prototype keys from themeMastery and solvedPuzzles dictionaries", () => {
+      const maliciousDto: CompactProgressDto = {
+        v: 1,
+        t: 1700000000,
+        sc: [],
+        pz: {
+          r: [800, 350, 800, 0, 0, 0],
+          tm: [
+            ["__proto__", 10, 8, 15, 1700000000],
+            ["constructor", 10, 8, 15, 1700000000],
+            ["prototype", 10, 8, 15, 1700000000],
+            ["fork", 10, 8, 15, 1700000000],
+          ],
+          ac: [0, 0, 0, 0],
+          sp: [
+            ["__proto__", 3, 1700000000],
+            ["constructor", 3, 1700000000],
+            ["prototype", 3, 1700000000],
+            ["puz-valid-01", 3, 1700000000],
+          ],
+          ca: 1700000000,
+          la: 1700000000,
+        },
+      };
+
+      const restored = defaultDictionaryMapper.fromCompact(maliciousDto);
+
+      expect(Object.keys(restored.puzzles.themeMastery)).toEqual(["fork"]);
+      expect(Object.keys(restored.puzzles.solvedPuzzles)).toEqual(["puz-valid-01"]);
+      expect((restored.puzzles.themeMastery as any)["__proto__"]).toBeUndefined();
+      expect((restored.puzzles.themeMastery as any)["constructor"]).toBeUndefined();
+      expect((restored.puzzles.themeMastery as any)["prototype"]).toBeUndefined();
+      expect((restored.puzzles.solvedPuzzles as any)["__proto__"]).toBeUndefined();
+      expect((restored.puzzles.solvedPuzzles as any)["constructor"]).toBeUndefined();
+      expect((restored.puzzles.solvedPuzzles as any)["prototype"]).toBeUndefined();
+
+      const plainObj: any = {};
+      expect(plainObj.masteryLevel).toBeUndefined();
+      expect(plainObj.stars).toBeUndefined();
+    });
+  });
+});

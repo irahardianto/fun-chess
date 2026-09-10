@@ -431,16 +431,15 @@ describe('useGameActions composable', () => {
       });
     });
 
-    it('clears drawOfferedBy and shows toast when game:draw_declined event arrives', () => {
-      const game = useGameActions();
-      const notification = useNotification();
+    it('clears drawOfferedBy and triggers onNotification when game:draw_declined event arrives (MAJ-012)', () => {
+      const onNotification = vi.fn();
+      const game = useGameActions({ onNotification });
       game.drawOfferedBy.value = { fromPlayerId: UUID_P2, fromPlayerName: 'Bob' };
 
       eventHandlers['game:draw_declined']({ byPlayerId: UUID_P1 });
 
       expect(game.drawOfferedBy.value).toBeNull();
-      expect(notification.activeNotification.value?.message).toBe('Opponent declined your draw offer');
-      expect(notification.activeNotification.value?.type).toBe('info');
+      expect(onNotification).toHaveBeenCalledWith('Opponent declined your draw offer', 'info');
     });
   });
 
@@ -798,6 +797,220 @@ describe('useGameActions composable', () => {
       });
 
       expect(audioListener).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ==========================================================================
+  // 8. Session Token Inclusion in Mid-Game Payloads (MAJ-007)
+  // ==========================================================================
+  describe('Session Token Inclusion in Mid-Game Payloads (MAJ-007)', () => {
+    it('includes sessionToken in makeMove when session is present', async () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+      session.sessionToken.value = 'token-secret-123';
+
+      const movePayload: MovePayload = { from: 'e2', to: 'e4' };
+      mockSocket.emit.mockImplementation((event: string, payload: any, ack: Function) => {
+        if (event === 'game:move') {
+          expect(payload.sessionToken).toBe('token-secret-123');
+          ack({ success: true, moveResult: { moveNumber: 1, san: 'e4', fen: 'fen', check: false, checkmate: false } });
+        }
+      });
+
+      const res = await game.makeMove('ROOM', movePayload);
+      expect(res.success).toBe(true);
+    });
+
+    it('includes sessionToken in resign when session is present', () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+      session.sessionToken.value = 'token-secret-123';
+
+      mockSocket.emit.mockImplementation((event: string, payload: any, ack?: Function) => {
+        if (event === 'game:resign') {
+          expect(payload.sessionToken).toBe('token-secret-123');
+          expect(payload.roomCode).toBe('ROOM');
+          if (ack) ack({ success: true });
+        }
+      });
+
+      game.resign('ROOM');
+      expect(mockSocket.emit).toHaveBeenCalledWith('game:resign', expect.objectContaining({
+        roomCode: 'ROOM',
+        sessionToken: 'token-secret-123',
+      }));
+    });
+
+    it('includes sessionToken in offerDraw when session is present', () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+      session.sessionToken.value = 'token-secret-123';
+
+      game.offerDraw('ROOM');
+      expect(mockSocket.emit).toHaveBeenCalledWith('game:offer_draw', expect.objectContaining({
+        roomCode: 'ROOM',
+        sessionToken: 'token-secret-123',
+      }));
+    });
+
+    it('includes sessionToken in respondDraw when session is present', () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+      session.sessionToken.value = 'token-secret-123';
+
+      game.respondDraw('ROOM', true);
+      expect(mockSocket.emit).toHaveBeenCalledWith('game:respond_draw', expect.objectContaining({
+        roomCode: 'ROOM',
+        accept: true,
+        sessionToken: 'token-secret-123',
+      }));
+    });
+
+    it('includes sessionToken in requestRematch when session is present', () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+      session.sessionToken.value = 'token-secret-123';
+
+      game.requestRematch('ROOM');
+      expect(mockSocket.emit).toHaveBeenCalledWith('game:request_rematch', expect.objectContaining({
+        roomCode: 'ROOM',
+        sessionToken: 'token-secret-123',
+      }));
+    });
+
+    it('includes sessionToken in respondRematch when session is present', () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+      session.sessionToken.value = 'token-secret-123';
+
+      game.respondRematch('ROOM', false);
+      expect(mockSocket.emit).toHaveBeenCalledWith('game:respond_rematch', expect.objectContaining({
+        roomCode: 'ROOM',
+        accept: false,
+        sessionToken: 'token-secret-123',
+      }));
+    });
+  });
+
+  // ==========================================================================
+  // 9. Reconnection Rehydration (MAJ-003)
+  // ==========================================================================
+  describe('Reconnection Rehydration (MAJ-003)', () => {
+    it('rehydrates pending draw offer from opponent upon room:reconnected event', () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+
+      const whitePlayer = createTestPlayer({ id: UUID_P1, color: 'w' });
+      const blackPlayer = createTestPlayer({ id: UUID_P2, name: 'Bob', color: 'b' });
+      session.currentPlayer.value = whitePlayer;
+
+      const reconnectedRoom = createTestRoom({
+        whitePlayer,
+        blackPlayer,
+        drawOffer: { offeredBy: UUID_P2, offeredAt: Date.now() },
+      });
+
+      eventHandlers['room:reconnected']({
+        room: reconnectedRoom,
+        player: whitePlayer,
+        roomStatus: 'playing',
+      });
+
+      expect(game.drawOfferedBy.value).toEqual({
+        fromPlayerId: UUID_P2,
+        fromPlayerName: 'Bob',
+      });
+    });
+
+    it('clears draw offer if none active upon room:reconnected event', () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+
+      game.drawOfferedBy.value = { fromPlayerId: UUID_P2, fromPlayerName: 'Bob' };
+
+      const whitePlayer = createTestPlayer({ id: UUID_P1, color: 'w' });
+      const blackPlayer = createTestPlayer({ id: UUID_P2, name: 'Bob', color: 'b' });
+      session.currentPlayer.value = whitePlayer;
+
+      const reconnectedRoom = createTestRoom({
+        whitePlayer,
+        blackPlayer,
+        drawOffer: null,
+      });
+
+      eventHandlers['room:reconnected']({
+        room: reconnectedRoom,
+        player: whitePlayer,
+        roomStatus: 'playing',
+      });
+
+      expect(game.drawOfferedBy.value).toBeNull();
+    });
+
+    it('rehydrates pending rematch request from opponent upon room:reconnected event', () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+
+      const whitePlayer = createTestPlayer({ id: UUID_P1, color: 'w' });
+      const blackPlayer = createTestPlayer({ id: UUID_P2, name: 'Bob', color: 'b' });
+      session.currentPlayer.value = whitePlayer;
+
+      const reconnectedRoom = createTestRoom({
+        whitePlayer,
+        blackPlayer,
+        rematch: { requestedBy: UUID_P2, requestedAt: Date.now(), status: 'pending' },
+      });
+
+      eventHandlers['room:reconnected']({
+        room: reconnectedRoom,
+        player: whitePlayer,
+        roomStatus: 'game_over',
+      });
+
+      expect(game.rematchRequestedBy.value).toEqual({
+        requestedBy: UUID_P2,
+        requesterName: 'Bob',
+      });
+    });
+
+    it('rehydrates draw offer and rematch request via useRoomSession.reconnect acknowledgment callback', async () => {
+      const session = useRoomSession();
+      const game = useGameActions();
+
+      const whitePlayer = createTestPlayer({ id: UUID_P1, color: 'w' });
+      const blackPlayer = createTestPlayer({ id: UUID_P2, name: 'Bob', color: 'b' });
+
+      const roomState = createTestRoom({
+        roomCode: 'ROOM',
+        whitePlayer,
+        blackPlayer,
+        drawOffer: { offeredBy: UUID_P2, offeredAt: Date.now() },
+        rematch: { requestedBy: UUID_P2, requestedAt: Date.now(), status: 'pending' },
+      });
+
+      mockSocket.emit.mockImplementation((event: string, _payload: any, ack: Function) => {
+        if (event === 'room:reconnect') {
+          ack({
+            success: true,
+            room: roomState,
+            player: whitePlayer,
+            roomStatus: 'playing',
+            sessionToken: 'reconnected-token-123',
+          });
+        }
+      });
+
+      await session.reconnect('ROOM', UUID_P1, 'token-123');
+
+      expect(session.currentRoom.value?.roomCode).toBe('ROOM');
+      expect(game.drawOfferedBy.value).toEqual({
+        fromPlayerId: UUID_P2,
+        fromPlayerName: 'Bob',
+      });
+      expect(game.rematchRequestedBy.value).toEqual({
+        requestedBy: UUID_P2,
+        requesterName: 'Bob',
+      });
     });
   });
 });

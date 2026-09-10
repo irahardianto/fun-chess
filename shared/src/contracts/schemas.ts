@@ -67,6 +67,9 @@ export const ChessSquareSchema = z
  * Pawn promotion piece target schema ('q', 'r', 'b', 'n').
  */
 export const PromotionPieceSchema = z.enum(["q", "r", "b", "n"]);
+/**
+ * Inferred DTO type for chess pawn promotion piece target ('q' | 'r' | 'b' | 'n').
+ */
 export type PromotionPieceDto = z.infer<typeof PromotionPieceSchema>;
 
 /**
@@ -106,6 +109,9 @@ export const PlayerSchema = z.preprocess(
       path: ["updatedAt"],
     }),
 );
+/**
+ * Inferred DTO type for sanitized public player representation.
+ */
 export type PlayerDto = z.infer<typeof PlayerSchema>;
 
 /**
@@ -236,6 +242,9 @@ export const CreateRoomRequestSchema = z.object({
   preferredColor: PreferredColorSchema,
   avatar: AvatarEmojiSchema,
 });
+/**
+ * Request payload for creating a new multiplayer game room.
+ */
 export type CreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;
 
 /**
@@ -247,6 +256,9 @@ export const CreateRoomSuccessResponseSchema = z.object({
   player: PlayerSchema,
   sessionToken: z.string().min(1, "Session token is required"),
 });
+/**
+ * Success response acknowledgement payload when a room is created.
+ */
 export type CreateRoomSuccessResponse = z.infer<typeof CreateRoomSuccessResponseSchema>;
 
 /**
@@ -262,6 +274,9 @@ export const CreateRoomErrorResponseSchema = z.object({
     details: z.record(z.unknown()).optional(),
   }),
 });
+/**
+ * Error response acknowledgement payload when room creation fails.
+ */
 export type CreateRoomErrorResponse = z.infer<typeof CreateRoomErrorResponseSchema>;
 
 /**
@@ -271,6 +286,9 @@ export const CreateRoomResponseSchema = z.union([
   CreateRoomSuccessResponseSchema,
   CreateRoomErrorResponseSchema,
 ]);
+/**
+ * Union type representing either a successful or failed room creation response.
+ */
 export type CreateRoomResponse = z.infer<typeof CreateRoomResponseSchema>;
 
 /**
@@ -281,6 +299,9 @@ export const JoinRoomRequestSchema = z.object({
   playerName: PlayerNameSchema,
   avatar: AvatarEmojiSchema,
 });
+/**
+ * Request payload for joining an existing game room with a 4-letter code.
+ */
 export type JoinRoomRequest = z.infer<typeof JoinRoomRequestSchema>;
 
 /**
@@ -291,6 +312,9 @@ export const ReconnectRequestSchema = z.object({
   playerId: z.string().uuid("Player ID must be a valid UUID"),
   sessionToken: z.string().min(1, "Session token is required").max(128),
 });
+/**
+ * Request payload for reconnecting to a game room using saved session credentials.
+ */
 export type ReconnectRequest = z.infer<typeof ReconnectRequestSchema>;
 
 /**
@@ -299,9 +323,18 @@ export type ReconnectRequest = z.infer<typeof ReconnectRequestSchema>;
 export const LeaveRoomRequestSchema = z.object({
   roomCode: RoomCodeSchema,
 });
+/**
+ * Request payload for voluntarily leaving a room.
+ */
 export type LeaveRoomRequest = z.infer<typeof LeaveRoomRequestSchema>;
 
+/**
+ * Alias schema for room departure request payload.
+ */
 export const RoomLeavePayloadSchema = LeaveRoomRequestSchema;
+/**
+ * Alias type for room departure request payload.
+ */
 export type RoomLeavePayload = LeaveRoomRequest;
 
 /**
@@ -313,6 +346,9 @@ export const PlayerLeftReasonSchema = z.enum([
   "kicked",
   "room_closed",
 ]);
+/**
+ * Reason code describing why a player departed from a room.
+ */
 export type PlayerLeftReason = z.infer<typeof PlayerLeftReasonSchema>;
 
 /**
@@ -323,6 +359,9 @@ export const RoomPlayerLeftPayloadSchema = z.object({
   playerName: z.string().min(1),
   reason: PlayerLeftReasonSchema.optional(),
 });
+/**
+ * Broadcast payload emitted when a player departs from a room.
+ */
 export type RoomPlayerLeftPayload = z.infer<typeof RoomPlayerLeftPayloadSchema>;
 
 /**
@@ -333,10 +372,14 @@ export const MovePayloadSchema = z.object({
   to: ChessSquareSchema,
   promotion: PromotionPieceSchema.optional(),
 });
+/**
+ * Chess move coordinates and optional promotion piece payload.
+ */
 export type MovePayloadDto = z.infer<typeof MovePayloadSchema>;
 
 /**
  * Socket request schema for submitting a move in an active game room.
+ * Includes optional HMAC sessionToken for cryptographic authentication (MAJ-007).
  * Accepts RFC 4122 UUID or any safe unique client string token (1-64 chars)
  * to support UUID, nanoid, or cryptographic hex digests without client bypass (MAJ-003).
  */
@@ -358,65 +401,122 @@ export const MakeMoveRequestSchema = z.object({
     .max(64, "Idempotency key cannot exceed 64 characters")
     .regex(/^[a-zA-Z0-9_-]+$/, "Idempotency key must be alphanumeric, hyphen, or underscore")
     .optional(),
+  /** Cryptographic HMAC session token for player verification (MAJ-007) */
+  sessionToken: z
+    .string()
+    .min(1, "Session token cannot be empty")
+    .max(256, "Session token exceeds maximum length")
+    .optional(),
 });
+/**
+ * Socket request payload for submitting a move in an active game room.
+ */
 export type MakeMoveRequest = z.infer<typeof MakeMoveRequestSchema>;
 
 /**
  * Socket request schema for resigning an active match.
+ * Includes optional HMAC sessionToken for cryptographic authentication (MAJ-007).
  */
 export const ResignRequestSchema = z.object({
   roomCode: RoomCodeSchema,
+  sessionToken: z.string().min(1, "Session token cannot be empty").max(256).optional(),
 });
+/**
+ * Socket request payload for resigning an active match.
+ */
 export type ResignRequest = z.infer<typeof ResignRequestSchema>;
 
 /**
  * Socket request schema for offering a draw to the opponent.
+ * Includes optional HMAC sessionToken for cryptographic authentication (MAJ-007).
  */
 export const OfferDrawRequestSchema = z.object({
   roomCode: RoomCodeSchema,
+  sessionToken: z.string().min(1, "Session token cannot be empty").max(256).optional(),
 });
+/**
+ * Socket request payload for offering a draw to the opponent.
+ */
 export type OfferDrawRequest = z.infer<typeof OfferDrawRequestSchema>;
 
 /**
  * Socket request schema for accepting or declining a draw offer.
+ * Includes optional HMAC sessionToken for cryptographic authentication (MAJ-007).
  */
 export const RespondDrawRequestSchema = z.object({
   roomCode: RoomCodeSchema,
   accept: z.boolean(),
+  sessionToken: z.string().min(1, "Session token cannot be empty").max(256).optional(),
 });
+/**
+ * Socket request payload for accepting or declining a draw offer.
+ */
 export type RespondDrawRequest = z.infer<typeof RespondDrawRequestSchema>;
 
 /**
  * Socket request schema for requesting a rematch after match conclusion.
+ * Includes optional HMAC sessionToken for cryptographic authentication (MAJ-007).
  */
 export const RequestRematchRequestSchema = z.object({
   roomCode: RoomCodeSchema,
+  sessionToken: z.string().min(1, "Session token cannot be empty").max(256).optional(),
 });
+/**
+ * Socket request payload for requesting a rematch after match conclusion.
+ */
 export type RequestRematchRequest = z.infer<typeof RequestRematchRequestSchema>;
 
 /**
  * Socket request schema for accepting or declining a rematch request.
+ * Includes optional HMAC sessionToken for cryptographic authentication (MAJ-007).
  */
 export const RespondRematchRequestSchema = z.object({
   roomCode: RoomCodeSchema,
   accept: z.boolean(),
+  sessionToken: z.string().min(1, "Session token cannot be empty").max(256).optional(),
 });
+/**
+ * Socket request payload for accepting or declining a rematch request.
+ */
 export type RespondRematchRequest = z.infer<typeof RespondRematchRequestSchema>;
 
 /**
- * HTTP response schema for the `/api/lan-info` network discovery endpoint.
+ * Host network addressing information payload schema.
+ * Aligned between server relay service and shared contracts (MIN-010).
  */
 export const LanInfoResponseSchema = z.object({
+  /** Primary local area network IPv4 address */
   lanIp: z.string(),
+  /** Active listening HTTP/WS TCP port */
   port: z.number().int().positive(),
+  /** Absolute local network base URL for LAN play (e.g. "http://192.168.1.100:3000") */
   localUrl: z.string().url(),
+  /** Full join URL with default route for QR code pairing */
   joinUrl: z.string().url(),
+  /** List of all non-internal IPv4 interface addresses discovered on host */
   interfaces: z.array(z.string()),
-  relayMode: z.enum(["cloud", "lan"]).optional(),
-  isCloudRelay: z.boolean().optional(),
+  /** Operating relay mode: 'cloud' when behind public URL / reverse proxy, 'lan' for direct LAN */
+  relayMode: z.enum(["cloud", "lan"]),
+  /** Boolean flag indicating if server operates in cloud relay mode */
+  isCloudRelay: z.boolean(),
+  /** Public base URL when deployed to Cloud Run or behind reverse proxy */
   publicUrl: z.string().url().optional(),
 });
+/**
+ * Inferred TypeScript type for LanInfoResponseSchema.
+ */
 export type LanInfoResponse = z.infer<typeof LanInfoResponseSchema>;
+
+/**
+ * Standard REST success envelope for LAN info discovery (MAJ-009).
+ */
+export const LanInfoEnvelopeSchema = z.object({
+  data: LanInfoResponseSchema,
+});
+/**
+ * Inferred TypeScript type for LanInfoEnvelopeSchema.
+ */
+export type LanInfoEnvelope = z.infer<typeof LanInfoEnvelopeSchema>;
 
 /**
  * Public lightweight liveness/readiness probe schema (/health, /api/health).
@@ -426,6 +526,9 @@ export const LivenessHealthResponseSchema = z.object({
   uptimeSeconds: z.number().nonnegative(),
   timestamp: z.string().datetime(),
 });
+/**
+ * Inferred response payload for liveness/readiness health check probe.
+ */
 export type LivenessHealthResponse = z.infer<typeof LivenessHealthResponseSchema>;
 
 /**
@@ -449,6 +552,9 @@ export const DetailedHealthResponseSchema = z.object({
     })
     .optional(),
 });
+/**
+ * Inferred response payload for deep operational telemetry and metrics probe.
+ */
 export type DetailedHealthResponse = z.infer<typeof DetailedHealthResponseSchema>;
 
 /**
@@ -457,6 +563,9 @@ export type DetailedHealthResponse = z.infer<typeof DetailedHealthResponseSchema
  * Aligned strictly with LivenessHealthResponse to resolve CRIT-001.
  */
 export const HealthCheckResponseSchema = LivenessHealthResponseSchema;
+/**
+ * Canonical alias type for liveness health check probe response.
+ */
 export type HealthCheckResponse = LivenessHealthResponse;
 
 /**
@@ -468,6 +577,9 @@ export const HttpErrorBodySchema = z.object({
   details: z.record(z.unknown()).optional(),
   correlationId: z.string().optional(),
 });
+/**
+ * Inferred standard HTTP error body payload.
+ */
 export type HttpErrorBody = z.infer<typeof HttpErrorBodySchema>;
 
 /**
@@ -478,6 +590,9 @@ export const HttpErrorEnvelopeSchema = z.object({
   code: z.number().int().min(400).max(599),
   error: HttpErrorBodySchema,
 });
+/**
+ * Inferred standard HTTP error envelope response payload.
+ */
 export type HttpErrorEnvelope = z.infer<typeof HttpErrorEnvelopeSchema>;
 
 const emptyStringToUndefined = (val: unknown): unknown =>
@@ -535,6 +650,9 @@ export const ServerEnvSchema = z.object({
   CLIENT_URL: z.preprocess(emptyStringToUndefined, z.string().optional()),
   CLIENT_DIST_PATH: z.preprocess(emptyStringToUndefined, z.string().optional()),
 });
+/**
+ * Inferred server environment configuration type.
+ */
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
 
 /**
@@ -545,6 +663,9 @@ export const StarRatingSchema = z.union([
   z.literal(2),
   z.literal(3),
 ]);
+/**
+ * Inferred performance star rating value (1, 2, or 3 stars).
+ */
 export type StarRatingDto = z.infer<typeof StarRatingSchema>;
 
 /**
@@ -558,6 +679,9 @@ export const ScenarioProgressSchema = z.object({
   firstCompletedAt: z.number().nonnegative(),
   lastCompletedAt: z.number().nonnegative(),
 });
+/**
+ * Inferred user progress record for an individual scenario.
+ */
 export type ScenarioProgressDto = z.infer<typeof ScenarioProgressSchema>;
 
 /**
@@ -567,6 +691,9 @@ export const ScenarioProgressMapSchema = z.record(
   z.string(),
   ScenarioProgressSchema,
 );
+/**
+ * Inferred dictionary mapping scenario ID to individual scenario progress records.
+ */
 export type ScenarioProgressMapDto = z.infer<typeof ScenarioProgressMapSchema>;
 
 /**
@@ -578,6 +705,9 @@ export const RatingHistoryPointSchema = z.object({
   puzzleId: z.string(),
   delta: z.number(),
 });
+/**
+ * Inferred historical rating data point recording rating progression over time.
+ */
 export type RatingHistoryPointDto = z.infer<typeof RatingHistoryPointSchema>;
 
 /**
@@ -592,6 +722,9 @@ export const AdaptiveRatingStateSchema = z.object({
   bestStreak: z.number().int().nonnegative(),
   ratingHistory: z.array(RatingHistoryPointSchema),
 });
+/**
+ * Inferred adaptive Elo rating state and performance statistics.
+ */
 export type AdaptiveRatingStateDto = z.infer<typeof AdaptiveRatingStateSchema>;
 
 /**
@@ -599,6 +732,9 @@ export type AdaptiveRatingStateDto = z.infer<typeof AdaptiveRatingStateSchema>;
  * Reconciled with PuzzleTheme union in puzzle.ts (MAJ-024).
  */
 export const PuzzleThemeSchema = z.enum(PUZZLE_THEMES);
+/**
+ * Inferred valid tactical or positional chess puzzle theme identifier.
+ */
 export type PuzzleThemeDto = z.infer<typeof PuzzleThemeSchema>;
 
 /**
@@ -613,6 +749,9 @@ export const ThemeMasteryProgressSchema = z.object({
   masteryLevel: z.enum(["novice", "apprentice", "master"]),
   lastPracticedAt: z.number().nonnegative(),
 });
+/**
+ * Inferred user mastery progress record for a specific tactical puzzle theme.
+ */
 export type ThemeMasteryProgressDto = z.infer<typeof ThemeMasteryProgressSchema>;
 
 /**
@@ -624,6 +763,9 @@ export const PuzzleArcadeStatsSchema = z.object({
   streakSurvivorHighScore: z.number().int().nonnegative(),
   totalRushRuns: z.number().int().nonnegative(),
 });
+/**
+ * Inferred arcade game mode statistics (Puzzle Rush and Streak Survivor high scores).
+ */
 export type PuzzleArcadeStatsDto = z.infer<typeof PuzzleArcadeStatsSchema>;
 
 /**
@@ -633,6 +775,9 @@ export const SolvedPuzzleRecordSchema = z.object({
   stars: StarRatingSchema,
   solvedAt: z.number().nonnegative(),
 });
+/**
+ * Inferred record of an individual solved puzzle with star rating and completion timestamp.
+ */
 export type SolvedPuzzleRecordDto = z.infer<typeof SolvedPuzzleRecordSchema>;
 
 /**
@@ -646,6 +791,9 @@ export const PuzzleProgressSchema = z.object({
   createdAt: z.number().nonnegative(),
   lastActiveAt: z.number().nonnegative(),
 });
+/**
+ * Inferred overall persistent user progress across Puzzle Hub.
+ */
 export type PuzzleProgressDto = z.infer<typeof PuzzleProgressSchema>;
 
 /**
@@ -658,6 +806,9 @@ export const UnifiedProgressPayloadSchema = z.object({
   scenarios: ScenarioProgressMapSchema,
   puzzles: PuzzleProgressSchema,
 });
+/**
+ * Inferred top-level data transfer object representing all user progress across scenarios and puzzles.
+ */
 export type UnifiedProgressPayloadDto = z.infer<typeof UnifiedProgressPayloadSchema>;
 
 /**
@@ -670,6 +821,9 @@ export const UnifiedProgressEnvelopeSchema = z.object({
   checksum: z.string().min(1),
   payload: UnifiedProgressPayloadSchema,
 });
+/**
+ * Inferred backup file envelope with checksum, schema version, and progress payload.
+ */
 export type UnifiedProgressEnvelopeDto = z.infer<typeof UnifiedProgressEnvelopeSchema>;
 
 /**
@@ -680,5 +834,8 @@ export const SyncMergeStrategySchema = z.enum([
   "replace_local",
   "keep_local",
 ]);
+/**
+ * Inferred strategy mode used when merging imported progress with local progress.
+ */
 export type SyncMergeStrategyDto = z.infer<typeof SyncMergeStrategySchema>;
 

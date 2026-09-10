@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
+import { serializeError } from "@fun-chess/shared";
 import { Logger } from "./logger.interface.js";
 
 const SENSITIVE_KEYS = new Set([
@@ -99,10 +100,7 @@ export async function runLoggedJob<T>(
       duration,
       durationMs: duration,
       status: "failed",
-      error:
-        err instanceof Error
-          ? { name: err.name, message: err.message, stack: err.stack }
-          : { raw: err },
+      error: serializeError(err),
     });
 
     throw err;

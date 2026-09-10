@@ -4,6 +4,7 @@ import {
   LivenessHealthResponseSchema,
   DetailedHealthResponseSchema,
   HttpErrorEnvelopeSchema,
+  serializeError,
   type LanInfoResponse,
   type LivenessHealthResponse,
   type DetailedHealthResponse,
@@ -124,7 +125,7 @@ export class FetchApiClient implements IApiClient {
     } catch (error) {
       this.logger.debug('AbortSignal unsupported by Request', {
         operation: 'get_safe_signal',
-        error: error instanceof Error ? error.message : String(error),
+        error: serializeError(error),
       });
       return undefined;
     }
@@ -142,57 +143,63 @@ export class FetchApiClient implements IApiClient {
     ) {
       return `${window.location.origin}${url}`;
     }
+    if (typeof window !== 'undefined' && url.startsWith('/')) {
+      return `http://localhost:3000${url}`;
+    }
     return url;
   }
 
   private async parseResponseBody<T>(response: Response): Promise<T> {
-    if (!response || response.status === 204) {
+    if (!response || response.status === 204 || response.status === 205) {
+      return null as T;
+    }
+
+    let text: string;
+    try {
+      if (typeof response.text === 'function') {
+        text = await response.text();
+      } else if (typeof (response as { json?: () => Promise<unknown> }).json === 'function') {
+        try {
+          const jsonResult = await (response as { json: () => Promise<unknown> }).json();
+          return jsonResult as T;
+        } catch (jsonErr) {
+          this.logger.warn('Failed to parse JSON response body', {
+            operation: 'http_parse_body',
+            error: serializeError(jsonErr),
+          });
+          return null as T;
+        }
+      } else {
+        return null as T;
+      }
+    } catch (streamErr) {
+      this.logger.error('Failed to read HTTP response stream', {
+        operation: 'http_parse_body',
+        error: serializeError(streamErr),
+      });
+      throw streamErr;
+    }
+
+    if (!text || text.trim().length === 0) {
       return null as T;
     }
 
     const contentType = response.headers?.get?.('content-type') ?? '';
     const isJson = !contentType || contentType.includes('json');
 
-    if (typeof response.text === 'function') {
-      const text = await response.text();
-      if (!text) {
-        return null as T;
-      }
-      if (isJson) {
-        try {
-          return JSON.parse(text) as T;
-        } catch (err) {
-          this.logger.warn('Failed to parse JSON response body', {
-            operation: 'http_parse_body',
-            error: err instanceof Error ? err.message : String(err),
-          });
-          return text as unknown as T;
-        }
-      }
-      return text as unknown as T;
-    }
-
-    if (typeof response.json === 'function') {
+    if (isJson) {
       try {
-        return await response.json();
-      } catch (err) {
-        this.logger.warn('Failed to parse JSON response body, attempting raw text fallback', {
+        return JSON.parse(text) as T;
+      } catch (parseErr) {
+        this.logger.warn('Failed to parse JSON response body', {
           operation: 'http_parse_body',
-          error: err instanceof Error ? err.message : String(err),
+          error: serializeError(parseErr),
         });
-        if (typeof (response as { text?: () => Promise<string> }).text === 'function') {
-          try {
-            const rawText = await (response as { text: () => Promise<string> }).text();
-            return (rawText ?? null) as T;
-          } catch {
-            return null as T;
-          }
-        }
-        return null as T;
+        return text as unknown as T;
       }
     }
 
-    return null as T;
+    return text as unknown as T;
   }
 
   async get<T>(url: string, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
@@ -243,7 +250,7 @@ export class FetchApiClient implements IApiClient {
         correlationId,
         duration: durationMs,
         durationMs,
-        error: err instanceof Error ? err.message : String(err),
+        error: serializeError(err),
       });
       throw err;
     } finally {
@@ -301,7 +308,7 @@ export class FetchApiClient implements IApiClient {
         correlationId,
         duration: durationMs,
         durationMs,
-        error: err instanceof Error ? err.message : String(err),
+        error: serializeError(err),
       });
       throw err;
     } finally {
@@ -310,11 +317,27 @@ export class FetchApiClient implements IApiClient {
   }
 
   async getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse> {
-    const res = await this.get<unknown>('/api/lan-info', options);
+    const res = await this.get<unknown>('/api/v1/lan-info', options);
     if (!res.ok) {
       this.handleResponseError(res, 'Failed to fetch LAN info', options?.correlationId ?? '');
     }
-    return LanInfoResponseSchema.parse(res.data);
+
+    // Support both standard { data: LanInfoResponse } envelope and direct payload (defensive fallback)
+    const raw =
+      res.data && typeof res.data === 'object' && 'data' in res.data
+        ? (res.data as { data: unknown }).data
+        : res.data;
+
+    let payload = raw;
+    if (raw && typeof raw === 'object') {
+      const p = { ...(raw as Record<string, unknown>) };
+      if (!p.relayMode && typeof p.isCloudRelay === 'boolean') {
+        p.relayMode = p.isCloudRelay ? 'cloud' : 'lan';
+      }
+      payload = p;
+    }
+
+    return LanInfoResponseSchema.parse(payload);
   }
 
   async checkHealth(options?: ApiRequestOptions): Promise<LivenessHealthResponse> {
@@ -380,7 +403,7 @@ export class FetchApiClient implements IApiClient {
         correlationId,
         duration: durationMs,
         durationMs,
-        error: err instanceof Error ? err.message : String(err),
+        error: serializeError(err),
       });
       return false;
     } finally {

@@ -256,6 +256,7 @@ describe("RelayAddressService & NetworkInterfaceProvider (MAJ-016, MIN-031, ENH-
       const service = new RelayAddressService({
         publicUrl: "https://fun-chess-xyz.a.run.app",
         port: 8080,
+        suppressCloudInterfaces: false,
         networkInterfaceProvider: new StaticNetworkInterfaceProvider(
           mockInterfaces,
         ),
@@ -275,9 +276,10 @@ describe("RelayAddressService & NetworkInterfaceProvider (MAJ-016, MIN-031, ENH-
       });
     });
 
-    it("falls back to [lanIp] when no physical interfaces are available in cloud mode with StaticNetworkInterfaceProvider", () => {
+    it("falls back to [lanIp] when no physical interfaces are available in cloud mode with suppressCloudInterfaces: false", () => {
       const service = new RelayAddressService({
         publicUrl: "https://fun-chess-xyz.a.run.app",
+        suppressCloudInterfaces: false,
         networkInterfaceProvider: new StaticNetworkInterfaceProvider({}),
       });
 
@@ -285,10 +287,34 @@ describe("RelayAddressService & NetworkInterfaceProvider (MAJ-016, MIN-031, ENH-
       expect(info.interfaces).toEqual(["fun-chess-xyz.a.run.app"]);
     });
 
-    it("suppresses internal network interfaces array in cloud relay mode with SystemNetworkInterfaceProvider to prevent topology disclosure (MIN-004)", () => {
+    it("suppresses internal network interfaces array in cloud relay mode by default to prevent topology disclosure (MIN-004, MAJ-013)", () => {
       const service = new RelayAddressService({
         publicUrl: "https://fun-chess-xyz.a.run.app",
         port: 8080,
+      });
+
+      const info = service.getAddressingInfo(8080);
+      expect(service.isCloudRelay()).toBe(true);
+      expect(info.interfaces).toEqual([]);
+    });
+
+    it("suppresses internal network interfaces array in cloud relay mode when suppressCloudInterfaces: true is explicitly configured", () => {
+      const service = new RelayAddressService({
+        publicUrl: "https://fun-chess-xyz.a.run.app",
+        port: 8080,
+        suppressCloudInterfaces: true,
+        networkInterfaceProvider: new StaticNetworkInterfaceProvider({
+          eth0: [
+            {
+              address: "10.0.0.2",
+              netmask: "255.255.255.0",
+              family: "IPv4",
+              mac: "00:00:00:00:00:00",
+              internal: false,
+              cidr: "10.0.0.2/24",
+            },
+          ],
+        }),
       });
 
       const info = service.getAddressingInfo(8080);
@@ -588,7 +614,9 @@ describe("RelayAddressService & NetworkInterfaceProvider (MAJ-016, MIN-031, ENH-
         expect.objectContaining({
           operation: "get_all_lan_interfaces",
           correlationId: "corr-throw-test",
-          error: "UV_ENOBUFS: no buffer space available",
+          error: expect.objectContaining({
+            message: "UV_ENOBUFS: no buffer space available",
+          }),
         }),
       );
 
@@ -800,7 +828,9 @@ describe("RelayAddressService & NetworkInterfaceProvider (MAJ-016, MIN-031, ENH-
       expect(mockLogger.warn).toHaveBeenCalledWith(
         "Failed to retrieve network interfaces from provider, falling back to localhost",
         expect.objectContaining({
-          error: "Raw string error",
+          error: expect.objectContaining({
+            message: "Raw string error",
+          }),
         }),
       );
     });

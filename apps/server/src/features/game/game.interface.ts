@@ -24,18 +24,21 @@ export interface IGameService {
     req: MakeMoveRequest,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<MoveApplicationResult>;
 
   resign(
     roomCode: string,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload }>;
 
   offerDraw(
     roomCode: string,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{
     room: RoomState;
     fromPlayer: Player;
@@ -47,6 +50,7 @@ export interface IGameService {
     socketId: string,
     accept: boolean,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{
     room: RoomState;
     accept: boolean;
@@ -58,6 +62,7 @@ export interface IGameService {
     roomCode: string,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{ room: RoomState; requestedBy: string; requesterName: string }>;
 
   respondRematch(
@@ -65,6 +70,7 @@ export interface IGameService {
     socketId: string,
     accept: boolean,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{
     room: RoomState;
     accept: boolean;

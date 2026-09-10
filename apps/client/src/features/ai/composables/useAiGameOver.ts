@@ -5,7 +5,7 @@ import type {
   GameOverPayload,
   IClock,
 } from '@fun-chess/shared';
-import { createGameOverPayload } from '@fun-chess/shared';
+import { createGameOverPayload, serializeError } from '@fun-chess/shared';
 import { generateCorrelationId, type ILogger } from '@/platform/telemetry';
 import type { UseAiBoardStateReturn } from './useAiBoardState.js';
 import type { useTakebackHistory } from './useTakebackHistory.js';
@@ -171,7 +171,7 @@ export function useAiGameOver(options: UseAiGameOverOptions) {
         status: 'failed',
         duration: durationMs,
         durationMs,
-        error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
+        error: serializeError(err),
       });
       throw err;
     }

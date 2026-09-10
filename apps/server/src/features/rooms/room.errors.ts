@@ -109,3 +109,32 @@ export class RoomBusyError extends AppError {
     Object.setPrototypeOf(this, RoomBusyError.prototype);
   }
 }
+
+/**
+ * Thrown when cryptographic session token generation fails (CRIT-002).
+ * Fails closed instead of falling back to insecure raw IDs.
+ */
+export class SessionGenerationError extends AppError {
+  constructor(
+    message = "Failed to securely initialize player session token",
+    details?: Record<string, unknown>,
+  ) {
+    super("ERR_INTERNAL_SERVER", message, 500, details);
+    this.name = "SessionGenerationError";
+    Object.setPrototypeOf(this, SessionGenerationError.prototype);
+  }
+}
+
+/**
+ * Thrown when an unauthenticated or invalid session token is provided for player actions (MAJ-007).
+ */
+export class InvalidSessionError extends AppError {
+  constructor(
+    message = "Invalid or expired session token",
+    details?: Record<string, unknown>,
+  ) {
+    super("ERR_UNAUTHORIZED", message, 401, details);
+    this.name = "InvalidSessionError";
+    Object.setPrototypeOf(this, InvalidSessionError.prototype);
+  }
+}

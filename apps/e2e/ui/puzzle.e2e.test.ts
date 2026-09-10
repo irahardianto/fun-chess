@@ -93,7 +93,7 @@ test.describe('Tactical Puzzle Hub Journey', () => {
     await expect(puzzlesPage.puzzleArena).toBeVisible();
   });
 
-  test('launches Adaptive Rating Ladder, verifies HUD and rating progression, executes multi-ply puzzle with bot counter-move, and advances', async ({ page }) => {
+  test('launches Adaptive Rating Ladder, verifies HUD and rating progression over multiple puzzles, and retains climbed rating in hub [ENH-007]', async ({ page }) => {
     const lobbyPage = new LobbyPage(page);
     const puzzlesPage = new PuzzlesPage(page);
 
@@ -128,9 +128,10 @@ test.describe('Tactical Puzzle Hub Journey', () => {
     // 7. Execute Ply 2 (White e1 to g1 kingside castling to finish the puzzle)
     await puzzlesPage.makeMove('e1', 'g1');
 
-    // 8. Expect celebratory puzzle solved modal
+    // 8. Expect celebratory puzzle solved modal with positive rating gain (+15 Elo Points)
     await puzzlesPage.expectPuzzleSolved();
     await expect(puzzlesPage.completionModal).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.metric-val.text-success')).toContainText('+15 Elo Points');
 
     // 9. Advance to next ladder puzzle
     await expect(puzzlesPage.puzzleNextBtn).toBeVisible({ timeout: 10_000 });
@@ -138,8 +139,90 @@ test.describe('Tactical Puzzle Hub Journey', () => {
     await expect(puzzlesPage.completionModal).not.toBeVisible();
     await expect(puzzlesPage.puzzleArena).toBeVisible();
 
-    // 10. Verify rating increased from 800 in the rating climb HUD and streak updated to 1
+    // 10. Verify rating increased from 800 -> 815 in the rating climb HUD and streak updated to 1
+    await expect(puzzlesPage.ratingDisplay).toContainText('815');
     await expect(puzzlesPage.streakDisplay).toContainText('Streak: 1');
+
+    // 11. Return to Puzzle Hub and verify climbed rating (815) is persisted on the ladder card pill
+    await page.locator('[data-testid="back-btn"]').click();
+    await puzzlesPage.waitForHub();
+    await expect(page.locator('[data-testid="live-elo-pill"]')).toContainText('815');
+  });
+
+  test('launches Rapid Puzzle Rush loop, executes consecutive multi-puzzle solves, and verifies automated rapid loop transitions and score climbing [ENH-007]', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+    const puzzlesPage = new PuzzlesPage(page);
+
+    // 1. Navigate to Puzzle Hub
+    await lobbyPage.goto();
+    await lobbyPage.openPuzzles();
+    await puzzlesPage.waitForHub();
+
+    // 2. Launch 3-Minute Blitz Puzzle Rush
+    await expect(puzzlesPage.rushCard).toBeVisible({ timeout: 10_000 });
+    await puzzlesPage.startRush('blitz');
+
+    // 3. Verify Puzzle Rush Arena mounts
+    await expect(puzzlesPage.puzzleRushArena).toBeVisible({ timeout: 15_000 });
+    await expect(puzzlesPage.rushHudBar).toBeVisible({ timeout: 10_000 });
+
+    // 4. Verify initial HUD state (Score: 0, Strikes: 0/3, Combo: x1)
+    await expect(puzzlesPage.rushScore).toContainText('0');
+    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(0);
+    await expect(page.locator('[data-testid="combo-badge"]')).toContainText('x1');
+
+    // 5. Rapid puzzle rush loop: solve 2 consecutive puzzles via active runner solutions
+    for (let puzzleIdx = 0; puzzleIdx < 2; puzzleIdx++) {
+      const expectedScore = puzzleIdx;
+      await expect(puzzlesPage.rushScore).toContainText(String(expectedScore));
+
+      // Retrieve current puzzle moves from active rush runner
+      const currentMoves = await page.evaluate(() => {
+        const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as any;
+        const runner = arena?.__vueParentComponent?.setupState?.rush?.runner;
+        const p = runner?.currentPuzzle?.value;
+        return p?.moves as string[] | undefined;
+      });
+
+      expect(currentMoves, `Puzzle ${puzzleIdx + 1} must have defined solution moves`).toBeDefined();
+      expect(currentMoves!.length).toBeGreaterThan(0);
+
+      // Execute moves sequentially
+      for (let ply = 0; ply < currentMoves!.length; ply++) {
+        const uci = currentMoves![ply]!;
+        const from = uci.slice(0, 2);
+        const to = uci.slice(2, 4);
+
+        if (ply % 2 === 0) {
+          // Player ply: click from and to squares
+          await puzzlesPage.makeMove(from, to);
+        } else {
+          // Bot counter-ply: wait for bot piece to arrive on target square
+          await expect(page.locator(`[data-square="${to}"] [data-testid="chess-piece"]:visible`)).toBeVisible({ timeout: 5_000 });
+        }
+      }
+
+      // Verify score increments immediately upon solving
+      await expect(puzzlesPage.rushScore).toContainText(String(expectedScore + 1), { timeout: 5_000 });
+
+      // In blitz mode, verify time bonus notification appeared (+5s)
+      await expect(page.locator('[data-testid="time-bonus-notification"]')).toBeVisible({ timeout: 3_000 });
+
+      // Automated rapid loop: no completion modal blocks, next puzzle loads automatically
+      if (puzzleIdx < 1) {
+        await page.waitForTimeout(600); // 400ms transition timeout in usePuzzleRush
+      }
+    }
+
+    // 6. Verify final rush HUD metrics: score is 2, combo multiplier is active, 0 strikes incurred
+    await expect(puzzlesPage.rushScore).toContainText('2');
+    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(0);
+    await expect(page.locator('[data-testid="combo-badge"]')).toHaveAttribute('data-multiplier', /[1-9]/);
+
+    // 7. Exit Puzzle Rush back to Puzzle Hub
+    await puzzlesPage.rushExitBtn.click();
+    await puzzlesPage.waitForHub();
+    await expect(puzzlesPage.puzzleHubView).toBeVisible();
   });
 
   test('launches Puzzle Rush 3-minute blitz, verifies countdown timer and strikes HUD, incurs 3 strikes, and verifies game over modal', async ({ page }) => {

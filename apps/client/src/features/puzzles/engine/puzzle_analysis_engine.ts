@@ -15,6 +15,7 @@ import {
   createSafeChess,
   isValidFen,
 } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 
 // Modular sub-module exports (MAJ-007)
 export * from './geometry/attack_rays';
@@ -80,7 +81,12 @@ function simulateSolutionMoves(
         to: to as unknown as import('chess.js').Square,
         promotion,
       });
-    } catch {
+    } catch (err) {
+      logger.debug('Failed simulating solution move in puzzle_analysis_engine', {
+        operation: 'simulate_solution_moves',
+        moveUci,
+        error: err instanceof Error ? err.message : String(err),
+      });
       break;
     }
   }
@@ -100,7 +106,12 @@ export function analyzePuzzleSolution(puzzle: Puzzle): PuzzleAnalysisResult {
   try {
     chessInit = createSafeChess(puzzle.fen);
     chessSim = createSafeChess(puzzle.fen);
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to initialize chess from puzzle FEN', {
+      operation: 'analyze_puzzle_solution',
+      fen: puzzle.fen,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return createFallbackAnalysisResult(puzzle);
   }
 

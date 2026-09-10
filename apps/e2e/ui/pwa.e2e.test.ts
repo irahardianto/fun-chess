@@ -120,7 +120,7 @@ test.describe('PWA Offline Capabilities and Transitions', () => {
       await gamePage.waitForArena();
       await expect(page.locator('[data-testid="solo-ai-arena"]')).toBeVisible({ timeout: 15_000 });
 
-      const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"]');
+      const myTurn = page.locator('.bottom-player-section [data-testid="turn-badge-active"], .bottom-player-section .player-badge.is-active-turn').first();
       await expect(myTurn).toBeVisible({ timeout: 15_000 });
 
       // Play move 1. e2 -> e4 offline

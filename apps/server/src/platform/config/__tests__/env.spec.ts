@@ -306,6 +306,43 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
         expect(config.PUBLIC_URL).toBe("https://fun-chess-app-prod.a.run.app");
         expect(config.SESSION_SECRET).toBe(prodSecret);
       });
+
+      it("emits structured JSON to stderr when METRICS_SECRET is not configured in production mode (MIN-013)", () => {
+        const prodSecret = ["valid", "prod", "secret", "16ch"].join("-");
+        const stderrChunks: string[] = [];
+        const originalStderrWrite = process.stderr.write;
+        process.stderr.write = ((chunk: string | Uint8Array) => {
+          stderrChunks.push(chunk.toString());
+          return true;
+        }) as typeof process.stderr.write;
+
+        try {
+          loadServerConfig({
+            NODE_ENV: "production",
+            PUBLIC_URL: "https://fun-chess-app-prod.a.run.app",
+            SESSION_SECRET: prodSecret,
+          });
+
+          const parsedLogs = stderrChunks
+            .map((chunk) => {
+              try {
+                return JSON.parse(chunk) as Record<string, unknown>;
+              } catch {
+                return null;
+              }
+            })
+            .filter(Boolean);
+
+          const warningLog = parsedLogs.find(
+            (l) => l?.["warning"] === "METRICS_SECRET_MISSING" && l?.["operation"] === "env_validation",
+          );
+          expect(warningLog).toBeDefined();
+          expect(warningLog?.["level"]).toBe("warn");
+          expect(String(warningLog?.["message"])).toContain("METRICS_SECRET is not configured in production mode");
+        } finally {
+          process.stderr.write = originalStderrWrite;
+        }
+      });
     });
   });
 

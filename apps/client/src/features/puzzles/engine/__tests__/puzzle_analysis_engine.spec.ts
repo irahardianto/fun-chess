@@ -138,7 +138,7 @@ describe('PuzzleAnalysisEngine Unit Tests (MAJ-037)', () => {
       expect(motif.explanation).toContain('Greek Gift');
     });
 
-    it('returns fallback motif for invalid FEN without throwing', () => {
+    it('returns fallback motif for invalid FEN without throwing (MIN-008)', () => {
       const motif = classifyTacticalMotif('invalid-fen-1', 'e2e4', 'invalid-fen-2');
       expect(motif.theme).toBe('fork');
       expect(motif.confidence).toBe(0.5);

@@ -126,18 +126,32 @@ describe("GameOver Utilities (MAJ-039)", () => {
       expect(payload.message).toBe("Draw by stalemate!");
     });
 
-    it("calculates duration with Date.now() when nowMs is omitted (Line 92)", () => {
-      const fiveSecondsAgo = Date.now() - 5000;
+    it("defaults durationSeconds to 1 when nowMs is omitted without calling Date.now() (MAJ-016)", () => {
+      const fixedStart = 1700000000000;
       const payload = createGameOverPayload({
         winner: "w",
         reason: "checkmate",
         finalFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         totalMoves: 15,
-        startTimeMs: fiveSecondsAgo,
+        startTimeMs: fixedStart,
       });
 
-      expect(payload.durationSeconds).toBeGreaterThanOrEqual(4);
-      expect(payload.durationSeconds).toBeLessThanOrEqual(6);
+      expect(payload.durationSeconds).toBe(1);
+    });
+
+    it("calculates duration deterministically when both startTimeMs and nowMs are provided (MAJ-016)", () => {
+      const startTime = 1700000000000;
+      const now = startTime + 42000;
+      const payload = createGameOverPayload({
+        winner: "w",
+        reason: "checkmate",
+        finalFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        totalMoves: 15,
+        startTimeMs: startTime,
+        nowMs: now,
+      });
+
+      expect(payload.durationSeconds).toBe(42);
     });
 
     it("defaults durationSeconds to 1 when both durationSeconds and startTimeMs are omitted", () => {

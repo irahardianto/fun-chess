@@ -55,18 +55,33 @@ export function assignPlayerColors(
 }
 
 /**
- * Pure transition adding a player to an existing room (MIN-021).
+ * Pure transition adding a player to an existing room (MIN-021, MAJ-016).
  */
 export function addPlayerToRoom(
   room: RoomState,
   player: Player,
-  nowOrAsSpectator: number | boolean,
+  now: number,
+): { nextRoom: RoomState; assignedColor: PieceColor; isSpectator: false };
+export function addPlayerToRoom(
+  room: RoomState,
+  player: Player,
+  isSpectator: boolean,
+  now: number,
+): { nextRoom: RoomState; assignedColor: PieceColor; isSpectator: false };
+export function addPlayerToRoom(
+  room: RoomState,
+  player: Player,
+  nowOrIsSpectator: number | boolean,
   optionalNow?: number,
 ): { nextRoom: RoomState; assignedColor: PieceColor; isSpectator: false } {
-  const now =
-    typeof nowOrAsSpectator === "number"
-      ? nowOrAsSpectator
-      : (optionalNow ?? Date.now());
+  let now: number;
+  if (typeof nowOrIsSpectator === "number") {
+    now = nowOrIsSpectator;
+  } else if (typeof optionalNow === "number") {
+    now = optionalNow;
+  } else {
+    throw new Error("Missing required 'now' parameter in addPlayerToRoom");
+  }
 
   // Active player joining
   if (room.whitePlayer && room.blackPlayer) {

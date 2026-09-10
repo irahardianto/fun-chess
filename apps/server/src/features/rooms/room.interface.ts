@@ -68,7 +68,7 @@ export interface IRoomService {
 
   getRoom(roomCode: string, correlationId?: string): Promise<RoomState | null>;
 
-  cleanupAbandonedRooms(maxAgeMs?: number, correlationId?: string): Promise<number>;
+  cleanupAbandonedRooms(maxAgeMs?: number, jobCorrelationId?: string): Promise<number>;
 }
 
 /**
@@ -117,6 +117,16 @@ export interface IRoomGameAdapter {
     rematch: RoomState["rematch"],
     newGameState?: GameState,
     players?: { whitePlayer: Player | null; blackPlayer: Player | null },
+    correlationId?: string,
+  ): Promise<RoomState>;
+
+  /**
+   * Updates a player's socket ID in the room state under lock (MAJ-007 socket auto-healing).
+   */
+  updatePlayerSocket(
+    roomCode: string,
+    playerId: string,
+    newSocketId: string,
     correlationId?: string,
   ): Promise<RoomState>;
 }

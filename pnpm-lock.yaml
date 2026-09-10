@@ -44,7 +44,7 @@ importers:
   apps/client:
     dependencies:
       '@fun-chess/shared':
-        specifier: workspace:^1.0.0
+        specifier: workspace:1.0.0
         version: link:../../shared
       canvas-confetti:
         specifier: 1.9.4
@@ -105,7 +105,7 @@ importers:
   apps/e2e:
     devDependencies:
       '@fun-chess/shared':
-        specifier: workspace:*
+        specifier: workspace:1.0.0
         version: link:../../shared
       '@playwright/test':
         specifier: 1.55.1
@@ -123,7 +123,7 @@ importers:
   apps/server:
     dependencies:
       '@fun-chess/shared':
-        specifier: workspace:^1.0.0
+        specifier: workspace:1.0.0
         version: link:../../shared
       chess.js:
         specifier: 1.4.0

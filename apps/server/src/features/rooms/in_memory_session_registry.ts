@@ -3,11 +3,14 @@ import {
   verifySessionToken,
   generateSessionToken,
   tokenFingerprint,
+  serializeError,
 } from "@fun-chess/shared";
 import { SessionRecord, SessionRegistry } from "./session_registry.js";
 import type { StorageQueryOptions, StorageMutationOptions } from "./room.store.js";
 import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
 import { type Logger, defaultLogger } from "../../platform/logger/index.js";
+import { SessionGenerationError } from "./room.errors.js";
+
 
 /**
  * In-memory production implementation of SessionRegistry.
@@ -27,23 +30,60 @@ export class InMemorySessionRegistry implements SessionRegistry {
 
   private readonly DEFAULT_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
+  private readonly clock: IClock;
+  private readonly idGenerator: IIdGenerator;
+  private readonly logger: Logger;
+  private readonly sessionSecret: string;
+  private readonly isProduction: boolean;
+
   constructor(
-    private readonly clock: IClock = new SystemClock(),
-    private readonly idGenerator: IIdGenerator = new UuidGenerator(),
-    private readonly logger: Logger = defaultLogger,
-    private readonly sessionSecret: string = process.env.SESSION_SECRET ??
-      "default-fun-chess-dev-secret-key-32b",
+    sessionSecret: string,
+    isProduction?: boolean,
+  );
+  constructor(
+    clock?: IClock,
+    idGenerator?: IIdGenerator,
+    logger?: Logger,
+    sessionSecret?: string,
+    isProduction?: boolean,
+  );
+  constructor(
+    clockOrSecret?: IClock | string,
+    idGeneratorOrIsProd?: IIdGenerator | boolean,
+    logger?: Logger,
+    sessionSecret?: string,
+    isProduction?: boolean,
   ) {
-    if (
-      process.env.NODE_ENV === "production" &&
-      this.sessionSecret === "default-fun-chess-dev-secret-key-32b"
-    ) {
+    if (typeof clockOrSecret === "string") {
+      this.sessionSecret = clockOrSecret;
+      this.isProduction = Boolean(idGeneratorOrIsProd);
+      this.clock = new SystemClock();
+      this.idGenerator = new UuidGenerator();
+      this.logger = defaultLogger;
+    } else {
+      this.clock = clockOrSecret ?? new SystemClock();
+      this.idGenerator = (idGeneratorOrIsProd as IIdGenerator) ?? new UuidGenerator();
+      this.logger = logger ?? defaultLogger;
+      if (!sessionSecret) {
+        throw new Error("sessionSecret is required for InMemorySessionRegistry");
+      }
+      this.sessionSecret = sessionSecret;
+      this.isProduction = isProduction ?? false;
+    }
+
+    if (!this.sessionSecret) {
+      throw new Error("sessionSecret is required for InMemorySessionRegistry");
+    }
+
+    if (this.isProduction && this.sessionSecret.length < 16) {
       this.logger.error(
-        "CRITICAL: Default development session secret used in production mode (MAJ-004). Set SESSION_SECRET.",
+        "CRITICAL: Insecure session secret in production mode. Secret must be at least 16 characters.",
         { operation: "session_registry_init" },
       );
     }
   }
+
+
 
   private assertNotAborted(signal?: AbortSignal): void {
     if (signal?.aborted) {
@@ -73,13 +113,24 @@ export class InMemorySessionRegistry implements SessionRegistry {
 
     const code = params.roomCode.toUpperCase();
     const rawId = this.idGenerator.generateId();
-    let sessionToken = rawId;
+    let sessionToken: string;
     try {
       sessionToken = generateSessionToken(rawId, this.sessionSecret);
-    } catch {
-      sessionToken = rawId;
+    } catch (cryptoErr) {
+      this.logger.error("Cryptographic session token generation failed", {
+        operation: "session_storage_create",
+        roomCode: code,
+        playerId: params.playerId,
+        error: serializeError(cryptoErr),
+        ...(options?.correlationId ? { correlationId: options.correlationId } : {}),
+      });
+      throw new SessionGenerationError(
+        "Failed to securely initialize player session token",
+        { roomCode: code, playerId: params.playerId },
+      );
     }
     const now = this.clock.now();
+
     const expiresInMs = params.ttlMs || this.DEFAULT_TTL_MS;
     const expiresAt = now + expiresInMs;
 
@@ -129,14 +180,12 @@ export class InMemorySessionRegistry implements SessionRegistry {
   ): Promise<SessionRecord | null> {
     this.assertNotAborted(options?.signal);
 
-    const isTestOrDev =
-      process.env.NODE_ENV === "test" ||
-      process.env.NODE_ENV === "development" ||
-      !process.env.NODE_ENV;
+    const isTestOrDev = !this.isProduction;
 
     const verification = verifySessionToken(sessionToken, this.sessionSecret, {
       allowUnsignedInDev: isTestOrDev,
     });
+
 
     if (!verification.valid) {
       if (

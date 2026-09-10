@@ -264,7 +264,7 @@ export function mergeUnifiedProgress(
   local: UnifiedProgressPayload,
   incoming: UnifiedProgressPayload,
   strategy: SyncMergeStrategy,
-  now: number = Date.now(),
+  now: number,
 ): UnifiedProgressPayload {
   if (strategy === "keep_local") {
     return structuredClone(local);
@@ -621,9 +621,13 @@ export class DefaultProgressMergeEngine implements ProgressMergeEngine {
     local: UnifiedProgressPayload,
     incoming: UnifiedProgressPayload,
     strategy: SyncMergeStrategy,
-    now: number = Date.now(),
+    now?: number,
   ): UnifiedProgressPayload {
-    return mergeUnifiedProgress(local, incoming, strategy, now);
+    const referenceNow =
+      now !== undefined
+        ? now
+        : Math.max(local.exportedAt ?? 0, incoming.exportedAt ?? 0);
+    return mergeUnifiedProgress(local, incoming, strategy, referenceNow);
   }
 
   public calculateDiff(

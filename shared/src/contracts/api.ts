@@ -1,5 +1,6 @@
 import type {
   LanInfoResponse,
+  LanInfoEnvelope,
   HealthCheckResponse,
   LivenessHealthResponse,
   DetailedHealthResponse,
@@ -8,7 +9,7 @@ import type {
 /**
  * Re-exporting validated network discovery response type inferred from LanInfoResponseSchema.
  */
-export type { LanInfoResponse };
+export type { LanInfoResponse, LanInfoEnvelope };
 
 /**
  * Re-exporting validated health check telemetry response types.

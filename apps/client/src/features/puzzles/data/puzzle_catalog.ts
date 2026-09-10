@@ -657,11 +657,15 @@ export function getClosestPuzzleToRating(
   const excludedSet = new Set(excludeIds);
   const candidates = ALL_PUZZLES.filter((p) => !excludedSet.has(p.id));
 
+  type ArrayWithToSorted<T> = readonly T[] & {
+    toSorted(compareFn?: (a: T, b: T) => number): T[];
+  };
+
   if (candidates.length === 0) {
     // If all puzzles excluded, fallback to any closest candidate
     if (ALL_PUZZLES.length === 0) return null;
     return (
-      [...ALL_PUZZLES].sort(
+      (ALL_PUZZLES as unknown as ArrayWithToSorted<Puzzle>).toSorted(
         (a, b) =>
           Math.abs(a.rating - targetRating) - Math.abs(b.rating - targetRating),
       )[0] ?? null
@@ -669,7 +673,7 @@ export function getClosestPuzzleToRating(
   }
 
   return (
-    candidates.sort(
+    (candidates as unknown as ArrayWithToSorted<Puzzle>).toSorted(
       (a, b) =>
         Math.abs(a.rating - targetRating) - Math.abs(b.rating - targetRating),
     )[0] ?? null

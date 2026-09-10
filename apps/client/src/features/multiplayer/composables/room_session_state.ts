@@ -5,10 +5,20 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Finding MAJ-002.
  */
 
-import { ref, computed, getCurrentInstance, type ComputedRef } from 'vue';
+import {
+  ref,
+  computed,
+  getCurrentInstance,
+  hasInjectionContext,
+  inject,
+  type ComputedRef,
+  type Ref,
+  type InjectionKey,
+} from 'vue';
 import type {
   Player,
   RoomState,
+  RoomStatus,
   SavedSession,
   SocketErrorPayload,
 } from '@fun-chess/shared';
@@ -77,6 +87,36 @@ export function notifySessionReset(clearStorage = true): void {
     } catch (err) {
       logger.warn('Error executing session reset hook', {
         operation: 'session_reset_hook',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+}
+
+export type RoomReconnectedHook = (payload: { room: RoomState; player: Player; roomStatus?: RoomStatus }) => void;
+const roomReconnectedHooks = new Set<RoomReconnectedHook>();
+
+/**
+ * Registers a hook to be invoked when a room session successfully reconnects (MAJ-003).
+ * Decouples useRoomSession from direct static dependencies on useGameActions.
+ */
+export function registerRoomReconnectedHook(hook: RoomReconnectedHook): () => void {
+  roomReconnectedHooks.add(hook);
+  return () => {
+    roomReconnectedHooks.delete(hook);
+  };
+}
+
+/**
+ * Notifies all registered subscribers of room reconnection for state rehydration (MAJ-003).
+ */
+export function notifyRoomReconnected(payload: { room: RoomState; player: Player; roomStatus?: RoomStatus }): void {
+  roomReconnectedHooks.forEach((hook) => {
+    try {
+      hook(payload);
+    } catch (err) {
+      logger.warn('Error executing room reconnected hook', {
+        operation: 'room_reconnected_hook',
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -206,18 +246,69 @@ export function clearSession(): void {
 }
 
 // ----------------------------------------------------------------------------
-// Module-Singleton Reactive Room Session State (MAJ-013)
+// Room Session State Factory & DI (MAJ-020)
 // ----------------------------------------------------------------------------
-export const currentRoom = ref<RoomState | null>(null);
-export const currentPlayer = ref<Player | null>(null);
-export const sessionToken = ref<string | null>(null);
+export interface RoomSessionState {
+  currentRoom: Ref<RoomState | null>;
+  currentPlayer: Ref<Player | null>;
+  sessionToken: Ref<string | null>;
+  isHost: ComputedRef<boolean>;
+  isSpectator: ComputedRef<boolean>;
+  reset: (clearStorage?: boolean) => void;
+}
 
-export const isHost: ComputedRef<boolean> = computed(() => {
-  if (!currentRoom.value || !currentPlayer.value) return false;
-  return currentRoom.value.hostId === currentPlayer.value.id;
-});
+export const ROOM_SESSION_STATE_KEY: InjectionKey<RoomSessionState> = Symbol('ROOM_SESSION_STATE_KEY');
 
-export const isSpectator: ComputedRef<boolean> = computed(() => {
-  if (!currentRoom.value || !currentPlayer.value) return false;
-  return currentRoom.value.spectators?.some((s) => s.id === currentPlayer.value?.id) ?? false;
-});
+export function createRoomSessionState(): RoomSessionState {
+  const room = ref<RoomState | null>(null);
+  const player = ref<Player | null>(null);
+  const token = ref<string | null>(null);
+
+  const host: ComputedRef<boolean> = computed(() => {
+    if (!room.value || !player.value) return false;
+    return room.value.hostId === player.value.id;
+  });
+
+  const spectator: ComputedRef<boolean> = computed(() => {
+    if (!room.value || !player.value) return false;
+    return room.value.spectators?.some((s) => s.id === player.value?.id) ?? false;
+  });
+
+  function reset(clearStorage = true): void {
+    room.value = null;
+    player.value = null;
+    token.value = null;
+    if (clearStorage) {
+      clearSession();
+    }
+  }
+
+  return {
+    currentRoom: room,
+    currentPlayer: player,
+    sessionToken: token,
+    isHost: host,
+    isSpectator: spectator,
+    reset,
+  };
+}
+
+export const defaultRoomSessionState = createRoomSessionState();
+
+export function useRoomSessionState(): RoomSessionState {
+  if (hasInjectionContext()) {
+    const injected = inject(ROOM_SESSION_STATE_KEY, null);
+    if (injected) return injected;
+  }
+  return defaultRoomSessionState;
+}
+
+export const currentRoom = defaultRoomSessionState.currentRoom;
+export const currentPlayer = defaultRoomSessionState.currentPlayer;
+export const sessionToken = defaultRoomSessionState.sessionToken;
+export const isHost = defaultRoomSessionState.isHost;
+export const isSpectator = defaultRoomSessionState.isSpectator;
+
+export function resetRoomSessionState(clearStorage = true): void {
+  defaultRoomSessionState.reset(clearStorage);
+}

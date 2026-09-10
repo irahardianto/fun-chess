@@ -1,4 +1,4 @@
-import { LanInfoResponse } from "@fun-chess/shared";
+import { LanInfoEnvelope } from "@fun-chess/shared";
 import { IAddressingInfoProvider } from "../http.interface.js";
 
 export interface LanInfoControllerOptions {
@@ -6,7 +6,7 @@ export interface LanInfoControllerOptions {
 }
 
 /**
- * Controller for host network addressing and QR discovery endpoints (MIN-029).
+ * Controller for host network addressing and QR discovery endpoints (MIN-029, MAJ-009).
  */
 export class LanInfoController {
   private readonly addressService: IAddressingInfoProvider;
@@ -15,7 +15,8 @@ export class LanInfoController {
     this.addressService = options.addressService;
   }
 
-  public getLanInfo(port: number = 3000): LanInfoResponse {
-    return this.addressService.getAddressingInfo(port || 3000);
+  public getLanInfo(port: number = 3000): LanInfoEnvelope {
+    const info = this.addressService.getAddressingInfo(port || 3000);
+    return { data: info };
   }
 }

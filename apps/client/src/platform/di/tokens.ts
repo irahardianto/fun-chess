@@ -54,6 +54,6 @@ export const HAPTICS_KEY: InjectionKey<IHapticsService> = Symbol('HAPTICS');
 export const WEBRTC_DISCOVERY_KEY: InjectionKey<IWebRtcDiscovery> = Symbol('WEBRTC_DISCOVERY');
 export const CLIPBOARD_SERVICE_KEY: InjectionKey<IClipboardService> = Symbol('CLIPBOARD_SERVICE');
 export const CAMERA_SERVICE_KEY: InjectionKey<ICameraService> = Symbol('CAMERA_SERVICE');
-export const NETWORK_MONITOR_KEY: InjectionKey<INetworkMonitor> = Symbol('NETWORK_MONITOR');
+export { NETWORK_MONITOR_KEY, LOCATION_PROVIDER_KEY } from '../browser/tokens';
 export const SOCKET_CLIENT_KEY: InjectionKey<TypedSocket> = Symbol('SOCKET_CLIENT');
 

@@ -1,8 +1,12 @@
+import type { TimerHandle, ITimerService } from "./timer_service.js";
+
 export const DISCONNECT_GRACE_PERIOD_MS = 60_000;
 
+export type StoredTimer = NodeJS.Timeout | TimerHandle;
+
 export interface IDisconnectTimerRegistry {
-  set(roomCode: string, playerId: string, timer: NodeJS.Timeout): void;
-  get(roomCode: string, playerId: string): NodeJS.Timeout | undefined;
+  set(roomCode: string, playerId: string, timer: StoredTimer): void;
+  get(roomCode: string, playerId: string): StoredTimer | undefined;
   cancel(roomCode: string, playerId: string): boolean;
   cancelAllForRoom(roomCode: string): void;
   clear(): void;
@@ -14,22 +18,39 @@ export interface IDisconnectTimerRegistry {
  * Encapsulates mutable timer state (MIN-007) and enables test isolation.
  */
 export class DisconnectTimerRegistry implements IDisconnectTimerRegistry {
-  private readonly timers = new Map<string, NodeJS.Timeout>();
+  private readonly timers = new Map<string, StoredTimer>();
+
+  constructor(private readonly timerService?: ITimerService) {}
+
+  private clearTimer(timer: StoredTimer): void {
+    if (this.timerService) {
+      this.timerService.clearTimeout(timer);
+    } else if (timer && typeof timer === "object" && "id" in timer) {
+      const id = (timer as TimerHandle).id;
+      if (id && typeof id === "object") {
+        clearTimeout(id as NodeJS.Timeout);
+      } else if (typeof id === "number") {
+        clearTimeout(id as unknown as NodeJS.Timeout);
+      }
+    } else {
+      clearTimeout(timer as NodeJS.Timeout);
+    }
+  }
 
   private getKey(roomCode: string, playerId: string): string {
     return `${roomCode.toUpperCase()}:${playerId}`;
   }
 
-  public set(roomCode: string, playerId: string, timer: NodeJS.Timeout): void {
+  public set(roomCode: string, playerId: string, timer: StoredTimer): void {
     const key = this.getKey(roomCode, playerId);
     const existing = this.timers.get(key);
     if (existing) {
-      clearTimeout(existing);
+      this.clearTimer(existing);
     }
     this.timers.set(key, timer);
   }
 
-  public get(roomCode: string, playerId: string): NodeJS.Timeout | undefined {
+  public get(roomCode: string, playerId: string): StoredTimer | undefined {
     return this.timers.get(this.getKey(roomCode, playerId));
   }
 
@@ -37,7 +58,7 @@ export class DisconnectTimerRegistry implements IDisconnectTimerRegistry {
     const key = this.getKey(roomCode, playerId);
     const timer = this.timers.get(key);
     if (timer) {
-      clearTimeout(timer);
+      this.clearTimer(timer);
       this.timers.delete(key);
       return true;
     }
@@ -48,7 +69,7 @@ export class DisconnectTimerRegistry implements IDisconnectTimerRegistry {
     const prefix = `${roomCode.toUpperCase()}:`;
     for (const [key, timer] of this.timers.entries()) {
       if (key.startsWith(prefix)) {
-        clearTimeout(timer);
+        this.clearTimer(timer);
         this.timers.delete(key);
       }
     }
@@ -56,7 +77,7 @@ export class DisconnectTimerRegistry implements IDisconnectTimerRegistry {
 
   public clear(): void {
     for (const timer of this.timers.values()) {
-      clearTimeout(timer);
+      this.clearTimer(timer);
     }
     this.timers.clear();
   }
@@ -65,6 +86,7 @@ export class DisconnectTimerRegistry implements IDisconnectTimerRegistry {
     return this.timers.size;
   }
 }
+
 
 /**
  * Creates an isolated DisconnectTimerRegistry instance for test environments (ENH-001).

@@ -1,5 +1,6 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { performance } from "node:perf_hooks";
+import { serializeError } from "@fun-chess/shared";
 import { Logger } from "../logger/logger.interface.js";
 import { extractClientIp } from "./ip_utils.js";
 import {
@@ -21,7 +22,7 @@ import {
   handleHealthRoutes,
   handleStaticRoutes,
   handleLanInfoRoute,
-  formatHttpError,
+  handleNotFoundRoute,
   formatHttpErrorFromException,
   HealthRouteAuthContext,
 } from "./http_helpers.js";
@@ -37,11 +38,18 @@ export interface HttpRouterOptions {
   lanInfoController: LanInfoController;
   staticController: StaticController;
   rateLimiter?: HttpRateLimiter;
+  notFoundRateLimiter?: HttpRateLimiter;
 }
 
 /**
  * HttpRouter orchestrates HTTP request processing across security, CORS,
  * rate limiting, controller routing, and structured logging (MIN-035, MAJ-020).
+ *
+ * NOTE ON HTTP SCOPE (MAJ-008):
+ * The server HTTP layer strictly exposes GET/HEAD for health probes, telemetry,
+ * host addressing, and static SPA delivery, with zero POST endpoints. All game
+ * and room mutations are dispatched exclusively via WebSockets (Socket.IO).
+ *
  * Conforms to code-organization-principles: CC < 10, functions 10-50 lines.
  */
 export class HttpRouter {
@@ -55,6 +63,7 @@ export class HttpRouter {
   private readonly lanInfoController: LanInfoController;
   private readonly staticController: StaticController;
   private readonly rateLimiter?: HttpRateLimiter;
+  private readonly notFoundRateLimiter?: HttpRateLimiter;
 
   constructor(options: HttpRouterOptions) {
     this.config = options.config;
@@ -67,6 +76,7 @@ export class HttpRouter {
     this.lanInfoController = options.lanInfoController;
     this.staticController = options.staticController;
     this.rateLimiter = options.rateLimiter;
+    this.notFoundRateLimiter = options.notFoundRateLimiter;
   }
 
   public async handleRequest(
@@ -114,7 +124,7 @@ export class HttpRouter {
     // 4. Request Entry Logging (ENH-008, MAJ-020)
     this.logRequestEntry(correlationId, clientIp, method, pathname, req, userId);
 
-    const { sendJsonResponse, sendTextResponse } = this.createResponders(
+    const { sendJsonResponse, sendTextResponse, sendRedirect } = this.createResponders(
       res,
       correlationId,
       startTime,
@@ -136,6 +146,7 @@ export class HttpRouter {
         userId,
         sendJsonResponse,
         sendTextResponse,
+        sendRedirect,
       );
     } catch (err) {
       this.handleDispatchError(
@@ -188,6 +199,11 @@ export class HttpRouter {
     sendTextResponse: (
       statusCode: number,
       text: string,
+      options?: { skipLog?: boolean; operation?: string },
+    ) => void;
+    sendRedirect: (
+      statusCode: number,
+      location: string,
       options?: { skipLog?: boolean; operation?: string },
     ) => void;
   } {
@@ -248,7 +264,30 @@ export class HttpRouter {
       }
     };
 
-    return { sendJsonResponse, sendTextResponse };
+    const sendRedirect = (
+      statusCode: number,
+      location: string,
+      options?: { skipLog?: boolean; operation?: string },
+    ) => {
+      res.writeHead(statusCode, {
+        Location: location,
+      });
+      res.end();
+      if (!options?.skipLog) {
+        this.logResponse(
+          statusCode,
+          options?.operation || "http_request",
+          correlationId,
+          clientIp,
+          method,
+          pathname,
+          startTime,
+          userId,
+        );
+      }
+    };
+
+    return { sendJsonResponse, sendTextResponse, sendRedirect };
   }
 
   private logResponse(
@@ -263,7 +302,7 @@ export class HttpRouter {
   ): void {
     const duration = Math.round(performance.now() - startTime);
     const logContext = {
-      operation,
+      operation: operation || "http_request",
       correlationId,
       clientIp,
       method,
@@ -299,6 +338,11 @@ export class HttpRouter {
     sendTextResponse: (
       statusCode: number,
       text: string,
+      options?: { skipLog?: boolean; operation?: string },
+    ) => void,
+    sendRedirect: (
+      statusCode: number,
+      location: string,
       options?: { skipLog?: boolean; operation?: string },
     ) => void,
   ): Promise<void> {
@@ -361,7 +405,7 @@ export class HttpRouter {
       return;
     }
 
-    // 8. Host Addressing & QR Discovery
+    // 8. Host Addressing & QR Discovery (MAJ-009)
     if (
       handleLanInfoRoute(
         req,
@@ -370,21 +414,23 @@ export class HttpRouter {
         this.port,
         this.lanInfoController,
         sendJsonResponse,
+        sendRedirect,
       )
     ) {
       return;
     }
 
-    // 9. Unhandled 404 Route (MIN-007)
-    sendJsonResponse(
-      404,
-      formatHttpError(
-        404,
-        "ERR_NOT_FOUND",
-        `Cannot ${method} ${pathname}`,
-        correlationId,
-      ),
-      { operation: "http_not_found" },
+    // 9. Unhandled 404 Route (MIN-007, ENH-001)
+    handleNotFoundRoute(
+      clientIp,
+      pathname,
+      method,
+      correlationId,
+      sendJsonResponse,
+      this.notFoundRateLimiter,
+      this.logger,
+      startTime,
+      userId,
     );
   }
 
@@ -404,10 +450,6 @@ export class HttpRouter {
     ) => void,
   ): void {
     const duration = Math.round(performance.now() - startTime);
-    const errorObj =
-      err instanceof Error
-        ? { name: err.name, message: err.message, stack: err.stack }
-        : { raw: err };
 
     const { statusCode, payload } = formatHttpErrorFromException(
       err,
@@ -423,7 +465,7 @@ export class HttpRouter {
       duration,
       durationMs: duration,
       statusCode,
-      error: errorObj,
+      error: serializeError(err),
       ...(userId ? { userId } : {}),
     };
 
@@ -435,6 +477,9 @@ export class HttpRouter {
 
     if (!res.headersSent) {
       sendJsonResponse(statusCode, payload, { skipLog: true });
+    } else if (!res.writableEnded) {
+      // Fix hanging connection risk on mid-stream dispatch error (MIN-005)
+      res.destroy();
     }
   }
 }

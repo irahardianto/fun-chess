@@ -252,4 +252,45 @@ export class MockRoomStore implements RoomStore {
       return { updatedRoom: updated, result: updated };
     });
   }
+
+  public async updatePlayerSocket(
+    roomCode: string,
+    playerId: string,
+    newSocketId: string,
+    _correlationId?: string,
+  ): Promise<RoomState> {
+    return this.mutate(roomCode, (room) => {
+      let whitePlayer = room.whitePlayer;
+      let blackPlayer = room.blackPlayer;
+      let spectators = room.spectators;
+      let found = false;
+
+      if (whitePlayer?.id === playerId) {
+        whitePlayer = { ...whitePlayer, socketId: newSocketId, isConnected: true };
+        found = true;
+      } else if (blackPlayer?.id === playerId) {
+        blackPlayer = { ...blackPlayer, socketId: newSocketId, isConnected: true };
+        found = true;
+      } else if (spectators.some((s) => s.id === playerId)) {
+        spectators = spectators.map((s) =>
+          s.id === playerId ? { ...s, socketId: newSocketId, isConnected: true } : s,
+        );
+        found = true;
+      }
+
+      if (!found) {
+        throw new Error(`Player ${playerId} not in room ${roomCode}`);
+      }
+
+      const now = this.clock.now();
+      const updated: RoomState = {
+        ...room,
+        whitePlayer,
+        blackPlayer,
+        spectators,
+        lastActivityAt: now,
+      };
+      return { updatedRoom: updated, result: updated };
+    });
+  }
 }

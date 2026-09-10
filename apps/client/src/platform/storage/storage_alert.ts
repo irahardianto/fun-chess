@@ -1,3 +1,4 @@
+import { serializeError } from '@fun-chess/shared';
 import { logger as defaultLogger, type ILogger } from '../telemetry';
 
 /**
@@ -61,7 +62,7 @@ export class StorageAlertDispatcher {
       } catch (err) {
         this.logger.error('Error in storage alert listener', {
           operation: 'storage_alert_notify',
-          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
+          error: serializeError(err),
         });
       }
     }

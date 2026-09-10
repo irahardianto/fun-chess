@@ -13,7 +13,7 @@ import {
 import { getRandomPuzzle } from '../data/puzzle_catalog';
 import { usePuzzleRunner } from './usePuzzleRunner';
 import { usePuzzleProgress } from './usePuzzleProgress';
-import { usePuzzleRushTimer } from './usePuzzleRushTimer';
+import { usePuzzleRushTimer, type ITimerService } from './usePuzzleRushTimer';
 
 export interface UsePuzzleRushOptions {
   mode?: 'puzzle_rush' | 'streak_survivor';
@@ -22,6 +22,7 @@ export interface UsePuzzleRushOptions {
   initialDurationSeconds?: number;
   maxStrikes?: number;
   clock?: IClock;
+  timerService?: ITimerService;
   logger?: ILogger;
   randomFn?: () => number;
 }
@@ -44,6 +45,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   let initialDuration = 180;
   let maxStrikesLimit = 3;
   let explicitClock: IClock | undefined;
+  let explicitTimerService: ITimerService | undefined;
   let fallbackLogger: ILogger | undefined;
   let randomFn: (() => number) | undefined;
 
@@ -55,6 +57,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
     initialDuration = typeof options.initialDurationSeconds === 'number' ? options.initialDurationSeconds : 180;
     maxStrikesLimit = typeof options.maxStrikes === 'number' ? options.maxStrikes : 3;
     explicitClock = options.clock;
+    explicitTimerService = options.timerService;
     fallbackLogger = options.logger;
     randomFn = options.randomFn;
   }
@@ -80,6 +83,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   const timer = usePuzzleRushTimer({
     initialDurationSeconds: initialDuration,
     clock,
+    timerService: explicitTimerService,
     onExpire: () => endGame(),
   });
 

@@ -84,6 +84,13 @@ import {
   ReconnectRequestSchema,
   MovePayloadSchema,
   MakeMoveRequestSchema,
+  ResignRequestSchema,
+  OfferDrawRequestSchema,
+  RespondDrawRequestSchema,
+  RequestRematchRequestSchema,
+  RespondRematchRequestSchema,
+  LanInfoResponseSchema,
+  LanInfoEnvelopeSchema,
   ServerEnvSchema,
   LivenessHealthResponseSchema,
   DetailedHealthResponseSchema,
@@ -1439,6 +1446,91 @@ describe("Shared Contracts & Data Model Specification", () => {
           idempotencyKey: "invalid token!",
         }),
       ).toThrow();
+
+      // Accepts valid optional sessionToken (MAJ-007)
+      const parsedWithToken = MakeMoveRequestSchema.parse({
+        roomCode: "ABCD",
+        move: { from: "e2", to: "e4" },
+        sessionToken: "session-token-abc.123",
+      });
+      expect(parsedWithToken.sessionToken).toBe("session-token-abc.123");
+
+      // Rejects empty sessionToken if provided
+      expect(() =>
+        MakeMoveRequestSchema.parse({
+          roomCode: "ABCD",
+          move: { from: "e2", to: "e4" },
+          sessionToken: "",
+        }),
+      ).toThrow();
+    });
+
+    it("validates Resign, Draw, and Rematch request schemas with optional sessionToken (MAJ-007)", () => {
+      // ResignRequestSchema
+      const resign1 = ResignRequestSchema.parse({ roomCode: "ABCD" });
+      expect(resign1.sessionToken).toBeUndefined();
+      const resign2 = ResignRequestSchema.parse({ roomCode: "ABCD", sessionToken: "tok-123" });
+      expect(resign2.sessionToken).toBe("tok-123");
+      expect(() => ResignRequestSchema.parse({ roomCode: "ABCD", sessionToken: "" })).toThrow();
+
+      // OfferDrawRequestSchema
+      const draw1 = OfferDrawRequestSchema.parse({ roomCode: "ABCD" });
+      expect(draw1.sessionToken).toBeUndefined();
+      const draw2 = OfferDrawRequestSchema.parse({ roomCode: "ABCD", sessionToken: "tok-123" });
+      expect(draw2.sessionToken).toBe("tok-123");
+      expect(() => OfferDrawRequestSchema.parse({ roomCode: "ABCD", sessionToken: "" })).toThrow();
+
+      // RespondDrawRequestSchema
+      const respDraw1 = RespondDrawRequestSchema.parse({ roomCode: "ABCD", accept: true });
+      expect(respDraw1.sessionToken).toBeUndefined();
+      const respDraw2 = RespondDrawRequestSchema.parse({ roomCode: "ABCD", accept: false, sessionToken: "tok-123" });
+      expect(respDraw2.sessionToken).toBe("tok-123");
+      expect(() => RespondDrawRequestSchema.parse({ roomCode: "ABCD", accept: true, sessionToken: "" })).toThrow();
+
+      // RequestRematchRequestSchema
+      const rematch1 = RequestRematchRequestSchema.parse({ roomCode: "ABCD" });
+      expect(rematch1.sessionToken).toBeUndefined();
+      const rematch2 = RequestRematchRequestSchema.parse({ roomCode: "ABCD", sessionToken: "tok-123" });
+      expect(rematch2.sessionToken).toBe("tok-123");
+      expect(() => RequestRematchRequestSchema.parse({ roomCode: "ABCD", sessionToken: "" })).toThrow();
+
+      // RespondRematchRequestSchema
+      const respRematch1 = RespondRematchRequestSchema.parse({ roomCode: "ABCD", accept: true });
+      expect(respRematch1.sessionToken).toBeUndefined();
+      const respRematch2 = RespondRematchRequestSchema.parse({ roomCode: "ABCD", accept: false, sessionToken: "tok-123" });
+      expect(respRematch2.sessionToken).toBe("tok-123");
+      expect(() => RespondRematchRequestSchema.parse({ roomCode: "ABCD", accept: true, sessionToken: "" })).toThrow();
+    });
+
+    it("validates LanInfoResponseSchema and LanInfoEnvelopeSchema with required relayMode and isCloudRelay (MIN-010)", () => {
+      const validLanInfo = {
+        lanIp: "192.168.1.50",
+        port: 3000,
+        localUrl: "http://192.168.1.50:3000",
+        joinUrl: "http://192.168.1.50:3000",
+        interfaces: ["192.168.1.50"],
+        relayMode: "lan" as const,
+        isCloudRelay: false,
+      };
+
+      const parsed = LanInfoResponseSchema.parse(validLanInfo);
+      expect(parsed.relayMode).toBe("lan");
+      expect(parsed.isCloudRelay).toBe(false);
+
+      // Enveloped response (MAJ-009)
+      const envelope = LanInfoEnvelopeSchema.parse({ data: validLanInfo });
+      expect(envelope.data.relayMode).toBe("lan");
+      expect(envelope.data.isCloudRelay).toBe(false);
+
+      // Rejects when relayMode is missing (MIN-010 drift remediation)
+      const missingRelayMode = { ...validLanInfo };
+      delete (missingRelayMode as any).relayMode;
+      expect(() => LanInfoResponseSchema.parse(missingRelayMode)).toThrow();
+
+      // Rejects when isCloudRelay is missing
+      const missingIsCloudRelay = { ...validLanInfo };
+      delete (missingIsCloudRelay as any).isCloudRelay;
+      expect(() => LanInfoResponseSchema.parse(missingIsCloudRelay)).toThrow();
     });
   });
 

@@ -21,12 +21,13 @@ describe("LanInfoController", () => {
     });
 
     const result = controller.getLanInfo(4000);
-    expect(result.port).toBe(4000);
-    expect(result.lanIp).toBe("192.168.1.100");
-    expect(result.localUrl).toBe("http://localhost:4000");
-    expect(result.joinUrl).toBe("http://192.168.1.100:4000");
-    expect(result.relayMode).toBe("lan");
-    expect(result.isCloudRelay).toBe(false);
+    expect(result.data).toBeDefined();
+    expect(result.data.port).toBe(4000);
+    expect(result.data.lanIp).toBe("192.168.1.100");
+    expect(result.data.localUrl).toBe("http://localhost:4000");
+    expect(result.data.joinUrl).toBe("http://192.168.1.100:4000");
+    expect(result.data.relayMode).toBe("lan");
+    expect(result.data.isCloudRelay).toBe(false);
   });
 
   it("handles cloud relay mode addressing info correctly (MIN-027)", () => {
@@ -49,12 +50,13 @@ describe("LanInfoController", () => {
     });
 
     const result = controller.getLanInfo(8080);
-    expect(result.port).toBe(8080);
-    expect(result.lanIp).toBe("cloud-relay.fun-chess.io");
-    expect(result.joinUrl).toBe("https://cloud-relay.fun-chess.io");
-    expect(result.publicUrl).toBe("https://cloud-relay.fun-chess.io");
-    expect(result.relayMode).toBe("cloud");
-    expect(result.isCloudRelay).toBe(true);
+    expect(result.data).toBeDefined();
+    expect(result.data.port).toBe(8080);
+    expect(result.data.lanIp).toBe("cloud-relay.fun-chess.io");
+    expect(result.data.joinUrl).toBe("https://cloud-relay.fun-chess.io");
+    expect(result.data.publicUrl).toBe("https://cloud-relay.fun-chess.io");
+    expect(result.data.relayMode).toBe("cloud");
+    expect(result.data.isCloudRelay).toBe(true);
   });
 
   it("falls back to default port 3000 when port is omitted or 0 (MIN-027)", () => {
@@ -79,11 +81,11 @@ describe("LanInfoController", () => {
     });
 
     const resultDefault = controller.getLanInfo();
-    expect(resultDefault.port).toBe(3000);
+    expect(resultDefault.data.port).toBe(3000);
     expect(recordedPorts).toContain(3000);
 
     const resultZero = controller.getLanInfo(0);
-    expect(resultZero.port).toBe(3000);
+    expect(resultZero.data.port).toBe(3000);
     expect(recordedPorts).toEqual([3000, 3000]);
   });
 });

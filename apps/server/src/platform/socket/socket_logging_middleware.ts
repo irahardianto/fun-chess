@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { Logger } from "../logger/logger.interface.js";
-import { SocketErrorPayload, ErrorCode } from "@fun-chess/shared";
+import { SocketErrorPayload, ErrorCode, serializeError } from "@fun-chess/shared";
 import { extractClientIp, SocketRateLimiter } from "./socket_rate_limiter.js";
 import type { z } from "zod";
 
@@ -275,14 +275,7 @@ export function safeDispatchResponse<TRes>(
         operation: context?.operationName,
         correlationId: context?.correlationId,
         socketId: context?.socketId,
-        error:
-          dispatchErr instanceof Error
-            ? {
-                name: dispatchErr.name,
-                message: dispatchErr.message,
-                stack: dispatchErr.stack,
-              }
-            : { raw: dispatchErr },
+        error: serializeError(dispatchErr),
       });
     }
   }
@@ -522,14 +515,7 @@ export function formatSocketErrorResponse(
       duration,
       durationMs: duration,
       status: "failed",
-      error:
-        rawError instanceof Error
-          ? {
-              name: rawError.name,
-              message: rawError.message,
-              stack: rawError.stack,
-            }
-          : { raw: rawError },
+      error: serializeError(rawError),
     });
   }
 
@@ -585,22 +571,158 @@ export function withCorrelation(
   };
 }
 
-/**
- * Rate-limiting pipeline stage for socket operations (MAJ-021, ENH-006).
- */
-export function withRateLimit(
-  params: CheckRateLimitParams,
-): CheckRateLimitResult {
-  return checkSocketRateLimit(params);
+export interface SocketMiddlewareContext<TPayload = unknown, TRes = unknown>
+  extends SocketPipelineContext {
+  schema?: z.ZodType<TPayload>;
+  rateLimiter?: SocketRateLimiter;
+  rateLimitErrorMessage?:
+    | string
+    | ((operationName: string, defaultLimitDesc: string) => string);
+  logger: Logger;
+  callback?: (res: TRes) => void;
+  handler: SocketHandlerFn<TPayload, TRes>;
+  validatedData?: TPayload;
+  result?: TRes;
+  error?: unknown;
+  errorPayload?: SocketErrorPayload;
+  handled?: boolean;
+}
+
+export type SocketMiddleware<TPayload = unknown, TRes = unknown> = (
+  ctx: SocketMiddlewareContext<TPayload, TRes>,
+  next: () => Promise<void>,
+) => Promise<void>;
+
+export function composeSocketMiddleware<TPayload = unknown, TRes = unknown>(
+  ...middlewares: SocketMiddleware<TPayload, TRes>[]
+): (ctx: SocketMiddlewareContext<TPayload, TRes>) => Promise<void> {
+  return async (ctx: SocketMiddlewareContext<TPayload, TRes>) => {
+    let index = -1;
+    async function dispatch(i: number): Promise<void> {
+      if (i <= index) {
+        throw new Error("next() called multiple times");
+      }
+      index = i;
+      const fn = middlewares[i];
+      if (!fn) return;
+      await fn(ctx, () => dispatch(i + 1));
+    }
+    await dispatch(0);
+  };
 }
 
 /**
- * Ingress schema validation pipeline stage for socket operations (MAJ-021).
+ * Rate-limiting pipeline stage for socket operations (MAJ-021, MAJ-025, ENH-006).
+ */
+export function withRateLimit(
+  params: CheckRateLimitParams,
+): CheckRateLimitResult;
+export function withRateLimit<TPayload = unknown, TRes = unknown>(
+  ctx: SocketMiddlewareContext<TPayload, TRes>,
+  next: () => Promise<void>,
+): Promise<void>;
+export function withRateLimit<TPayload = unknown, TRes = unknown>(
+  paramsOrCtx: CheckRateLimitParams | SocketMiddlewareContext<TPayload, TRes>,
+  maybeNext?: () => Promise<void>,
+): CheckRateLimitResult | Promise<void> {
+  if (maybeNext && typeof maybeNext === "function") {
+    const ctx = paramsOrCtx as SocketMiddlewareContext<TPayload, TRes>;
+    const next = maybeNext;
+    return (async () => {
+      const effectiveRateLimiter =
+        ctx.rateLimiter ??
+        (ctx.socketObj?.data?.["rateLimiter"] as SocketRateLimiter | undefined);
+
+      const rateLimitResult = checkSocketRateLimit({
+        rateLimiter: effectiveRateLimiter,
+        clientIp: ctx.clientIp,
+        socketId: ctx.socketId,
+        operationName: ctx.operationName,
+        correlationId: ctx.correlationId,
+        userId: ctx.userId,
+        startTime: ctx.startTime,
+        logger: ctx.logger,
+        rateLimitErrorMessage: ctx.rateLimitErrorMessage,
+      });
+
+      if (!rateLimitResult.allowed) {
+        ctx.errorPayload = rateLimitResult.errorPayload;
+        ctx.handled = true;
+        const dispatchContext = {
+          operationName: ctx.operationName,
+          correlationId: ctx.correlationId,
+          socketId: ctx.socketId,
+        };
+        safeDispatchResponse(
+          ctx.callback,
+          ctx.socketObj,
+          false,
+          rateLimitResult.errorPayload,
+          ctx.logger,
+          dispatchContext,
+        );
+        return;
+      }
+      await next();
+    })();
+  }
+  return checkSocketRateLimit(paramsOrCtx as CheckRateLimitParams);
+}
+
+/**
+ * Ingress schema validation pipeline stage for socket operations (MAJ-021, MAJ-025).
  */
 export function withValidation<TReq>(
   params: ValidatePayloadParams<TReq>,
-): ValidatePayloadResult<TReq> {
-  return validateSocketPayload(params);
+): ValidatePayloadResult<TReq>;
+export function withValidation<TPayload = unknown, TRes = unknown>(
+  ctx: SocketMiddlewareContext<TPayload, TRes>,
+  next: () => Promise<void>,
+): Promise<void>;
+export function withValidation<TPayload = unknown, TRes = unknown>(
+  paramsOrCtx: ValidatePayloadParams<TPayload> | SocketMiddlewareContext<TPayload, TRes>,
+  maybeNext?: () => Promise<void>,
+): ValidatePayloadResult<TPayload> | Promise<void> {
+  if (maybeNext && typeof maybeNext === "function") {
+    const ctx = paramsOrCtx as SocketMiddlewareContext<TPayload, TRes>;
+    const next = maybeNext;
+    return (async () => {
+      const validationResult = validateSocketPayload({
+        rawReq: ctx.rawReq,
+        schema: ctx.schema,
+        operationName: ctx.operationName,
+        correlationId: ctx.correlationId,
+        socketId: ctx.socketId,
+        clientIp: ctx.clientIp,
+        userId: ctx.userId,
+        startTime: ctx.startTime,
+        logger: ctx.logger,
+      });
+
+      if (!validationResult.valid) {
+        ctx.errorPayload = validationResult.errorPayload;
+        ctx.handled = true;
+        const dispatchContext = {
+          operationName: ctx.operationName,
+          correlationId: ctx.correlationId,
+          socketId: ctx.socketId,
+        };
+        safeDispatchResponse(
+          ctx.callback,
+          ctx.socketObj,
+          false,
+          validationResult.errorPayload,
+          ctx.logger,
+          dispatchContext,
+        );
+        return;
+      }
+
+      ctx.validatedData = validationResult.data;
+      await next();
+    })();
+  }
+  return validateSocketPayload(paramsOrCtx as ValidatePayloadParams<TPayload>);
 }
 
 export function logOperationStart(
@@ -660,12 +782,34 @@ export interface SocketLoggingStage {
 }
 
 /**
- * Structured logging pipeline stage providing start, success, and error logging (MAJ-021).
+ * Structured logging pipeline stage providing start, success, and error logging (MAJ-021, MAJ-025).
  */
 export function withLogging(
   logger: Logger,
   ctx: SocketPipelineContext,
-): SocketLoggingStage {
+): SocketLoggingStage;
+export function withLogging<TPayload = unknown, TRes = unknown>(
+  ctx: SocketMiddlewareContext<TPayload, TRes>,
+  next: () => Promise<void>,
+): Promise<void>;
+export function withLogging<TPayload = unknown, TRes = unknown>(
+  loggerOrCtx: Logger | SocketMiddlewareContext<TPayload, TRes>,
+  ctxOrNext?: SocketPipelineContext | (() => Promise<void>),
+): SocketLoggingStage | Promise<void> {
+  if (ctxOrNext && typeof ctxOrNext === "function") {
+    const ctx = loggerOrCtx as SocketMiddlewareContext<TPayload, TRes>;
+    const next = ctxOrNext;
+    return (async () => {
+      logOperationStart(ctx.logger, ctx);
+      await next();
+      if (ctx.handled && !ctx.errorPayload) {
+        logOperationSuccess(ctx.logger, ctx, ctx.result);
+      }
+    })();
+  }
+
+  const logger = loggerOrCtx as Logger;
+  const ctx = ctxOrNext as SocketPipelineContext;
   return {
     logStart: () => logOperationStart(logger, ctx),
     logSuccess: (result: unknown) => logOperationSuccess(logger, ctx, result),
@@ -684,12 +828,81 @@ export function withLogging(
 }
 
 /**
+ * Error mapping & dispatch pipeline stage for socket operations (MAJ-025).
+ */
+export async function withErrorMapping<TPayload = unknown, TRes = unknown>(
+  ctx: SocketMiddlewareContext<TPayload, TRes>,
+  next: () => Promise<void>,
+): Promise<void> {
+  const dispatchContext = {
+    operationName: ctx.operationName,
+    correlationId: ctx.correlationId,
+    socketId: ctx.socketId,
+  };
+  try {
+    await next();
+    if (ctx.handled && !ctx.errorPayload) {
+      safeDispatchResponse(
+        ctx.callback,
+        ctx.socketObj,
+        true,
+        ctx.result,
+        ctx.logger,
+        dispatchContext,
+      );
+    }
+  } catch (err: unknown) {
+    ctx.error = err;
+    const { errorPayload } = formatSocketErrorResponse({
+      err,
+      operationName: ctx.operationName,
+      correlationId: ctx.correlationId,
+      socketId: ctx.socketId,
+      clientIp: ctx.clientIp,
+      userId: ctx.userId,
+      startTime: ctx.startTime,
+      logger: ctx.logger,
+    });
+    ctx.errorPayload = errorPayload;
+    ctx.handled = true;
+    safeDispatchResponse(
+      ctx.callback,
+      ctx.socketObj,
+      false,
+      errorPayload,
+      ctx.logger,
+      dispatchContext,
+    );
+  }
+}
+
+/**
+ * Domain handler execution pipeline stage for socket operations (MAJ-025).
+ */
+export async function withHandlerExecution<TPayload = unknown, TRes = unknown>(
+  ctx: SocketMiddlewareContext<TPayload, TRes>,
+): Promise<void> {
+  const result = await ctx.handler(
+    (ctx.validatedData !== undefined ? ctx.validatedData : ctx.rawReq) as TPayload,
+    {
+      correlationId: ctx.correlationId,
+      socketId: ctx.socketId,
+      clientIp: ctx.clientIp,
+      userId: ctx.userId,
+    },
+  );
+  ctx.result = result;
+  ctx.handled = true;
+}
+
+/**
  * Higher-order interceptor providing 3-point automated structured logging
  * (start, success, failure) with correlation IDs, latency tracking, and structured error responses.
  *
  * Uses static operation names in log messages (MIN-011) and full sensitive payload redaction (MIN-012).
  * Integrates optional rate limiting with structured drops logging (CRIT-001).
  * Decomposed into focused helper functions (MAJ-021).
+ * Composed via functional middleware pipeline (MAJ-025).
  * Supports unified single-options configuration while maintaining full backward compatibility (ENH-011).
  */
 export function wrapSocketHandler<TPayload = unknown, TRes = unknown>(
@@ -793,11 +1006,19 @@ export function wrapSocketHandler<TPayload = unknown, TRes = unknown>(
     rateLimitErrorMessage = parsed.rateLimitErrorMessage;
   }
 
+  const pipeline = composeSocketMiddleware<TPayload, TRes>(
+    withErrorMapping,
+    withLogging,
+    withRateLimit,
+    withValidation,
+    withHandlerExecution,
+  );
+
   return async (
     rawReq: unknown,
     callback?: (res: TRes) => void,
   ): Promise<TRes | undefined> => {
-    const ctx = withCorrelation(
+    const baseCtx = withCorrelation(
       socketParam,
       rawReq,
       operationName,
@@ -805,97 +1026,18 @@ export function wrapSocketHandler<TPayload = unknown, TRes = unknown>(
       logPayload,
     );
 
-    const logging = withLogging(logger, ctx);
-    logging.logStart();
-
-    const dispatchContext = {
-      operationName,
-      correlationId: ctx.correlationId,
-      socketId: ctx.socketId,
+    const ctx: SocketMiddlewareContext<TPayload, TRes> = {
+      ...baseCtx,
+      schema,
+      rateLimiter,
+      rateLimitErrorMessage,
+      logger,
+      callback,
+      handler,
     };
 
-    const effectiveRateLimiter =
-      rateLimiter ??
-      (ctx.socketObj?.data?.["rateLimiter"] as SocketRateLimiter | undefined);
+    await pipeline(ctx);
 
-    // 1. Rate Limiting Pre-check (CRIT-001, MAJ-001, MAJ-003, MAJ-021, ENH-006)
-    const rateLimitResult = withRateLimit({
-      rateLimiter: effectiveRateLimiter,
-      clientIp: ctx.clientIp,
-      socketId: ctx.socketId,
-      operationName: ctx.operationName,
-      correlationId: ctx.correlationId,
-      userId: ctx.userId,
-      startTime: ctx.startTime,
-      logger,
-      rateLimitErrorMessage,
-    });
-    if (!rateLimitResult.allowed) {
-      safeDispatchResponse(
-        callback,
-        ctx.socketObj,
-        false,
-        rateLimitResult.errorPayload,
-        logger,
-        dispatchContext,
-      );
-      return undefined;
-    }
-
-    // 2. Ingress Schema Validation (MAJ-021)
-    const validationResult = withValidation({
-      rawReq,
-      schema,
-      operationName: ctx.operationName,
-      correlationId: ctx.correlationId,
-      socketId: ctx.socketId,
-      clientIp: ctx.clientIp,
-      userId: ctx.userId,
-      startTime: ctx.startTime,
-      logger,
-    });
-    if (!validationResult.valid) {
-      safeDispatchResponse(
-        callback,
-        ctx.socketObj,
-        false,
-        validationResult.errorPayload,
-        logger,
-        dispatchContext,
-      );
-      return undefined;
-    }
-
-    // 3. Execution & Result Dispatch (MAJ-021, ENH-010)
-    try {
-      const result = await handler(validationResult.data as TPayload, {
-        correlationId: ctx.correlationId,
-        socketId: ctx.socketId,
-        clientIp: ctx.clientIp,
-        userId: ctx.userId,
-      });
-
-      logging.logSuccess(result);
-      safeDispatchResponse(
-        callback,
-        ctx.socketObj,
-        true,
-        result,
-        logger,
-        dispatchContext,
-      );
-      return result;
-    } catch (err: unknown) {
-      const { errorPayload } = logging.logError(err);
-      safeDispatchResponse(
-        callback,
-        ctx.socketObj,
-        false,
-        errorPayload,
-        logger,
-        dispatchContext,
-      );
-      return undefined;
-    }
+    return ctx.errorPayload ? undefined : ctx.result;
   };
 }

@@ -179,11 +179,68 @@ export class MockRoomGameAdapter implements IRoomGameAdapter {
     return structuredClone(updated);
   }
 
+  public updatePlayerSocketCalls: Array<{
+    roomCode: string;
+    playerId: string;
+    newSocketId: string;
+  }> = [];
+
+  public async updatePlayerSocket(
+    roomCode: string,
+    playerId: string,
+    newSocketId: string,
+    _correlationId?: string,
+  ): Promise<RoomState> {
+    const code = roomCode.toUpperCase();
+    const existing = this.rooms.get(code);
+    if (!existing) {
+      throw new RoomNotFoundError(code);
+    }
+    this.updatePlayerSocketCalls.push({
+      roomCode: code,
+      playerId,
+      newSocketId,
+    });
+
+    let whitePlayer = existing.whitePlayer;
+    let blackPlayer = existing.blackPlayer;
+    let spectators = existing.spectators;
+    let found = false;
+
+    if (whitePlayer?.id === playerId) {
+      whitePlayer = { ...whitePlayer, socketId: newSocketId, isConnected: true };
+      found = true;
+    } else if (blackPlayer?.id === playerId) {
+      blackPlayer = { ...blackPlayer, socketId: newSocketId, isConnected: true };
+      found = true;
+    } else if (spectators.some((s) => s.id === playerId)) {
+      spectators = spectators.map((s) =>
+        s.id === playerId ? { ...s, socketId: newSocketId, isConnected: true } : s,
+      );
+      found = true;
+    }
+
+    if (!found) {
+      throw new Error(`Player ${playerId} not in room ${code}`);
+    }
+
+    const updated: RoomState = {
+      ...structuredClone(existing),
+      whitePlayer,
+      blackPlayer,
+      spectators,
+      lastActivityAt: Date.now(),
+    };
+    this.rooms.set(code, updated);
+    return structuredClone(updated);
+  }
+
   public clear(): void {
     this.rooms.clear();
     this.applyGameMoveCalls = [];
     this.finalizeGameCalls = [];
     this.updateDrawOfferCalls = [];
     this.updateRematchCalls = [];
+    this.updatePlayerSocketCalls = [];
   }
 }

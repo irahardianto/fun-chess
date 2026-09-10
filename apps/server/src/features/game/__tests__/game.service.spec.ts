@@ -1067,4 +1067,175 @@ describe("GameService", () => {
       ).rejects.toThrow(GameNotActiveError);
     });
   });
+
+  describe("Mid-Game Session Token Auto-Healing & 4xx Domain Error Logging (MAJ-004, MAJ-007)", () => {
+    it("auto-heals socket ID when player submits action with valid sessionToken but new socketId", async () => {
+      const mockSessionRegistry = new MockSessionRegistry();
+      const sessionRecord = await mockSessionRegistry.createSession({
+        roomCode: "HEAL",
+        playerId: "p_white_id",
+        socketId: "sock_white_old",
+        color: "w",
+        isHost: true,
+      });
+
+      const customService = new GameService(
+        store,
+        clock,
+        idGenerator,
+        logger,
+        mockSessionRegistry,
+      );
+
+      const room = createActiveGameRoom("HEAL");
+      await store.save(room);
+
+      const infoSpy = vi.spyOn(logger, "info");
+
+      // Move with new socketId and valid sessionToken
+      const result = await customService.makeMove(
+        { roomCode: "HEAL", move: { from: "e2", to: "e4" } },
+        "sock_white_new",
+        "corr-heal-1",
+        sessionRecord.sessionToken,
+      );
+
+      expect(result.moveResult.from).toBe("e2");
+      expect(result.moveResult.to).toBe("e4");
+
+      // Verify auto-heal log
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Player socket auto-healed",
+        expect.objectContaining({
+          operation: "player_socket_auto_healed",
+          roomCode: "HEAL",
+          playerId: "p_white_id",
+          oldSocketId: "sock_white",
+          newSocketId: "sock_white_new",
+          correlationId: "corr-heal-1",
+        }),
+      );
+
+      // Verify roomAdapter updated player socket
+      const updated = await store.getRoom("HEAL");
+      expect(updated?.whitePlayer?.socketId).toBe("sock_white_new");
+    });
+
+    it("auto-heals socket ID on mid-game resign with valid sessionToken", async () => {
+      const mockSessionRegistry = new MockSessionRegistry();
+      const sessionRecord = await mockSessionRegistry.createSession({
+        roomCode: "HRES",
+        playerId: "p_white_id",
+        socketId: "sock_white_old",
+        color: "w",
+        isHost: true,
+      });
+
+      const customService = new GameService(
+        store,
+        clock,
+        idGenerator,
+        logger,
+        mockSessionRegistry,
+      );
+
+      const room = createActiveGameRoom("HRES");
+      await store.save(room);
+
+      const { room: updatedRoom, gameOverPayload } = await customService.resign(
+        "HRES",
+        "sock_white_new",
+        "corr-heal-resign",
+        sessionRecord.sessionToken,
+      );
+
+      expect(updatedRoom.status).toBe("game_over");
+      expect(gameOverPayload.winner).toBe("b");
+      expect(gameOverPayload.reason).toBe("resignation");
+
+      const savedRoom = await store.getRoom("HRES");
+      expect(savedRoom?.whitePlayer?.socketId).toBe("sock_white_new");
+    });
+
+    it("emits logger.warn instead of logger.error for expected 4xx domain errors across mid-game actions", async () => {
+      const warnSpy = vi.spyOn(logger, "warn");
+      const errorSpy = vi.spyOn(logger, "error");
+
+      // 1. RoomNotFoundError on resign
+      await expect(
+        service.resign("NONEXIST", "sock_any", "corr-warn-1"),
+      ).rejects.toBeInstanceOf(RoomNotFoundError);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Player resignation rejected",
+        expect.objectContaining({
+          operation: "game_resign",
+          correlationId: "corr-warn-1",
+        }),
+      );
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        "Player resignation failed",
+        expect.anything(),
+      );
+
+      // 2. GameNotActiveError on offerDraw
+      const gameOverRoom = createActiveGameRoom("DONE");
+      gameOverRoom.status = "game_over";
+      await store.save(gameOverRoom);
+
+      await expect(
+        service.offerDraw("DONE", "sock_white", "corr-warn-2"),
+      ).rejects.toBeInstanceOf(GameNotActiveError);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Draw offer rejected",
+        expect.objectContaining({
+          operation: "game_draw_action",
+          correlationId: "corr-warn-2",
+        }),
+      );
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        "Draw offer failed",
+        expect.anything(),
+      );
+
+      // 3. PlayerNotInRoomError on respondDraw
+      const activeRoom = createActiveGameRoom("DRAW404");
+      activeRoom.drawOffer = { offeredBy: "p_white_id", offeredAt: 1000 };
+      await store.save(activeRoom);
+
+      await expect(
+        service.respondDraw("DRAW404", "sock_unknown", true, "corr-warn-3"),
+      ).rejects.toBeInstanceOf(PlayerNotInRoomError);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Draw response rejected",
+        expect.objectContaining({
+          operation: "game_draw_action",
+          correlationId: "corr-warn-3",
+        }),
+      );
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        "Draw response failed",
+        expect.anything(),
+      );
+
+      // 4. GameNotActiveError on requestRematch when room is still playing
+      await expect(
+        service.requestRematch("DRAW404", "sock_white", "corr-warn-4"),
+      ).rejects.toBeInstanceOf(GameNotActiveError);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Rematch request rejected",
+        expect.objectContaining({
+          operation: "game_rematch_action",
+          correlationId: "corr-warn-4",
+        }),
+      );
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        "Rematch request failed",
+        expect.anything(),
+      );
+    });
+  });
 });

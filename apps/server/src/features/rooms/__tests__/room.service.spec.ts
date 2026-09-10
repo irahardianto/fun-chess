@@ -14,6 +14,7 @@ import {
 } from "../room.errors.js";
 import { DisconnectTimerRegistry } from "../disconnect_timer_registry.js";
 import { NullLogger } from "../../../platform/logger/null_logger.js";
+import { MockTimerService } from "../timer_service.js";
 import type { IClock, IIdGenerator } from "@fun-chess/shared";
 import {
   createInitialGameState,
@@ -27,7 +28,7 @@ describe("RoomService", () => {
 
   beforeEach(() => {
     store = new MockRoomStore();
-    sessionRegistry = new InMemorySessionRegistry();
+    sessionRegistry = new InMemorySessionRegistry("test-secret-at-least-16-chars-long", false);
     service = new RoomService(store, sessionRegistry);
   });
 
@@ -1633,10 +1634,128 @@ describe("RoomService", () => {
 
       // Leave room
       await loggedService.leaveRoom(room.roomCode, "sock_1_new", cid);
+
       const leaveLogs = logger.infoLogs.filter(
         (l) => l.context?.operation === "room_leave",
       );
       expect(leaveLogs.some((l) => l.context?.correlationId === cid)).toBe(true);
+    });
+  });
+
+  describe("Wave 2 SC-4 Enhancements (MAJ-004, MAJ-007, MAJ-010, MAJ-011, MAJ-014)", () => {
+    it("abstracts timer scheduling using injected ITimerService (MAJ-014)", async () => {
+      const mockTimer = new MockTimerService();
+      const customService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        mockTimer,
+      );
+
+      const { room } = await customService.createRoom(
+        { playerName: "WhitePlayer" },
+        "sock_1",
+      );
+      await customService.joinRoom(
+        { roomCode: room.roomCode, playerName: "BlackPlayer" },
+        "sock_2",
+      );
+
+      let forfeitCalled = false;
+      await customService.handleDisconnect(
+        "sock_2",
+        () => {
+          forfeitCalled = true;
+        },
+        5000,
+      );
+
+      expect(mockTimer.getPendingCount()).toBe(1);
+      expect(forfeitCalled).toBe(false);
+
+      // Deterministically advance time without real clock delay
+      await mockTimer.advance(5000);
+
+      expect(forfeitCalled).toBe(true);
+      expect(mockTimer.getPendingCount()).toBe(0);
+    });
+
+    it("updates player socket ID via updatePlayerSocket (MAJ-007)", async () => {
+      const { room } = await service.createRoom(
+        { playerName: "HostP", preferredColor: "w" },
+        "sock_initial",
+      );
+      expect(room.whitePlayer?.socketId).toBe("sock_initial");
+
+      const updated = await service.updatePlayerSocket(
+        room.roomCode,
+        room.hostId,
+        "sock_auto_healed",
+      );
+
+      expect(updated.whitePlayer?.socketId).toBe("sock_auto_healed");
+      expect(updated.whitePlayer?.isConnected).toBe(true);
+
+      // Throws if player not in room
+      await expect(
+        service.updatePlayerSocket(room.roomCode, "unknown_player", "sock_foo"),
+      ).rejects.toThrow(PlayerNotInRoomError);
+    });
+
+    it("eliminates logger.error for expected 4xx domain errors and logs at warn (MAJ-004)", async () => {
+      const logger = new NullLogger();
+      const loggedService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        undefined,
+        logger,
+      );
+
+      // 1. Invalid room code / not found
+      await expect(
+        loggedService.joinRoom(
+          { roomCode: "NONO", playerName: "ValidName" },
+          "sock_test",
+        ),
+      ).rejects.toThrow(RoomNotFoundError);
+
+      const joinWarns = logger.warnLogs.filter(
+        (l) => l.context?.operation === "room_join",
+      );
+      expect(joinWarns.length).toBe(1);
+      expect(joinWarns[0].message).toBe("Room join rejected");
+
+      const joinErrors = logger.errorLogs.filter(
+        (l) => l.context?.operation === "room_join",
+      );
+      expect(joinErrors.length).toBe(0);
+
+      // 2. Invalid player name on createRoom
+      await expect(
+        loggedService.createRoom({ playerName: "" }, "sock_test"),
+      ).rejects.toThrow(InvalidPayloadError);
+
+      const createWarns = logger.warnLogs.filter(
+        (l) => l.context?.operation === "room_create",
+      );
+      expect(createWarns.length).toBe(1);
+      expect(createWarns[0].message).toBe("Room creation rejected");
+
+      const createErrors = logger.errorLogs.filter(
+        (l) => l.context?.operation === "room_create",
+      );
+      expect(createErrors.length).toBe(0);
+    });
+
+    it("propagates jobCorrelationId to cleanupAbandonedRooms (MAJ-010)", async () => {
+      const cid = "job-correl-12345";
+      const cleaned = await service.cleanupAbandonedRooms(1000, cid);
+      expect(cleaned).toBe(0);
     });
   });
 });

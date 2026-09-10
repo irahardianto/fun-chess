@@ -17,7 +17,7 @@ import {
 import { NullLogger } from "../../logger/null_logger.js";
 import { MemoryFileStorage } from "../file_storage.js";
 import {
-  LanInfoResponse,
+  LanInfoEnvelope,
   LivenessHealthResponse,
   DetailedHealthResponse,
   HttpErrorEnvelope,
@@ -124,20 +124,29 @@ describe("createHttpServer", () => {
     expect(metricsData.activeSockets).toBe(2);
   });
 
-  it("responds to GET /api/lan-info with valid LAN info JSON and relay mode metadata", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
+  it("responds to GET /api/v1/lan-info with valid LAN info JSON envelope and relay mode metadata (MAJ-009)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/v1/lan-info`, {
       headers: { Origin: "http://localhost:5173" },
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
     expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
 
-    const data = (await res.json()) as LanInfoResponse;
-    expect(data.port).toBe(3000);
-    expect(data.localUrl).toBe("http://localhost:3000");
-    expect(data.joinUrl).toBe("http://192.168.1.50:3000");
-    expect(data.relayMode).toBe("lan");
-    expect(data.isCloudRelay).toBe(false);
+    const body = (await res.json()) as LanInfoEnvelope;
+    expect(body.data).toBeDefined();
+    expect(body.data.port).toBe(3000);
+    expect(body.data.localUrl).toBe("http://localhost:3000");
+    expect(body.data.joinUrl).toBe("http://192.168.1.50:3000");
+    expect(body.data.relayMode).toBe("lan");
+    expect(body.data.isCloudRelay).toBe(false);
+  });
+
+  it("redirects legacy GET /api/lan-info to /api/v1/lan-info with HTTP 307 (MAJ-009)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/lan-info`, {
+      redirect: "manual",
+    });
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("/api/v1/lan-info");
   });
 
   it("handles CORS OPTIONS preflight with 204 No Content for allowed origin and logs success (MAJ-014)", async () => {
@@ -362,15 +371,15 @@ describe("createHttpServer", () => {
 
     try {
       // 1st request succeeds
-      const res1 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
+      const res1 = await fetch(`http://127.0.0.1:${rlPort}/api/v1/lan-info`);
       expect(res1.status).toBe(200);
 
       // 2nd request succeeds
-      const res2 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
+      const res2 = await fetch(`http://127.0.0.1:${rlPort}/api/v1/lan-info`);
       expect(res2.status).toBe(200);
 
       // 3rd request rate limited (429)
-      const res3 = await fetch(`http://127.0.0.1:${rlPort}/api/lan-info`);
+      const res3 = await fetch(`http://127.0.0.1:${rlPort}/api/v1/lan-info`);
       expect(res3.status).toBe(429);
       const data = (await res3.json()) as HttpErrorEnvelope;
       expect(data.status).toBe("error");
@@ -469,13 +478,13 @@ describe("createHttpServer", () => {
       expect(data.relay?.publicUrl).toBe("https://fun-chess-prod.a.run.app");
     });
 
-    it("returns cloud relay joinUrl in /api/lan-info endpoint", async () => {
-      const res = await fetch(`http://127.0.0.1:${cloudPort}/api/lan-info`);
+    it("returns cloud relay joinUrl in /api/v1/lan-info endpoint (MAJ-009)", async () => {
+      const res = await fetch(`http://127.0.0.1:${cloudPort}/api/v1/lan-info`);
       expect(res.status).toBe(200);
-      const data = (await res.json()) as LanInfoResponse;
-      expect(data.relayMode).toBe("cloud");
-      expect(data.isCloudRelay).toBe(true);
-      expect(data.joinUrl).toBe("https://fun-chess-prod.a.run.app");
+      const data = (await res.json()) as LanInfoEnvelope;
+      expect(data.data.relayMode).toBe("cloud");
+      expect(data.data.isCloudRelay).toBe(true);
+      expect(data.data.joinUrl).toBe("https://fun-chess-prod.a.run.app");
     });
   });
 
@@ -876,7 +885,9 @@ describe("createHttpServer", () => {
           (l) => l.context?.["operation"] === "extract_http_user_id",
         );
         expect(debugLog).toBeDefined();
-        expect(debugLog?.context?.["error"]).toBe("Malformed query string parse error");
+        expect(debugLog?.context?.["error"]).toEqual(
+          expect.objectContaining({ message: "Malformed query string parse error" }),
+        );
       } finally {
         globalThis.URLSearchParams = originalSearchParams;
       }
@@ -939,7 +950,7 @@ describe("createHttpServer", () => {
 
       const blocked = handleRateLimitCheck(
         "127.0.0.1",
-        "/api/lan-info",
+        "/api/v1/lan-info",
         "GET",
         "corr-123",
         rateLimiter,
@@ -987,6 +998,37 @@ describe("createHttpServer", () => {
         (l) => l.context?.["operation"] === "http_server_init" && l.message.includes("lanService is deprecated"),
       );
       expect(warnLog).toBeDefined();
+    });
+  });
+
+  describe("404 Probing Defense-in-Depth (ENH-001)", () => {
+    it("throttles repeated 404 probing from same client IP", async () => {
+      const { HttpRateLimiter } = await import("../http_rate_limiter.js");
+      const notFoundLimiter = new HttpRateLimiter({
+        maxRequests: 2,
+        windowMs: 10_000,
+        pruneIntervalMs: 0,
+      });
+
+      const testLogger = new NullLogger();
+
+      // Directly test handleNotFoundRoute with custom notFoundLimiter
+      const { handleNotFoundRoute } = await import("../http_helpers.js");
+      const responses: { statusCode: number; data: unknown }[] = [];
+      const mockSend = (status: number, data: unknown) => {
+        responses.push({ statusCode: status, data });
+      };
+
+      handleNotFoundRoute("1.2.3.4", "/.env", "GET", "c-1", mockSend, notFoundLimiter, testLogger);
+      expect(responses[0]?.statusCode).toBe(404);
+
+      handleNotFoundRoute("1.2.3.4", "/wp-admin", "GET", "c-2", mockSend, notFoundLimiter, testLogger);
+      expect(responses[1]?.statusCode).toBe(404);
+
+      // 3rd probe throttled with 429
+      handleNotFoundRoute("1.2.3.4", "/phpmyadmin", "GET", "c-3", mockSend, notFoundLimiter, testLogger);
+      expect(responses[2]?.statusCode).toBe(429);
+      expect((responses[2]?.data as HttpErrorEnvelope).error.code).toBe("ERR_RATE_LIMITED");
     });
   });
 });

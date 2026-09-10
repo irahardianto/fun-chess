@@ -88,11 +88,10 @@ export function createGameOverPayload(
 ): GameOverPayload {
   let durationSeconds = options.durationSeconds;
   if (durationSeconds === undefined) {
-    if (options.startTimeMs !== undefined) {
-      const now = options.nowMs ?? Date.now();
+    if (options.startTimeMs !== undefined && options.nowMs !== undefined) {
       durationSeconds = Math.max(
         1,
-        Math.round((now - options.startTimeMs) / 1000),
+        Math.round((options.nowMs - options.startTimeMs) / 1000),
       );
     } else {
       durationSeconds = 1;

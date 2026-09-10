@@ -8,3 +8,4 @@ export * from './hardware';
 export * from './di';
 export * from './ui';
 export * from './time';
+export * from './browser';

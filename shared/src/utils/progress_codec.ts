@@ -278,21 +278,27 @@ export class DefaultProgressCodec implements ProgressCodec {
 
   /**
    * Encodes progress payload into a formatted JSON backup envelope for 1-click file export.
+   * Pure and deterministic when reference now timestamp is supplied (MAJ-016).
    *
    * @param payload - Domain progress payload
+   * @param now - Optional reference timestamp in milliseconds for exportedAt when not in payload
    * @returns Formatted JSON backup envelope string
    */
-  public encodeToEnvelopeJson(payload: UnifiedProgressPayload): string {
+  public encodeToEnvelopeJson(
+    payload: UnifiedProgressPayload,
+    now?: number,
+  ): string {
     const sanitized = defaultSchemaValidator.assertValid(payload);
     const canonicalPayload = canonicalJsonStringify(sanitized);
     const checksum = crc32Checksum.toHex(
       crc32Checksum.calculate(canonicalPayload),
     );
 
+    const exportedAtMs = sanitized.exportedAt || (now !== undefined ? now : 0);
     const envelope: UnifiedProgressEnvelope = {
       magic: "FC_PROGRESS_V1",
       schemaVersion: UNIFIED_PROGRESS_SCHEMA_VERSION,
-      exportedAt: new Date(sanitized.exportedAt || Date.now()).toISOString(),
+      exportedAt: new Date(exportedAtMs).toISOString(),
       checksum,
       payload: sanitized,
     };
@@ -397,8 +403,9 @@ export async function decodeProgressFromQr(
  */
 export function encodeProgressToEnvelope(
   payload: UnifiedProgressPayload,
+  now?: number,
 ): string {
-  return defaultProgressCodec.encodeToEnvelopeJson(payload);
+  return defaultProgressCodec.encodeToEnvelopeJson(payload, now);
 }
 
 /**

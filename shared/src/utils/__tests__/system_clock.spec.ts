@@ -42,5 +42,14 @@ describe("SystemClock & MockClock (ENH-005)", () => {
       clock.setTime(5000);
       expect(clock.now()).toBe(5000);
     });
+
+    it("resets time to 0 or specified value", () => {
+      const clock = new MockClock(5000);
+      clock.reset();
+      expect(clock.now()).toBe(0);
+
+      clock.reset(12345);
+      expect(clock.now()).toBe(12345);
+    });
   });
 });

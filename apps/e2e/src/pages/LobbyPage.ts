@@ -53,6 +53,9 @@ export class LobbyPage {
    */
   async selectAvatar(emoji: string): Promise<void> {
     const avatarBtn = this.page.locator(`[data-testid="lobby-avatar-option-${emoji}"]`);
+    if (!(await avatarBtn.isVisible())) {
+      await this.selectMode('multiplayer_lan');
+    }
     await expect(avatarBtn).toBeVisible({ timeout: 10_000 });
     await avatarBtn.click();
   }
@@ -62,6 +65,10 @@ export class LobbyPage {
    */
   async getSelectedAvatar(): Promise<string | null> {
     const selectedBtn = this.page.locator('.avatar-option-btn.is-selected');
+    if (!(await selectedBtn.isVisible())) {
+      await this.selectMode('multiplayer_lan');
+    }
+    await expect(selectedBtn).toBeVisible({ timeout: 10_000 });
     if ((await selectedBtn.count()) > 0) {
       return (await selectedBtn.innerText()).trim();
     }

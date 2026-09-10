@@ -8,3 +8,4 @@ export * from './usePuzzleRush';
 export * from './usePuzzleRushTimer';
 export * from './usePuzzleAnimationState';
 export * from './useThemedDrills';
+export * from './usePuzzleMoveExecution';

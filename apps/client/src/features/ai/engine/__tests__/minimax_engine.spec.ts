@@ -4,6 +4,7 @@ import type { AiSearchConfig } from '@fun-chess/shared';
 import {
   MinimaxEngine,
   minimaxEngine,
+  createMinimaxEngine,
   scoreMoveForOrdering,
   orderMoves,
 } from '../minimax_engine.js';
@@ -282,6 +283,24 @@ describe('Minimax Search Engine (Alpha-Beta Search & Tactics)', () => {
       });
       expect(result.move).toBeDefined();
       expect(result.nodesEvaluated).toBeGreaterThan(5);
+    });
+
+    it('supports custom IClock and PRNG injection (MAJ-017)', async () => {
+      let currentTime = 1000;
+      const customClock = {
+        now: () => currentTime,
+      };
+      const customPrng = () => 0.5;
+
+      const customEngine = createMinimaxEngine(customClock, customPrng);
+      const fen = '8/8/4k3/8/8/4K3/4P3/8 w - - 0 1';
+      const result = await customEngine.findBestMove(fen, {
+        ...fastConfig,
+        depth: 2,
+      });
+
+      expect(result.move).toBeDefined();
+      expect(result.searchDurationMs).toBe(0);
     });
   });
 });

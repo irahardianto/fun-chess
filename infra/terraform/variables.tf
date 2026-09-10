@@ -71,4 +71,25 @@ variable "cors_origin" {
   }
 }
 
+variable "session_secret" {
+  type        = string
+  description = "Cryptographic signing secret for player session HMAC tokens (minimum 16 characters in production)."
+  sensitive   = true
 
+  validation {
+    condition     = length(var.session_secret) >= 16
+    error_message = "session_secret must contain at least 16 characters for HMAC signing."
+  }
+}
+
+variable "metrics_secret" {
+  type        = string
+  description = "Secret key for telemetry and deep health check endpoint authorization (minimum 8 characters when configured)."
+  sensitive   = true
+  default     = ""
+
+  validation {
+    condition     = var.metrics_secret == "" || length(var.metrics_secret) >= 8
+    error_message = "metrics_secret must be empty or contain at least 8 characters."
+  }
+}

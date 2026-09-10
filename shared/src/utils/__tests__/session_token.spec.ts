@@ -213,4 +213,117 @@ describe("HMAC-SHA256 Session Token Utilities (MAJ-004, CRIT-002)", () => {
       expect(tokenFingerprint(null as unknown as string)).toBe("");
     });
   });
+
+  describe("Stateless Token Expiration Timestamp (ENH-002)", () => {
+    const fixedNow = 1750000000000;
+    const futureExpiry = fixedNow + 3600000; // +1 hour
+
+    it("generates a 3-part dot-delimited signed token when expiresAt is provided as a number", () => {
+      const token = generateSessionToken(testUuid, testSecret, futureExpiry);
+      const parts = token.split(".");
+
+      expect(parts).toHaveLength(3);
+      expect(parts[0]).toBe(testUuid);
+      expect(parts[1]).toBe(String(futureExpiry));
+      expect(parts[2]).toHaveLength(64);
+      expect(parts[2]).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("generates a 3-part token when expiresAt is provided in options object", () => {
+      const token = generateSessionToken(testUuid, testSecret, { expiresAt: futureExpiry });
+      const parts = token.split(".");
+
+      expect(parts).toHaveLength(3);
+      expect(parts[0]).toBe(testUuid);
+      expect(parts[1]).toBe(String(futureExpiry));
+      expect(parts[2]).toHaveLength(64);
+    });
+
+    it("signSessionToken supports options with expiresAt", () => {
+      const token = signSessionToken(testUuid, testSecret, { expiresAt: futureExpiry });
+      const parsed = parseSessionToken(token);
+
+      expect(parsed).not.toBeNull();
+      expect(parsed?.sessionId).toBe(testUuid);
+      expect(parsed?.expiresAt).toBe(futureExpiry);
+    });
+
+    it("throws when invalid expiresAt is provided", () => {
+      expect(() => generateSessionToken(testUuid, testSecret, -1000)).toThrow(
+        "Cannot sign session token: expiresAt must be a positive integer timestamp",
+      );
+      expect(() => generateSessionToken(testUuid, testSecret, 0)).toThrow(
+        "Cannot sign session token: expiresAt must be a positive integer timestamp",
+      );
+      expect(() => generateSessionToken(testUuid, testSecret, 1.234)).toThrow(
+        "Cannot sign session token: expiresAt must be a positive integer timestamp",
+      );
+      expect(() => generateSessionToken(testUuid, testSecret, { expiresAt: NaN })).toThrow(
+        "Cannot sign session token: expiresAt must be a positive integer timestamp",
+      );
+    });
+
+    it("parses 3-part token correctly into sessionId, signature, and expiresAt", () => {
+      const token = generateSessionToken(testUuid, testSecret, futureExpiry);
+      const parsed = parseSessionToken(token);
+
+      expect(parsed).toEqual({
+        sessionId: testUuid,
+        signature: expect.stringMatching(/^[0-9a-f]{64}$/),
+        expiresAt: futureExpiry,
+      });
+    });
+
+    it("returns null when parsing 3-part token with non-numeric or malformed expiresAt", () => {
+      expect(parseSessionToken(`${testUuid}.notanumber.${"a".repeat(64)}`)).toBeNull();
+      expect(parseSessionToken(`${testUuid}.-500.${"a".repeat(64)}`)).toBeNull();
+      expect(parseSessionToken(`${testUuid}.123.456.${"a".repeat(64)}`)).toBeNull();
+    });
+
+    it("verifies unexpired 3-part token successfully with custom now option", () => {
+      const token = generateSessionToken(testUuid, testSecret, futureExpiry);
+      const result = verifySessionToken(token, testSecret, { now: fixedNow });
+
+      expect(result.valid).toBe(true);
+      expect(result.uuid).toBe(testUuid);
+      expect(result.expiresAt).toBe(futureExpiry);
+      expect(result.reason).toBeUndefined();
+    });
+
+    it("rejects expired 3-part token when now is at or after expiresAt", () => {
+      const token = generateSessionToken(testUuid, testSecret, futureExpiry);
+      const resultAtExpiry = verifySessionToken(token, testSecret, { now: futureExpiry });
+      const resultAfterExpiry = verifySessionToken(token, testSecret, { now: futureExpiry + 1000 });
+
+      expect(resultAtExpiry.valid).toBe(false);
+      expect(resultAtExpiry.reason).toBe("expired");
+      expect(resultAtExpiry.uuid).toBe(testUuid);
+      expect(resultAtExpiry.expiresAt).toBe(futureExpiry);
+
+      expect(resultAfterExpiry.valid).toBe(false);
+      expect(resultAfterExpiry.reason).toBe("expired");
+    });
+
+    it("rejects 3-part token if expiration timestamp is tampered with (fails HMAC check)", () => {
+      const token = generateSessionToken(testUuid, testSecret, futureExpiry);
+      const [uuid, , signature] = token.split(".");
+      const extendedExpiry = futureExpiry + 86400000; // Attacker tries to extend expiry by 1 day
+      const tamperedToken = `${uuid}.${extendedExpiry}.${signature}`;
+
+      const result = verifySessionToken(tamperedToken, testSecret, { now: fixedNow });
+      expect(result.valid).toBe(false);
+      expect(result.reason).toBe("invalid_signature");
+    });
+
+    it("preserves backward compatibility for 2-part tokens without expiresAt", () => {
+      const legacyToken = generateSessionToken(testUuid, testSecret);
+      const parsed = parseSessionToken(legacyToken);
+      expect(parsed?.expiresAt).toBeUndefined();
+
+      const verification = verifySessionToken(legacyToken, testSecret, { now: futureExpiry + 999999 });
+      expect(verification.valid).toBe(true);
+      expect(verification.uuid).toBe(testUuid);
+      expect(verification.expiresAt).toBeUndefined();
+    });
+  });
 });

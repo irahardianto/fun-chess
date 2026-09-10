@@ -38,17 +38,19 @@ describe('FetchApiClient Real HTTP Integration Tests (MAJ-026)', () => {
         return;
       }
 
-      if (url.pathname === '/api/lan-info') {
+      if (url.pathname === '/api/v1/lan-info' || url.pathname === '/api/lan-info') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
-            lanIp: '127.0.0.1',
-            port: 3000,
-            localUrl: baseUrl,
-            joinUrl: `${baseUrl}/join`,
-            interfaces: ['127.0.0.1'],
-            relayMode: 'lan',
-            isCloudRelay: false,
+            data: {
+              lanIp: '127.0.0.1',
+              port: 3000,
+              localUrl: baseUrl,
+              joinUrl: `${baseUrl}/join`,
+              interfaces: ['127.0.0.1'],
+              relayMode: 'lan',
+              isCloudRelay: false,
+            },
           })
         );
         return;

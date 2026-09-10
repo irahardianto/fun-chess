@@ -17,6 +17,19 @@ export interface EvaluatedCandidateMove {
 }
 
 /**
+ * Creates a deterministic 32-bit PRNG generator from an integer seed (MAJ-017).
+ */
+export function createSeededPrng(seed = 123456789): () => number {
+  let s = seed >>> 0;
+  return function mulberry32(): number {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
  * Determines whether a blunder should be injected based on blunder probability.
  *
  * @param blunderChance - Probability between 0.0 and 1.0

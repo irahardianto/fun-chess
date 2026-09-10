@@ -234,4 +234,37 @@ describe('LocalStorageProgressStore', () => {
       expect(map).toBeDefined();
     });
   });
+
+  describe('Versioned Envelope & Schema Migration (MIN-012)', () => {
+    it('persists progress wrapped in versioned envelope with legacy compatibility', async () => {
+      await store.saveProgress('fork-mastery', 3, 0);
+
+      const raw = mockStorage[TEST_STORAGE_KEY];
+      expect(raw).toBeDefined();
+      const parsed = JSON.parse(raw!);
+      expect(parsed.version).toBe(1);
+      expect(parsed.data).toBeDefined();
+      expect(parsed.data['fork-mastery']).toBeDefined();
+      expect(parsed['fork-mastery']).toBeDefined();
+    });
+
+    it('seamlessly deserializes legacy unversioned raw map payloads', async () => {
+      const legacyRaw = {
+        'legacy-scenario': {
+          scenarioId: 'legacy-scenario',
+          starsEarned: 2,
+          attemptsCount: 3,
+          hintsUsedTotal: 1,
+          firstCompletedAt: 1000,
+          lastCompletedAt: 2000,
+        },
+      };
+      mockStorage[TEST_STORAGE_KEY] = JSON.stringify(legacyRaw);
+
+      const map = await store.getProgressMap();
+      expect(map['legacy-scenario']).toBeDefined();
+      expect(map['legacy-scenario']?.starsEarned).toBe(2);
+      expect(map['legacy-scenario']?.attemptsCount).toBe(3);
+    });
+  });
 });

@@ -286,15 +286,32 @@ export class InMemoryRoomStore implements RoomStore {
     }
   }
 
-  private assertTicketValid(code: string, explicitContext?: LockContext): void {
+  private assertTicketValid(
+    code: string,
+    explicitContext?: LockContext,
+    allowUnlocked?: boolean,
+  ): void {
+    if (allowUnlocked) return;
+
     const ctx = explicitContext ?? this.lockContextStorage.getStore();
+    const activeTicket = this.activeTickets.get(code);
+
+    if (activeTicket !== undefined) {
+      if (
+        !ctx ||
+        ctx.roomCode !== code ||
+        ctx.ticket !== activeTicket ||
+        this.cancelledTickets.has(ctx.ticket)
+      ) {
+        throw new StaleLockExecutionError(code, ctx?.ticket ?? 0);
+      }
+      return;
+    }
+
     if (!ctx) return;
     if (ctx.roomCode !== code) return;
 
-    if (
-      this.cancelledTickets.has(ctx.ticket) ||
-      this.activeTickets.get(code) !== ctx.ticket
-    ) {
+    if (this.cancelledTickets.has(ctx.ticket)) {
       throw new StaleLockExecutionError(code, ctx.ticket);
     }
   }
@@ -703,7 +720,15 @@ export class InMemoryRoomStore implements RoomStore {
   ): Promise<void> {
     this.assertNotAborted(options?.signal);
     const code = room.roomCode.toUpperCase();
-    this.assertTicketValid(code);
+    const explicitCtx: LockContext | undefined =
+      options?.ticket !== undefined
+        ? {
+            roomCode: code,
+            ticket: options.ticket,
+            isCancelled: () => this.cancelledTickets.has(options.ticket!),
+          }
+        : undefined;
+    this.assertTicketValid(code, explicitCtx, options?.allowUnlocked);
 
     if (!this.rooms.has(code) && this.rooms.size >= this.maxRooms) {
       throw new RoomCapacityExceededError(this.maxRooms);

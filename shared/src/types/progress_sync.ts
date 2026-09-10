@@ -333,8 +333,9 @@ export interface ProgressCodec {
 
   /**
    * Encodes payload into a human-readable JSON backup envelope for 1-click file export.
+   * Pure and deterministic when reference now timestamp is supplied (MAJ-016).
    */
-  encodeToEnvelopeJson(payload: UnifiedProgressPayload): string;
+  encodeToEnvelopeJson(payload: UnifiedProgressPayload, now?: number): string;
 
   /**
    * Decodes and validates a JSON backup envelope string.

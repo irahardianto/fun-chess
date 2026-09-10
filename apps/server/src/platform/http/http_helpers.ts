@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Logger } from "../logger/logger.interface.js";
-import { AppError } from "@fun-chess/shared";
+import { AppError, serializeError } from "@fun-chess/shared";
 import { isOriginAllowed } from "../config/index.js";
 import { HttpRateLimiter } from "./http_rate_limiter.js";
 import {
@@ -145,7 +145,7 @@ export function resolveDistPath(
           log?.debug("Failed checking client dist directory candidate via fileStorage", {
             operation: "resolve_client_dist_dir",
             candidate,
-            error: err instanceof Error ? err.message : String(err),
+            error: serializeError(err),
           });
         }
       }
@@ -163,7 +163,7 @@ export function resolveDistPath(
       log?.debug("Failed checking client dist directory candidate", {
         operation: "resolve_client_dist_dir",
         candidate,
-        error: err instanceof Error ? err.message : String(err),
+        error: serializeError(err),
       });
     }
   }
@@ -443,12 +443,32 @@ export function extractHttpUserId(
       logger?.debug("Failed to parse URL search params for userId extraction", {
         operation: "extract_http_user_id",
         url,
-        error: err instanceof Error ? err.message : String(err),
+        error: serializeError(err),
       });
     }
   }
 
   return undefined;
+}
+
+/**
+ * Detects obvious automated vulnerability and sensitive file path scanning attempts (ENH-001).
+ * These probing paths MUST NOT bypass ingress rate limiting as static candidates.
+ */
+export function isProbingPath(pathname: string): boolean {
+  const lower = pathname.toLowerCase();
+  return (
+    lower.includes("/.env") ||
+    lower.includes("/.git") ||
+    lower.endsWith(".php") ||
+    lower.endsWith(".sql") ||
+    lower.endsWith(".bak") ||
+    lower.endsWith(".config") ||
+    lower.includes("/wp-") ||
+    lower.includes("/admin") ||
+    lower.includes("/phpmyadmin") ||
+    lower.includes("/actuator")
+  );
 }
 
 export function handleRateLimitCheck(
@@ -467,7 +487,7 @@ export function handleRateLimitCheck(
   startTime?: number,
   userId?: string,
 ): boolean {
-  if (pathname === "/healthz") {
+  if (pathname === "/healthz" || pathname === "/api/lan-info") {
     return false;
   }
 
@@ -476,7 +496,8 @@ export function handleRateLimitCheck(
     !pathname.startsWith("/api/") &&
     pathname !== "/health" &&
     pathname !== "/metrics" &&
-    pathname !== "/health/detail";
+    pathname !== "/health/detail" &&
+    !isProbingPath(pathname);
 
   if (isStaticCandidate) {
     return false;
@@ -526,14 +547,90 @@ export function handleLanInfoRoute(
     data: unknown,
     options?: { skipLog?: boolean; operation?: string },
   ) => void,
+  sendRedirect?: (
+    statusCode: number,
+    location: string,
+    options?: { skipLog?: boolean; operation?: string },
+  ) => void,
 ): boolean {
-  if ((method === "GET" || method === "HEAD") && pathname === "/api/lan-info") {
+  if (method !== "GET" && method !== "HEAD") {
+    return false;
+  }
+
+  if (pathname === "/api/v1/lan-info") {
     const requestPort = port || req.socket?.localPort || 3000;
     const lanInfo = lanInfoController.getLanInfo(requestPort);
     sendJsonResponse(200, lanInfo, { operation: "lan_info" });
     return true;
   }
+
+  if (pathname === "/api/lan-info") {
+    if (sendRedirect) {
+      sendRedirect(307, "/api/v1/lan-info", { operation: "lan_info_redirect" });
+    } else {
+      sendJsonResponse(307, null, { operation: "lan_info_redirect" });
+    }
+    return true;
+  }
+
   return false;
+}
+
+/**
+ * Rate limits 404 probing to mitigate automated vulnerability path scanning (ENH-001).
+ * When repeated 404s from the same IP exceed the threshold, returns 429 Too Many Requests.
+ */
+export function handleNotFoundRoute(
+  clientIp: string,
+  pathname: string,
+  method: string,
+  correlationId: string,
+  sendJsonResponse: (
+    statusCode: number,
+    data: unknown,
+    options?: { skipLog?: boolean; operation?: string },
+  ) => void,
+  notFoundRateLimiter?: HttpRateLimiter,
+  logger?: Logger,
+  startTime?: number,
+  userId?: string,
+): void {
+  if (notFoundRateLimiter && !notFoundRateLimiter.consume(clientIp)) {
+    const duration = startTime ? Math.round(performance.now() - startTime) : 0;
+    logger?.warn("HTTP 404 probing rate limit exceeded", {
+      operation: "http_rate_limited",
+      correlationId,
+      clientIp,
+      path: pathname,
+      method,
+      duration,
+      durationMs: duration,
+      ...(userId ? { userId } : {}),
+    });
+
+    sendJsonResponse(
+      429,
+      formatHttpError(
+        429,
+        "ERR_RATE_LIMITED",
+        "Too many non-existent path requests. Please slow down.",
+        correlationId,
+      ),
+      { operation: "http_rate_limited" },
+    );
+    return;
+  }
+
+  sendJsonResponse(
+    404,
+    formatHttpError(
+      404,
+      "ERR_NOT_FOUND",
+      `Cannot ${method} ${pathname}`,
+      correlationId,
+    ),
+    { operation: "http_request" },
+  );
 }
 
 export function createFallbackHtml(port: number): string {
@@ -556,7 +653,7 @@ export function createFallbackHtml(port: number): string {
     <h1>♞ Fun Chess Server</h1>
     <div class="badge">Running on port ${port}</div>
     <p>API endpoints are active:</p>
-    <p><a href="/api/lan-info" style="color: #48dbfb;">/api/lan-info</a> &bull; <a href="/health" style="color: #48dbfb;">/health</a> &bull; <a href="/healthz" style="color: #48dbfb;">/healthz</a></p>
+    <p><a href="/api/v1/lan-info" style="color: #48dbfb;">/api/v1/lan-info</a> &bull; <a href="/health" style="color: #48dbfb;">/health</a> &bull; <a href="/healthz" style="color: #48dbfb;">/healthz</a></p>
     <p style="font-size: 0.9em; opacity: 0.8;">To view the web client, ensure client assets are built in <code>apps/client/dist</code> or run the client dev server.</p>
   </div>
 </body>

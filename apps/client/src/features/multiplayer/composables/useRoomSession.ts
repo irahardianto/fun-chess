@@ -36,6 +36,7 @@ import {
   setRoomSessionNavigation,
   getCustomNavigation,
   notifySessionReset,
+  notifyRoomReconnected,
   logger,
   createValidationError,
   getSavedSession,
@@ -227,6 +228,11 @@ function handleRoomReconnected(data: {
   if (data?.player) {
     currentPlayer.value = data.player;
   }
+  notifyRoomReconnected({
+    room: data.room,
+    player: data.player,
+    roomStatus: data.roomStatus as RoomStatus | undefined,
+  });
 }
 
 function handleGameStarted(gameState: GameState) {
@@ -512,6 +518,11 @@ export async function reconnect(
         roomCode: res.room.roomCode,
         playerId: res.player.id,
         sessionToken: effectiveToken,
+      });
+      notifyRoomReconnected({
+        room: res.room,
+        player: res.player,
+        roomStatus: res.roomStatus,
       });
     },
     onError: (err) => {

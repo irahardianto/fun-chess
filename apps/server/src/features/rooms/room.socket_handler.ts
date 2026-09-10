@@ -120,10 +120,7 @@ async function safeSocketJoin(
       roomCode,
       socketId: socket.id,
       action: "join",
-      error:
-        err instanceof Error
-          ? { name: err.name, message: err.message, stack: err.stack }
-          : { raw: err },
+      error: serializeError(err),
     });
   }
 }
@@ -144,10 +141,7 @@ async function safeSocketLeave(
       roomCode,
       socketId: socket.id,
       action: "leave",
-      error:
-        err instanceof Error
-          ? { name: err.name, message: err.message, stack: err.stack }
-          : { raw: err },
+      error: serializeError(err),
     });
   }
 }
@@ -301,7 +295,12 @@ export function registerRoomSocketHandlers(
         roomStatus: result.room.status,
       });
 
-      // MAJ-025: Dual delivery eliminated. State delivered exclusively via ack callback.
+      // MAJ-003: Re-establish room:reconnected socket event emission (unicast to the reconnecting socket)
+      socket.emit("room:reconnected", {
+        room: sanitizePublicRoom(result.room),
+        player: sanitizePublicPlayer(result.player),
+        roomStatus: result.room.status,
+      });
 
       return {
         success: true,
@@ -354,10 +353,7 @@ export function registerRoomSocketHandlers(
               operation: "socket_room_membership_error",
               roomCode,
               action: "fetch_and_leave",
-              error:
-                err instanceof Error
-                  ? { name: err.name, message: err.message, stack: err.stack }
-                  : { raw: err },
+              error: serializeError(err),
             });
           }
         }

@@ -19,5 +19,4 @@ export * from './AppPwaBanner.vue';
 export { default as AppPwaManager } from './AppPwaManager.vue';
 export * from './AppPwaManager.vue';
 
-export * from './composables/useTheme';
-export * from './composables/useNotification';
+export * from './composables';

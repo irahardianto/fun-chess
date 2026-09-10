@@ -422,6 +422,8 @@ describe('QrCodeModal.vue', () => {
             localUrl: 'http://localhost:3000',
             joinUrl: 'http://192.168.1.120:3000',
             interfaces: ['192.168.1.120'],
+            relayMode: 'lan',
+            isCloudRelay: false,
           },
         },
       });
@@ -493,6 +495,8 @@ describe('QrCodeModal.vue', () => {
             localUrl: 'http://localhost:3000',
             joinUrl: 'http://192.168.1.100:3000',
             interfaces: ['192.168.1.100', '10.0.4.15'],
+            relayMode: 'lan',
+            isCloudRelay: false,
           },
         },
       });
@@ -724,6 +728,8 @@ describe('QrCodeModal.vue', () => {
               localUrl: 'http://localhost',
               joinUrl: 'http://192.168.1.50',
               interfaces: [],
+              relayMode: 'lan',
+              isCloudRelay: false,
             },
           },
         });
@@ -753,6 +759,8 @@ describe('QrCodeModal.vue', () => {
             localUrl: 'http://localhost:3000',
             joinUrl: 'http://192.168.1.42:3000',
             interfaces: [],
+            relayMode: 'lan',
+            isCloudRelay: false,
           },
         },
       });

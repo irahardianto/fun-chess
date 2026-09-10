@@ -1,21 +1,21 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { InMemoryRoomStore } from "../in_memory_room.store.js";
-import { InMemorySessionRegistry } from "../in_memory_session_registry.js";
-import { RoomService } from "../room.service.js";
-import { GameService } from "../../game/game.service.js";
 import {
-  GameNotActiveError,
-  NotYourTurnError,
-  RoomFullError,
-} from "@fun-chess/shared";
-import {
+  InMemoryRoomStore,
+  InMemorySessionRegistry,
+  RoomService,
+  createInitialRoomState,
   OptimisticLockConflictError,
   RoomAlreadyExistsError,
   StaleLockExecutionError,
   LockExecutionTimeoutError,
-} from "../room.errors.js";
-import { createInitialRoomState } from "../room.logic.js";
-import type { Player } from "@fun-chess/shared";
+} from "../../features/rooms/index.js";
+import { GameService } from "../../features/game/index.js";
+import {
+  GameNotActiveError,
+  NotYourTurnError,
+  RoomFullError,
+  type Player,
+} from "@fun-chess/shared";
 
 interface TestableStore {
   lockQueues: Map<string, unknown>;
@@ -33,7 +33,9 @@ describe("Room & Game Concurrency Control", () => {
 
   beforeEach(() => {
     store = new InMemoryRoomStore();
-    sessionRegistry = new InMemorySessionRegistry();
+    sessionRegistry = new InMemorySessionRegistry(
+      "test-secret-at-least-16-chars-long",
+    );
     roomService = new RoomService(store, sessionRegistry);
     gameService = new GameService(roomService);
   });

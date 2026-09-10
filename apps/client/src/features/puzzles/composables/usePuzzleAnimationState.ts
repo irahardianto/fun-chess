@@ -1,4 +1,4 @@
-import { ref, readonly, onUnmounted, getCurrentInstance } from 'vue';
+import { ref, readonly, onUnmounted, onScopeDispose, getCurrentScope, getCurrentInstance } from 'vue';
 
 export interface UsePuzzleAnimationStateOptions {
   shakeDurationMs?: number;
@@ -59,7 +59,11 @@ export function usePuzzleAnimationState(options: UsePuzzleAnimationStateOptions 
     isWaitingForBot.value = false;
   }
 
-  if (getCurrentInstance()) {
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      clearAnimationTimers();
+    });
+  } else if (getCurrentInstance()) {
     onUnmounted(() => {
       clearAnimationTimers();
     });

@@ -1,29 +1,26 @@
 import { ref, computed, readonly, onUnmounted, getCurrentInstance } from 'vue';
-import type { Square as ChessSquare } from 'chess.js';
 import type {
   Puzzle,
   Square,
   PieceColor,
   StarRating,
-  PlayerMoveAction,
-  MoveValidationOutcome,
   PlayerMistakeRefutation,
   PuzzleAttemptResult,
   PuzzleAnalysisResult,
   IClock,
 } from '@fun-chess/shared';
-import { createSafeChess, SystemClock } from '@fun-chess/shared';
-import { validatePuzzleMove } from '../engine/puzzle_validator';
+import { SystemClock } from '@fun-chess/shared';
 import { calculatePuzzleStars } from '../engine/star_calculator';
 import { analyzePuzzleSolution } from '../engine/puzzle_analysis_engine';
 import { usePuzzleHints } from './usePuzzleHints';
 import { usePuzzleReplay, type ReplayStep } from './usePuzzleReplay';
 import { usePuzzleAnimationState } from './usePuzzleAnimationState';
+import { usePuzzleMoveExecution } from './usePuzzleMoveExecution';
 import { useAudio } from '../../../composables/useAudio';
-import { logger } from '@/platform/telemetry';
 import { useInjectClock } from '@/platform/di';
 
 export type { ReplayStep };
+export * from './usePuzzleMoveExecution';
 
 export interface UsePuzzleRunnerOptions {
   puzzle?: Puzzle | null;
@@ -38,7 +35,8 @@ export interface UsePuzzleRunnerOptions {
 
 /**
  * Primary game loop orchestrator for puzzle gameplay sessions.
- * Decomposed and composed using `usePuzzleHints`, `usePuzzleReplay`, and `usePuzzleAnimationState` (MAJ-021).
+ * Decomposed and composed using `usePuzzleHints`, `usePuzzleReplay`,
+ * `usePuzzleAnimationState`, and `usePuzzleMoveExecution` (MAJ-021, MAJ-024).
  */
 export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
   const clock = options.clock ?? (getCurrentInstance() ? useInjectClock() : new SystemClock());
@@ -115,22 +113,32 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     anim.clearAnimationTimers();
   }
 
-  function recalculateLegalMoves(fenStr: string, sq: Square | null): Square[] {
-    if (!sq) return [];
-    try {
-      const chess = createSafeChess(fenStr);
-      const moves = chess.moves({ square: sq as ChessSquare, verbose: true });
-      return moves.map((m) => m.to as Square);
-    } catch (err) {
-      logger.warn('Failed to calculate legal moves from FEN', {
-        operation: 'puzzle_runner_recalculate_legal_moves',
-        fenStr,
-        square: sq,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return [];
-    }
-  }
+  // Composed Move Execution Subsystem (MAJ-024)
+  const moveExec = usePuzzleMoveExecution({
+    currentPuzzle,
+    currentFen,
+    currentMoveIndex,
+    selectedSquare,
+    legalMoves,
+    lastMove,
+    isCompleted,
+    isSolvedSuccessfully,
+    mistakesCount,
+    feedbackMessage,
+    lastMistakeRefutation,
+    attemptResult,
+    playerColor,
+    calculatedStars,
+    anim,
+    hints,
+    replay,
+    autoAudio,
+    audio,
+    onSolve: options.onSolve,
+    onSolved: options.onSolved,
+    onMistake: options.onMistake,
+    onFailed: options.onFailed,
+  });
 
   function loadPuzzle(puzzle: Puzzle) {
     clearTimers();
@@ -149,145 +157,6 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     anim.resetAnimationState();
     replay.resetReplay();
     hints.resetHints();
-  }
-
-  function selectSquare(sq: Square) {
-    if (isCompleted.value || anim.isWaitingForBot.value) return;
-
-    if (selectedSquare.value === sq) {
-      selectedSquare.value = null;
-      legalMoves.value = [];
-      return;
-    }
-
-    if (selectedSquare.value && legalMoves.value.includes(sq)) {
-      applyPlayerMove({ from: selectedSquare.value, to: sq });
-      return;
-    }
-
-    try {
-      const chess = createSafeChess(currentFen.value);
-      const piece = chess.get(sq as ChessSquare);
-      if (piece && piece.color === playerColor.value) {
-        selectedSquare.value = sq;
-        legalMoves.value = recalculateLegalMoves(currentFen.value, sq);
-        lastMistakeRefutation.value = null;
-        if (autoAudio) audio.playPickup();
-      } else {
-        selectedSquare.value = null;
-        legalMoves.value = [];
-      }
-    } catch (err) {
-      logger.warn('Failed to inspect square on board', {
-        operation: 'puzzle_runner_select_square',
-        square: sq,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      selectedSquare.value = null;
-      legalMoves.value = [];
-    }
-  }
-
-  function handleFailedPuzzleMove(outcome: MoveValidationOutcome): void {
-    mistakesCount.value += 1;
-    feedbackMessage.value = outcome.feedback;
-    lastMistakeRefutation.value = outcome.refutation ?? null;
-    selectedSquare.value = null;
-    legalMoves.value = [];
-    if (autoAudio) audio.playError();
-    anim.triggerShake(400);
-
-    if (currentPuzzle.value) {
-      hints.checkAutoNudge(
-        mistakesCount.value,
-        currentPuzzle.value,
-        currentMoveIndex.value,
-        currentFen.value
-      );
-      options.onMistake?.(currentPuzzle.value, mistakesCount.value);
-      options.onFailed?.(currentPuzzle.value, mistakesCount.value);
-    }
-  }
-
-  function finalizePuzzleSuccess(outcome: MoveValidationOutcome): void {
-    if (!currentPuzzle.value) return;
-
-    currentFen.value = outcome.nextFen;
-    currentMoveIndex.value = outcome.nextMoveIndex;
-    isCompleted.value = true;
-    isSolvedSuccessfully.value = true;
-    replay.completeReplay();
-
-    const hintsUsed = hints.hintsUsedCount.value;
-    if (hintsUsed === 0 && mistakesCount.value === 0) {
-      attemptResult.value = 'solved_first_try';
-    } else if (hintsUsed > 0) {
-      attemptResult.value = 'solved_with_hints';
-    } else {
-      attemptResult.value = 'solved_with_retries';
-    }
-
-    if (autoAudio) audio.playVictory();
-
-    const callback = options.onSolved || options.onSolve;
-    callback?.(
-      currentPuzzle.value,
-      calculatedStars.value,
-      hintsUsed,
-      mistakesCount.value
-    );
-  }
-
-  function scheduleOpponentReply(outcome: MoveValidationOutcome): void {
-    if (outcome.intermediateFen) {
-      currentFen.value = outcome.intermediateFen;
-    }
-    anim.scheduleBotReply(() => {
-      if (!currentPuzzle.value) return;
-      currentFen.value = outcome.nextFen;
-      currentMoveIndex.value = outcome.nextMoveIndex;
-      if (outcome.botReplyMove) {
-        lastMove.value = { from: outcome.botReplyMove.from, to: outcome.botReplyMove.to };
-        if (autoAudio) audio.playMove();
-      }
-      hints.resetHints();
-    }, 450);
-  }
-
-  function handleSuccessfulPlayerMove(
-    move: PlayerMoveAction,
-    outcome: MoveValidationOutcome
-  ): void {
-    selectedSquare.value = null;
-    legalMoves.value = [];
-    lastMove.value = { from: move.from, to: move.to };
-    feedbackMessage.value = outcome.feedback;
-    lastMistakeRefutation.value = null;
-    if (autoAudio) audio.playMove();
-
-    if (outcome.isPuzzleComplete) {
-      finalizePuzzleSuccess(outcome);
-    } else if (outcome.botReplyMove) {
-      scheduleOpponentReply(outcome);
-    }
-  }
-
-  function applyPlayerMove(move: PlayerMoveAction): void {
-    if (!currentPuzzle.value || isCompleted.value || anim.isWaitingForBot.value) return;
-
-    const outcome = validatePuzzleMove(
-      currentPuzzle.value,
-      currentMoveIndex.value,
-      currentFen.value,
-      move
-    );
-
-    if (!outcome.isCorrect) {
-      handleFailedPuzzleMove(outcome);
-      return;
-    }
-
-    handleSuccessfulPlayerMove(move, outcome);
   }
 
   function revealNextHint() {
@@ -384,8 +253,8 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     clock,
     clearTimers,
     loadPuzzle,
-    selectSquare,
-    applyPlayerMove,
+    selectSquare: moveExec.selectSquare,
+    applyPlayerMove: moveExec.applyPlayerMove,
     revealNextHint,
     revealHint: revealNextHint,
     resetCurrentPuzzle,

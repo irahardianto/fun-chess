@@ -13,13 +13,14 @@ test.describe('LAN Information & Discovery API (/api/lan-info)', () => {
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('application/json');
 
-    // Assert: Contract Schema Validation via Zod
+    // Assert: Contract Schema Validation via Zod (supporting standard REST { data: ... } envelope)
     const body: unknown = await response.json();
-    const parseResult = LanInfoResponseSchema.safeParse(body);
+    const payload = (body && typeof body === 'object' && 'data' in body) ? (body as { data: unknown }).data : body;
+    const parseResult = LanInfoResponseSchema.safeParse(payload);
     expect(parseResult.success, `Schema validation failed: ${JSON.stringify(parseResult)}`).toBe(true);
 
     // Assert: Structural invariants per .agentwork/api_contracts.md
-    const lanInfo = body as LanInfoResponse;
+    const lanInfo = payload as LanInfoResponse;
 
     // lanIp
     expect(typeof lanInfo.lanIp).toBe('string');
@@ -53,13 +54,9 @@ test.describe('LAN Information & Discovery API (/api/lan-info)', () => {
       expect(iface.length).toBeGreaterThan(0);
     }
 
-    // Optional relay properties
-    if (lanInfo.relayMode) {
-      expect(['cloud', 'lan']).toContain(lanInfo.relayMode);
-    }
-    if (lanInfo.isCloudRelay !== undefined) {
-      expect(typeof lanInfo.isCloudRelay).toBe('boolean');
-    }
+    // Required relay properties (MIN-010)
+    expect(['cloud', 'lan']).toContain(lanInfo.relayMode);
+    expect(typeof lanInfo.isCloudRelay).toBe('boolean');
     if (lanInfo.publicUrl) {
       const publicUrl = lanInfo.publicUrl;
       expect(() => new URL(publicUrl)).not.toThrow();

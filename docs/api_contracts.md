@@ -1,470 +1,497 @@
-# API & Integration Contracts: Fun Chess Audit Remediation
+# Frozen API Contracts: Fun Chess Audit Remediation
 
-> **Status: FROZEN ARCHITECTURAL CONTRACT**
-> **Phase: DESIGN (Remediation)**
-> **Author: System Architect (@architect)**
-> **Audience: All Builders (@backend-engineer, @frontend-engineer, @tech-lead, @test-automation-engineer)**
-> **Scope: Remediation of Audit Findings (CRIT-001, MIN-001, CRIT-002, MAJ-004, MAJ-007, MAJ-014, MAJ-017, MAJ-018, MAJ-019, MAJ-020, MAJ-025, MIN-024, MIN-026, MIN-027)**
-> **Contract Rule: Once published in DESIGN phase, this specification is binding. Builders must implement to these exact signatures, behaviors, error codes, and formats.**
+> **Status:** FROZEN ARCHITECTURAL CONTRACTS
+> **Phase:** Wave 0 (Design Phase)
+> **Author:** System Architect (`@architect`)
+> **Audience:** All Domain Implementers (`@backend-engineer`, `@frontend-engineer`, `@tech-lead`, `@test-automation-engineer`)
+> **Authority:** Preempts all individual builder decisions. Any deviation requires formal ADR and Architect approval.
+> **Audit Findings Addressed:** MAJ-003, MAJ-007, MAJ-008, MAJ-009, MIN-010
 
 ---
 
-## 1. HTTP Ingress Routing & Unversioned Policy (MIN-026, MIN-027)
+## 1. REST API Specification: `/api/v1/lan-info` (MAJ-009, MIN-010)
 
-### 1.1 Architecture Decision Record: Retention of Unversioned Endpoints
-- **Context:** Finding MIN-026 observed that native HTTP endpoints (`/api/lan-info`, `/health`, `/health/detail`, `/metrics`, `/healthz`) do not have `/api/v1/...` prefixes. Finding MIN-027 noted that `/api/lan-info` returns a flat JSON object rather than a `{ data: ... }` envelope.
-- **User Directive & Decision:** **Strictly retain existing unversioned routes without path aliases or wrapper mutations.**
-- **Rationale:**
-  1. **Operational Stability:** Infrastructure orchestrators (Google Cloud Run probes, Kubernetes readiness/liveness probes, container health checkers) are actively configured against `/healthz` and `/health`. Adding alias redirects or shifting to `/api/v1/health` introduces infrastructure failure points and redundant routing table entries.
-  2. **LAN Discovery Protocol Compatibility:** The client PWA, WebRTC signaling layer, and local QR code generator expect the authoritative addressing metadata directly at `GET /api/lan-info`. Wrapping this response in a `{ data: ... }` envelope would break existing mobile clients and cached PWA service worker offline fallbacks.
-  3. **Simplicity (KISS/YAGNI):** The Fun Chess HTTP surface is a compact utility and telemetry plane (WebSocket Socket.IO handles the core game domain). Route aliases (e.g., exposing both `/api/lan-info` and `/api/v1/lan-info`) add dead code maintenance overhead.
+### 1.1 Context & Defect Analysis
+- **Defect (MAJ-009):** The host addressing and QR discovery endpoint was previously mounted at unversioned `/api/lan-info` and returned naked, un-enveloped JSON payloads. This violated `api-design-principles.md` (requiring URL path versioning `/api/v1/...` and standard `{ data: ... }` response envelopes).
+- **Defect (MIN-010):** Contract drift between `apps/server/src/features/lan/relay_address.service.ts` and `shared/src/contracts/schemas.ts`. The server implementation mandated `relayMode: "cloud" | "lan"` and `isCloudRelay: boolean`, whereas `LanInfoResponseSchema` in `@fun-chess/shared` defined both fields as optional (`.optional()`).
 
-### 1.2 Authoritative HTTP Route Specification
+### 1.2 Routing & Backward-Compatible Redirect Specification
+The server MUST register two routes in `apps/server/src/platform/http/`:
 
-| Method | Path | Auth Required | Operation Name | Success Response Payload | Error Responses |
-|---|---|---|---|---|---|
-| `GET`, `HEAD` | `/healthz` | None (Public) | `health_readiness` | `200 "OK"` (`text/plain; charset=utf-8`) | `500` JSON Error Envelope |
-| `GET`, `HEAD` | `/health` | None (Public) | `health_liveness` | `200` JSON `LivenessHealthResponse` (`application/json`) | `500` JSON Error Envelope |
-| `GET`, `HEAD` | `/api/health` | None (Public) | `health_liveness` | `200` JSON `LivenessHealthResponse` (`application/json`) | `500` JSON Error Envelope |
-| `GET`, `HEAD` | `/metrics` | Yes (`isTelemetryAuthorized`) | `health_telemetry` | `200` JSON `DetailedHealthResponse` | `403` `ERR_UNAUTHORIZED`, `500` Error Envelope |
-| `GET`, `HEAD` | `/health/detail` | Yes (`isTelemetryAuthorized`) | `health_telemetry` | `200` JSON `DetailedHealthResponse` | `403` `ERR_UNAUTHORIZED`, `500` Error Envelope |
-| `GET`, `HEAD` | `/api/lan-info` | None (Public) | `lan_info` | `200` JSON `LanAddressingInfo` | `429` `ERR_RATE_LIMITED`, `500` Error Envelope |
-| `GET`, `HEAD` | Static / SPA routes | None (Public) | `static_serve` | `200`/`304` Static file content or fallback HTML | `404` (if no fallback), `500` Error Envelope |
-| Any | Unmatched paths | None | `http_not_found` | None | `404` JSON Error Envelope (`ERR_NOT_FOUND`) |
+1. **Canonical Endpoint:** `GET /api/v1/lan-info` (and `HEAD /api/v1/lan-info`)
+   - Returns HTTP `200 OK` with standard JSON envelope `{ data: LanInfoResponse }`.
+2. **Backward-Compatible Legacy Endpoint:** `GET /api/lan-info` (and `HEAD /api/lan-info`)
+   - Emits HTTP `307 Temporary Redirect` (or HTTP `308 Permanent Redirect`) with header `Location: /api/v1/lan-info`.
+   - For clients that do not automatically follow redirects (or during backward-compatibility grace period in automated unit tests), the server helper `handleLanInfoRoute` may directly return the canonical `{ data: LanInfoResponse }` envelope or emit 307 redirect based on request headers / configuration.
 
-### 1.3 HTTP Response Envelope Schemas
-- **Public LAN Info Response Contract (`GET /api/lan-info`):**
-  Flat JSON structure per `LanAddressingInfo` schema (no envelope):
-  ```json
-  {
+#### HTTP Headers
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+X-Correlation-ID: 550e8400-e29b-41d4-a716-446655440000
+Content-Security-Policy: default-src 'self'; ...
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+```
+
+### 1.3 JSON Response Envelope & Schema (Single Source of Truth)
+The schema in `shared/src/contracts/schemas.ts` is updated to make `relayMode` and `isCloudRelay` strictly required, eliminating contract drift:
+
+```typescript
+import { z } from "zod";
+
+/**
+ * Host network addressing information payload schema.
+ * Aligned between server relay service and shared contracts (MIN-010).
+ */
+export const LanInfoResponseSchema = z.object({
+  /** Primary local area network IPv4 address */
+  lanIp: z.string().ip({ version: "v4" }),
+  /** Active listening HTTP/WS TCP port */
+  port: z.number().int().min(1).max(65535),
+  /** Absolute local network base URL for LAN play (e.g. "http://192.168.1.100:3000") */
+  localUrl: z.string().url(),
+  /** Full join URL with default route for QR code pairing */
+  joinUrl: z.string().url(),
+  /** List of all non-internal IPv4 interface addresses discovered on host */
+  interfaces: z.array(z.string().ip({ version: "v4" })),
+  /** Operating relay mode: 'cloud' when behind public URL / reverse proxy, 'lan' for direct LAN */
+  relayMode: z.enum(["cloud", "lan"]),
+  /** Boolean flag indicating if server operates in cloud relay mode */
+  isCloudRelay: z.boolean(),
+  /** Public base URL when deployed to Cloud Run or behind reverse proxy */
+  publicUrl: z.string().url().optional(),
+});
+export type LanInfoResponse = z.infer<typeof LanInfoResponseSchema>;
+
+/**
+ * Standard REST success envelope for LAN info discovery (MAJ-009).
+ */
+export const LanInfoEnvelopeSchema = z.object({
+  data: LanInfoResponseSchema,
+});
+export type LanInfoEnvelope = z.infer<typeof LanInfoEnvelopeSchema>;
+```
+
+### 1.4 Response Payload Examples
+
+#### Example A: Local Network (LAN) Mode
+```json
+{
+  "data": {
     "lanIp": "192.168.1.50",
     "port": 3000,
-    "localUrl": "http://localhost:3000",
+    "localUrl": "http://192.168.1.50:3000",
     "joinUrl": "http://192.168.1.50:3000",
-    "interfaces": ["192.168.1.50"],
+    "interfaces": [
+      "192.168.1.50",
+      "10.0.0.12"
+    ],
     "relayMode": "lan",
     "isCloudRelay": false
   }
-  ```
-- **Standard HTTP Error Response Contract:**
-  All error responses (403, 404, 429, 500) MUST conform to the unified error envelope:
-  ```json
-  {
-    "error": {
-      "code": "ERR_UNAUTHORIZED",
-      "message": "Telemetry access restricted to authorized callers or loopback",
-      "statusCode": 403,
-      "correlationId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "timestamp": "2026-09-10T06:00:00.000Z"
-    }
-  }
-  ```
-
----
-
-## 2. Telemetry Ingress Authorization & IP Security Contract (CRIT-001, MIN-001)
-
-### 2.1 IP Normalization Contract (`normalizeIp` in `ip_utils.ts`)
-- **Vulnerability Remediated (CRIT-001):** Previously, `normalizeIp` defaulted unparseable/invalid IPs to `"127.0.0.1"`, enabling remote callers with malformed headers to bypass telemetry authorization.
-- **Fail-Closed Guarantee:** `normalizeIp` MUST return `"unknown"` for any missing, empty, whitespace-only, non-string, or syntactically invalid IP string (`net.isIP(trimmed) === 0`).
-- **IPv4-Mapped IPv6 Prefix:** Strips `::ffff:` prefix before validation.
-- **Canonical Specification:**
-  ```typescript
-  import net from "node:net";
-
-  export function normalizeIp(rawIp: string | undefined): string {
-    if (!rawIp || typeof rawIp !== "string") {
-      return "unknown";
-    }
-    let trimmed = rawIp.trim();
-    if (trimmed.startsWith("::ffff:")) {
-      trimmed = trimmed.slice(7);
-    }
-    if (!trimmed || net.isIP(trimmed) === 0) {
-      return "unknown";
-    }
-    return trimmed;
-  }
-  ```
-
-### 2.2 Client IP Extraction Contract (`extractClientIp` in `ip_utils.ts`)
-- When `trustProxy === false`:
-  - `extractClientIp` strictly evaluates direct TCP socket remote address (`req.socket?.remoteAddress` or `socket.conn?.remoteAddress`).
-  - `x-forwarded-for` and all proxy headers are strictly ignored.
-  - Passes direct address through `normalizeIp`. If socket address is missing or invalid, returns `"unknown"`.
-- When `trustProxy === true`:
-  - Evaluates the rightmost entry in `x-forwarded-for` (the client IP immediately prior to the trusted ingress reverse proxy).
-  - Passes candidate through `normalizeIp`. If the header value is invalid, returns `"unknown"`.
-
-### 2.3 Telemetry Authorization Contract (`isTelemetryAuthorized` in `health.controller.ts`)
-- **Protected Endpoints:** `/metrics`, `/health/detail`.
-- **Authorization Parameters Interface:**
-  ```typescript
-  export interface TelemetryAuthParams {
-    clientIp: string;
-    directSocketIp?: string; // Direct remote TCP IP from req.socket.remoteAddress
-    headers: Record<string, string | string[] | undefined>;
-    metricsSecret?: string;
-    isProduction: boolean;
-  }
-  ```
-- **Rules of Authorization (Evaluated in Strict Order):**
-  1. **Strict Loopback Evaluation (Anti-Spoofing Rule):**
-     - Loopback access privilege (`127.0.0.1`, `::1`, `::ffff:127.0.0.1`) is ONLY granted if the physical TCP connection (`directSocketIp`) is a verified loopback address.
-     - **Remote Loopback Spoofing Denial:** If an incoming request arrives over a non-loopback TCP socket (or `directSocketIp` is `"unknown"`), but provides an `X-Forwarded-For: 127.0.0.1` header, loopback privilege is **STRICTLY DENIED**. Loopback cannot be claimed via proxy headers.
-  2. **Timing-Safe `METRICS_SECRET` Verification (MIN-001):**
-     - If `metricsSecret` is configured (non-empty string):
-       - Candidate secret is extracted from `x-metrics-secret` header (first array item if array) or `Authorization: Bearer <token>`.
-       - If no candidate token is provided, authorization fails.
-       - Candidate token comparison against `metricsSecret` MUST use `crypto.timingSafeEqual` with matching byte lengths to prevent timing side-channel attacks.
-       - If byte lengths differ, constant-time SHA-256 digest comparison must be performed to avoid leaking length:
-         ```typescript
-         import crypto from "node:crypto";
-
-         function timingSafeStringEqual(a: string, b: string): boolean {
-           const hashA = crypto.createHash("sha256").update(a).digest();
-           const hashB = crypto.createHash("sha256").update(b).digest();
-           return crypto.timingSafeEqual(hashA, hashB);
-         }
-         ```
-  3. **Non-Production Fallback:**
-     - If `!isProduction` and `!metricsSecret`: Permitted for local development.
-     - If `isProduction` and `!metricsSecret`: Denied by default (fail closed, warning emitted at startup).
-
----
-
-## 3. HMAC-SHA256 Cryptographic Session Token Contract (MAJ-004, CRIT-002)
-
-### 3.1 Token Format Specification
-A Fun Chess session token is a tamper-evident, cryptographically signed string in two dot-separated segments:
+}
 ```
-<uuid>.<signature>
-```
-- **`uuid` segment:** 36-character canonical RFC 4122 UUID v4 (`/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`).
-- **`signature` segment:** 64-character lowercase hex digest of the HMAC-SHA256 computed over the `uuid` segment:
-  $$\text{signature} = \text{HMAC-SHA256}(\text{key} = \text{signingKey}, \text{data} = \text{uuid})$$
-- **Total Token Length:** 36 + 1 + 64 = 101 characters. Satisfies `SessionTokenSchema` constraint (`min(1).max(128)`).
-- **Entropy & Defense:** Guarantees that session tokens cannot be forged or guessable by brute-force room codes or player IDs.
 
-### 3.2 Signing Key Derivation
-- Canonical environment variable: `SESSION_SECRET`.
-- **Derivation Algorithm:**
-  ```typescript
-  import crypto from "node:crypto";
-
-  export function deriveSessionKey(secret: string): Buffer {
-    return crypto.createHash("sha256").update(secret, "utf-8").digest();
+#### Example B: Cloud Relay Mode (Google Cloud Run / Production)
+```json
+{
+  "data": {
+    "lanIp": "10.0.0.1",
+    "port": 8080,
+    "localUrl": "http://10.0.0.1:8080",
+    "joinUrl": "https://chess.example.com",
+    "interfaces": [
+      "10.0.0.1"
+    ],
+    "relayMode": "cloud",
+    "isCloudRelay": true,
+    "publicUrl": "https://chess.example.com"
   }
-  ```
-- **Environment & Startup Rules:**
-  - In production (`NODE_ENV === "production"`): `SESSION_SECRET` MUST be defined and contain at least 16 characters. If missing, the server logs a critical configuration error and fails startup validation.
-  - In development/testing: If unset, a deterministic development fallback (`"fun-chess-dev-session-secret-key-32b"`) is used with an explicit warning logged.
+}
+```
 
-### 3.3 Core Shared Utility Contract (`@fun-chess/shared/utils/session_token.ts`)
+### 1.5 Client Ingress Contract (`FetchApiClient.getLanInfo`)
+The client API adapter in `apps/client/src/platform/api/fetch_api_client.ts` requests `/api/v1/lan-info` and safely parses the enveloped payload:
+
 ```typescript
-export interface SessionTokenResult {
-  token: string;
-  uuid: string;
-}
+async getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse> {
+  const res = await this.get<unknown>('/api/v1/lan-info', options);
+  if (!res.ok) {
+    this.handleResponseError(res, 'Failed to fetch LAN info', options?.correlationId ?? '');
+  }
 
-export interface SessionTokenVerification {
-  valid: boolean;
-  uuid?: string;
-  reason?: "invalid_format" | "invalid_signature" | "missing_secret";
+  // Support both standard { data: LanInfoResponse } envelope and direct payload (defensive fallback)
+  if (res.data && typeof res.data === 'object' && 'data' in res.data) {
+    return LanInfoResponseSchema.parse((res.data as { data: unknown }).data);
+  }
+  return LanInfoResponseSchema.parse(res.data);
 }
+```
+
+---
+
+## 2. Mid-Game Socket Action Schemas & Server Verification (MAJ-007)
+
+### 2.1 Context & Security Vulnerability
+- **Defect (MAJ-007):** Mid-game action schemas (`MakeMoveRequestSchema`, `ResignRequestSchema`, `OfferDrawRequestSchema`, `RespondDrawRequestSchema`, `RequestRematchRequestSchema`, `RespondRematchRequestSchema`) only accepted `roomCode` and action data. Neither the schema nor the client payload included the HMAC `sessionToken`.
+- **Security Vulnerability:** Authentication was coupled exclusively to the transient Socket.IO `socket.id`. If a player momentarily disconnected and reconnected with a new socket ID before the reconnection handshake completed, all subsequent move attempts failed with `PlayerNotInRoomError`. Furthermore, if an attacker could guess or observe a valid `roomCode`, they could emit socket events from an arbitrary connection if socket tracking slipped.
+
+### 2.2 Schema Updates in `shared/src/contracts/schemas.ts`
+All mid-game request schemas MUST accept an optional `sessionToken` field:
+
+```typescript
+/**
+ * Socket request schema for submitting a move in an active game room.
+ * Includes optional HMAC sessionToken for cryptographic authentication (MAJ-007).
+ */
+export const MakeMoveRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  move: MovePayloadSchema,
+  expectedMoveNumber: z.number().int().nonnegative().optional(),
+  idempotencyKey: z
+    .string()
+    .min(1, "Idempotency key must not be empty")
+    .max(64, "Idempotency key cannot exceed 64 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Idempotency key must be alphanumeric, hyphen, or underscore")
+    .optional(),
+  /** Cryptographic HMAC session token for player verification (MAJ-007) */
+  sessionToken: z
+    .string()
+    .min(1, "Session token cannot be empty")
+    .max(256, "Session token exceeds maximum length")
+    .optional(),
+});
+export type MakeMoveRequest = z.infer<typeof MakeMoveRequestSchema>;
 
 /**
- * Generates a cryptographically signed session token.
+ * Socket request schema for resigning an active match.
  */
-export function generateSessionToken(
-  uuid: string,
-  sessionSecret: string,
-): string;
+export const ResignRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  sessionToken: z.string().min(1).max(256).optional(),
+});
+export type ResignRequest = z.infer<typeof ResignRequestSchema>;
 
 /**
- * Validates a session token signature using timing-safe comparison.
- * Supports backward compatibility for legacy unsigned UUID tokens when enabled.
+ * Socket request schema for offering a draw to the opponent.
  */
-export function verifySessionToken(
-  token: string,
-  sessionSecret: string,
-  options?: { allowUnsignedInDev?: boolean },
-): SessionTokenVerification;
+export const OfferDrawRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  sessionToken: z.string().min(1).max(256).optional(),
+});
+export type OfferDrawRequest = z.infer<typeof OfferDrawRequestSchema>;
+
+/**
+ * Socket request schema for accepting or declining a draw offer.
+ */
+export const RespondDrawRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  accept: z.boolean(),
+  sessionToken: z.string().min(1).max(256).optional(),
+});
+export type RespondDrawRequest = z.infer<typeof RespondDrawRequestSchema>;
+
+/**
+ * Socket request schema for requesting a rematch after match conclusion.
+ */
+export const RequestRematchRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  sessionToken: z.string().min(1).max(256).optional(),
+});
+export type RequestRematchRequest = z.infer<typeof RequestRematchRequestSchema>;
+
+/**
+ * Socket request schema for accepting or declining a rematch request.
+ */
+export const RespondRematchRequestSchema = z.object({
+  roomCode: RoomCodeSchema,
+  accept: z.boolean(),
+  sessionToken: z.string().min(1).max(256).optional(),
+});
+export type RespondRematchRequest = z.infer<typeof RespondRematchRequestSchema>;
 ```
 
-### 3.4 Verification & Reconnection Workflow
-1. **Creation:**
-   - In `RoomService.createRoom` and `RoomService.joinRoom`:
-   - An ID generator generates `playerId` (UUID) and a session `uuid`.
-   - The server calls `generateSessionToken(uuid, env.SESSION_SECRET)`.
-   - The token is registered in `SessionRegistry` and returned to the client **only via the acknowledgment callback**.
-2. **Reconnection Verification:**
-   - In `room:reconnect`, the client transmits `{ roomCode, playerId, sessionToken }`.
-   - `RoomService.reconnect` immediately executes `verifySessionToken(token, secret)`:
-     - If `!verification.valid`: Fast cryptographic rejection with `ERR_UNAUTHORIZED`. The database/in-memory store is not even queried, mitigating DoS on session storage.
-     - If `verification.valid`: Query `SessionRegistry.validateSession(token, roomCode, playerId)`.
-3. **Backward Compatibility & Test Migration:**
-   - If `options.allowUnsignedInDev === true` (allowed only when `NODE_ENV === "test"` or in development mode):
-     - If the token is a valid UUIDv4 without a dot (`.`), it is accepted with `valid: true`.
-   - In production mode: Unsigned tokens are unconditionally rejected.
+### 2.3 Server Verification Semantics (`GameService`)
+Server verification MUST follow the **Dual-Authentication & Session Auto-Healing Protocol**:
 
-### 3.5 Token Masking & Redaction Rules (CRIT-002)
-- **Zero Cleartext Logging:** Raw session tokens MUST NEVER appear in application logs, HTTP access logs, query strings, or error messages.
-- **`InMemorySessionRegistry` Metadata:** Replace all instances of `sessionToken` in debug/info logs with a masked fingerprint:
-  ```typescript
-  export function maskToken(token: string): string {
-    if (!token || typeof token !== "string") return "[REDACTED]";
-    if (token.length <= 12) return "[REDACTED]";
-    return `${token.slice(0, 8)}...${token.slice(-6)}`;
-  }
-  ```
-- **HTTP Ingress Scrubbing:** `extractHttpUserId` in `http_server.ts` MUST NOT inspect `x-session-token` or URL query parameter `sessionToken`. It only inspects `x-user-id` and `x-player-id`.
-
----
-
-## 4. Socket Event Contracts & Reconnect Single-Delivery (MAJ-025, MIN-024)
-
-### 4.1 Elimination of Dual-Delivery on `room:reconnect` (MAJ-025)
-- **Problem Statement:** Previously, upon reconnection, `room.socket_handler.ts` emitted `"room:reconnected"` to the client socket and simultaneously returned the identical payload in the acknowledgment callback. Both handlers executed on the client, causing race conditions, state tearing, and duplicate render passes.
-- **Architectural Mandate:**
-  1. **Deprecate `room:reconnected` socket emit:** The server MUST NOT emit `"room:reconnected"` to `socket`.
-  2. **Single Ingress Channel:** Reconnection state is delivered **exclusively through the acknowledgment callback**.
-  3. **Peer Broadcast Preserved:** The peer player in the room is notified via:
-     ```typescript
-     socket.to(roomCode).emit("room:player_reconnected", {
-       playerId: result.player.id,
-       playerName: result.player.name,
-       roomStatus: result.room.status,
-     });
-     ```
-  4. **Event Declaration Deprecation:** Mark `"room:reconnected"` in `ServerToClientEvents` with `@deprecated`:
-     ```typescript
-     export interface ServerToClientEvents {
-       /**
-        * @deprecated Dual-delivery eliminated per MAJ-025.
-        * State is delivered strictly via room:reconnect acknowledgment callback.
-        * Retained as optional client listener for backward compatibility.
-        */
-       "room:reconnected": (data: {
-         room: RoomState;
-         player: Player;
-         roomStatus?: RoomStatus;
-       }) => void;
-       // ...
-     }
-     ```
-
-### 4.2 Reconnection Acknowledgment Response Contract (MIN-024)
-- **Authoritative Type Contract (`shared/src/contracts/events.ts`):**
-  ```typescript
-  export interface ReconnectSuccessAck {
-    success: true;
-    room: RoomState;
-    player: Player;
-    roomStatus: RoomStatus;
-    sessionToken: string;
-  }
-
-  export interface ReconnectErrorAck {
-    success: false;
-    error: SocketErrorPayload;
-  }
-
-  export type ReconnectAckPayload = ReconnectSuccessAck | ReconnectErrorAck;
-  ```
-- **Client Generic Typing (`useRoomSession.ts`):**
-  ```typescript
-  return transport.emitWithTimeout<ReconnectRequest, ReconnectAckPayload>(
-    s,
-    'room:reconnect',
-    validationResult.data,
-    {
-      timeoutMs: 8000,
-      operation: 'socket_room_reconnect',
-      correlationId,
-      onSuccess: (res) => {
-        currentRoom.value = res.room;
-        currentPlayer.value = res.player;
-        sessionToken.value = res.sessionToken;
-        saveSession({
-          roomCode: res.room.roomCode,
-          playerId: res.player.id,
-          sessionToken: res.sessionToken,
-        });
-      },
-      onError: (err) => {
-        if (err.code === 'ERR_ROOM_NOT_FOUND' || err.code === 'ERR_UNAUTHORIZED') {
-          resetRoomSessionState(true);
-          clearSession();
-          onRoomClosed?.();
-        }
-      },
-    },
-  );
-  ```
-
----
-
-## 5. Socket Middleware Pipeline Architecture (MAJ-007, MAJ-019)
-
-### 5.1 Pipeline Decomposition Overview
-The monolithic `wrapSocketHandler` (CC 31, 212 lines) is decomposed into 4 discrete, composable middleware stages:
 ```
-Inbound Socket Event (rawPayload, callback)
-  │
-  ├── 1. withCorrelation
-  │      └── Generate/sanitize correlationId, extract clientIp & userId, log "Operation started"
-  │
-  ├── 2. withRateLimit
-  │      └── Evaluate rate limiter bucket; if exceeded, log reject & safeDispatchResponse(429)
-  │
-  ├── 3. withValidation
-  │      └── Zod schema validation; if invalid, log reject & safeDispatchResponse(400)
-  │
-  └── 4. withLogging & Execution
-         └── Execute domain handler, capture duration, log "Operation succeeded" / "Operation failed",
-             safeDispatchResponse with defensive callback protection
+Client Action Socket Ingress
+          │
+          ▼
+   Does request or socket
+   contain sessionToken?
+          │
+    ┌─────┴─────┐
+   YES          NO
+    │            │
+    ▼            ▼
+Validate token   Fallback: Verify player
+in Session       by socket.id in room
+Registry         (Legacy / Grace period)
+    │            │
+    ├─ Invalid ──┴─ Not in room ──► Reject (401/404)
+    │
+    ▼
+Does session match roomCode & player?
+    │
+    ├─ No ──► Reject PlayerNotInRoomError
+    │
+    ▼
+Is player.socketId != socket.id?
+    │
+    ├─ YES ─► Auto-heal: update player.socketId in Room
+    │         and re-bind socket to room channel
+    ▼
+Execute Game Action (move, resign, draw, rematch)
 ```
 
-### 5.2 Middleware Contracts & Signatures
+#### Detailed Verification Algorithm
+1. **Token Extraction:**
+   - Check `req.sessionToken`. If absent, check `socket.data.sessionToken`.
+2. **Cryptographic Validation:**
+   - When a token is present, validate via `sessionRegistry.validateSession(sessionToken, roomCode, expectedPlayerId)`.
+   - If invalid signature or expired: throw `InvalidSessionError` (HTTP 401).
+   - If valid: resolve the authentic `playerId`.
+3. **Session Auto-Healing (Connection Recovery):**
+   - If `player.socketId !== currentSocketId`:
+     - The player has reconnected or opened a new socket.
+     - Automatically update `player.socketId = currentSocketId` in the room state.
+     - Join the new socket to the room room channel (`socket.join(roomCode)`).
+     - Log diagnostic message: `operation: "player_socket_auto_healed"`.
+4. **Turn & State Authorization:**
+   - Verify the authenticated `playerId` owns the turn (for `game:move`) or is an active participant in the match (for resign/draw/rematch).
+5. **Fallback:**
+   - If NO `sessionToken` was provided by request or socket, verify via existing socket ID mapping `room.whitePlayer?.socketId === socket.id || room.blackPlayer?.socketId === socket.id`. If unmatched, throw `PlayerNotInRoomError`.
+
+### 2.4 Client Egress Contract (`useGameActions.ts`)
+The client composable in `apps/client/src/features/multiplayer/composables/useGameActions.ts` extracts `sessionToken` from the reactive session store and attaches it to every emitted action:
 
 ```typescript
-export interface SocketHandlerContext {
-  correlationId: string;
-  socketId: string;
-  clientIp?: string;
-  userId?: string;
-  startTime: number;
-}
+// In useGameActions.ts:
+const sessionToken = currentSession.value?.sessionToken;
 
-export type SocketMiddlewareNext<TPayload, TRes> = (
-  payload: TPayload,
-  context: SocketHandlerContext,
-) => Promise<TRes>;
+// Submitting a move:
+await emitSocketAction('game:move', {
+  roomCode,
+  move: { from, to, promotion },
+  expectedMoveNumber,
+  idempotencyKey,
+  sessionToken,
+});
 
-export type SocketMiddleware<TPayloadIn, TPayloadOut, TRes> = (
-  next: SocketMiddlewareNext<TPayloadOut, TRes>,
-) => SocketMiddlewareNext<TPayloadIn, TRes>;
+// Resigning:
+await emitSocketAction('game:resign', {
+  roomCode,
+  sessionToken,
+});
 ```
-
-1. **`withCorrelation`:**
-   - Initializes `correlationId` (`/^[a-zA-Z0-9_-]{8,64}$/` or `randomUUID()`).
-   - Extracts and normalizes `clientIp` via `extractClientIp(socket, trustProxy)`.
-   - Extracts `userId` from socket session data or payload metadata.
-   - Logs `operation_started` at `info` level (sanitized payload at `debug`).
-2. **`withRateLimit`:**
-   - Injects `SocketRateLimiter`.
-   - Verifies allowance against `clientIp` (or `socketId` fallback).
-   - If blocked: returns `ERR_RATE_LIMITED` payload via acknowledgment.
-3. **`withValidation`:**
-   - Validates `rawReq` against `schema?: z.ZodType<TPayload>`.
-   - If validation fails: formats issues, returns `ERR_INVALID_PAYLOAD`.
-4. **`withLogging`:**
-   - Wraps handler execution in high-resolution timer (`performance.now()`).
-   - Emits structured `operation_succeeded` with `duration`, `durationMs`, and `status: "success"`.
-   - On unhandled exception: formats sanitized error envelope and logs `operation_failed` with `duration` and `error: serializeError(err)`.
-
-### 5.3 Defensive Client Callback Execution Contract (MAJ-007)
-- **Vulnerability Remediated:** If a client acknowledgment callback throws a synchronous runtime exception, it must NOT escape into the outer catch block. Escaping exceptions previously caused the server to log a false "Operation failed" and invoke the callback a second time with an error.
-- **Defensive Dispatch Specification:**
-  ```typescript
-  export function safeDispatchResponse<TRes>(
-    callback: ((res: TRes) => void) | undefined,
-    socketObj: SocketLike | undefined,
-    success: boolean,
-    dataOrError: unknown,
-    logger: Logger,
-    context: { operation: string; correlationId: string },
-  ): void {
-    if (typeof callback === "function") {
-      try {
-        if (success) {
-          callback(dataOrError as TRes);
-        } else {
-          callback({
-            success: false,
-            error: dataOrError,
-          } as unknown as TRes);
-        }
-      } catch (cbErr) {
-        logger.warn("Client acknowledgment callback threw exception; double dispatch suppressed", {
-          operation: context.operation,
-          correlationId: context.correlationId,
-          error: serializeError(cbErr),
-        });
-      }
-      return;
-    }
-
-    // Fallback: emit error event to socket if no ack callback was provided
-    if (!success && socketObj && typeof socketObj.emit === "function") {
-      try {
-        socketObj.emit("error", dataOrError);
-      } catch (emitErr) {
-        logger.warn("Failed to emit error to socket", {
-          operation: context.operation,
-          correlationId: context.correlationId,
-          error: serializeError(emitErr),
-        });
-      }
-    }
-  }
-  ```
 
 ---
 
-## 6. HTTP Server Routing Architecture & IFileStorage (MAJ-014, MAJ-020)
+## 3. `room:reconnected` Socket Event & Client Rehydration (MAJ-003)
 
-### 6.1 `HttpRouter` Extraction Contract (`apps/server/src/platform/http/http_router.ts`)
-The 326-line closure inside `createHttpServer` (CC 40) is replaced by an instantiated `HttpRouter` class (CC < 10 per method):
+### 3.1 Context & Defect Analysis
+- **Defect (MAJ-003):** Refactor `MAJ-025` eliminated emitting `room:reconnected` to the reconnecting client, relying exclusively on the acknowledgment callback.
+- **Consequence:** `useGameActions.ts:255` was registered to listen for `room:reconnected` to restore incoming draw offers (`drawOfferedBy`) and rematch requests (`rematchRequestedBy`). Because the socket event was never emitted, reconnecting players lost active draw offers and rematch modals.
+
+### 3.2 Dual-Delivery Reconnection Protocol
+To guarantee 100% resilience against both event drops and callback timeouts, the server and client implement **Dual-Delivery Reconnection**:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Reconnecting Client
+    participant Server as RoomSocketHandler
+    participant Room as RoomService
+    participant Reg as SessionRegistry
+    actor Opponent as Opponent Client
+
+    Client->>Server: emit("room:reconnect", { roomCode, playerId, sessionToken }, ackCallback)
+    Server->>Reg: validateSession(sessionToken, roomCode, playerId)
+    Server->>Room: reconnect(roomCode, playerId, socket.id)
+    Server->>Server: socket.join(roomCode)
+
+    par Broadcast to Room (Opponent)
+        Server->>Opponent: emit("room:player_reconnected", { playerId, playerName, roomStatus })
+    and Unicast Event to Reconnecting Client
+        Server->>Client: emit("room:reconnected", { room, player, roomStatus })
+    and Acknowledgment Callback
+        Server-->>Client: ackCallback({ success: true, room, player, roomStatus, sessionToken })
+    end
+
+    Note over Client: useGameActions re-hydrates drawOffer & rematch from payload
+```
+
+### 3.3 Event Schema (`shared/src/contracts/events.ts`)
+```typescript
+/**
+ * Payload emitted specifically to the reconnecting client socket upon successful reconnect (MAJ-003).
+ */
+export const RoomReconnectedPayloadSchema = z.object({
+  /** Complete sanitized public room state */
+  room: RoomSchema,
+  /** Current player representation */
+  player: PlayerSchema,
+  /** Active room status */
+  roomStatus: RoomStatusSchema.optional(),
+});
+export type RoomReconnectedPayload = z.infer<typeof RoomReconnectedPayloadSchema>;
+```
+
+### 3.4 Server Emission Contract (`room.socket_handler.ts`)
+```typescript
+// apps/server/src/features/rooms/room.socket_handler.ts (in handleReconnect):
+const roomCode = result.room.roomCode;
+await safeSocketJoin(socket, roomCode, logger);
+
+// Cancel disconnect timers for this player
+timerRegistry.cancel(roomCode, result.player.id);
+
+// 1. Notify other players in room
+socket.to(roomCode).emit("room:player_reconnected", {
+  playerId: result.player.id,
+  playerName: result.player.name,
+  roomStatus: result.room.status,
+});
+
+// 2. Unicast state event directly to reconnecting socket (MAJ-003)
+socket.emit("room:reconnected", {
+  room: sanitizePublicRoom(result.room),
+  player: sanitizePublicPlayer(result.player),
+  roomStatus: result.room.status,
+});
+
+// 3. Complete acknowledgment callback
+return {
+  success: true,
+  room: sanitizePublicRoom(result.room),
+  player: sanitizePublicPlayer(result.player),
+  roomStatus: result.room.status,
+  sessionToken: result.sessionToken ?? req.sessionToken,
+};
+```
+
+### 3.5 Client Rehydration Contract (`useGameActions.ts` & `useRoomSession.ts`)
+`useGameActions.ts` handles the event and restores reactive state:
 
 ```typescript
-export interface HttpRouterDependencies {
-  roomStore: IRoomCountProvider;
-  addressService: IAddressingInfoProvider;
-  staticController: StaticController;
-  healthController: HealthController;
-  rateLimiter: HttpRateLimiter;
-  logger: Logger;
-  port: number;
-  isProduction: boolean;
-  metricsSecret?: string;
-  allowedOrigins: string[];
-  trustProxy: boolean;
-  fileStorage?: IFileStorage;
-}
+export function handleRoomReconnected(data: { room: RoomState; player: Player }): void {
+  if (!data?.room || !data?.player) return;
 
-export class HttpRouter {
-  constructor(private readonly deps: HttpRouterDependencies) {}
+  const opponent =
+    data.room.whitePlayer?.id === data.player.id
+      ? data.room.blackPlayer
+      : data.room.whitePlayer;
+
+  // Re-hydrate pending draw offer
+  if (opponent && data.room.drawOffer && data.room.drawOffer.offeredBy === opponent.id) {
+    drawOfferedBy.value = {
+      fromPlayerId: opponent.id,
+      fromPlayerName: opponent.name,
+    };
+  } else {
+    drawOfferedBy.value = null;
+  }
+
+  // Re-hydrate pending rematch request
+  if (
+    opponent &&
+    data.room.rematch &&
+    data.room.rematch.requestedBy === opponent.id &&
+    (data.room.rematch.status ?? 'pending') === 'pending'
+  ) {
+    rematchRequestedBy.value = {
+      requestedBy: opponent.id,
+      requesterName: opponent.name,
+    };
+  } else {
+    rematchRequestedBy.value = null;
+  }
+}
+```
+
+In addition, `useRoomSession.ts` MUST call `handleRoomReconnected({ room: ack.room, player: ack.player })` when processing the acknowledgment callback if the event listener was not already triggered (idempotent rehydration).
+
+---
+
+## 4. Client HTTP Contract & Server Route Alignment (MAJ-008)
+
+### 4.1 Architectural Scope: HTTP vs. WebSocket Boundary
+The Fun Chess system architecture establishes a strict separation of transport concerns:
+
+| Concern | Protocol | Rationale |
+|---|---|---|
+| **Discovery & Health** | HTTP GET/HEAD | Stateless, cacheable, CDN-friendly, compatible with container orchestrator liveness probes. |
+| **Static SPA Delivery** | HTTP GET | Served via Node HTTP static handler with strict CSP and traversal defense. |
+| **All State Mutations** | WebSocket (Socket.IO) | Low latency, synchronized game clock, CAS locking, room presence, reconnection timers. |
+
+### 4.2 Endpoint Mapping
+The following table defines ALL supported HTTP routes exposed by `apps/server/src/platform/http/http_router.ts`:
+
+| Method | Route Path | Handler / Controller | Return Type | Auth / Purpose |
+|---|---|---|---|---|
+| `GET`, `HEAD` | `/health` | `HealthController.getLiveness` | `LivenessHealthResponse` | Public probe |
+| `GET`, `HEAD` | `/api/health` | `HealthController.getLiveness` | `LivenessHealthResponse` | Public probe alias |
+| `GET`, `HEAD` | `/health/detail` | `HealthController.getDeepHealth` | `DetailedHealthResponse` | Telemetry / Admin probe |
+| `GET`, `HEAD` | `/api/v1/lan-info` | `LanInfoController.getLanInfo` | `LanInfoEnvelope` | Host networking & QR code |
+| `GET`, `HEAD` | `/api/lan-info` | `handleLanInfoRoute` | 307 Redirect to `/api/v1/lan-info` | Legacy backward compat |
+| `GET`, `HEAD` | `/favicon.svg` | Static File Handler | Image SVG | Lightweight connectivity check |
+| `GET` | `/*` (SPA) | `StaticController.serveStatic` | `text/html` or static assets | Client web app bundle |
+
+### 4.3 `IApiClient` Contract Clarification (`apps/client/src/platform/api/api_client.interface.ts`)
+To prevent false assumptions of REST mutation endpoints (MAJ-008):
+1. The server exposes **zero POST endpoints**. All state changes MUST be dispatched over WebSockets.
+2. `IApiClient` explicitly documents this boundary. If `post<T>` is retained for future extensibility or third-party webhooks, it MUST be annotated with `@deprecated` or `@remarks` stating that the Fun Chess core server accepts queries via GET only:
+
+```typescript
+/**
+ * Centralized HTTP API client for client composables and features.
+ *
+ * NOTE ON TRANSPORT ARCHITECTURE (MAJ-008):
+ * Fun Chess server uses HTTP strictly for queries, discovery, and health probes.
+ * All game and room mutations (room creation, joins, moves, resignations) occur
+ * exclusively via TypedSocket (Socket.IO).
+ */
+export interface IApiClient {
+  /** Performs GET request with timeout, correlation tracing, and error handling */
+  get<T>(url: string, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
 
   /**
-   * Dispatches incoming HTTP requests through the middleware pipeline and route controllers.
+   * Discovers LAN networking information from server at /api/v1/lan-info (MAJ-009, MIN-010).
    */
-  public async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const startTime = performance.now();
-    const correlationId = sanitizeCorrelationId(req.headers["x-correlation-id"]);
-    const clientIp = extractClientIp(req, this.deps.trustProxy);
+  getLanInfo(options?: ApiRequestOptions): Promise<LanInfoResponse>;
 
-    // 1. Security Headers & CORS
-    // 2. Rate Limiting Check
-    // 3. Health & Telemetry Routes (/health, /healthz, /metrics, /health/detail)
-    // 4. LAN Info Route (/api/lan-info)
-    // 5. Static & SPA Routes
-    // 6. 404 Fallback
-  }
+  /**
+   * Lightweight health probe targeting server liveness at /health (CRIT-001).
+   */
+  checkHealth(options?: ApiRequestOptions): Promise<LivenessHealthResponse>;
+
+  /**
+   * Deep telemetry probe targeting /health/detail (CRIT-001).
+   */
+  getDetailedHealth(options?: ApiRequestOptions): Promise<DetailedHealthResponse>;
+
+  /**
+   * Verifies network connectivity via light probe HEAD request.
+   */
+  checkConnectivity(probeUrl?: string, options?: ApiRequestOptions): Promise<boolean>;
+
+  /**
+   * @deprecated Server exposes zero POST endpoints (MAJ-008). All mutations must use WebSocket events.
+   */
+  post<T>(url: string, body?: unknown, options?: ApiRequestOptions): Promise<ApiResponse<T>>;
 }
 ```
 
-### 6.2 `IFileStorage` Exposure in `StartServerOptions` (MAJ-014)
-- Add `fileStorage?: IFileStorage` to `StartServerOptions` in `apps/server/src/index.ts`.
-- In `startServer`:
-  ```typescript
-  export interface StartServerOptions {
-    // ...
-    /** Abstracted file storage provider for static asset resolution */
-    fileStorage?: IFileStorage;
-    // ...
-  }
-  ```
-- Pass `options.fileStorage` to `createHttpServer({ ..., fileStorage: options.fileStorage })`.
-- In `resolveDistPath`: Check path existence using `fileStorage?.stat?.()` rather than direct Node `fs.existsSync()`, preserving pure I/O isolation.
+---
+
+## 5. Frozen Contract Summary for Implementers
+
+| Contract Target | Source File | Implementer Responsibility |
+|---|---|---|
+| **`/api/v1/lan-info`** | `shared/src/contracts/schemas.ts`<br>`apps/server/src/platform/http/http_helpers.ts` | Wrap in `{ data: LanInfoResponse }`, add 307 redirect from `/api/lan-info`, update `LanInfoResponseSchema` (`relayMode` & `isCloudRelay` required). |
+| **Mid-Game `sessionToken`** | `shared/src/contracts/schemas.ts`<br>`apps/server/src/features/game/game.service.ts`<br>`apps/client/src/features/multiplayer/composables/useGameActions.ts` | Add `sessionToken?: string` to 6 action schemas; verify and auto-heal socket in `GameService`; forward `sessionToken` from `useGameActions`. |
+| **`room:reconnected`** | `shared/src/contracts/events.ts`<br>`apps/server/src/features/rooms/room.socket_handler.ts`<br>`apps/client/src/features/multiplayer/composables/useGameActions.ts` | Restore `socket.emit("room:reconnected", payload)` unicast on reconnect; parse and rehydrate draw and rematch dialogs. |
+| **`IApiClient`** | `apps/client/src/platform/api/api_client.interface.ts`<br>`apps/client/src/platform/api/fetch_api_client.ts` | Call `/api/v1/lan-info`, unwrap envelope, annotate `post<T>` deprecation and HTTP query-only scope. |

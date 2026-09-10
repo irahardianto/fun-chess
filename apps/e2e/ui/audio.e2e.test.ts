@@ -168,9 +168,11 @@ test.describe("Audio Synthesis & Volume/Mute Settings Persistence", () => {
       timeout: 15_000,
     });
 
-    const myTurn = page.locator(
-      '.bottom-player-section [data-testid="turn-badge-active"]',
-    );
+    const myTurn = page
+      .locator(
+        '.bottom-player-section [data-testid="turn-badge-active"], .bottom-player-section .player-badge.is-active-turn',
+      )
+      .first();
     await expect(myTurn).toBeVisible({ timeout: 15_000 });
 
     // 3. Make move in unmuted state (should trigger move audio synthesis)

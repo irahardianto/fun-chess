@@ -5,6 +5,7 @@ import {
   applyEvaluationNoise,
   selectBlunderMove,
   chooseFinalMove,
+  createSeededPrng,
   type EvaluatedCandidateMove,
 } from '../blunder_generator.js';
 
@@ -149,6 +150,27 @@ describe('Blunder Generator (Calibrated Mistake & Noise Model)', () => {
       expect(() => chooseFinalMove([], baseConfig)).toThrow(
         'Cannot choose final move from empty candidate list',
       );
+    });
+  });
+
+  describe('createSeededPrng (MAJ-017)', () => {
+    it('produces deterministic pseudorandom sequence from same seed', () => {
+      const prng1 = createSeededPrng(42);
+      const prng2 = createSeededPrng(42);
+
+      const seq1 = [prng1(), prng1(), prng1()];
+      const seq2 = [prng2(), prng2(), prng2()];
+
+      expect(seq1).toEqual(seq2);
+      expect(seq1[0]).toBeGreaterThanOrEqual(0);
+      expect(seq1[0]).toBeLessThan(1);
+    });
+
+    it('produces different sequences from different seeds', () => {
+      const prng1 = createSeededPrng(100);
+      const prng2 = createSeededPrng(200);
+
+      expect(prng1()).not.toBe(prng2());
     });
   });
 });

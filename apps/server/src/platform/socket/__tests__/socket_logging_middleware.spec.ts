@@ -9,6 +9,12 @@ import {
   safeDispatchResponse,
   withCorrelation,
   withLogging,
+  withRateLimit,
+  withValidation,
+  withErrorMapping,
+  withHandlerExecution,
+  composeSocketMiddleware,
+  type SocketMiddlewareContext,
 } from "../socket_logging_middleware.js";
 import { NullLogger } from "../../logger/null_logger.js";
 import { AppError, RoomCapacityExceededError } from "../../../features/rooms/room.errors.js";
@@ -733,6 +739,141 @@ describe("wrapSocketHandler", () => {
       expect(errResult.errorPayload.code).toBe("ERR_INVALID_MOVE");
       expect(logger.warnLogs).toHaveLength(1);
       expect(logger.warnLogs[0].message).toBe("Operation rejected");
+    });
+  });
+
+  describe("composeSocketMiddleware & Pipeline Stages (MAJ-025)", () => {
+    it("executes middlewares in order and throws if next is called multiple times", async () => {
+      const order: number[] = [];
+      const m1 = async (_ctx: SocketMiddlewareContext, next: () => Promise<void>) => {
+        order.push(1);
+        await next();
+        order.push(4);
+      };
+      const m2 = async (_ctx: SocketMiddlewareContext, next: () => Promise<void>) => {
+        order.push(2);
+        await next();
+        order.push(3);
+      };
+
+      const composed = composeSocketMiddleware(m1, m2);
+      const fakeCtx = {} as SocketMiddlewareContext;
+      await composed(fakeCtx);
+
+      expect(order).toEqual([1, 2, 3, 4]);
+
+      const doubleNextMiddleware = async (_ctx: SocketMiddlewareContext, next: () => Promise<void>) => {
+        await next();
+        await next();
+      };
+      const faultyPipeline = composeSocketMiddleware(doubleNextMiddleware);
+      await expect(faultyPipeline(fakeCtx)).rejects.toThrow("next() called multiple times");
+    });
+
+    it("withRateLimit as middleware blocks execution and dispatches 429 when rate limit exceeded", async () => {
+      const logger = new NullLogger();
+      const limiter = new SocketRateLimiter({
+        windowMs: 10_000,
+        maxRequests: 1,
+      });
+
+      let nextCalled = false;
+      let callbackPayload: unknown;
+
+      const baseCtx = withCorrelation("sock_rl_pipe", {}, "test:rl_pipe");
+      const ctx: SocketMiddlewareContext = {
+        ...baseCtx,
+        rateLimiter: limiter,
+        logger,
+        callback: (res) => {
+          callbackPayload = res;
+        },
+        handler: async () => ({ success: true }),
+      };
+
+      // First call succeeds through middleware
+      await withRateLimit(ctx, async () => {
+        nextCalled = true;
+      });
+      expect(nextCalled).toBe(true);
+      expect(ctx.errorPayload).toBeUndefined();
+
+      // Second call is blocked by rate limiter
+      nextCalled = false;
+      await withRateLimit(ctx, async () => {
+        nextCalled = true;
+      });
+      expect(nextCalled).toBe(false);
+      expect(ctx.errorPayload?.code).toBe("ERR_RATE_LIMITED");
+      expect(ctx.handled).toBe(true);
+      expect((callbackPayload as { error?: { code?: string } })?.error?.code).toBe("ERR_RATE_LIMITED");
+    });
+
+    it("withValidation as middleware blocks execution and dispatches 400 when validation fails", async () => {
+      const logger = new NullLogger();
+      let nextCalled = false;
+      let callbackPayload: unknown;
+
+      const baseCtx = withCorrelation("sock_v_pipe", { age: "invalid" }, "test:v_pipe");
+      const ctx: SocketMiddlewareContext = {
+        ...baseCtx,
+        schema: z.object({ age: z.number() }),
+        logger,
+        callback: (res) => {
+          callbackPayload = res;
+        },
+        handler: async () => ({ success: true }),
+      };
+
+      await withValidation(ctx, async () => {
+        nextCalled = true;
+      });
+
+      expect(nextCalled).toBe(false);
+      expect(ctx.errorPayload?.code).toBe("ERR_INVALID_PAYLOAD");
+      expect(ctx.handled).toBe(true);
+      expect((callbackPayload as { error?: { code?: string } })?.error?.code).toBe("ERR_INVALID_PAYLOAD");
+    });
+
+    it("withErrorMapping catches errors and formats error response without rethrowing", async () => {
+      const logger = new NullLogger();
+      let callbackPayload: unknown;
+
+      const baseCtx = withCorrelation("sock_err_pipe", {}, "test:err_pipe");
+      const ctx: SocketMiddlewareContext = {
+        ...baseCtx,
+        logger,
+        callback: (res) => {
+          callbackPayload = res;
+        },
+        handler: async () => {
+          throw new CustomTestError();
+        },
+      };
+
+      await withErrorMapping(ctx, async () => {
+        throw new CustomTestError();
+      });
+
+      expect(ctx.handled).toBe(true);
+      expect(ctx.errorPayload?.code).toBe("ERR_INVALID_MOVE");
+      expect((callbackPayload as { error?: { code?: string } })?.error?.code).toBe("ERR_INVALID_MOVE");
+    });
+
+    it("withHandlerExecution executes the handler with validated data and context", async () => {
+      const baseCtx = withCorrelation("sock_exec", { name: "Bob" }, "test:exec");
+      const ctx: SocketMiddlewareContext = {
+        ...baseCtx,
+        logger: new NullLogger(),
+        handler: async (req: unknown, handlerCtx) => {
+          return { greeting: `Hello ${(req as { name: string }).name}`, socketId: handlerCtx.socketId };
+        },
+      };
+
+      await withHandlerExecution(ctx);
+
+      expect(ctx.handled).toBe(true);
+      expect(ctx.result).toEqual({ greeting: "Hello Bob", socketId: "sock_exec" });
     });
   });
 });

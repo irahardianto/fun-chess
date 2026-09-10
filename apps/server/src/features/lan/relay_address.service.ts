@@ -1,18 +1,11 @@
 import os, { NetworkInterfaceInfo } from "node:os";
-import { LanInfoResponse as BaseLanInfoResponse } from "@fun-chess/shared";
+import {
+  type LanInfoResponse,
+  serializeError,
+} from "@fun-chess/shared";
 import { Logger } from "../../platform/logger/index.js";
 
-/**
- * Extended LAN & Cloud Relay Information response structure.
- */
-export interface LanInfoResponse extends BaseLanInfoResponse {
-  /** Addressing mode: 'cloud' when running with PUBLIC_URL, 'lan' for local network */
-  readonly relayMode: "cloud" | "lan";
-  /** Flag indicating whether the server is acting as an internet cloud relay */
-  readonly isCloudRelay: boolean;
-  /** Public base URL when deployed to Cloud Run or behind a reverse proxy */
-  readonly publicUrl?: string;
-}
+export type { LanInfoResponse };
 
 /**
  * Abstraction provider for operating system network interface discovery.
@@ -69,6 +62,8 @@ export interface RelayAddressConfig {
   readonly logger?: Logger;
   /** Optional network interface provider (defaults to SystemNetworkInterfaceProvider) (MAJ-016) */
   readonly networkInterfaceProvider?: INetworkInterfaceProvider;
+  /** Optional flag to suppress internal network interfaces in cloud relay mode (MAJ-013, MIN-004) */
+  readonly suppressCloudInterfaces?: boolean;
 }
 
 /**
@@ -149,7 +144,7 @@ export function normalizePublicUrl(
         operation: "normalize_public_url",
         correlationId,
         rawUrl: trimmed,
-        error: error instanceof Error ? error.message : String(error),
+        error: serializeError(error),
       },
     );
     return trimmed.replace(/\/+$/, "");
@@ -183,7 +178,7 @@ export function extractHostnameFromUrl(
       operation: "extract_hostname_from_url",
       correlationId,
       rawUrl: trimmed,
-      error: error instanceof Error ? error.message : String(error),
+      error: serializeError(error),
     });
     return trimmed.replace(/^https?:\/\//i, "").split(/[:/]/)[0] || "127.0.0.1";
   }
@@ -245,7 +240,7 @@ export class RelayAddressService implements IRelayAddressService {
         {
           operation: "get_all_lan_interfaces",
           correlationId,
-          error: err instanceof Error ? err.message : String(err),
+          error: serializeError(err),
         },
       );
       if (!addresses.includes("127.0.0.1")) {
@@ -384,12 +379,9 @@ export class RelayAddressService implements IRelayAddressService {
       const publicUrl = this.getPublicUrl(correlationId)!;
       const joinUrl = publicUrl;
 
-      // In production cloud relay (using SystemNetworkInterfaceProvider), suppress internal network topology (MIN-004).
-      // If a StaticNetworkInterfaceProvider is explicitly provided in tests, preserve interfaces.
-      const cloudInterfaces =
-        this.networkInterfaceProvider instanceof StaticNetworkInterfaceProvider
-          ? interfaces
-          : [];
+      // In cloud relay mode, suppress internal network topology (MIN-004) unless explicitly configured otherwise (MAJ-013).
+      const shouldSuppress = this.config.suppressCloudInterfaces ?? true;
+      const cloudInterfaces = shouldSuppress ? [] : interfaces;
 
       this.config.logger?.debug("Resolved Cloud Relay addressing info", {
         operation: "get_addressing_info",

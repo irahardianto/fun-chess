@@ -210,6 +210,13 @@ describe("room.logic pure functions", () => {
         ).toThrow(GameNotActiveError);
       }
     });
+
+    it("throws an error if now is omitted (MAJ-016)", () => {
+      expect(() =>
+        // @ts-expect-error testing runtime missing parameter
+        addPlayerToRoom(initialRoom, guestPlayer),
+      ).toThrow("Missing required 'now' parameter in addPlayerToRoom");
+    });
   });
 
   describe("disconnectPlayerTransition", () => {

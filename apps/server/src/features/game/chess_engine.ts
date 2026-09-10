@@ -9,7 +9,9 @@ import {
   Square,
   calculateMaterialAndCaptures,
   getKingSquare,
+  serializeError,
 } from "@fun-chess/shared";
+import type { Logger } from "../../platform/logger/index.js";
 
 export interface ValidationSuccess {
   success: true;
@@ -54,8 +56,9 @@ export class ChessEngine {
     let chess: Chess;
     try {
       chess = new Chess(currentFen);
-    } catch {
-      return { success: false, error: "Invalid board FEN string" };
+    } catch (err: unknown) {
+      const detail = err instanceof Error && err.message ? `: ${err.message}` : "";
+      return { success: false, error: `Invalid board FEN string${detail}` };
     }
 
     if (chess.turn() !== expectedTurn) {
@@ -301,16 +304,25 @@ export class ChessEngine {
 
   /**
    * Locates the square of the king from a FEN string.
-   * Catches FEN parsing errors and logs debug details before returning null (MIN-001).
+   * Returns null if FEN is malformed or king square is not present (MIN-003).
    */
   public static findKingSquare(
     fen: string,
     color: PieceColor,
+    logger?: Logger,
   ): Square | null {
     try {
       const chess = new Chess(fen);
       return this.getKingSquare(chess, color);
-    } catch {
+    } catch (err: unknown) {
+      if (logger) {
+        logger.debug("Failed to parse FEN in findKingSquare", {
+          operation: "find_king_square_fen_error",
+          fen,
+          color,
+          error: serializeError(err),
+        });
+      }
       return null;
     }
   }

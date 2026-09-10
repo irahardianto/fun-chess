@@ -1,4 +1,5 @@
 import {
+  AppError,
   GameOverPayload,
   GameOverReason,
   GameState,
@@ -22,7 +23,11 @@ import {
   serializeError,
 } from "@fun-chess/shared";
 import { randomUUID } from "node:crypto";
-import type { IRoomGameAdapter, ISessionRegistry } from "../rooms/index.js";
+import type {
+  IRoomGameAdapter,
+  ISessionRegistry,
+  SessionRecord,
+} from "../rooms/index.js";
 import { ChessEngine } from "./chess_engine.js";
 import { type Logger, defaultLogger } from "../../platform/logger/index.js";
 import { IGameService, MoveApplicationResult } from "./game.interface.js";
@@ -93,6 +98,7 @@ export class GameService implements IGameService {
     req: MakeMoveRequest,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{ room: RoomState; player: Player }> {
     const roomCode = normalizeRoomCode(req.roomCode);
     const room = await this.roomAdapter.getRoom(roomCode, correlationId);
@@ -105,12 +111,15 @@ export class GameService implements IGameService {
       throw new GameNotActiveError(room.status);
     }
 
-    const player = this.getPlayerBySocketId(room, socketId);
-    if (!player) {
-      throw new PlayerNotInRoomError(socketId);
-    }
+    const { player, room: resolvedRoom } =
+      await this.resolveAuthenticatedPlayer(
+        room,
+        socketId,
+        sessionToken,
+        correlationId,
+      );
 
-    return { room, player };
+    return { room: resolvedRoom, player };
   }
 
   /**
@@ -290,6 +299,7 @@ export class GameService implements IGameService {
     req: MakeMoveRequest,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<MoveApplicationResult> {
     const startTime = this.clock.now();
     const roomCode = normalizeRoomCode(req.roomCode);
@@ -299,6 +309,7 @@ export class GameService implements IGameService {
         req,
         socketId,
         correlationId,
+        sessionToken,
       );
 
       this.logger.debug("Applying chess move", {
@@ -426,6 +437,7 @@ export class GameService implements IGameService {
     roomCode: string,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload }> {
     const startTime = this.clock.now();
     const code = normalizeRoomCode(roomCode);
@@ -441,14 +453,19 @@ export class GameService implements IGameService {
         throw new GameNotActiveError(room.status);
       }
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+      const { player, room: resolvedRoom } =
+        await this.resolveAuthenticatedPlayer(
+          room,
+          socketId,
+          sessionToken,
+          correlationId,
+        );
 
       const winnerColor: PieceColor = player.color === "w" ? "b" : "w";
       const winnerPlayer =
-        winnerColor === "w" ? room.whitePlayer : room.blackPlayer;
+        winnerColor === "w"
+          ? resolvedRoom.whitePlayer
+          : resolvedRoom.blackPlayer;
       const winnerName = winnerPlayer?.name || "Opponent";
 
       const gameOverPayload: GameOverPayload = createGameOverPayload({
@@ -456,9 +473,9 @@ export class GameService implements IGameService {
         winnerName,
         loserName: player.name,
         reason: "resignation",
-        finalFen: room.game.fen,
-        totalMoves: room.game.moveCount,
-        startTimeMs: room.createdAt,
+        finalFen: resolvedRoom.game.fen,
+        totalMoves: resolvedRoom.game.moveCount,
+        startTimeMs: resolvedRoom.createdAt,
       });
 
       const updatedRoom = await this.roomAdapter.finalizeGame(
@@ -481,14 +498,20 @@ export class GameService implements IGameService {
       return { room: updatedRoom, gameOverPayload };
     } catch (err) {
       const duration = this.clock.now() - startTime;
-      this.logger.error("Player resignation failed", {
+      const isClientError = err instanceof AppError && err.statusCode < 500;
+      const logContext = {
         operation: "game_resign",
         correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
         error: serializeError(err),
-      });
+      };
+      if (isClientError) {
+        this.logger.warn("Player resignation rejected", logContext);
+      } else {
+        this.logger.error("Player resignation failed", logContext);
+      }
       throw err;
     }
   }
@@ -500,6 +523,7 @@ export class GameService implements IGameService {
     roomCode: string,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{
     room: RoomState;
     fromPlayer: Player;
@@ -519,13 +543,18 @@ export class GameService implements IGameService {
         throw new GameNotActiveError(room.status);
       }
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+      const { player, room: resolvedRoom } =
+        await this.resolveAuthenticatedPlayer(
+          room,
+          socketId,
+          sessionToken,
+          correlationId,
+        );
 
       const opponent =
-        player.color === "w" ? room.blackPlayer : room.whitePlayer;
+        player.color === "w"
+          ? resolvedRoom.blackPlayer
+          : resolvedRoom.whitePlayer;
 
       const updatedRoom = await this.roomAdapter.updateDrawOffer(
         code,
@@ -554,14 +583,20 @@ export class GameService implements IGameService {
       };
     } catch (err) {
       const duration = this.clock.now() - startTime;
-      this.logger.error("Draw offer failed", {
+      const isClientError = err instanceof AppError && err.statusCode < 500;
+      const logContext = {
         operation: "game_draw_action",
         correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
         error: serializeError(err),
-      });
+      };
+      if (isClientError) {
+        this.logger.warn("Draw offer rejected", logContext);
+      } else {
+        this.logger.error("Draw offer failed", logContext);
+      }
       throw err;
     }
   }
@@ -574,6 +609,7 @@ export class GameService implements IGameService {
     socketId: string,
     accept: boolean,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{
     room: RoomState;
     accept: boolean;
@@ -594,16 +630,19 @@ export class GameService implements IGameService {
         throw new GameNotActiveError(room.status);
       }
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+      const { player, room: resolvedRoom } =
+        await this.resolveAuthenticatedPlayer(
+          room,
+          socketId,
+          sessionToken,
+          correlationId,
+        );
 
-      if (!room.drawOffer) {
+      if (!resolvedRoom.drawOffer) {
         throw new GameNotActiveError("No draw offer is currently pending");
       }
 
-      if (room.drawOffer.offeredBy === player.id) {
+      if (resolvedRoom.drawOffer.offeredBy === player.id) {
         throw new InvalidPayloadError(
           "draw",
           "Cannot accept or decline your own draw offer",
@@ -639,9 +678,9 @@ export class GameService implements IGameService {
       const gameOverPayload: GameOverPayload = createGameOverPayload({
         winner: "draw",
         reason: "draw_agreement",
-        finalFen: room.game.fen,
-        totalMoves: room.game.moveCount,
-        startTimeMs: room.createdAt,
+        finalFen: resolvedRoom.game.fen,
+        totalMoves: resolvedRoom.game.moveCount,
+        startTimeMs: resolvedRoom.createdAt,
       });
 
       const updatedRoom = await this.roomAdapter.finalizeGame(
@@ -669,14 +708,20 @@ export class GameService implements IGameService {
       };
     } catch (err) {
       const duration = this.clock.now() - startTime;
-      this.logger.error("Draw response failed", {
+      const isClientError = err instanceof AppError && err.statusCode < 500;
+      const logContext = {
         operation: "game_draw_action",
         correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
         error: serializeError(err),
-      });
+      };
+      if (isClientError) {
+        this.logger.warn("Draw response rejected", logContext);
+      } else {
+        this.logger.error("Draw response failed", logContext);
+      }
       throw err;
     }
   }
@@ -688,6 +733,7 @@ export class GameService implements IGameService {
     roomCode: string,
     socketId: string,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{ room: RoomState; requestedBy: string; requesterName: string }> {
     const startTime = this.clock.now();
     const code = normalizeRoomCode(roomCode);
@@ -705,10 +751,12 @@ export class GameService implements IGameService {
         );
       }
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
+      const { player } = await this.resolveAuthenticatedPlayer(
+        room,
+        socketId,
+        sessionToken,
+        correlationId,
+      );
 
       const updatedRoom = await this.roomAdapter.updateRematch(
         code,
@@ -740,14 +788,20 @@ export class GameService implements IGameService {
       };
     } catch (err) {
       const duration = this.clock.now() - startTime;
-      this.logger.error("Rematch request failed", {
+      const isClientError = err instanceof AppError && err.statusCode < 500;
+      const logContext = {
         operation: "game_rematch_action",
         correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
         error: serializeError(err),
-      });
+      };
+      if (isClientError) {
+        this.logger.warn("Rematch request rejected", logContext);
+      } else {
+        this.logger.error("Rematch request failed", logContext);
+      }
       throw err;
     }
   }
@@ -760,6 +814,7 @@ export class GameService implements IGameService {
     socketId: string,
     accept: boolean,
     correlationId?: string,
+    sessionToken?: string,
   ): Promise<{
     room: RoomState;
     accept: boolean;
@@ -776,18 +831,21 @@ export class GameService implements IGameService {
         throw new RoomNotFoundError(code);
       }
 
-      if (!room.rematch || room.rematch.status !== "pending") {
+      const { player, room: resolvedRoom } =
+        await this.resolveAuthenticatedPlayer(
+          room,
+          socketId,
+          sessionToken,
+          correlationId,
+        );
+
+      if (!resolvedRoom.rematch || resolvedRoom.rematch.status !== "pending") {
         throw new GameNotActiveError(
           "No pending rematch request found for this room",
         );
       }
 
-      const player = this.getPlayerBySocketId(room, socketId);
-      if (!player) {
-        throw new PlayerNotInRoomError(socketId);
-      }
-
-      if (player.id === room.rematch.requestedBy) {
+      if (player.id === resolvedRoom.rematch.requestedBy) {
         throw new InvalidPayloadError(
           "rematch",
           "Cannot accept or decline your own rematch request",
@@ -800,7 +858,7 @@ export class GameService implements IGameService {
         const updatedRoom = await this.roomAdapter.updateRematch(
           code,
           {
-            ...room.rematch,
+            ...resolvedRoom.rematch,
             status: "declined",
           },
           undefined,
@@ -827,8 +885,8 @@ export class GameService implements IGameService {
       }
 
       // Accept rematch: swap piece colors
-      const whitePlayer = room.whitePlayer;
-      const blackPlayer = room.blackPlayer;
+      const whitePlayer = resolvedRoom.whitePlayer;
+      const blackPlayer = resolvedRoom.blackPlayer;
 
       if (
         !whitePlayer ||
@@ -848,7 +906,7 @@ export class GameService implements IGameService {
       const updatedRoom = await this.roomAdapter.updateRematch(
         code,
         {
-          ...room.rematch,
+          ...resolvedRoom.rematch,
           status: "accepted",
         },
         nextGameState,
@@ -875,16 +933,105 @@ export class GameService implements IGameService {
       };
     } catch (err) {
       const duration = this.clock.now() - startTime;
-      this.logger.error("Rematch response failed", {
+      const isClientError = err instanceof AppError && err.statusCode < 500;
+      const logContext = {
         operation: "game_rematch_action",
         correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
         error: serializeError(err),
-      });
+      };
+      if (isClientError) {
+        this.logger.warn("Rematch response rejected", logContext);
+      } else {
+        this.logger.error("Rematch response failed", logContext);
+      }
       throw err;
     }
+  }
+
+  /**
+   * Resolves the player from the given room using session token authentication or socket ID fallback.
+   * If session token is valid but the player's socket has changed (e.g. after network reconnection),
+   * auto-heals the socket ID in the room store and session registry (MAJ-007).
+   */
+  private async resolveAuthenticatedPlayer(
+    room: RoomState,
+    socketId: string,
+    sessionToken?: string,
+    correlationId?: string,
+  ): Promise<{ player: Player; room: RoomState }> {
+    if (sessionToken && this.sessionRegistry) {
+      try {
+        let session: SessionRecord | null = null;
+        if (typeof this.sessionRegistry.getSessionByToken === "function") {
+          session = await this.sessionRegistry.getSessionByToken(
+            sessionToken,
+            correlationId ? { correlationId } : undefined,
+          );
+        }
+        if (
+          session &&
+          session.roomCode.toUpperCase() === room.roomCode.toUpperCase()
+        ) {
+          const playerId = session.playerId;
+          let player =
+            room.whitePlayer?.id === playerId
+              ? room.whitePlayer
+              : room.blackPlayer?.id === playerId
+                ? room.blackPlayer
+                : null;
+          if (player) {
+            let currentRoom = room;
+            if (player.socketId !== socketId) {
+              const oldSocketId = player.socketId;
+              currentRoom = await this.roomAdapter.updatePlayerSocket(
+                room.roomCode,
+                playerId,
+                socketId,
+                correlationId,
+              );
+              player =
+                currentRoom.whitePlayer?.id === playerId
+                  ? currentRoom.whitePlayer
+                  : currentRoom.blackPlayer?.id === playerId
+                    ? currentRoom.blackPlayer
+                    : player;
+              await this.sessionRegistry.touchSession(
+                sessionToken,
+                socketId,
+                undefined,
+                correlationId ? { correlationId } : undefined,
+              );
+              this.logger.info("Player socket auto-healed", {
+                operation: "player_socket_auto_healed",
+                roomCode: room.roomCode,
+                playerId,
+                oldSocketId,
+                newSocketId: socketId,
+                ...(correlationId ? { correlationId } : {}),
+              });
+            }
+            return { player, room: currentRoom };
+          }
+        }
+      } catch (err) {
+        this.logger.warn("Session validation failed during player resolution", {
+          operation: "session_validation_fallback",
+          roomCode: room.roomCode,
+          socketId,
+          error: serializeError(err),
+          ...(correlationId ? { correlationId } : {}),
+        });
+      }
+    }
+
+    const player = this.getPlayerBySocketId(room, socketId);
+    if (!player) {
+      throw new PlayerNotInRoomError(socketId);
+    }
+    return { player, room };
   }
 
   private getPlayerBySocketId(

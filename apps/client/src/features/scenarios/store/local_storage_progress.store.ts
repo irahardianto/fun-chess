@@ -19,6 +19,12 @@ export interface LocalStorageProgressStoreOptions {
   clock?: IClock;
 }
 
+export interface PersistedScenarioProgressEnvelope {
+  version: number;
+  data: ScenarioProgressMap;
+  [scenarioId: string]: unknown;
+}
+
 /**
  * Robust localStorage implementation of ScenarioProgressStore (MIN-004, MIN-015).
  * Includes defensive JSON parsing, runtime type narrowing, error boundaries,
@@ -107,8 +113,15 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
         return {};
       }
 
+      // MIN-012: Unpack versioned envelope if present, else fallback to legacy raw map
+      const data =
+        parsed.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data)
+          ? (parsed.data as Record<string, unknown>)
+          : (parsed as Record<string, unknown>);
+
       const result: ScenarioProgressMap = {};
-      for (const [key, val] of Object.entries(parsed)) {
+      for (const [key, val] of Object.entries(data)) {
+        if (key === 'version' || key === 'data') continue;
         const sanitized = this.sanitizeRecord(val);
         if (sanitized) {
           result[key] = sanitized;
@@ -159,7 +172,12 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
 
     if (this.storage.isAvailable()) {
       try {
-        this.storage.setItem(this.storageKey, JSON.stringify(currentMap));
+        const payload = {
+          version: 1,
+          data: currentMap,
+          ...currentMap,
+        };
+        this.storage.setItem(this.storageKey, JSON.stringify(payload));
       } catch (err) {
         if (isQuotaExceededError(err)) {
           storageAlertDispatcher.notify({
@@ -196,7 +214,12 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
 
     if (this.storage.isAvailable()) {
       try {
-        this.storage.setItem(this.storageKey, JSON.stringify(sanitizedMap));
+        const payload = {
+          version: 1,
+          data: sanitizedMap,
+          ...sanitizedMap,
+        };
+        this.storage.setItem(this.storageKey, JSON.stringify(payload));
       } catch (err) {
         if (isQuotaExceededError(err)) {
           storageAlertDispatcher.notify({

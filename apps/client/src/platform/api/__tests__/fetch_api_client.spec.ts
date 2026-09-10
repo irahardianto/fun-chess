@@ -292,7 +292,7 @@ describe('FetchApiClient', () => {
       'Failed to parse JSON response body',
       expect.objectContaining({
         operation: 'http_parse_body',
-        error: expect.any(String),
+        error: expect.anything(),
       })
     );
   });

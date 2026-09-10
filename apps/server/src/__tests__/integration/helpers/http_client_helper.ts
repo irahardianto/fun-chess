@@ -17,7 +17,8 @@ export async function fetchLanInfo(
   const res = await fetch(`${baseUrl}/api/lan-info`, {
     signal: AbortSignal.timeout(timeoutMs),
   });
-  const data = (await res.json()) as LanInfoResponse;
+  const json = (await res.json()) as { data?: LanInfoResponse } & LanInfoResponse;
+  const data = json.data ?? json;
   return {
     status: res.status,
     headers: res.headers,

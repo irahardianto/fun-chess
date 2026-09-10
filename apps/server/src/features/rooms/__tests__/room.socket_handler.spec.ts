@@ -125,7 +125,7 @@ describe("Room Socket Handlers", () => {
 
   beforeEach(() => {
     store = new MockRoomStore();
-    sessionRegistry = new InMemorySessionRegistry();
+    sessionRegistry = new InMemorySessionRegistry("test-secret-at-least-16-chars-long", false);
     service = new RoomService(store, sessionRegistry);
     logger = new NullLogger();
     io = new TestIo();
@@ -551,11 +551,15 @@ describe("Room Socket Handlers", () => {
       expect(reconnectedEmit).toBeDefined();
       expect(asRecord(reconnectedEmit?.payload).playerId).toBe(created.hostId);
 
-      // Dual delivery eliminated: room:reconnected is not emitted to the reconnecting socket (MAJ-025)
+      // MAJ-003: Re-establish room:reconnected socket event emission (unicast to the reconnecting socket)
       const reconnectedSelfEmit = reconnSocket.emittedEvents.find(
         (e) => e.event === "room:reconnected",
       );
-      expect(reconnectedSelfEmit).toBeUndefined();
+      expect(reconnectedSelfEmit).toBeDefined();
+      const reconPayload = asRecord(reconnectedSelfEmit?.payload);
+      expect(reconPayload.room).toBeDefined();
+      expect(reconPayload.player).toBeDefined();
+      expect(reconPayload.roomStatus).toBe("playing");
     });
 
     it("rejects room:reconnect with ERR_RATE_LIMITED when rate limit is exceeded (SEC-HIGH-001)", async () => {
@@ -1213,11 +1217,12 @@ describe("Room Socket Handlers", () => {
 
       expect(ackPayload?.roomStatus).toBe("playing");
 
-      // MAJ-025: Dual delivery eliminated, state delivered exclusively in ackPayload
+      // MAJ-003: Authoritative roomStatus sent in unicast room:reconnected
       const reconEvent = reconnectSocket.emittedEvents.find(
         (e) => e.event === "room:reconnected",
       );
-      expect(reconEvent).toBeUndefined();
+      expect(reconEvent).toBeDefined();
+      expect(asRecord(reconEvent?.payload).roomStatus).toBe("playing");
     });
   });
 
@@ -2041,6 +2046,12 @@ describe("Room Socket Handlers", () => {
           l.context?.action === "fetch_and_leave",
       );
       expect(warnLog).toBeDefined();
+      expect(warnLog?.context?.error).toEqual(
+        expect.objectContaining({
+          name: "Error",
+          message: "Cluster fetchSockets error",
+        }),
+      );
     });
 
     it("evicts all fetched sockets from room when room is deleted on host leave", async () => {

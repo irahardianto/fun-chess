@@ -16,6 +16,7 @@ import {
   isValidFen,
   PIECE_CENTIPAWN_VALUES,
 } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 
 /**
  * Human-readable piece display names.
@@ -165,7 +166,11 @@ export function generateMistakeRefutation(
   let chess: Chess;
   try {
     chess = createSafeChess(fen);
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to parse FEN in generateMistakeRefutation', {
+      operation: 'generate_mistake_refutation',
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 
@@ -178,7 +183,11 @@ export function generateMistakeRefutation(
       to: playerMove.to as unknown as import('chess.js').Square,
       promotion: playerMove.promotion,
     });
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to execute playerMove in generateMistakeRefutation', {
+      operation: 'generate_mistake_refutation',
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 
@@ -285,7 +294,12 @@ export function generateStepBreakdowns(puzzle: Puzzle): readonly PuzzleStepExpla
         to: to as unknown as import('chess.js').Square,
         promotion,
       });
-    } catch {
+    } catch (err) {
+      logger.debug('Failed to execute move in generateStepBreakdowns', {
+        operation: 'generate_step_breakdowns',
+        moveUci,
+        error: err instanceof Error ? err.message : String(err),
+      });
       moveRes = null;
     }
 

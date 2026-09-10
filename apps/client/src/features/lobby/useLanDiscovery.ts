@@ -1,7 +1,7 @@
 import { ref, onMounted, getCurrentInstance } from 'vue';
 import type { LanInfoResponse } from '@fun-chess/shared';
 import { useInjectLogger, useInjectStorage, useInjectApiClient, useInjectWebRtcDiscovery } from '@/platform/di';
-import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
+import { safeLocalStorage, STORAGE_KEYS, type KeyValueStorage } from '@/platform/storage';
 import { apiClient, type IApiClient } from '@/platform/api';
 import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 import {
@@ -9,7 +9,7 @@ import {
   defaultWebRtcDiscovery,
 } from '@/platform/hardware';
 
-const STORAGE_KEY = 'fun_chess_lan_ip';
+const STORAGE_KEY = STORAGE_KEYS.LAN_IP;
 
 /**
  * Attempts to detect local IPv4 address via WebRTC ICE candidate gathering.

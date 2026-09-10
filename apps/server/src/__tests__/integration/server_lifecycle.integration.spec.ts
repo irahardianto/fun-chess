@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import http, { Server as HttpServer } from "node:http";
 import net from "node:net";
-import { createHttpServer } from "../platform/http/http_server.js";
-import { ShutdownCoordinator } from "../platform/lifecycle/shutdown_coordinator.js";
-import { NullLogger } from "../platform/logger/null_logger.js";
-import { TypedSocketServer } from "../platform/socket/socket_server.js";
-import { MockRoomStore } from "../features/rooms/index.js";
-import { RelayAddressService } from "../features/lan/index.js";
+import { createHttpServer } from "../../platform/http/http_server.js";
+import { ShutdownCoordinator } from "../../platform/lifecycle/shutdown_coordinator.js";
+import { NullLogger } from "../../platform/logger/null_logger.js";
+import { TypedSocketServer } from "../../platform/socket/socket_server.js";
+import { MockRoomStore } from "../../features/rooms/index.js";
+import { RelayAddressService } from "../../features/lan/index.js";
 
 interface ErrorResponseBody {
   status: string;
@@ -116,7 +116,7 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
         (l) => l.context?.operation === "http_error",
       );
       expect(errorLog).toBeDefined();
-      expect(errorLog?.context?.path).toBe("/api/lan-info");
+      expect(errorLog?.context?.path).toMatch(/\/api\/(v1\/)?lan-info/);
     });
 
     it("does not attempt to re-send response when headers were already sent", async () => {
@@ -319,9 +319,11 @@ describe("Server Lifecycle & Error Catch Integration (MAJ-034)", () => {
         (l) => l.context?.operation === "server_shutdown_error",
       );
       expect(fatalLog).toBeDefined();
-      expect(fatalLog?.context?.error).toEqual({
-        raw: "String exception during close",
-      });
+      expect(fatalLog?.context?.error).toEqual(
+        expect.objectContaining({
+          raw: "String exception during close",
+        }),
+      );
     });
 
     it("executes additionalCleanups and handles rejected cleanup promises without crashing", async () => {

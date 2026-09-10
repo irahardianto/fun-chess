@@ -1,6 +1,7 @@
 import type { Square, TutorialStep, StepMoveConstraint } from '@fun-chess/shared';
 import type { Square as ChessSquare } from 'chess.js';
 import { createSafeChess } from '@fun-chess/shared';
+import { logger } from '@/platform/telemetry';
 
 export interface PlayerMoveInput {
   from: Square;
@@ -63,7 +64,11 @@ export function validateStepMove(
       if (res && testEngine.isCheckmate()) {
         return { valid: true, reason: 'Delivers sound checkmate' };
       }
-    } catch (_err) {
+    } catch (err) {
+      logger.debug('Failed to evaluate checkmate move in validateStepMove', {
+        operation: 'validate_step_move',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return { valid: false, reason: 'Move does not match required step constraints' };
     }
   }
@@ -106,7 +111,11 @@ export function isSourceSquareAllowed(
           return true;
         }
       }
-    } catch (_err) {
+    } catch (err) {
+      logger.debug('Failed to evaluate checkmate in isSourceSquareAllowed', {
+        operation: 'is_source_square_allowed',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return false;
     }
   }
@@ -155,7 +164,11 @@ export function getAllowedTargetsForSource(
           targets.add(m.to as Square);
         }
       }
-    } catch (_err) {
+    } catch (err) {
+      logger.debug('Failed to test checkmate moves in getAllowedTargetsForSource', {
+        operation: 'get_allowed_targets_for_source',
+        error: err instanceof Error ? err.message : String(err),
+      });
       return Array.from(targets);
     }
   }

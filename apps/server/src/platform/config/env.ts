@@ -74,9 +74,15 @@ export const ServerEnvSchema = BaseServerEnvSchema.extend({
 }).superRefine((val, ctx) => {
   if (val.NODE_ENV === "production") {
     if (!val.METRICS_SECRET) {
-      console.warn(
-        "WARNING: METRICS_SECRET is not configured in production mode (MIN-002). " +
-        "Telemetry endpoints (/metrics, /health/detail) will deny all non-loopback requests.",
+      process.stderr.write(
+        JSON.stringify({
+          level: "warn",
+          operation: "env_validation",
+          warning: "METRICS_SECRET_MISSING",
+          message:
+            "WARNING: METRICS_SECRET is not configured in production mode (MIN-002). " +
+            "Telemetry endpoints (/metrics, /health/detail) will deny all non-loopback requests.",
+        }) + "\n",
       );
     }
     if (!val.SESSION_SECRET) {

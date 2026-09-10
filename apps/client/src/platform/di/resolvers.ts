@@ -16,6 +16,8 @@ import {
   WEBRTC_DISCOVERY_KEY,
   CLIPBOARD_SERVICE_KEY,
   CAMERA_SERVICE_KEY,
+  LOCATION_PROVIDER_KEY,
+  NETWORK_MONITOR_KEY,
 } from './tokens';
 import type { IApiClient } from '../api/api_client.interface';
 import type { KeyValueStorage } from '../storage/key_value_storage';
@@ -41,8 +43,16 @@ import {
   defaultClipboardService,
   defaultCameraService,
 } from '../hardware';
+import {
+  BrowserLocationProvider,
+  BrowserNetworkMonitor,
+  type ILocationProvider,
+  type INetworkMonitor,
+} from '../browser';
 
 const defaultClock: IClock = new SystemClock();
+const defaultLocationProvider: ILocationProvider = new BrowserLocationProvider();
+const defaultNetworkMonitor: INetworkMonitor = new BrowserNetworkMonitor();
 let defaultScenarioStore: ScenarioProgressStore | null = null;
 let defaultPuzzleStore: PuzzleProgressStore | null = null;
 let defaultProgressStorage: ProgressStorage | null = null;
@@ -142,4 +152,18 @@ export const useInjectClipboard = useInjectClipboardService;
 
 export function useInjectCameraService(fallback?: ICameraService): ICameraService {
   return inject(CAMERA_SERVICE_KEY, fallback ?? defaultCameraService);
+}
+
+export function useInjectLocationProvider(fallback?: ILocationProvider): ILocationProvider {
+  if (hasInjectionContext()) {
+    return inject(LOCATION_PROVIDER_KEY, fallback ?? defaultLocationProvider);
+  }
+  return fallback ?? defaultLocationProvider;
+}
+
+export function useInjectNetworkMonitor(fallback?: INetworkMonitor): INetworkMonitor {
+  if (hasInjectionContext()) {
+    return inject(NETWORK_MONITOR_KEY, fallback ?? defaultNetworkMonitor);
+  }
+  return fallback ?? defaultNetworkMonitor;
 }

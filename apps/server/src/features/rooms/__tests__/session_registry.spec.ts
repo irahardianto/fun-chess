@@ -1,13 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { InMemorySessionRegistry } from "../in_memory_session_registry.js";
 import { NullLogger } from "../../../platform/logger/null_logger.js";
+import { SessionGenerationError } from "../room.errors.js";
+
+const TEST_SESSION_SECRET = ["test", "session", "secret", "key", "32b", "length"].join("-");
 
 describe("InMemorySessionRegistry", () => {
   let registry: InMemorySessionRegistry;
 
   beforeEach(() => {
-    registry = new InMemorySessionRegistry();
+    registry = new InMemorySessionRegistry(TEST_SESSION_SECRET, false);
   });
+
 
   afterEach(() => {
     vi.useRealTimers();
@@ -560,9 +564,16 @@ describe("InMemorySessionRegistry", () => {
     it("uses injected IClock and IIdGenerator", async () => {
       const fixedTime = 1700000000000;
       const mockClock = { now: () => fixedTime };
-      const mockIdGen = { generateId: () => "mocked-uuid-token" };
+      const validUuid = "550e8400-e29b-41d4-a716-446655440000";
+      const mockIdGen = { generateId: () => validUuid };
 
-      const customRegistry = new InMemorySessionRegistry(mockClock, mockIdGen);
+      const customRegistry = new InMemorySessionRegistry(
+        mockClock,
+        mockIdGen,
+        undefined,
+        TEST_SESSION_SECRET,
+        false,
+      );
       const record = await customRegistry.createSession({
         playerId: "p-custom",
         roomCode: "CUST",
@@ -571,11 +582,33 @@ describe("InMemorySessionRegistry", () => {
         socketId: "sock-c",
       });
 
-      expect(record.sessionToken).toBe("mocked-uuid-token");
+      expect(record.sessionToken).toContain(validUuid);
       expect(record.createdAt).toBe(fixedTime);
       expect(record.lastSeenAt).toBe(fixedTime);
     });
+
+    it("fails closed and throws SessionGenerationError when cryptographic signing fails (CRIT-002)", async () => {
+      const mockIdGen = { generateId: () => "invalid-raw-uuid" };
+      const customRegistry = new InMemorySessionRegistry(
+        undefined,
+        mockIdGen,
+        undefined,
+        TEST_SESSION_SECRET,
+        false,
+      );
+
+      await expect(
+        customRegistry.createSession({
+          playerId: "p-fail",
+          roomCode: "FAIL",
+          color: "w",
+          isHost: true,
+          socketId: "sock-f",
+        }),
+      ).rejects.toThrow(SessionGenerationError);
+    });
   });
+
 
   describe("getSessionByToken (SEC-002)", () => {
     it("retrieves session record by sessionToken", async () => {
@@ -655,7 +688,14 @@ describe("InMemorySessionRegistry", () => {
   describe("DEBUG-level mutation logging and credential scrubbing (CRIT-002, ENH-010)", () => {
     it("logs debug records on createSession, touchSession, updateSessionColor, and cleanupExpiredSessions with scrubbed tokens", async () => {
       const logger = new NullLogger();
-      const loggedRegistry = new InMemorySessionRegistry(undefined, undefined, logger);
+      const loggedRegistry = new InMemorySessionRegistry(
+        undefined,
+        undefined,
+        logger,
+        TEST_SESSION_SECRET,
+        false,
+      );
+
 
       // 1. createSession
       const created = await loggedRegistry.createSession({
@@ -798,6 +838,37 @@ describe("InMemorySessionRegistry", () => {
       await expect(
         registry.clear({ signal: controller.signal }),
       ).rejects.toThrow();
+    });
+
+    it("requires sessionSecret in constructor and throws if missing (MAJ-005)", () => {
+      expect(() => new InMemorySessionRegistry("" as unknown as string)).toThrow(
+        "sessionSecret is required",
+      );
+      expect(
+        () =>
+          new InMemorySessionRegistry(
+            undefined,
+            undefined,
+            undefined,
+            "",
+          ),
+      ).toThrow("sessionSecret is required");
+    });
+
+    it("logs error when insecure secret is provided in production mode (MAJ-005)", () => {
+      const logger = new NullLogger();
+      new InMemorySessionRegistry(
+        undefined,
+        undefined,
+        logger,
+        "short-secret",
+        true,
+      );
+      const errorLogs = logger.errorLogs.filter(
+        (l) => l.context?.operation === "session_registry_init",
+      );
+      expect(errorLogs.length).toBe(1);
+      expect(errorLogs[0]?.message).toContain("Insecure session secret in production mode");
     });
   });
 });

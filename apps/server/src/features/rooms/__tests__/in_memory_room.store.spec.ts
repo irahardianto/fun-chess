@@ -1052,6 +1052,28 @@ describe("InMemoryRoomStore", () => {
         });
       }).toThrow(StaleLockExecutionError);
     });
+
+    it("enforces active lock ticket check or requires allowUnlocked in save() (MIN-009)", async () => {
+      const room = createDummyRoom("LOCKS");
+      await store.save(room);
+
+      // Simulate an active lock on room LOCKS
+      testStore(store).activeTickets.set("LOCKS", 42);
+
+      // Attempting to save without ticket or allowUnlocked should throw StaleLockExecutionError
+      await expect(store.save(room)).rejects.toThrow(StaleLockExecutionError);
+
+      // Saving with wrong ticket should throw StaleLockExecutionError
+      await expect(store.save(room, undefined, { ticket: 99 })).rejects.toThrow(StaleLockExecutionError);
+
+      // Saving with matching ticket succeeds
+      await expect(store.save(room, undefined, { ticket: 42 })).resolves.toBeUndefined();
+
+      // Saving with allowUnlocked: true succeeds even under active lock
+      await expect(store.save(room, undefined, { allowUnlocked: true })).resolves.toBeUndefined();
+
+      testStore(store).activeTickets.delete("LOCKS");
+    });
   });
 
   describe("Additional Branch Coverage (MAJ-001)", () => {
