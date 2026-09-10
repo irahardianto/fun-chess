@@ -51,6 +51,7 @@ describe('useGameActions composable', () => {
   }
 
   function createTestPlayer(overrides: Partial<Player> = {}): Player {
+    const now = Date.now();
     return {
       id: UUID_P1,
       socketId: 'mock_sock_p1',
@@ -59,7 +60,9 @@ describe('useGameActions composable', () => {
       color: 'w',
       isHost: true,
       isConnected: true,
-      connectedAt: Date.now(),
+      connectedAt: now,
+      createdAt: now,
+      updatedAt: now,
       ...overrides,
     };
   }
@@ -698,37 +701,9 @@ describe('useGameActions composable', () => {
   });
 
   // ==========================================================================
-  // 7b. Room Departure & Action Execution Validation (MAJ-033)
+  // 7b. Action Execution Disconnected Validation
   // ==========================================================================
-  describe('Room Departure & Action Execution Validation (MAJ-033)', () => {
-    it('leaves room and emits room:leave with callback', async () => {
-      const game = useGameActions();
-
-      mockSocket.emit.mockImplementation((event: string, payload: any, ack: Function) => {
-        if (event === 'room:leave') {
-          expect(payload.roomCode).toBe('GAME');
-          ack({ success: true });
-        }
-      });
-
-      const cb = vi.fn();
-      const success = await game.leaveRoom('GAME', cb);
-
-      expect(success).toBe(true);
-      expect(cb).toHaveBeenCalledWith({ success: true });
-    });
-
-    it('rejects leaveRoom with invalid room code without emitting', async () => {
-      const game = useGameActions();
-      const cb = vi.fn();
-
-      const success = await game.leaveRoom('INVALID_LONG_CODE', cb);
-
-      expect(success).toBe(false);
-      expect(cb).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
-      expect(mockSocket.emit).not.toHaveBeenCalled();
-    });
-
+  describe('Action Execution Disconnected Validation', () => {
     it('returns error and does not emit when socket is disconnected for any action', () => {
       mockSocket.connected = false;
       const game = useGameActions();

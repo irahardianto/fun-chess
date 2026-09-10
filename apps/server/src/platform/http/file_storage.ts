@@ -1,4 +1,5 @@
 import { stat, readFile, realpath } from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 export interface FileStat {
   isDirectory: boolean;
@@ -9,6 +10,7 @@ export interface IFileStorage {
   stat(filePath: string): Promise<FileStat>;
   readFile(filePath: string): Promise<Buffer>;
   realpath(filePath: string): Promise<string>;
+  existsSync?(filePath: string): boolean;
 }
 
 /**
@@ -16,6 +18,10 @@ export interface IFileStorage {
  * Canonicalizes real filesystem paths and resolves symlinks (MAJ-001).
  */
 export class NodeFileStorage implements IFileStorage {
+  existsSync(filePath: string): boolean {
+    return existsSync(filePath);
+  }
+
   async stat(filePath: string): Promise<FileStat> {
     const s = await stat(filePath);
     return {
@@ -60,6 +66,10 @@ export class MemoryFileStorage implements IFileStorage {
 
   public addDirectory(dirPath: string): void {
     this.directories.add(dirPath);
+  }
+
+  public existsSync(filePath: string): boolean {
+    return this.directories.has(filePath) || this.files.has(filePath);
   }
 
   public setErrorSimulator(

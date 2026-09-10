@@ -49,6 +49,7 @@ export type GameOverReason =
 /**
  * Public representation of a player inside a room.
  * MUST NEVER contain private session credentials or secret tokens (CRIT-001).
+ * Adheres to database-design-principles.md entity audit standards (MIN-025).
  */
 export interface Player {
   /** Unique UUID v4 identifier for the player */
@@ -65,8 +66,18 @@ export interface Player {
   isHost: boolean;
   /** Real-time socket connectivity state */
   isConnected: boolean;
-  /** Epoch timestamp (milliseconds) when the player joined */
+  /** Epoch timestamp (milliseconds) when socket connection was established or last reconnected */
   connectedAt: number;
+  /**
+   * Epoch timestamp (milliseconds) when the player entity was first instantiated.
+   * STRICTLY IMMUTABLE: set once at creation and never mutated thereafter.
+   */
+  readonly createdAt: number;
+  /**
+   * Epoch timestamp (milliseconds) when player metadata, connection state, or attributes were last updated.
+   * Monotonically non-decreasing: updatedAt >= createdAt.
+   */
+  updatedAt: number;
 }
 
 /**
@@ -110,8 +121,18 @@ export interface SavedSession {
   sessionToken: string;
 }
 
-import type { MovePayload } from "./schemas.js";
-export type { MovePayload };
+/**
+ * Chess move coordinate and promotion payload.
+ * Defined directly in models.ts to break circular dependency with schemas.ts (MAJ-008).
+ */
+export interface MovePayload {
+  /** Source square */
+  from: string;
+  /** Destination square */
+  to: string;
+  /** Optional pawn promotion target piece */
+  promotion?: PromotionPiece;
+}
 
 /**
  * Full details of an executed chess move.

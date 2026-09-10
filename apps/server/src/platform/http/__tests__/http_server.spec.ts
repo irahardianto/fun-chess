@@ -15,6 +15,7 @@ import {
   MockRelayAddressService,
 } from "../../../features/lan/index.js";
 import { NullLogger } from "../../logger/null_logger.js";
+import { MemoryFileStorage } from "../file_storage.js";
 import {
   LanInfoResponse,
   LivenessHealthResponse,
@@ -505,6 +506,22 @@ describe("createHttpServer", () => {
       expect(typeof pathResolved).toBe("string");
       expect(pathResolved.length).toBeGreaterThan(0);
     });
+
+    it("utilizes fileStorage.existsSync without direct fs probes when fileStorage is configured (MAJ-014)", () => {
+      const memoryStorage = new MemoryFileStorage();
+      memoryStorage.addDirectory("/app/apps/client/dist");
+
+      const pathResolved = resolveDistPath(
+        {
+          roomStore: store,
+          logger,
+          fileStorage: memoryStorage,
+        },
+        logger,
+        memoryStorage,
+      );
+      expect(pathResolved).toBe("/app/apps/client/dist");
+    });
   });
 
   describe("static logging with status code (MIN-016)", () => {
@@ -797,7 +814,7 @@ describe("createHttpServer", () => {
       }
     });
 
-    it("extracts userId from request headers or query parameters (ENH-008)", () => {
+    it("extracts userId from request headers or query parameters without extracting session tokens (CRIT-002, ENH-008)", () => {
       const dummyReq1 = {
         headers: { "x-user-id": "user-from-header" },
       } as unknown as http.IncomingMessage;
@@ -808,10 +825,11 @@ describe("createHttpServer", () => {
       } as unknown as http.IncomingMessage;
       expect(extractHttpUserId(dummyReq2)).toBe("player-from-header");
 
+      // CRIT-002: Session tokens must NEVER be extracted as userId
       const dummyReq3 = {
         headers: { "x-session-token": "session-token-val" },
       } as unknown as http.IncomingMessage;
-      expect(extractHttpUserId(dummyReq3)).toBe("session-token-val");
+      expect(extractHttpUserId(dummyReq3)).toBeUndefined();
 
       const dummyReq4 = {
         headers: {},
@@ -825,17 +843,43 @@ describe("createHttpServer", () => {
       } as unknown as http.IncomingMessage;
       expect(extractHttpUserId(dummyReq5)).toBe("query-player-456");
 
+      // CRIT-002: Query sessionToken must NEVER be extracted as userId
       const dummyReq6 = {
         headers: {},
         url: "/api/lan-info?sessionToken=query-session-789",
       } as unknown as http.IncomingMessage;
-      expect(extractHttpUserId(dummyReq6)).toBe("query-session-789");
+      expect(extractHttpUserId(dummyReq6)).toBeUndefined();
 
       const dummyReq7 = {
         headers: {},
         url: "/api/lan-info",
       } as unknown as http.IncomingMessage;
       expect(extractHttpUserId(dummyReq7)).toBeUndefined();
+    });
+
+    it("logs debug when URL search params cannot be parsed (CRIT-002)", () => {
+      const logger = new NullLogger();
+      const mockReq = { headers: {} } as unknown as http.IncomingMessage;
+
+      // Mock URLSearchParams to throw
+      const originalSearchParams = globalThis.URLSearchParams;
+      globalThis.URLSearchParams = class extends originalSearchParams {
+        constructor(_init?: string | string[][] | Record<string, string> | URLSearchParams) {
+          throw new Error("Malformed query string parse error");
+        }
+      } as unknown as typeof URLSearchParams;
+
+      try {
+        const result = extractHttpUserId(mockReq, "/api/test?invalid=param", logger);
+        expect(result).toBeUndefined();
+        const debugLog = logger.debugLogs.find(
+          (l) => l.context?.["operation"] === "extract_http_user_id",
+        );
+        expect(debugLog).toBeDefined();
+        expect(debugLog?.context?.["error"]).toBe("Malformed query string parse error");
+      } finally {
+        globalThis.URLSearchParams = originalSearchParams;
+      }
     });
 
     it("includes optional userId in http_rate_limited log record when request includes user identification (ENH-008)", async () => {

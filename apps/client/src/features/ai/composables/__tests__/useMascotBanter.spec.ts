@@ -166,5 +166,15 @@ describe('useMascotBanter', () => {
       vi.advanceTimersByTime(1100);
       expect(activeDialogue.value).toBeNull();
     });
+
+    it('uses injected randomFn for deterministic dialogue selection (MAJ-013)', () => {
+      const { triggerBanter } = useMascotBanter({
+        persona: peanutPup,
+        randomFn: () => 0, // Always pick first dialogue
+      });
+
+      const line = triggerBanter('game_start');
+      expect(line).toBe(peanutPup.dialogues.game_start[0]);
+    });
   });
 });

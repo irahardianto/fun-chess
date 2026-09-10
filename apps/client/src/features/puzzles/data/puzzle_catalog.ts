@@ -682,6 +682,7 @@ export function getClosestPuzzleToRating(
 export function getRandomPuzzle(
   theme?: PuzzleTheme,
   targetRating?: number,
+  randomFn: () => number = Math.random,
 ): Puzzle {
   let pool = theme ? getPuzzlesByTheme(theme) : ALL_PUZZLES;
   if (pool.length === 0) {
@@ -696,10 +697,10 @@ export function getRandomPuzzle(
     );
     // Take from the top 5 closest
     const slice = sorted.slice(0, Math.min(5, sorted.length));
-    return slice[Math.floor(Math.random() * slice.length)] ?? defaultPuzzle;
+    return slice[Math.floor(randomFn() * slice.length)] ?? defaultPuzzle;
   }
 
-  return pool[Math.floor(Math.random() * pool.length)] ?? defaultPuzzle;
+  return pool[Math.floor(randomFn() * pool.length)] ?? defaultPuzzle;
 }
 
 /**

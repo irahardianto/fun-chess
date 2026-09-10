@@ -1,864 +1,980 @@
-# Database & Client Storage Contracts: Full Codebase Remediation
-**Document Version:** 1.0.0 (FROZEN)  
-**Author:** Senior Database Engineer (`@database-expert`)  
-**Domain:** Storage Architecture, Schema Migrations, Two-Phase Commit Transactions, and Concurrency Controls  
-**Target Scope Cards:** `SC-1-SHARED`, `SC-2-SERVER`, `SC-3-CLIENT-CORE`, `SC-4-CLIENT-FEATURES`  
-**Audit Findings Addressed:** `[CRIT-001]`, `[MIN-005]`, `[MIN-006]`, `[MAJ-020]`, `[MIN-026]`, `[MAJ-005]`
+---
+spec_id: DB-CONTRACT-2026-09-10
+title: "Data Model & Storage Contracts: Fun Chess Audit Remediation"
+doc_type: tsd
+status: approved
+created_at: "2026-09-10"
+updated_at: "2026-09-10"
+version: 1.0.0
+owner: database-expert
+dependencies:
+  specs:
+    - .agentwork/brief.md
+---
+
+# Data Model & Storage Contracts: Fun Chess Audit Remediation
+
+## Executive Overview
+
+This contract document defines authoritative data models, in-memory store invariants, storage interface signatures, and client-side persistence lifecycle protocols for the Fun Chess audit remediation (`docs/audits/review-findings-codebase-2026-09-10-0553.md`).
+
+These specifications are frozen design contracts consumed by builders in Scope Cards SC-1, SC-2, SC-3, SC-4, and SC-5. All implementations must conform strictly to these interfaces, invariants, and migration protocols.
+
+### Audit Findings Addressed
+
+| Finding ID | Severity | Dimension | Domain | Target Files | Description |
+|---|---|---|---|---|---|
+| **MIN-025** | Minor | F (Integration/DB) | Shared Models | `shared/src/contracts/models.ts`, `schemas.ts` | Absence of base entity audit timestamps (`createdAt`, `updatedAt`) on `Player`. |
+| **MIN-028** | Minor | F (Integration/DB) | Server Store | `apps/server/src/features/rooms/in_memory_room.store.ts` | Secondary reverse index memory retention in `findBySocketId` fallback lookup. |
+| **ENH-013** | Enhancement | F (Integration/DB) | Server Store | `apps/server/src/features/rooms/in_memory_room.store.ts` | Deep cloning on high-frequency read queries creating excessive GC pressure. |
+| **CRIT-002** | Critical | A/B/D (Security/Obs) | Server Sessions | `in_memory_session_registry.ts`, `http_server.ts` | Sensitive session token credential leakage in logs and storage metadata. |
+| **MAJ-004** | Major | A (Security/Config) | Shared/Server | `shared/src/contracts/schemas.ts`, `in_memory_session_registry.ts` | `SESSION_SECRET` documented but unused; session tokens un-signed. |
+| **ENH-015** | Enhancement | F (Integration/DB) | Storage Interfaces | `room.store.ts`, `session_registry.ts` | Absence of cancellation `AbortSignal` in data store interfaces. |
+| **ENH-014** | Enhancement | F (Integration/DB) | Client Storage | `apps/client/src/platform/storage/migration.ts` | Client storage key deprecation pruning requires user visit after 30 days (ADR). |
+| **MIN-004** | Minor | C (Architecture) | Client Stores | `local_storage_progress.store.ts` | Module-level stateful singletons and eager execution at import time. |
+| **MIN-015** | Minor | E (Code Quality) | Client Stores | `local_storage_progress.store.ts`, `puzzle_progress.store.ts` | Constructor parameter inconsistency and asymmetric interface contracts. |
+| **MIN-016** | Minor | E (Code Quality) | Client Stores | `local_storage_unified.store.ts` | Duplicated fallback scenario restoration block in `LocalStorageUnifiedStore`. |
 
 ---
 
-## 1. Executive Summary & Finding Traceability
+## 1. Data Model Contracts: `Player` Entity Audit Timestamps (MIN-025)
 
-This contract specification provides the authoritative, frozen design for all storage, migration, transaction, and concurrency remediation required by the Fun Chess platform audit (`docs/audits/review-findings-fun-chess-codebase-2026-09-08-0618.md`).
+<!-- contract: player-audit-timestamps -->
+<!-- requirement: MIN-025 -->
 
-All implementations in Wave 1 (`SC-1-SHARED`), Wave 2 (`SC-2-SERVER`, `SC-3-CLIENT-CORE`), and Wave 3 (`SC-4-CLIENT-FEATURES`) MUST conform strictly to these contracts.
+### 1.1 Motivation & Architectural Rule
 
-| Finding ID | Severity | Problem Summary | Remediation Specification | Target File | Scope Card |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **[CRIT-001]** | **CRITICAL** | `migrateStorageV1ToV2` uninvoked at bootstrap causing total data loss on upgrade; destructive `removeItem` on legacy keys | Non-destructive migration with 30-day deprecation timestamp; wired in `apps/client/src/main.ts` | `apps/client/src/platform/storage/keys.ts`<br>`apps/client/src/main.ts` | `SC-3-CLIENT-CORE` |
-| **[MIN-006]** | **MINOR** | Nested empty `catch {}` blocks in `migrateStorageV1ToV2` silently swallow storage exceptions | Structured 3-point logging using `ILogger`; correlation ID attachment; zero empty catches | `apps/client/src/platform/storage/keys.ts` | `SC-3-CLIENT-CORE` |
-| **[MAJ-020]** | **MAJOR** | `LocalStorageUnifiedStore.overwriteAll` 2PC transaction lacks start/success logs, duration, and silently drops write errors on successful rollback | 3-point structured logging (`start`, `success`, `failure`), duration tracking, primary error logging with `rolledBack: true` | `apps/client/src/features/portability/store/local_storage_unified.store.ts` | `SC-4-CLIENT-FEATURES` |
-| **[MIN-005]** | **MINOR** | Corrupted JSON silently swallowed in `LocalStorageProgressStore.getProgressMap` with empty catch | Explicit `logger.warn` diagnostics logging with error details, falling back safely to memory cache | `apps/client/src/features/scenarios/store/local_storage_progress.store.ts` | `SC-4-CLIENT-FEATURES` |
-| **[MIN-026]** | **MINOR** | `LocalStoragePuzzleProgressStore` performs 102 lines of manual `typeof` sanitization bypassing shared schema | Delegate sanitization to `sanitizeAndValidateProgress` from `@fun-chess/shared` | `apps/client/src/features/puzzles/store/local_storage_puzzle_store.ts` | `SC-4-CLIENT-FEATURES` |
-| **[MAJ-005]** | **MAJOR** | `InMemoryRoomStore.withLock` has 5000ms acquisition timeout but unbounded execution timeout; hung action leaks lock forever | Dual-timeout race specification: 5000ms acquisition timeout + 5000ms execution timeout race | `apps/server/src/features/rooms/in_memory_room.store.ts`<br>`apps/server/src/features/rooms/room.errors.ts` | `SC-2-SERVER` |
+Per `database-design-principles.md` (lines 22-26):
+> **Required columns for all tables/entities:**
+> - `id` — primary key (UUID v4)
+> - `created_at` — timestamp, set on creation, never updated
+> - `updated_at` — timestamp, updated on every modification
 
----
+The `Player` entity in `shared/src/contracts/models.ts` previously recorded only `connectedAt: number`, lacking standard audit lifecycle timestamps. This caused asymmetric auditing between server sessions and client player state, hindered distributed debugging of player reconnection sequences, and made it impossible to detect stale player objects during concurrent room state synchronization.
 
-## 2. Client LocalStorage Migration Contract (CRIT-001, MIN-006)
+### 1.2 TypeScript Contract: `Player`
 
-### 2.1 Problem & Vulnerability Analysis
-1. **Dead Code & Data Loss (CRIT-001):** `migrateStorageV1ToV2(storage)` in `apps/client/src/platform/storage/keys.ts` is defined but never invoked in `apps/client/src/main.ts` or during store instantiation. Consequently, users upgrading from earlier client versions lose access to their puzzle history, streak milestones, and rating data because `LocalStoragePuzzleProgressStore` reads solely from the v2 key (`fun_chess_puzzle_progress_v2`).
-2. **Destructive Removal Without Deprecation Window:** Lines 47–48 of `keys.ts` immediately execute:
-   ```typescript
-   storage.removeItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1);
-   storage.removeItem(STORAGE_KEYS.PUZZLE_PROGRESS_LEGACY);
-   ```
-   If a client encounters an issue or rolls back to a previous release within days of migration, their legacy progress is permanently destroyed. Per `database-design-principles.md` (Migration Safety: *"Never drop columns/keys without deprecation; Additive changes first"*), legacy data MUST be preserved with a 30-day grace window before pruning.
-3. **Empty Catch Blocks (MIN-006):** Lines 50–55 contain nested empty `catch {}` blocks:
-   ```typescript
-   try { ... } catch { /* Corrupted v1 data: safe no-op */ }
-   try { ... } catch { /* Storage access exceptions gracefully handled */ }
-   ```
-   This directly violates `rugged-software-constitution.md` (*"No silent failures"*) and `error-handling-principles.md` (*"Zero Tolerance for Empty Catch Blocks"*).
-
----
-
-### 2.2 Storage Key Registry & Deprecation Schema
-
-The centralized storage registry in `apps/client/src/platform/storage/keys.ts` is extended with the deprecation metadata key:
+**File:** `shared/src/contracts/models.ts`
 
 ```typescript
-export const STORAGE_KEYS = {
-  SCENARIO_PROGRESS: 'fun_chess_scenario_progress_v1',
-  PUZZLE_PROGRESS_V1: 'fun_chess_puzzle_progress_v1',
-  PUZZLE_PROGRESS_LEGACY: 'fun_chess_puzzle_progress',
-  PUZZLE_PROGRESS_V2: 'fun_chess_puzzle_progress_v2',
-  PUZZLE_PROGRESS_DEPRECATED_AT: 'fun_chess_puzzle_progress_deprecated_at',
-  PLAYER_AVATAR: 'fun_chess_player_avatar',
-  THEME: 'fun_chess_theme',
-  LAN_IP: 'fun_chess_lan_ip',
-  SESSION_TOKEN: 'fun_chess_session_token',
-  PWA_SNOOZE: 'fun_chess_pwa_install_snoozed_until',
-} as const;
-
-export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
-
-/** 30-day retention grace window in milliseconds (30 * 24 * 60 * 60 * 1000) */
-export const LEGACY_STORAGE_DEPRECATION_WINDOW_MS = 2_592_000_000;
+/**
+ * Public representation of a player inside a room.
+ * MUST NEVER contain private session credentials or secret tokens (CRIT-001).
+ * Adheres to database-design-principles.md entity audit standards (MIN-025).
+ */
+export interface Player {
+  /** Unique UUID v4 identifier for the player */
+  id: string;
+  /** Ephemeral Socket.io connection identifier (omitted from public client broadcasts per ENH-001) */
+  socketId?: string;
+  /** Player display name (1-20 characters, sanitized) */
+  name: string;
+  /** Selected emoji avatar (e.g. 🦁, 🚀, 🦄, ⚡, 👑, 🐼) */
+  avatar?: string;
+  /** Active piece color assignment ('w' or 'b') */
+  color: PieceColor;
+  /** Indicates whether the player is the room creator */
+  isHost: boolean;
+  /** Real-time socket connectivity state */
+  isConnected: boolean;
+  /** Epoch timestamp (milliseconds) when socket connection was established or last reconnected */
+  connectedAt: number;
+  /**
+   * Epoch timestamp (milliseconds) when the player entity was first instantiated.
+   * STRICTLY IMMUTABLE: set once at creation and never mutated thereafter.
+   */
+  readonly createdAt: number;
+  /**
+   * Epoch timestamp (milliseconds) when player metadata, connection state, or attributes were last updated.
+   * Monotonically non-decreasing: updatedAt >= createdAt.
+   */
+  updatedAt: number;
+}
 ```
 
----
+### 1.3 Zod Schema Contract: `PlayerSchema`
 
-### 2.3 Non-Destructive Migration State Machine
-
-```mermaid
-flowchart TD
-    Start([migrateStorageV1ToV2]) --> CheckAvail{storage.isAvailable?}
-    CheckAvail -- No --> AbortLog[Log debug: Storage unavailable, skip migration] --> Done([Done])
-    CheckAvail -- Yes --> CheckV2{PUZZLE_PROGRESS_V2 exists?}
-
-    %% Path A: V2 Already Exists
-    CheckV2 -- Yes --> CheckDeprecDate{Check PUZZLE_PROGRESS_DEPRECATED_AT}
-    CheckDeprecDate -- Not Set & Legacy Exists --> SetDeprec[Stamp DEPRECATED_AT = now] --> Done
-    CheckDeprecDate -- Elapsed >= 30 Days --> PruneLegacy[Remove PUZZLE_PROGRESS_V1, PUZZLE_PROGRESS_LEGACY, DEPRECATED_AT<br>Log info: Pruned expired legacy keys] --> Done
-    CheckDeprecDate -- Elapsed < 30 Days or No Legacy --> RetainLegacy[Log debug: Legacy keys retained in grace period] --> Done
-
-    %% Path B: V2 Does Not Exist (Migration Needed)
-    CheckV2 -- No --> ReadLegacy{Read PUZZLE_PROGRESS_V1 or LEGACY}
-    ReadLegacy -- None Found --> NoOp[Log debug: No legacy puzzle progress found] --> Done
-    ReadLegacy -- Raw Data Found --> ParseJson{JSON.parse raw data}
-    ParseJson -- Error --> WarnCorrupt[Log warn: Corrupted legacy progress JSON, abort write] --> Done
-    ParseJson -- Success Object --> WriteV2[Write PUZZLE_PROGRESS_V2 = JSON.stringify data]
-    WriteV2 --> StampDeprec[Stamp PUZZLE_PROGRESS_DEPRECATED_AT = now]
-    StampDeprec --> LogMigrated[Log info: Successfully migrated legacy data to v2; legacy keys preserved for 30 days] --> Done
-```
-
----
-
-### 2.4 Migration Algorithm & Logging Specification
+**File:** `shared/src/contracts/schemas.ts`
 
 ```typescript
-import type { KeyValueStorage } from './key_value_storage';
-import { STORAGE_KEYS, LEGACY_STORAGE_DEPRECATION_WINDOW_MS } from './keys';
-import { logger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
+/**
+ * Public player representation schema.
+ * All Player objects are strictly free of private credentials (CRIT-001)
+ * and raw transport socket identifiers in client broadcasts (ENH-001).
+ * Enforces non-negative epoch milliseconds for audit timestamps (MIN-025).
+ */
+export const PlayerSchema = z.object({
+  id: z.string().uuid("Player ID must be a valid UUID"),
+  name: PlayerNameSchema,
+  avatar: AvatarEmojiSchema.optional(),
+  color: PieceColorSchema,
+  isHost: z.boolean(),
+  isConnected: z.boolean(),
+  connectedAt: z.number().nonnegative("connectedAt must be a non-negative epoch timestamp"),
+  createdAt: z.number().nonnegative("createdAt must be a non-negative epoch timestamp"),
+  updatedAt: z.number().nonnegative("updatedAt must be a non-negative epoch timestamp"),
+}).refine((data) => data.updatedAt >= data.createdAt, {
+  message: "updatedAt must be greater than or equal to createdAt",
+  path: ["updatedAt"],
+});
 
-export interface MigrationOutcome {
-  status: 'migrated' | 'already_migrated' | 'pruned' | 'skipped' | 'corrupt' | 'error';
-  legacyKeyFound?: string;
-  deprecationTimestamp?: number;
-  error?: string;
+export type PlayerDto = z.infer<typeof PlayerSchema>;
+```
+
+### 1.4 Default Population & Immutability Rules
+
+1. **Creation Time Population (`createRoom` / `joinRoom`):**
+   - When a player entity is constructed:
+     ```typescript
+     const now = clock.now();
+     const player: Player = {
+       id: playerId,
+       socketId,
+       name: sanitizedName,
+       avatar: req.avatar || "🦁",
+       color: assignedColor,
+       isHost: isRoomHost,
+       isConnected: true,
+       connectedAt: now,
+       createdAt: now,
+       updatedAt: now,
+     };
+     ```
+2. **Immutability of `createdAt`:**
+   - `createdAt` is typed as `readonly`.
+   - Mutation functions, reconnect transitions, color inversion logic, and serialization mappers MUST NEVER overwrite `createdAt`.
+   - During room transitions (e.g. `disconnectPlayerTransition`, `reconnectPlayerTransition`, `addPlayerToRoom`), `createdAt` must be copied verbatim from the existing player entity.
+3. **Mutation Rules for `updatedAt`:**
+   - `updatedAt` MUST be updated to `clock.now()` whenever any of the following events occur:
+     - Player connects or reconnects (`isConnected: true`, updated `socketId`, updated `connectedAt`).
+     - Player disconnects (`isConnected: false`, cleared or retained `socketId`).
+     - Player piece color changes (e.g. rematch color switch).
+     - Player avatar or display name is updated.
+4. **Backward Compatibility & Ingress Normalization:**
+   - When deserializing legacy client or test payloads that lack `createdAt` or `updatedAt`:
+     - If `createdAt` is undefined: fallback to `connectedAt` if valid, otherwise `clock.now()`.
+     - If `updatedAt` is undefined: fallback to `connectedAt` if valid, otherwise `clock.now()`.
+   - In unit test fixture helpers (e.g. `createDummyRoom`):
+     ```typescript
+     connectedAt: now,
+     createdAt: now,
+     updatedAt: now,
+     ```
+
+---
+
+## 2. In-Memory Store Contracts: Server Persistence Invariants
+
+<!-- contract: server-in-memory-stores -->
+<!-- requirement: MIN-028, ENH-013, CRIT-002, MAJ-004 -->
+
+### 2.1 `InMemoryRoomStore` Architecture & State Model
+
+**File:** `apps/server/src/features/rooms/in_memory_room.store.ts`
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                          InMemoryRoomStore                             │
+│                                                                        │
+│   rooms: Map<RoomCode, Readonly<RoomState>>                            │
+│     │ (pre-frozen snapshots stored per CAS version)                    │
+│     ▼                                                                  │
+│   socketIndex: Map<SocketId, { roomCode: string, playerId: string }>   │
+│     │ (O(1) primary socket reverse lookup)                             │
+│     ▼                                                                  │
+│   roomSockets: Map<RoomCode, Set<SocketId>>                            │
+│     │ (O(1) cascade unindexing map)                                    │
+│     ▼                                                                  │
+│   lockQueues: Map<RoomCode, { tail: Promise<void>, waitersCount: n }>  │
+│     (serialized async FIFO mutex per roomCode)                         │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Dual Index Invariants:
+1. **Primary Room Index:** `rooms` maps normalized uppercase 4-character room codes (`"ABCD"`) to immutable `Readonly<RoomState>`.
+2. **Reverse Socket Index (`socketIndex`):** Maps `socketId` directly to `{ roomCode, playerId }`.
+3. **Room-to-Sockets Secondary Index (`roomSockets`):** Maps `roomCode` to `Set<socketId>`. Tracks all sockets associated with white player, black player, and active spectators in that room.
+4. **Consistency Invariant:**
+   $$\forall s \in \text{Domain}(socketIndex): \quad socketIndex(s) = (R, P) \implies s \in roomSockets(R) \land \text{PlayerHasSocket}(R, P, s)$$
+5. **Zero Memory Retention Invariant:**
+   On room deletion (`delete(roomCode)`), room expiry, or socket reassignment, all matching keys in `socketIndex` and `roomSockets` MUST be removed. No disconnected socket or stale room entry may persist in memory.
+
+### 2.2 Fallback Socket Lookup Re-Indexing Rule (MIN-028)
+
+#### Problem Analysis
+In `InMemoryRoomStore.findBySocketId(socketId: string)`, if `this.socketIndex.get(socketId)` returns `undefined` (or returns a stale pointer invalidated during socket cleanup), the method falls back to a linear scan across `this.rooms.values()`.
+
+Previously (lines 302–316):
+```typescript
+// VULNERABLE CODE (MIN-028):
+for (const room of this.rooms.values()) {
+  if (room.whitePlayer?.socketId === socketId) {
+    return { room: structuredClone(room), playerId: room.whitePlayer.id };
+  }
+  // ... black player & spectator checks
+}
+```
+When a match was found in the fallback scan:
+1. The store returned the room without re-populating `this.socketIndex` or `this.roomSockets`.
+2. Subsequent queries for that same socket had to execute another $O(N)$ linear scan, wasting CPU cycles.
+3. If stale entries existed in `socketIndex` from previous reconnect attempts for that room, they were retained indefinitely, causing progressive memory leaks.
+
+#### Contractual Re-Indexing Rule
+Whenever the fallback scan matches an active player or spectator in a room, the store **MUST execute `this.indexSockets(room)` immediately before returning**.
+
+```typescript
+// AUTHORITATIVE FALLBACK SCAN PATTERN (MIN-028):
+public async findBySocketId(
+  socketId: string,
+  options?: StorageQueryOptions,
+): Promise<{ room: Readonly<RoomState>; playerId: string } | null> {
+  this.assertNotAborted(options?.signal);
+
+  // 1. O(1) Fast path: check reverse socketIndex
+  const indexed = this.socketIndex.get(socketId);
+  if (indexed) {
+    const room = this.rooms.get(indexed.roomCode);
+    if (room) {
+      const isPlayerSocket =
+        room.whitePlayer?.socketId === socketId ||
+        room.blackPlayer?.socketId === socketId ||
+        room.spectators?.some((s) => s.socketId === socketId);
+
+      if (isPlayerSocket) {
+        return { room, playerId: indexed.playerId };
+      }
+    }
+    // Stale index detected: purge invalid entry
+    this.socketIndex.delete(socketId);
+    const sockets = this.roomSockets.get(indexed.roomCode);
+    if (sockets) {
+      sockets.delete(socketId);
+      if (sockets.size === 0) {
+        this.roomSockets.delete(indexed.roomCode);
+      }
+    }
+  }
+
+  // 2. Fallback scan across all active rooms
+  for (const room of this.rooms.values()) {
+    this.assertNotAborted(options?.signal);
+
+    if (room.whitePlayer?.socketId === socketId) {
+      // SELF-HEALING INVARIANT: Re-index immediately (MIN-028)
+      this.indexSockets(room);
+      return { room, playerId: room.whitePlayer.id };
+    }
+    if (room.blackPlayer?.socketId === socketId) {
+      // SELF-HEALING INVARIANT: Re-index immediately (MIN-028)
+      this.indexSockets(room);
+      return { room, playerId: room.blackPlayer.id };
+    }
+    const spectator = room.spectators?.find((s) => s.socketId === socketId);
+    if (spectator) {
+      // SELF-HEALING INVARIANT: Re-index immediately (MIN-028)
+      this.indexSockets(room);
+      return { room, playerId: spectator.id };
+    }
+  }
+
+  return null;
+}
+```
+
+### 2.3 Deep Freeze / Copy Invariants for Read Queries (ENH-013)
+
+#### Problem Analysis
+`findByCode` and `findBySocketId` are executed at high frequency (heartbeats, client polls, move validations, socket message ingress). Calling `structuredClone(room)` on every read allocated hundreds of thousands of heap objects per second in active multiplayer benchmarks, triggering heavy V8 garbage collection pauses (5–25ms GC stop-the-world spikes).
+
+#### Contractual Zero-Allocation Read Invariant
+1. **Write-Path Deep Freezing:**
+   When persisting a room state via `save()`, `createIfAbsent()`, or `mutate()`, the store creates an isolated clone, recursively freezes it via `deepFreeze()`, and stores the immutable reference in `this.rooms`.
+2. **Read-Path Direct Reference Return:**
+   High-frequency read queries (`findByCode`, `findBySocketId`, `listActiveRooms`) return the pre-frozen `Readonly<RoomState>` reference directly without invoking `structuredClone()`.
+3. **Mutation Isolation:**
+   The only pathway to mutate room state is via `store.mutate(roomCode, mutator)` or inside `store.withLock(roomCode, action)`. The `mutate` implementation clones the frozen state *once* before passing it to the mutator, ensuring user mutations operate on a private mutable draft.
+
+#### Recursive Deep Freeze Specification
+```typescript
+/**
+ * Recursively freezes an object and its nested properties to enforce immutability at runtime.
+ * Guarantees zero runtime allocations on read queries while preventing state corruption.
+ */
+export function deepFreeze<T>(obj: T): Readonly<T> {
+  if (obj === null || typeof obj !== "object" || Object.isFrozen(obj)) {
+    return obj;
+  }
+
+  Object.freeze(obj);
+
+  for (const key of Object.getOwnPropertyNames(obj)) {
+    const val = (obj as Record<string, unknown>)[key];
+    if (val !== null && (typeof val === "object" || typeof val === "function")) {
+      deepFreeze(val);
+    }
+  }
+
+  return obj;
+}
+```
+
+#### Read vs. Mutate Performance Contract:
+- **`findByCode(code)`:** $O(1)$ lookup, 0 heap allocations, returns frozen pointer.
+- **`findBySocketId(socketId)`:** $O(1)$ map lookup on index hit, 0 heap allocations, returns frozen pointer.
+- **`mutate(code, mutator)`:** Mutates isolated draft inside room lock, increments version, deep-freezes result, updates `this.rooms`, re-indexes sockets.
+
+---
+
+## 3. In-Memory Session Registry: HMAC-SHA256 & Credential Scrubbing
+
+<!-- contract: session-storage-and-redaction -->
+<!-- requirement: CRIT-002, MAJ-004 -->
+
+### 3.1 HMAC-SHA256 Signed Session Tokens (MAJ-004)
+
+#### Token Format Specification
+Session tokens authenticate WebSocket reconnection and API operations. Tokens must be cryptographically tamper-resistant.
+
+$$\text{SessionToken} = \text{SessionId} \,\|\, \texttt{"."} \,\|\, \text{HMAC-SHA256}_{\text{SESSION\_SECRET}}(\text{SessionId})$$
+
+- **`SessionId`:** Standard RFC 4122 UUID v4 (36 ASCII characters, e.g. `c7b98f21-8f5c-482a-9290-0e10b14b8a7f`).
+- **Delimiter:** Literal period (`.`).
+- **`Signature`:** 64-character lowercase hexadecimal string representing the HMAC-SHA256 digest of the `SessionId` using `SESSION_SECRET`.
+- **Total Token Length:** Exactly 101 characters (36 + 1 + 64).
+
+#### Secret Key Handling & Fallback
+- `SESSION_SECRET` is obtained from `env.SESSION_SECRET`.
+- If `SESSION_SECRET` is omitted in non-production environments (`NODE_ENV !== "production"`), a deterministic development secret is used, and a startup warning is logged.
+- In production (`NODE_ENV === "production"`), if `SESSION_SECRET` is missing or shorter than 32 characters, server bootstrap MUST fail fast with `ConfigurationError`.
+
+#### Signing & Verification Utilities Contract
+
+**File:** `shared/src/utils/session_token.ts`
+
+```typescript
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export interface SessionTokenPayload {
+  sessionId: string;
+  signature: string;
+  token: string;
 }
 
 /**
- * Migrates stored puzzle progress from legacy v1 keys to canonical v2 schema.
- * Enforces non-destructive deprecation: retains legacy keys for 30 days before pruning.
- *
- * @param storage - Target KeyValueStorage implementation
- * @param log - Optional structured logger (defaults to platform logger)
- * @param referenceNowMs - Optional timestamp for testing time travel
- * @returns MigrationOutcome summary
+ * Signs a session ID with HMAC-SHA256 using the provided secret.
  */
-export function migrateStorageV1ToV2(
-  storage: KeyValueStorage,
-  log: ILogger = logger,
-  referenceNowMs: number = Date.now()
-): MigrationOutcome {
-  const correlationId = generateCorrelationId();
-  const operation = 'migrate_storage_v1_to_v2';
-
-  try {
-    if (!storage.isAvailable()) {
-      log.debug('Storage is unavailable; skipping v1->v2 puzzle progress migration', {
-        operation,
-        correlationId,
-      });
-      return { status: 'skipped' };
-    }
-
-    const v2Data = storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_V2);
-    const v1Raw = storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1);
-    const legacyRaw = storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_LEGACY);
-    const deprecatedAtRaw = storage.getItem(STORAGE_KEYS.PUZZLE_PROGRESS_DEPRECATED_AT);
-
-    // Case 1: V2 already exists — handle deprecation lifecycle of legacy keys
-    if (v2Data) {
-      const hasLegacyKeys = Boolean(v1Raw || legacyRaw);
-
-      if (!hasLegacyKeys) {
-        // Legacy keys already purged; nothing to do
-        return { status: 'already_migrated' };
-      }
-
-      // Check if deprecation timestamp is recorded
-      if (!deprecatedAtRaw) {
-        // Stamp deprecation timestamp now to begin 30-day countdown
-        storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_DEPRECATED_AT, String(referenceNowMs));
-        log.info('PUZZLE_PROGRESS_V2 exists; stamped deprecation timer on legacy keys', {
-          operation,
-          correlationId,
-          deprecationTimestamp: referenceNowMs,
-          graceWindowMs: LEGACY_STORAGE_DEPRECATION_WINDOW_MS,
-        });
-        return { status: 'already_migrated', deprecationTimestamp: referenceNowMs };
-      }
-
-      const deprecatedAt = Number(deprecatedAtRaw);
-      if (!Number.isNaN(deprecatedAt) && referenceNowMs - deprecatedAt >= LEGACY_STORAGE_DEPRECATION_WINDOW_MS) {
-        // 30 days elapsed: safe to prune legacy keys
-        storage.removeItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1);
-        storage.removeItem(STORAGE_KEYS.PUZZLE_PROGRESS_LEGACY);
-        storage.removeItem(STORAGE_KEYS.PUZZLE_PROGRESS_DEPRECATED_AT);
-
-        log.info('Pruned legacy puzzle progress keys after 30-day deprecation grace window', {
-          operation,
-          correlationId,
-          deprecatedAt,
-          prunedAt: referenceNowMs,
-          retentionDurationMs: referenceNowMs - deprecatedAt,
-        });
-        return { status: 'pruned', deprecationTimestamp: deprecatedAt };
-      }
-
-      // Within 30-day grace period: retain legacy keys
-      log.debug('Legacy puzzle progress keys retained within 30-day deprecation grace window', {
-        operation,
-        correlationId,
-        deprecatedAt,
-        remainingMs: Math.max(0, LEGACY_STORAGE_DEPRECATION_WINDOW_MS - (referenceNowMs - deprecatedAt)),
-      });
-      return { status: 'already_migrated', deprecationTimestamp: deprecatedAt };
-    }
-
-    // Case 2: V2 does not exist — migrate legacy data if present
-    const legacyKeyFound = v1Raw
-      ? STORAGE_KEYS.PUZZLE_PROGRESS_V1
-      : legacyRaw
-        ? STORAGE_KEYS.PUZZLE_PROGRESS_LEGACY
-        : null;
-
-    const sourceRaw = v1Raw || legacyRaw;
-    if (!sourceRaw || !legacyKeyFound) {
-      log.debug('No legacy puzzle progress data found; migration not required', {
-        operation,
-        correlationId,
-      });
-      return { status: 'skipped' };
-    }
-
-    try {
-      const parsed = JSON.parse(sourceRaw);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        log.warn('Legacy puzzle progress contains non-object JSON payload; aborting migration', {
-          operation,
-          correlationId,
-          legacyKey: legacyKeyFound,
-        });
-        return { status: 'corrupt', legacyKeyFound };
-      }
-
-      // Write canonical v2 key
-      storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_V2, JSON.stringify(parsed));
-
-      // Non-destructive: DO NOT delete legacy keys! Stamp deprecation timestamp instead
-      storage.setItem(STORAGE_KEYS.PUZZLE_PROGRESS_DEPRECATED_AT, String(referenceNowMs));
-
-      log.info('Successfully migrated legacy puzzle progress to v2 schema with 30-day deprecation retention', {
-        operation,
-        correlationId,
-        sourceKey: legacyKeyFound,
-        targetKey: STORAGE_KEYS.PUZZLE_PROGRESS_V2,
-        deprecationTimestamp: referenceNowMs,
-      });
-
-      return {
-        status: 'migrated',
-        legacyKeyFound,
-        deprecationTimestamp: referenceNowMs,
-      };
-    } catch (parseErr) {
-      log.warn('Failed to parse legacy puzzle progress JSON during migration', {
-        operation,
-        correlationId,
-        legacyKey: legacyKeyFound,
-        error: parseErr instanceof Error ? parseErr.message : String(parseErr),
-      });
-      return {
-        status: 'corrupt',
-        legacyKeyFound,
-        error: parseErr instanceof Error ? parseErr.message : String(parseErr),
-      };
-    }
-  } catch (storageErr) {
-    log.error('Unexpected storage exception encountered during client migration', {
-      operation,
-      correlationId,
-      error: storageErr instanceof Error ? storageErr.message : String(storageErr),
-    });
-    return {
-      status: 'error',
-      error: storageErr instanceof Error ? storageErr.message : String(storageErr),
-    };
+export function signSessionToken(sessionId: string, secret: string): string {
+  if (!secret) {
+    throw new Error("Cannot sign session token: secret is required");
   }
+  const hmac = createHmac("sha256", secret);
+  hmac.update(sessionId);
+  const signature = hmac.digest("hex");
+  return `${sessionId}.${signature}`;
+}
+
+/**
+ * Validates the cryptographic HMAC-SHA256 signature of a session token in constant time.
+ */
+export function verifySessionToken(token: string, secret: string): boolean {
+  if (!token || !secret) return false;
+
+  const dotIndex = token.indexOf(".");
+  if (dotIndex === -1) return false;
+
+  const sessionId = token.slice(0, dotIndex);
+  const signature = token.slice(dotIndex + 1);
+
+  if (!sessionId || !signature || signature.length !== 64) {
+    return false;
+  }
+
+  const expectedSignature = createHmac("sha256", secret).update(sessionId).digest("hex");
+
+  const sigBuffer = Buffer.from(signature, "utf8");
+  const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+
+  if (sigBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(sigBuffer, expectedBuffer);
+}
+
+/**
+ * Parses a signed session token, returning null if structurally invalid.
+ */
+export function parseSessionToken(token: string): { sessionId: string; signature: string } | null {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 2 || !parts[0] || parts[1].length !== 64) {
+    return null;
+  }
+  return { sessionId: parts[0], signature: parts[1] };
 }
 ```
 
----
+### 3.2 Registry Storage & Indexing Contract
 
-### 2.5 Invocation Contract in Client Bootstrap (`apps/client/src/main.ts`)
-
-Per Rule 3 (Dependency Direction) and Finding [CRIT-001], the migration MUST be triggered synchronously in `apps/client/src/main.ts` prior to store instantiation, DI injection, and Vue app mounting.
+**File:** `apps/server/src/features/rooms/in_memory_session_registry.ts`
 
 ```typescript
-// apps/client/src/main.ts
-import { createApp } from 'vue';
-import App from './App.vue';
-import './assets/design-tokens.css';
-import {
-  API_CLIENT_KEY,
-  STORAGE_KEY,
-  SESSION_STORAGE_KEY,
-  AUDIO_SERVICE_KEY,
-  LOGGER_KEY,
-  SCENARIO_STORE_KEY,
-  PUZZLE_STORE_KEY,
-} from './platform/di';
-import { apiClient } from './platform/api';
-import { safeLocalStorage, safeSessionStorage } from './platform/storage';
-import { migrateStorageV1ToV2 } from './platform/storage/keys'; // <-- CRIT-001
-import { audioSynthesizer } from './platform/audio/audio_synthesizer';
-import { logger } from './platform/telemetry';
-import { defaultLocalStorageProgressStore } from './features/scenarios/store/local_storage_progress.store';
-import { defaultLocalStoragePuzzleProgressStore } from './features/puzzles/store/local_storage_puzzle_store';
+export class InMemorySessionRegistry implements SessionRegistry {
+  // Primary index: full signed sessionToken -> SessionRecord
+  private readonly sessions = new Map<string, SessionRecord>();
 
-// 1. Execute storage migrations before stores are mounted or accessed
-migrateStorageV1ToV2(safeLocalStorage, logger);
+  // Secondary index: roomCode -> Set<signedSessionToken> (cascade delete)
+  private readonly roomIndex = new Map<string, Set<string>>();
 
-const app = createApp(App);
+  // Secondary index: `${roomCode}:${playerId}` -> signedSessionToken
+  private readonly playerIndex = new Map<string, string>();
 
-// 2. Composition Root: Wire Infrastructure & Stores via app.provide (MAJ-019)
-app.provide(API_CLIENT_KEY, apiClient);
-app.provide(STORAGE_KEY, safeLocalStorage);
-app.provide(SESSION_STORAGE_KEY, safeSessionStorage);
-app.provide(AUDIO_SERVICE_KEY, audioSynthesizer);
-app.provide(LOGGER_KEY, logger);
-app.provide(SCENARIO_STORE_KEY, defaultLocalStorageProgressStore);
-app.provide(PUZZLE_STORE_KEY, defaultLocalStoragePuzzleProgressStore);
-
-// 3. Global Error Handler with Structured Telemetry Logging (MIN-014)
-app.config.errorHandler = (err, _instance, info) => {
-  logger.error('Unhandled Vue application error', {
-    operation: 'vue_error_handler',
-    correlationId: logger.generateCorrelationId?.() ?? undefined,
-    error: err instanceof Error ? err.message : String(err),
-    stack: err instanceof Error ? err.stack : undefined,
-    componentInfo: info,
-  });
-};
-
-app.mount('#app');
-```
-
----
-
-## 3. Structured Storage Two-Phase Commit Contract (MAJ-020)
-
-### 3.1 Problem & Vulnerability Analysis
-`LocalStorageUnifiedStore.overwriteAll` in `apps/client/src/features/portability/store/local_storage_unified.store.ts` performs a multi-store two-phase commit (2PC) write across `ScenarioProgressStore` and `PuzzleProgressStore`.
-
-The audit revealed three compliance defects:
-1. **Unlogged Transaction Entry & Exit (MAJ-020):** Per `logging-and-observability-mandate.md` (*"Universal Requirement: All Operations Must Be Logged — Database transactions are mandatory operations"*), operations require 3 points of logging: start, success with duration, and failure with correlation ID. `overwriteAll` had zero start or success logs.
-2. **Silent Drop of Primary Write Error on Compensating Rollback:** When `writeErr` occurred, the method entered the `catch (writeErr)` block. If the compensating rollback succeeded (`rollbackSucceeded = true`), it logged NOTHING. `writeErr` was attached as `cause` to `StorageCommitError`, but was never logged to telemetry.
-3. **Missing Telemetry Context:** No `correlationId` or `duration` was logged on primary failure paths.
-
----
-
-### 3.2 Authoritative 2PC Transaction Sequence
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Caller as Import/Sync Handler
-    participant UnifiedStore as LocalStorageUnifiedStore
-    participant Logger as ILogger
-    participant Scenarios as ScenarioProgressStore
-    participant Puzzles as PuzzleProgressStore
-    participant Alert as StorageAlertDispatcher
-
-    Caller->>UnifiedStore: overwriteAll(payload)
-    Note over UnifiedStore: Generate correlationId & startTime = Date.now()
-    UnifiedStore->>Logger: info("Starting unified storage 2PC overwrite", { operation, correlationId, payloadCounts })
-
-    %% Phase 0: Validate
-    Note over UnifiedStore: Phase 0: Ingress Validation (assertValidProgress)
-
-    %% Phase 1: Pre-write snapshot
-    Note over UnifiedStore: Phase 1: Capture Pre-Write Snapshot
-    UnifiedStore->>Scenarios: getProgressMap()
-    UnifiedStore->>Puzzles: getProgress()
-    Note over UnifiedStore: snapshot = structuredClone({ scenarios, puzzles })
-
-    %% Phase 2: Staged Write
-    alt Staged Write Succeeds
-        UnifiedStore->>Scenarios: restoreProgressMap(payload.scenarios)
-        UnifiedStore->>Puzzles: restoreProgress(payload.puzzles)
-        UnifiedStore->>Logger: info("Unified storage 2PC overwrite succeeded", { operation, correlationId, duration })
-        UnifiedStore-->>Caller: resolve(void)
-    else Staged Write Fails (writeErr)
-        Note over UnifiedStore: Phase 2 Failed: Execute Compensating Rollback
-        alt Compensating Rollback Succeeds
-            UnifiedStore->>Scenarios: restoreProgressMap(snapshot.scenarios)
-            UnifiedStore->>Puzzles: restoreProgress(snapshot.puzzles)
-            UnifiedStore->>Logger: error("Unified storage write failed; compensating rollback succeeded", { operation, correlationId, duration, writeErr, rolledBack: true })
-            opt Quota Exceeded
-                UnifiedStore->>Alert: notify(STORAGE_QUOTA_EXCEEDED)
-            end
-            UnifiedStore-->>Caller: reject(StorageCommitError(rolledBack: true, cause: writeErr))
-        else Compensating Rollback Fails (rollbackErr)
-            UnifiedStore->>Logger: fatal("FATAL: Two-phase commit rollback failed", { operation, correlationId, duration, primaryError: writeErr, rollbackError: rollbackErr, rolledBack: false })
-            UnifiedStore-->>Caller: reject(StorageCommitError(rolledBack: false, cause: writeErr))
-        end
-    end
-```
-
----
-
-### 3.3 2PC Implementation Contract with 3-Point Logging
-
-```typescript
-// apps/client/src/features/portability/store/local_storage_unified.store.ts
-
-export class LocalStorageUnifiedStore implements ProgressStorage {
   constructor(
-    private readonly scenarioStore: ScenarioProgressStore,
-    private readonly puzzleStore: PuzzleProgressStore,
-    private readonly log: ILogger = logger
+    private readonly clock: IClock = new SystemClock(),
+    private readonly idGenerator: IIdGenerator = new UuidGenerator(),
+    private readonly logger: Logger = defaultLogger,
+    private readonly sessionSecret: string = process.env.SESSION_SECRET ?? "default-fun-chess-dev-secret-key-32b",
   ) {}
+  // ...
+}
+```
 
-  public async overwriteAll(payload: UnifiedProgressPayload): Promise<void> {
-    const correlationId = generateCorrelationId();
-    const startTime = Date.now();
-    const operation = 'unified_store_overwrite';
+#### Verification Lifecycle in `validateSession`
+When validating a session for reconnection:
+1. Verify token cryptographic integrity: `verifySessionToken(sessionToken, this.sessionSecret)`. If false, reject immediately (fail-closed, return `null`).
+2. Lookup session record by `sessionToken`. If missing, return `null`.
+3. Validate room code and player ID match: `record.roomCode === roomCode.toUpperCase() && record.playerId === playerId`.
+4. Validate expiration threshold: `this.clock.now() <= record.expiresAt`. If expired, delete session and return `null`.
+5. On success, return `structuredClone(record)` (or frozen record).
 
-    // 1. Mandatory Point 1: Operation Start Logging
-    this.log.info('Starting unified storage 2PC overwrite', {
-      operation,
-      correlationId,
-      version: payload?.version,
-      scenariosCount: payload?.scenarios ? Object.keys(payload.scenarios).length : 0,
-      puzzlesSolvedCount: payload?.puzzles?.solvedPuzzles ? Object.keys(payload.puzzles.solvedPuzzles).length : 0,
-    });
+### 3.3 Log Scrubbing & Credential Masking (CRIT-002)
 
-    // Phase 0: Validate payload structure against authoritative schema
-    if (!payload || typeof payload !== 'object' || !payload.scenarios || !payload.puzzles) {
-      const err = new Error('Invalid payload: missing scenarios or puzzles data');
-      this.log.error('Unified storage 2PC overwrite rejected: invalid payload structure', {
-        operation,
-        correlationId,
-        duration: Date.now() - startTime,
-        error: err.message,
-      });
-      throw err;
-    }
+#### Security Vulnerability Remediated
+Previously, `in_memory_session_registry.ts` passed raw `sessionToken` directly into log metadata:
+```typescript
+// VULNERABLE LOGGING (CRIT-002):
+this.logger.debug("Session created", {
+  operation: "session_storage_create",
+  roomCode: code,
+  playerId: params.playerId,
+  sessionToken, // LEAKS RAW BEARER CREDENTIAL TO LOGS (CWE-532)
+});
+```
+Furthermore, `http_server.ts` extracted session tokens from headers and query parameters into `userId`, which bypassed Pino redaction and leaked to access logs.
 
-    let validatedPayload: UnifiedProgressPayload;
-    try {
-      validatedPayload = assertValidProgress(payload);
-    } catch (validationErr) {
-      this.log.error('Unified storage 2PC overwrite schema assertion failed', {
-        operation,
-        correlationId,
-        duration: Date.now() - startTime,
-        error: validationErr instanceof Error ? validationErr.message : String(validationErr),
-      });
-      throw validationErr;
-    }
+#### Mandatory Masking & Redaction Rules
+1. **Never Log Cleartext Tokens:** Raw session tokens MUST NEVER be included in log messages, debug payloads, trace metadata, or error properties.
+2. **Fingerprint / Masking Standards:**
+   - Use irreversible truncated SHA-256 fingerprint:
+     ```typescript
+     import { createHash } from "node:crypto";
+     export function maskSessionToken(token: string): string {
+       if (!token || token.length < 8) return "***";
+       return `${token.slice(0, 4)}...${token.slice(-4)}`;
+     }
+     export function tokenFingerprint(token: string): string {
+       return createHash("sha256").update(token).digest("hex").slice(0, 10);
+     }
+     ```
+3. **Structured Log Payload Contract:**
 
-    // Phase 1: Capture pre-write snapshot
-    const snapshot: StorageSnapshot = {
-      scenarios: structuredClone(await this.scenarioStore.getProgressMap()),
-      puzzles: structuredClone(await this.puzzleStore.getProgress()),
-    };
+| Operation | Allowed Metadata Fields | Prohibited Fields |
+|---|---|---|
+| `session_storage_create` | `operation`, `roomCode`, `playerId`, `tokenFingerprint`, `expiresInMs` | `sessionToken` (raw) |
+| `session_storage_touch` | `operation`, `tokenFingerprint`, `newSocketId`, `extendedTtlMs` | `sessionToken` (raw) |
+| `session_storage_delete` | `operation`, `tokenFingerprint`, `roomCode`, `playerId`, `reason` | `sessionToken` (raw) |
+| `session_storage_validate` | `operation`, `roomCode`, `playerId`, `isValid`, `failureReason` | `sessionToken` (raw) |
 
-    // Phase 2: Staged write
-    try {
-      // 2a. Reset and restore scenario records
-      if (typeof this.scenarioStore.restoreProgressMap === 'function') {
-        await this.scenarioStore.restoreProgressMap(validatedPayload.scenarios);
-      } else {
-        await this.scenarioStore.resetAllProgress();
-        for (const [id, progress] of Object.entries(validatedPayload.scenarios)) {
-          await this.scenarioStore.saveProgress(
-            id,
-            progress.starsEarned,
-            progress.hintsUsedTotal
-          );
-        }
-      }
+4. **HTTP Ingress Scrubbing:**
+   In `http_server.ts:extractHttpUserId`, remove all extraction of `x-session-token`, `session-token`, `sessionToken`, and `session_token` into `userId`. `userId` must strictly represent public player IDs or authenticated subjects.
 
-      // 2b. Write full puzzle state (including themeMastery & arcadeStats)
-      await this.puzzleStore.restoreProgress(validatedPayload.puzzles);
+---
 
-      // 2. Mandatory Point 2: Operation Success Logging
-      const duration = Date.now() - startTime;
-      this.log.info('Unified storage 2PC overwrite completed successfully', {
-        operation,
-        correlationId,
-        duration,
-        scenariosCommitted: Object.keys(validatedPayload.scenarios).length,
-        puzzlesSolvedCommitted: Object.keys(validatedPayload.puzzles.solvedPuzzles).length,
-      });
-    } catch (writeErr) {
-      const duration = Date.now() - startTime;
+## 4. Storage Interface Contracts: Query Cancellation (ENH-015)
 
-      // Compensating Rollback: restore from pre-write snapshot
-      let rollbackSucceeded = false;
-      try {
-        if (typeof this.scenarioStore.restoreProgressMap === 'function') {
-          await this.scenarioStore.restoreProgressMap(snapshot.scenarios);
-        } else {
-          await this.scenarioStore.resetAllProgress();
-          for (const [id, progress] of Object.entries(snapshot.scenarios)) {
-            await this.scenarioStore.saveProgress(
-              id,
-              progress.starsEarned,
-              progress.hintsUsedTotal
-            );
-          }
-        }
-        await this.puzzleStore.restoreProgress(snapshot.puzzles);
-        rollbackSucceeded = true;
-      } catch (rollbackErr) {
-        rollbackSucceeded = false;
-        // Critical rollback failure logging
-        this.log.fatal('FATAL: Two-phase commit rollback failed; storage in potentially inconsistent state', {
-          operation: 'unified_store_rollback',
-          correlationId,
-          duration,
-          primaryError: writeErr instanceof Error
-            ? { name: writeErr.name, message: writeErr.message, stack: writeErr.stack }
-            : { raw: writeErr },
-          rollbackError: rollbackErr instanceof Error
-            ? { name: rollbackErr.name, message: rollbackErr.message, stack: rollbackErr.stack }
-            : { raw: rollbackErr },
-        });
-      }
+<!-- contract: storage-query-cancellation -->
+<!-- requirement: ENH-015 -->
 
-      // 3. Mandatory Point 3: Operation Failure Logging (MAJ-020 fix)
-      if (rollbackSucceeded) {
-        this.log.error('Unified storage write failed; compensating rollback safely restored previous state', {
-          operation,
-          correlationId,
-          duration,
-          rolledBack: true,
-          error: writeErr instanceof Error
-            ? { name: writeErr.name, message: writeErr.message, stack: writeErr.stack }
-            : { raw: writeErr },
-        });
-      }
+### 4.1 Options Types Specification
 
-      // Check quota error & emit reactive alert
-      if (isQuotaExceededError(writeErr)) {
-        storageAlertDispatcher.notify({
-          type: 'STORAGE_QUOTA_EXCEEDED',
-          store: 'unified',
-          attemptedAction: 'overwrite',
-          timestamp: Date.now(),
-          message: 'Storage quota exceeded while importing progress. Local state was preserved.',
-          suggestedRemediation: 'EXPORT_BACKUP_AND_CLEAR',
-        });
-      }
+```typescript
+/**
+ * Standard query options for data store operations.
+ * Supports cooperative request cancellation via standard AbortSignal (ENH-015).
+ */
+export interface StorageQueryOptions {
+  /** Optional AbortSignal for aborting in-flight or queued queries */
+  signal?: AbortSignal;
+}
 
-      throw new StorageCommitError(
-        rollbackSucceeded
-          ? 'Failed to save unified progress. Existing progress was safely restored.'
-          : 'CRITICAL: Progress save failed and partial rollback failed.',
-        { cause: writeErr, rolledBack: rollbackSucceeded }
+/**
+ * Standard mutation options for data store operations.
+ * Combines distributed tracing correlationId with cooperative AbortSignal.
+ */
+export interface StorageMutationOptions extends StorageQueryOptions {
+  /** Correlation ID for distributed tracing across service boundaries */
+  correlationId?: string;
+}
+```
+
+### 4.2 Authoritative `RoomStore` Interface
+
+**File:** `apps/server/src/features/rooms/room.store.ts`
+
+```typescript
+import { RoomState } from "@fun-chess/shared";
+
+export type RoomMutator<T> = (
+  current: RoomState,
+) => Promise<{ updatedRoom: RoomState; result: T }> | { updatedRoom: RoomState; result: T };
+
+export interface StorageQueryOptions {
+  signal?: AbortSignal;
+}
+
+export interface StorageMutationOptions extends StorageQueryOptions {
+  correlationId?: string;
+}
+
+/**
+ * Storage boundary abstraction for room persistence.
+ * Adheres to Architectural Patterns Rule 1: I/O Isolation.
+ * Supports AbortSignal query cancellation across all asynchronous methods (ENH-015).
+ */
+export interface RoomStore {
+  /**
+   * Retrieves a read-only snapshot of the room state.
+   */
+  findByCode(
+    roomCode: string,
+    options?: StorageQueryOptions,
+  ): Promise<Readonly<RoomState> | null>;
+
+  /**
+   * Finds room and player by socket ID with index self-healing.
+   */
+  findBySocketId(
+    socketId: string,
+    options?: StorageQueryOptions,
+  ): Promise<{ room: Readonly<RoomState>; playerId: string } | null>;
+
+  /**
+   * Atomically executes a mutator function within the room's exclusive lock.
+   */
+  mutate<T>(
+    roomCode: string,
+    mutator: RoomMutator<T>,
+    options?: StorageMutationOptions,
+  ): Promise<T>;
+
+  /**
+   * Executes an arbitrary asynchronous callback within the room's exclusive lock.
+   */
+  withLock<T>(
+    roomCode: string,
+    action: () => Promise<T>,
+    correlationId?: string,
+    options?: StorageQueryOptions,
+  ): Promise<T>;
+
+  /**
+   * Saves a room state with CAS version validation.
+   */
+  save(
+    room: RoomState,
+    expectedVersion?: number,
+    options?: StorageMutationOptions,
+  ): Promise<void>;
+
+  /**
+   * Atomically creates and persists a room if no room with this roomCode exists.
+   */
+  createIfAbsent(
+    room: RoomState,
+    options?: StorageMutationOptions,
+  ): Promise<void>;
+
+  /**
+   * Deletes a room from storage and clears its pending lock queue and socket indexes.
+   */
+  delete(
+    roomCode: string,
+    options?: StorageMutationOptions,
+  ): Promise<boolean>;
+
+  /**
+   * Lists all active rooms.
+   */
+  listActiveRooms(
+    options?: StorageQueryOptions,
+  ): Promise<Readonly<RoomState>[]>;
+
+  /**
+   * Returns current active room count.
+   */
+  count(
+    options?: StorageQueryOptions,
+  ): Promise<number>;
+
+  /**
+   * Clears all room entries and releases all pending lock chains.
+   */
+  clear(
+    options?: StorageMutationOptions,
+  ): Promise<void>;
+}
+
+export type IRoomStore = RoomStore;
+```
+
+### 4.3 Authoritative `SessionRegistry` Interface
+
+**File:** `apps/server/src/features/rooms/session_registry.ts`
+
+```typescript
+import { PieceColor } from "@fun-chess/shared";
+import type { StorageQueryOptions, StorageMutationOptions } from "./room.store.js";
+
+export interface SessionRecord {
+  readonly sessionToken: string;
+  readonly playerId: string;
+  readonly roomCode: string;
+  color: PieceColor;
+  readonly isHost: boolean;
+  socketId: string;
+  readonly createdAt: number;
+  lastSeenAt: number;
+  expiresAt: number;
+}
+
+export interface SessionRegistry {
+  createSession(
+    params: {
+      playerId: string;
+      roomCode: string;
+      color: PieceColor;
+      isHost: boolean;
+      socketId: string;
+      ttlMs?: number;
+    },
+    options?: StorageMutationOptions,
+  ): Promise<SessionRecord>;
+
+  validateSession(
+    sessionToken: string,
+    roomCode: string,
+    playerId: string,
+    options?: StorageQueryOptions,
+  ): Promise<SessionRecord | null>;
+
+  getSessionByToken(
+    sessionToken: string,
+    options?: StorageQueryOptions,
+  ): Promise<SessionRecord | null>;
+
+  getSessionTokenForPlayer(
+    roomCode: string,
+    playerId: string,
+    options?: StorageQueryOptions,
+  ): Promise<string | null>;
+
+  touchSession(
+    sessionToken: string,
+    newSocketId: string,
+    extensionTtlMs?: number,
+    options?: StorageMutationOptions,
+  ): Promise<void>;
+
+  deleteSession(
+    sessionToken: string,
+    options?: StorageMutationOptions,
+  ): Promise<boolean>;
+
+  deleteSessionForPlayer(
+    roomCode: string,
+    playerId: string,
+    options?: StorageMutationOptions,
+  ): Promise<boolean>;
+
+  deleteSessionsForRoom(
+    roomCode: string,
+    options?: StorageMutationOptions,
+  ): Promise<number>;
+
+  cleanupExpiredSessions(
+    options?: StorageMutationOptions,
+  ): Promise<number>;
+
+  updateSessionColor(
+    roomCode: string,
+    playerId: string,
+    newColor: PieceColor,
+    options?: StorageMutationOptions,
+  ): Promise<void>;
+
+  clear(
+    options?: StorageMutationOptions,
+  ): Promise<void>;
+}
+
+export type ISessionRegistry = SessionRegistry;
+```
+
+### 4.4 Cancellation Semantics & In-Flight Abort Handling
+
+1. **Pre-Flight Abort Check:**
+   Every method must begin with a check:
+   ```typescript
+   private assertNotAborted(signal?: AbortSignal): void {
+     if (signal?.aborted) {
+       throw signal.reason ?? new DOMException("The operation was aborted", "AbortError");
+     }
+   }
+   ```
+2. **Lock Queue Race Cancellation:**
+   In `acquireLock(code, ticket, correlationId, signal)`:
+   If `signal` is provided, race the acquisition promise against an abort listener:
+   ```typescript
+   if (signal) {
+     const abortPromise = new Promise<never>((_, reject) => {
+       const onAbort = () => {
+         signal.removeEventListener("abort", onAbort);
+         reject(signal.reason ?? new DOMException("The operation was aborted", "AbortError"));
+       };
+       signal.addEventListener("abort", onAbort, { once: true });
+     });
+     // Race prevTail vs acquireTimer vs abortPromise
+   }
+   ```
+   If aborted while queued:
+   - Cancel the acquisition timer.
+   - Decrement `waitersCount` and delete entry if 0.
+   - Record cancelled ticket to prevent stale lock execution.
+   - Throw `AbortError`.
+
+---
+
+## 5. Client-Side Storage Contracts
+
+<!-- contract: client-storage-lifecycle -->
+<!-- requirement: ENH-014, MIN-004, MIN-015, MIN-016 -->
+
+### 5.1 Architecture Decision Record: 30-Day Opportunistic Deprecation Pruning (ENH-014)
+
+```
+Title: ADR-0004: Client-Side Storage 30-Day Opportunistic Deprecation Pruning
+Status: Approved
+Context:
+  Fun Chess migrated puzzle progress storage from legacy v1 keys (`fun_chess_puzzle_progress`,
+  `fun_chess_puzzle_progress_v1`) to the canonical v2 schema (`fun_chess_puzzle_progress_v2`).
+  A destructive migration would permanently destroy user progress if a client reverted to
+  an earlier cached PWA service worker or if a sync anomaly occurred.
+  However, browser web applications have no background daemon or cron process when tabs are
+  closed. Therefore, legacy storage retention and eventual pruning must be opportunistic.
+
+Decision:
+  1. Non-Destructive Initial Migration:
+     When v1 data is detected and v2 is absent, v1 data is migrated to v2. The legacy keys are
+     NOT deleted immediately. Instead, a deprecation timestamp is recorded:
+     `STORAGE_KEYS.PUZZLE_PROGRESS_DEPRECATED_AT = Date.now()`
+  2. Retention Window:
+     A grace retention window of 30 days is enforced:
+     `LEGACY_STORAGE_DEPRECATION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000` (2,592,000,000 ms).
+  3. Opportunistic Evaluation:
+     At client application bootstrap (inside `migrateStorageV1ToV2`), if v2 data exists and
+     legacy keys exist:
+     - If `referenceNowMs - deprecatedAt < 30 days`: Retain legacy keys for safety.
+     - If `referenceNowMs - deprecatedAt >= 30 days`: Safely prune all legacy keys:
+       - `storage.removeItem(STORAGE_KEYS.PUZZLE_PROGRESS_V1)`
+       - `storage.removeItem(STORAGE_KEYS.PUZZLE_PROGRESS_LEGACY)`
+       - `storage.removeItem(STORAGE_KEYS.PUZZLE_PROGRESS_DEPRECATED_AT)`
+       - `storage.removeItem(STORAGE_KEYS.MIGRATION_V1_V2_TIMESTAMP)`
+  4. Observability:
+     Every migration and pruning action emits structured telemetry with duration, correlationId,
+     and retention duration metrics.
+
+Consequences:
+  - Users have 30 days of rollback tolerance.
+  - Zero server overhead or background daemon requirements.
+  - After 30 days, device localStorage is cleaned up automatically on the user's next visit.
+```
+
+### 5.2 Two-Phase Commit (2PC) Protocol in `LocalStorageUnifiedStore`
+
+The `LocalStorageUnifiedStore.overwriteAll` method coordinates simultaneous overwrites of Academy progress (`ScenarioProgressStore`) and Puzzle progress (`PuzzleProgressStore`) using a strict 2PC protocol with pre-write snapshot and compensating rollback.
+
+```
+       Client Trigger: overwriteAll(payload)
+                       │
+                       ▼
+         ┌───────────────────────────┐
+         │ Phase 0: Pre-Validation   │ (assertValidProgress(payload))
+         └─────────────┬─────────────┘
+                       │ (Schema valid)
+                       ▼
+         ┌───────────────────────────┐
+         │ Phase 1: Snapshot Capture │ (deep clone existing state of both stores)
+         └─────────────┬─────────────┘
+                       │
+                       ▼
+         ┌───────────────────────────┐
+         │ Phase 2: Staged Write     │
+         │ - Write Scenario Store    │
+         │ - Write Puzzle Store      │
+         └─────────────┬─────────────┘
+                       │
+        ┌──────────────┴──────────────┐
+        │ Success                     │ Catch (writeErr)
+        ▼                             ▼
+┌───────────────┐           ┌───────────────────────────────┐
+│ Commit Done   │           │ Compensating Rollback         │
+│ Emit log.info │           │ - Restore Scenario from Snap  │
+└───────────────┘           │ - Restore Puzzle from Snap    │
+                            │ - Dispatch Quota Exceeded Msg │
+                            │ - Throw StorageCommitError    │
+                            └───────────────────────────────┘
+```
+
+#### Deduplication of Scenario Restoration (MIN-016)
+Previously, lines 93–104 and 112–123 of `local_storage_unified.store.ts` duplicated the exact same 12-line fallback scenario restoration loop.
+
+**Authoritative Helper Extraction:**
+```typescript
+/**
+ * Restores scenario progress map using atomic batch method when supported,
+ * or itemized fallback loop for basic store implementations (MIN-016).
+ */
+private async applyScenarioProgress(scenarios: ScenarioProgressMap): Promise<void> {
+  if (typeof this.scenarioStore.restoreProgressMap === "function") {
+    await this.scenarioStore.restoreProgressMap(scenarios);
+  } else {
+    await this.scenarioStore.resetAllProgress();
+    for (const [id, progress] of Object.entries(scenarios)) {
+      await this.scenarioStore.saveProgress(
+        id,
+        progress.starsEarned,
+        progress.hintsUsedTotal,
       );
     }
   }
 }
 ```
+This helper MUST be called identically in both Phase 2 staged write and Phase 2 compensating rollback.
 
----
+### 5.3 Progress Store Constructor Standardization & Factories (MIN-004, MIN-015)
 
-## 4. Progress Schema Sanitization Contract (MIN-026, MIN-005)
+#### Problem Analysis
+1. **Asymmetric Signatures (MIN-015):**
+   - `LocalStoragePuzzleProgressStore`: `(storageKey, storage, clock, logger)`
+   - `LocalStorageProgressStore`: `(storageKey, storage, logger, clock)`
+   This parameter inversion led to subtle test bugs where a mock clock was passed as a logger or vice versa.
+2. **Eager Singletons (MIN-004):**
+   - `export const defaultLocalStorageProgressStore = createDefaultLocalStorageProgressStore();`
+   Executed at module import time, preventing clean test isolation and risking DOM/localStorage access in non-browser execution contexts.
 
-### 4.1 Authoritative Sanitization Delegation (MIN-026)
-`LocalStoragePuzzleProgressStore` previously maintained 102 lines of manual `typeof` parsing and ad-hoc fallback values in `sanitizeProgress`. This violated DRY, bypassed Zod schema constraints in `@fun-chess/shared`, and caused maintenance friction.
-
-The store MUST delegate sanitization to the shared canonical validator `sanitizeAndValidateProgress` from `@fun-chess/shared`:
+#### Standardized Options Contract: `StorageOptions`
+**File:** `apps/client/src/features/scenarios/store/local_storage_progress.store.ts`
 
 ```typescript
-// apps/client/src/features/puzzles/store/local_storage_puzzle_store.ts
-import {
-  sanitizeAndValidateProgress,
-  UNIFIED_PROGRESS_SCHEMA_VERSION,
-  type PuzzleProgress,
-} from '@fun-chess/shared';
-import { DEFAULT_PUZZLE_PROGRESS } from './puzzle_progress.store';
+export interface ProgressStoreOptions {
+  storageKey?: string;
+  storage?: KeyValueStorage;
+  logger?: ILogger;
+  clock?: IClock;
+}
 
-/**
- * Sanitizes and validates unknown puzzle progress input by delegating to
- * the authoritative @fun-chess/shared schema validator.
- */
-private sanitizeProgress(raw: unknown): PuzzleProgress {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { ...DEFAULT_PUZZLE_PROGRESS };
+export class LocalStorageProgressStore implements ScenarioProgressStore {
+  private readonly storageKey: string;
+  private readonly storage: KeyValueStorage;
+  private readonly logger: ILogger;
+  private readonly clock: IClock;
+
+  /**
+   * Standard constructor accepting unified options bag (MIN-015),
+   * with positional fallback overload for backward compatibility.
+   */
+  constructor(options?: ProgressStoreOptions);
+  constructor(
+    storageKey?: string,
+    storage?: KeyValueStorage,
+    logger?: ILogger,
+    clock?: IClock,
+  );
+  constructor(
+    optionsOrKey: ProgressStoreOptions | string = SCENARIO_PROGRESS_STORAGE_KEY,
+    storage: KeyValueStorage = safeLocalStorage,
+    logger: ILogger = defaultLogger,
+    clock?: IClock,
+  ) {
+    if (typeof optionsOrKey === "object" && optionsOrKey !== null) {
+      this.storageKey = optionsOrKey.storageKey ?? SCENARIO_PROGRESS_STORAGE_KEY;
+      this.storage = optionsOrKey.storage ?? safeLocalStorage;
+      this.logger = optionsOrKey.logger ?? defaultLogger;
+      this.clock = optionsOrKey.clock ?? new SystemClock();
+    } else {
+      this.storageKey = optionsOrKey;
+      this.storage = storage;
+      this.logger = logger;
+      this.clock = clock ?? new SystemClock();
+    }
   }
-
-  // Wrap raw puzzle payload in minimal valid UnifiedProgressPayload envelope
-  const wrappedPayload = {
-    version: UNIFIED_PROGRESS_SCHEMA_VERSION,
-    exportedAt: Date.now(),
-    scenarios: {},
-    puzzles: raw,
-  };
-
-  const result = sanitizeAndValidateProgress(wrappedPayload);
-  if (result.success && result.data?.puzzles) {
-    return result.data.puzzles;
-  }
-
-  // Schema rejected payload: fall back defensively to default profile
-  return { ...DEFAULT_PUZZLE_PROGRESS };
+  // ...
 }
 ```
 
----
-
-### 4.2 Corrupted JSON Handling in Scenario Store (MIN-005)
-`LocalStorageProgressStore.getProgressMap` in `apps/client/src/features/scenarios/store/local_storage_progress.store.ts` previously swallowed JSON parse errors in an empty catch block (`catch {}`).
-
-The store MUST log a diagnostic warning with the error details and correlation ID before returning the in-memory fallback cache:
-
-```typescript
-// apps/client/src/features/scenarios/store/local_storage_progress.store.ts
-
-public async getProgressMap(): Promise<ScenarioProgressMap> {
-  if (!this.storage.isAvailable()) {
-    const result: ScenarioProgressMap = {};
-    for (const [id, rec] of this.memoryFallback.entries()) {
-      result[id] = { ...rec };
-    }
-    return result;
-  }
-
-  try {
-    const raw = this.storage.getItem(this.storageKey);
-    if (!raw) return {};
-
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      logger.warn('Scenario progress storage contained invalid non-object JSON; returning empty map', {
-        operation: 'get_scenario_progress_map',
-        storageKey: this.storageKey,
-      });
-      return {};
-    }
-
-    const result: ScenarioProgressMap = {};
-    for (const [key, val] of Object.entries(parsed)) {
-      const sanitized = this.sanitizeRecord(val);
-      if (sanitized) {
-        result[key] = sanitized;
-        this.memoryFallback.set(key, sanitized);
-      }
-    }
-    return result;
-  } catch (err) {
-    // MIN-005 Fix: Log corrupted storage JSON warning instead of silent swallow
-    logger.warn('Failed to parse scenario progress JSON from storage; safely falling back to memory cache', {
-      operation: 'get_scenario_progress_map',
-      storageKey: this.storageKey,
-      error: err instanceof Error ? err.message : String(err),
-    });
-
-    const result: ScenarioProgressMap = {};
-    for (const [id, rec] of this.memoryFallback.entries()) {
-      result[id] = { ...rec };
-    }
-    return result;
-  }
-}
-```
+#### Factory Pattern & Elimination of Module-Level Singletons (MIN-004)
+1. **Remove Eager Singletons:**
+   Remove top-level instantiation:
+   ```typescript
+   // DELETE (MIN-004):
+   // export const defaultLocalStorageProgressStore = createDefaultLocalStorageProgressStore();
+   ```
+2. **Export Pure Factories:**
+   ```typescript
+   export function createLocalStorageProgressStore(
+     options?: ProgressStoreOptions,
+   ): LocalStorageProgressStore {
+     return new LocalStorageProgressStore(options);
+   }
+   ```
+3. **Dependency Injection Wiring:**
+   Instantiate stores inside `createFunChessApp()` or within Vue `provide`:
+   ```typescript
+   export const SCENARIO_PROGRESS_STORE_KEY: InjectionKey<ScenarioProgressStore> =
+     Symbol("ScenarioProgressStore");
+   export const UNIFIED_PROGRESS_STORE_KEY: InjectionKey<ProgressStorage> =
+     Symbol("UnifiedProgressStore");
+   ```
 
 ---
 
-## 5. Server Ephemeral Room Lock Mutex Contract (MAJ-005)
+## 6. Implementation Traceability Matrix & Builder Task Assignments
 
-### 5.1 Problem Statement & Vulnerability Analysis
-`InMemoryRoomStore.withLock(roomCode, action)` guards concurrent operations on a per-room basis using a promise queue (`tail`). 
-
-The previous implementation enforced a 5000ms acquisition timeout (`LOCK_TIMEOUT_MS = 5000`), but once the lock was acquired, `await action()` ran **unbounded**:
-```typescript
-await Promise.race([prevTail, timeoutPromise]); // 5000ms acquisition timeout
-acquired = true;
-
-return await action(); // <-- UNBOUNDED EXECUTION (MAJ-005)
-```
-
-**Impact:** If `action()` stalled (e.g., waiting on an unresolved promise, slow worker, or CPU lock), the lock was held indefinitely. Subsequent operations queued behind `entry.tail` all failed with `LockTimeoutError`, permanently starving the room until server restart and leaking queued promise callbacks in Node.js heap.
-
----
-
-### 5.2 Dual-Timeout Race Mutex Specification
-
-To ensure robust mutual exclusion and total starvation immunity, `InMemoryRoomStore.withLock` MUST execute a **Dual-Timeout Race Architecture**:
-1. **Acquisition Timeout (5000ms):** Timeout waiting in queue for previous mutator to complete.
-2. **Execution Timeout (5000ms):** Timeout racing the executing mutator (`action()`) against a timer promise.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Mutator as Room Action
-    participant Store as InMemoryRoomStore.withLock
-    participant AcqTimer as Acquisition Timer (5000ms)
-    participant ExecTimer as Execution Timer (5000ms)
-    participant Queue as Lock Queue
-
-    Store->>AcqTimer: Start acquisition countdown
-    Store->>Queue: Await prevTail
-    alt Acquisition takes > 5000ms
-        AcqTimer-->>Store: Reject LockTimeoutError
-        Note over Store: acquired = false. Attach prevTail.finally() to defer release
-        Store-->>Mutator: Reject LockTimeoutError
-    else Acquisition succeeds in <= 5000ms
-        AcqTimer->>AcqTimer: clearTimeout(acqTimer)
-        Note over Store: acquired = true
-        Store->>ExecTimer: Start execution countdown (5000ms)
-        Store->>Mutator: Execute action()
-        alt action() completes in <= 5000ms
-            Mutator-->>Store: Return result
-            ExecTimer->>ExecTimer: clearTimeout(execTimer)
-            Note over Store: Release lock & drain queue
-            Store-->>Mutator: Return result
-        else action() hangs > 5000ms (MAJ-005)
-            ExecTimer-->>Store: Reject LockExecutionTimeoutError
-            Note over Store: acquired = true. Call releaseLock() immediately!
-            Note over Store: Next queued waiter is UNBLOCKED; room not starved
-            Store-->>Mutator: Reject LockExecutionTimeoutError
-        end
-    end
-```
+| Scope Card | Target File | Contract Section | Finding IDs | Builder Instructions |
+|---|---|---|---|---|
+| **SC-1** | `shared/src/contracts/models.ts` | §1.2 | MIN-025 | Update `Player` interface with `readonly createdAt: number` and `updatedAt: number`. |
+| **SC-1** | `shared/src/contracts/schemas.ts` | §1.3 | MIN-025 | Add `createdAt` and `updatedAt` non-negative number validations to `PlayerSchema`. |
+| **SC-1** | `shared/src/utils/session_token.ts` | §3.1 | MAJ-004 | Implement `signSessionToken` and `verifySessionToken` using HMAC-SHA256 and constant-time comparison. |
+| **SC-2** | `apps/server/src/platform/http/http_server.ts` | §3.3 | CRIT-002 | Remove session tokens from `extractHttpUserId`; ensure user IDs are never bearer tokens. |
+| **SC-2** | `apps/server/src/platform/logger/pino_logger.ts` | §3.3 | CRIT-002, ENH-007 | Add `x-session-token`, `session-token` to redaction paths. |
+| **SC-3** | `apps/server/src/features/rooms/room.store.ts` | §4.2 | ENH-015 | Add `options?: StorageQueryOptions` / `options?: StorageMutationOptions` with `signal?: AbortSignal`. |
+| **SC-3** | `apps/server/src/features/rooms/session_registry.ts` | §4.3 | ENH-015 | Add `options?: StorageQueryOptions` / `options?: StorageMutationOptions` with `signal?: AbortSignal`. |
+| **SC-3** | `apps/server/src/features/rooms/in_memory_room.store.ts` | §2.2, §2.3, §4.4 | MIN-028, ENH-013, ENH-015 | Re-index on fallback lookup (`this.indexSockets(room)`); deep-freeze on write and return frozen pointers on read; support `AbortSignal`. |
+| **SC-3** | `apps/server/src/features/rooms/in_memory_session_registry.ts` | §3.1, §3.2, §3.3, §4.3 | CRIT-002, MAJ-004, ENH-015 | Integrate HMAC-SHA256 signing and verification; scrub cleartext session tokens from all logs; support `AbortSignal`. |
+| **SC-4** | `apps/client/src/platform/storage/migration.ts` | §5.1 | ENH-014 | Document 30-day opportunistic deprecation pruning in ADR; ensure graceful retention. |
+| **SC-4** | `apps/client/src/features/portability/store/local_storage_unified.store.ts` | §5.2 | MIN-016 | Extract `applyScenarioProgress` helper to deduplicate fallback scenario restoration. |
+| **SC-5** | `apps/client/src/features/scenarios/store/local_storage_progress.store.ts` | §5.3 | MIN-004, MIN-015 | Support standardized `ProgressStoreOptions`; export factory `createLocalStorageProgressStore`; eliminate eager singleton. |
 
 ---
 
-### 5.3 Error Class Definition (`apps/server/src/features/rooms/room.errors.ts`)
+## 7. Verification & Acceptance Criteria
 
-```typescript
-/**
- * Thrown when an operation times out while actively executing inside a room's exclusive lock.
- * Addresses MAJ-005: Prevents hung actions from blocking room operations indefinitely.
- */
-export class LockExecutionTimeoutError extends AppError {
-  constructor(roomCode: string, timeoutMs: number) {
-    super(
-      'ERR_SOCKET_TIMEOUT',
-      `Execution timed out while holding lock on room '${roomCode}' after ${timeoutMs}ms`,
-      408,
-      { roomCode, timeoutMs, phase: 'execution' }
-    );
-    this.name = 'LockExecutionTimeoutError';
-  }
-}
-```
-
----
-
-### 5.4 Mutex Implementation Contract (`apps/server/src/features/rooms/in_memory_room.store.ts`)
-
-```typescript
-// apps/server/src/features/rooms/in_memory_room.store.ts
-
-export class InMemoryRoomStore implements RoomStore {
-  public readonly LOCK_TIMEOUT_MS = 5000;
-  public readonly EXECUTION_TIMEOUT_MS = 5000; // MAJ-005
-
-  public async withLock<T>(roomCode: string, action: () => Promise<T>): Promise<T> {
-    const code = roomCode.toUpperCase();
-    let entry = this.lockQueues.get(code);
-    if (!entry) {
-      entry = { tail: Promise.resolve(), waitersCount: 0 };
-      this.lockQueues.set(code, entry);
-    }
-
-    entry.waitersCount++;
-    const prevTail = entry.tail;
-
-    let releaseLock!: () => void;
-    const currentLock = new Promise<void>((resolve) => {
-      releaseLock = resolve;
-    });
-
-    entry.tail = prevTail.then(
-      () => currentLock,
-      () => currentLock
-    );
-
-    let acquireTimer: NodeJS.Timeout | undefined;
-    let executionTimer: NodeJS.Timeout | undefined;
-    let acquired = false;
-
-    try {
-      // 1. Lock Acquisition Race (5000ms acquisition timeout)
-      await Promise.race([
-        prevTail,
-        new Promise((_, reject) => {
-          acquireTimer = setTimeout(
-            () => reject(new LockTimeoutError(code, this.LOCK_TIMEOUT_MS)),
-            this.LOCK_TIMEOUT_MS
-          );
-        }),
-      ]);
-      acquired = true;
-      if (acquireTimer) clearTimeout(acquireTimer);
-
-      // 2. Lock Execution Race (5000ms execution timeout) — MAJ-005
-      const actionPromise = action();
-      const executionTimeoutPromise = new Promise<never>((_, reject) => {
-        executionTimer = setTimeout(
-          () => reject(new LockExecutionTimeoutError(code, this.EXECUTION_TIMEOUT_MS)),
-          this.EXECUTION_TIMEOUT_MS
-        );
-      });
-
-      return await Promise.race([actionPromise, executionTimeoutPromise]);
-    } finally {
-      if (acquireTimer) clearTimeout(acquireTimer);
-      if (executionTimer) clearTimeout(executionTimer);
-
-      if (acquired) {
-        // Mutator acquired the lock: release immediately on completion or execution timeout
-        releaseLock();
-        const currentEntry = this.lockQueues.get(code);
-        if (currentEntry) {
-          currentEntry.waitersCount--;
-          if (currentEntry.waitersCount <= 0) {
-            // Prevent memory leak: purge drained queue
-            this.lockQueues.delete(code);
-          }
-        }
-      } else {
-        // Acquisition timed out: DO NOT prematurely release the lock.
-        // Forward resolution once prevTail settles so subsequent waiters remain blocked until the slow holder completes.
-        prevTail.finally(() => {
-          releaseLock();
-          const currentEntry = this.lockQueues.get(code);
-          if (currentEntry) {
-            currentEntry.waitersCount--;
-            if (currentEntry.waitersCount <= 0) {
-              this.lockQueues.delete(code);
-            }
-          }
-        });
-      }
-    }
-  }
-}
-```
-
----
-
-## 6. Verification Test Matrices
-
-### 6.1 Client Migration Verification Matrix (`SC-3-CLIENT-CORE`)
-
-| Test Case | Inputs / State | Expected Behavior | Verification Assertions |
-| :--- | :--- | :--- | :--- |
-| **Migrate V1 Key** | Storage has `PUZZLE_PROGRESS_V1 = '{"solved":[1]}'` | Migrates to `PUZZLE_PROGRESS_V2`; sets `DEPRECATED_AT`; retains V1 key | `getItem(V2)` equals data;<br>`getItem(V1)` remains non-null;<br>`getItem(DEPRECATED_AT)` is set |
-| **Migrate Legacy Key** | Storage has `PUZZLE_PROGRESS_LEGACY = '{"solved":[2]}'` | Migrates to `PUZZLE_PROGRESS_V2`; sets `DEPRECATED_AT`; retains legacy key | `getItem(V2)` equals data;<br>`getItem(LEGACY)` remains non-null |
-| **Preserve V2 & Legacy (<30 days)** | Storage has V2, Legacy, and `DEPRECATED_AT = now - 10 days` | Does not alter V2; does not prune legacy | `getItem(V2)` untouched;<br>`getItem(LEGACY)` untouched |
-| **Prune Legacy (>=30 days)** | Storage has V2, Legacy, and `DEPRECATED_AT = now - 31 days` | Prunes legacy keys and deprecation key; V2 untouched | `getItem(V1)` is null;<br>`getItem(LEGACY)` is null;<br>`getItem(DEPRECATED_AT)` is null |
-| **Corrupted JSON Handling** | Storage has `PUZZLE_PROGRESS_V1 = '{broken json'` | Logs warning via `logger.warn`; does not write V2; no unhandled exception | `getItem(V2)` is null;<br>logger spy recorded `warn` with `operation` |
-| **Bootstrap Wiring** | `main.ts` loaded | Migration function called before app mount | Spy on `migrateStorageV1ToV2` called with `safeLocalStorage` |
-
----
-
-### 6.2 2PC Transaction Verification Matrix (`SC-4-CLIENT-FEATURES`)
-
-| Test Case | Scenario | Expected Behavior | Verification Assertions |
-| :--- | :--- | :--- | :--- |
-| **Happy Path Overwrite** | Valid payload, normal quota | Both stores updated; start & success logged | Logger `info` called twice with `operation: 'unified_store_overwrite'` and `duration` |
-| **Staged Write Failure + Rollback Success** | Scenario succeeds, Puzzle fails (e.g. storage error) | Snapshot restored to both stores; failure logged with `rolledBack: true` | Store data reverts to snapshot;<br>Logger `error` logged with primary error and `rolledBack: true`;<br>Throws `StorageCommitError(rolledBack: true)` |
-| **Staged Write Failure + Rollback Failure** | Puzzle fails, rollback throws | Throws `StorageCommitError(rolledBack: false)`; fatal log emitted | Logger `fatal` called with `primaryError` and `rollbackError` |
-| **Quota Exceeded Detection** | QuotaExceededError thrown during write | Storage alert emitted; snapshot restored | `storageAlertDispatcher.notify` called with `type: 'STORAGE_QUOTA_EXCEEDED'` |
-
----
-
-### 6.3 Room Mutex Timeout Verification Matrix (`SC-2-SERVER`)
-
-| Test Case | Scenario | Expected Behavior | Verification Assertions |
-| :--- | :--- | :--- | :--- |
-| **Acquisition Timeout** | Mutator 1 runs for 6000ms; Mutator 2 enqueued at t=100ms | Mutator 2 rejects with `LockTimeoutError` at t=5100ms; Mutator 1 completes normally | Mutator 2 rejects with `LockTimeoutError`;<br>Mutator 1 finishes; queue drains |
-| **Execution Timeout (MAJ-005)** | Mutator 1 hangs indefinitely (`new Promise(() => {})`) | Mutator 1 rejects with `LockExecutionTimeoutError` at t=5000ms; Mutator 2 queued behind it acquires lock and completes | Mutator 1 rejects with `LockExecutionTimeoutError`;<br>Mutator 2 resolves successfully; lock is NOT held forever |
-| **Fast Completion (No Timer Leaks)** | Mutators complete in 5ms | Both timers cleared immediately | `clearTimeout` called on both timers; zero event loop lag |
-
----
-
-## 7. Delivery Status & Next Steps
-
-This document is **FROZEN** and serves as the authoritative blueprint for:
-1. **Builder (`@backend-engineer`)** for `SC-1-SHARED` (contracts and validation utilities)
-2. **Tech-Lead (`@tech-lead[server]`)** for `SC-2-SERVER` (`InMemoryRoomStore.withLock` execution timeout and error types)
-3. **Tech-Lead (`@tech-lead[client-core]`)** for `SC-3-CLIENT-CORE` (`keys.ts` non-destructive migration and `main.ts` wiring)
-4. **Tech-Lead (`@tech-lead[client-features]`)** for `SC-4-CLIENT-FEATURES` (`local_storage_unified.store.ts` 3-point logging and `local_storage_puzzle_store.ts` sanitization)
+Every builder implementing components specified in this contract must verify:
+1. **Typecheck:** `pnpm run typecheck` passes with zero errors across all workspaces (`shared`, `apps/server`, `apps/client`, `apps/e2e`).
+2. **Lint:** `pnpm run lint` passes with zero errors and zero warnings.
+3. **Unit Tests:**
+   - `in_memory_room.store.spec.ts`: Tests verify fallback lookup re-indexing, read-query immutability (`Object.isFrozen`), and `AbortSignal` cancellation.
+   - `session_registry.spec.ts`: Tests verify HMAC-SHA256 signature verification, rejection of tampered tokens, token masking in logger spies, and `AbortSignal` cancellation.
+   - `local_storage_unified.store.spec.ts` & `local_storage_unified_store_2pc.spec.ts`: Tests verify 2PC commit, compensating rollback, and deduplicated scenario restoration.
+   - `create_puzzle_progress_store.spec.ts` & scenario store specs: Tests verify factory instantiation and options bag initialization.
+4. **Coverage Gate:** Server branch coverage meets or exceeds the mandatory >= 85.00% threshold.

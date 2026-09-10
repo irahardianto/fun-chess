@@ -81,8 +81,11 @@ export class AudioSynthesizer implements IAudioService {
 
   public setMuted(muted: boolean): void {
     this._isMuted = muted;
-    if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setValueAtTime(muted ? 0 : 0.4, this.ctx.currentTime);
+    const masterGain = this.masterGain;
+    const ctx = this.ctx;
+    // Audio context lifecycle safety guard: only ramp gain if audio graph is initialized
+    if (masterGain && ctx) {
+      masterGain.gain.setValueAtTime(muted ? 0 : 0.4, ctx.currentTime);
     }
   }
 
@@ -101,26 +104,25 @@ export class AudioSynthesizer implements IAudioService {
     this.bootstrapped = true;
 
     const unlockEvents = ['pointerdown', 'touchstart', 'keydown', 'click'];
-    this.unlockHandler = () => {
+    const handler = () => {
       this.initContext();
-      if (this.unlockHandler) {
-        unlockEvents.forEach((evt) => {
-          try {
-            window.removeEventListener(evt, this.unlockHandler!, true);
-          } catch (err) {
-            logger.warn('Failed to remove unlock listener', {
-              operation: 'audio_remove_unlock_listener',
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        });
-        this.unlockHandler = null;
-      }
+      unlockEvents.forEach((evt) => {
+        try {
+          window.removeEventListener(evt, handler, true);
+        } catch (err) {
+          logger.warn('Failed to remove unlock listener', {
+            operation: 'audio_remove_unlock_listener',
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
+      this.unlockHandler = null;
     };
+    this.unlockHandler = handler;
 
     unlockEvents.forEach((evt) => {
       try {
-        window.addEventListener(evt, this.unlockHandler!, { once: true, capture: true, passive: true });
+        window.addEventListener(evt, handler, { once: true, capture: true, passive: true });
       } catch (err) {
         logger.warn('Failed to attach unlock listener', {
           operation: 'audio_attach_unlock_listener',
@@ -174,10 +176,11 @@ export class AudioSynthesizer implements IAudioService {
     }
 
     if (this.unlockHandler && typeof window !== 'undefined') {
+      const handler = this.unlockHandler;
       const unlockEvents = ['pointerdown', 'touchstart', 'keydown', 'click'];
       unlockEvents.forEach((evt) => {
         try {
-          window.removeEventListener(evt, this.unlockHandler!, true);
+          window.removeEventListener(evt, handler, true);
         } catch (err) {
           logger.warn('Failed to remove unlock listener', {
             operation: 'audio_dispose',
@@ -211,7 +214,9 @@ export class AudioSynthesizer implements IAudioService {
   public playClick(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -225,7 +230,7 @@ export class AudioSynthesizer implements IAudioService {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(masterGain);
 
       osc.start(now);
       osc.stop(now + 0.035);
@@ -247,7 +252,9 @@ export class AudioSynthesizer implements IAudioService {
   public playMove(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -262,7 +269,7 @@ export class AudioSynthesizer implements IAudioService {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(masterGain);
 
       osc.start(now);
       osc.stop(now + 0.08);
@@ -280,7 +287,9 @@ export class AudioSynthesizer implements IAudioService {
   public playCapture(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -294,7 +303,7 @@ export class AudioSynthesizer implements IAudioService {
       gain1.gain.setValueAtTime(0.7, now);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.115);
       osc1.connect(gain1);
-      gain1.connect(this.masterGain);
+      gain1.connect(masterGain);
 
       // Oscillator 2: Sine punch
       const osc2 = ctx.createOscillator();
@@ -305,7 +314,7 @@ export class AudioSynthesizer implements IAudioService {
       gain2.gain.setValueAtTime(0.5, now);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
       osc2.connect(gain2);
-      gain2.connect(this.masterGain);
+      gain2.connect(masterGain);
 
       osc1.start(now);
       osc2.start(now);
@@ -325,7 +334,9 @@ export class AudioSynthesizer implements IAudioService {
   public playCheck(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -338,7 +349,7 @@ export class AudioSynthesizer implements IAudioService {
       gain1.gain.setValueAtTime(0.5, now);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
       osc1.connect(gain1);
-      gain1.connect(this.masterGain);
+      gain1.connect(masterGain);
 
       // Note 2: 880 Hz (A5)
       const osc2 = ctx.createOscillator();
@@ -349,7 +360,7 @@ export class AudioSynthesizer implements IAudioService {
       gain2.gain.setValueAtTime(0.6, now + 0.08);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
       osc2.connect(gain2);
-      gain2.connect(this.masterGain);
+      gain2.connect(masterGain);
 
       osc1.start(now);
       osc1.stop(now + 0.095);
@@ -369,7 +380,9 @@ export class AudioSynthesizer implements IAudioService {
   public playCheckmate(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -391,7 +404,7 @@ export class AudioSynthesizer implements IAudioService {
         gain.gain.exponentialRampToValueAtTime(0.001, now + time + duration);
 
         osc.connect(gain);
-        gain.connect(this.masterGain!);
+        gain.connect(masterGain);
 
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
@@ -410,7 +423,9 @@ export class AudioSynthesizer implements IAudioService {
   public playVictory(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -432,7 +447,7 @@ export class AudioSynthesizer implements IAudioService {
         gain.gain.exponentialRampToValueAtTime(0.001, now + time + duration);
 
         osc.connect(gain);
-        gain.connect(this.masterGain!);
+        gain.connect(masterGain);
 
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
@@ -451,7 +466,9 @@ export class AudioSynthesizer implements IAudioService {
   public playDefeat(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -472,7 +489,7 @@ export class AudioSynthesizer implements IAudioService {
         gain.gain.exponentialRampToValueAtTime(0.001, now + time + duration);
 
         osc.connect(gain);
-        gain.connect(this.masterGain!);
+        gain.connect(masterGain);
 
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
@@ -491,7 +508,9 @@ export class AudioSynthesizer implements IAudioService {
   public playDraw(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -506,7 +525,7 @@ export class AudioSynthesizer implements IAudioService {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(masterGain);
 
       osc.start(now);
       osc.stop(now + 0.33);
@@ -524,7 +543,9 @@ export class AudioSynthesizer implements IAudioService {
   public playError(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -539,7 +560,7 @@ export class AudioSynthesizer implements IAudioService {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.145);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(masterGain);
 
       osc.start(now);
       osc.stop(now + 0.15);
@@ -557,7 +578,9 @@ export class AudioSynthesizer implements IAudioService {
   public playTurnNotification(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -571,7 +594,7 @@ export class AudioSynthesizer implements IAudioService {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(masterGain);
 
       osc.start(now);
       osc.stop(now + 0.2);
@@ -589,7 +612,9 @@ export class AudioSynthesizer implements IAudioService {
   public playStart(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -605,7 +630,7 @@ export class AudioSynthesizer implements IAudioService {
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
         osc.connect(gain);
-        gain.connect(this.masterGain!);
+        gain.connect(masterGain);
 
         osc.start(now);
         osc.stop(now + 0.36);
@@ -624,7 +649,9 @@ export class AudioSynthesizer implements IAudioService {
   public playHint(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -645,7 +672,7 @@ export class AudioSynthesizer implements IAudioService {
         gain.gain.exponentialRampToValueAtTime(0.001, now + time + duration);
 
         osc.connect(gain);
-        gain.connect(this.masterGain!);
+        gain.connect(masterGain);
 
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
@@ -664,7 +691,9 @@ export class AudioSynthesizer implements IAudioService {
   public playStarEarned(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -685,7 +714,7 @@ export class AudioSynthesizer implements IAudioService {
         gain.gain.exponentialRampToValueAtTime(0.001, now + time + duration);
 
         osc.connect(gain);
-        gain.connect(this.masterGain!);
+        gain.connect(masterGain);
 
         osc.start(now + time);
         osc.stop(now + time + duration + 0.02);
@@ -704,7 +733,9 @@ export class AudioSynthesizer implements IAudioService {
   public playMascotHappy(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -720,7 +751,7 @@ export class AudioSynthesizer implements IAudioService {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(masterGain);
 
       osc.start(now);
       osc.stop(now + 0.24);
@@ -738,7 +769,9 @@ export class AudioSynthesizer implements IAudioService {
   public playMascotBlunder(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -753,7 +786,7 @@ export class AudioSynthesizer implements IAudioService {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(masterGain);
 
       osc.start(now);
       osc.stop(now + 0.36);
@@ -771,7 +804,9 @@ export class AudioSynthesizer implements IAudioService {
   public playStepComplete(): void {
     if (this._isMuted) return;
     const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
+    const masterGain = this.masterGain;
+    // Audio context lifecycle guard: ensure audio graph and master output node are valid
+    if (!ctx || !masterGain) return;
 
     try {
       const now = ctx.currentTime;
@@ -782,7 +817,7 @@ export class AudioSynthesizer implements IAudioService {
       gain1.gain.setValueAtTime(0.4, now);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
       osc1.connect(gain1);
-      gain1.connect(this.masterGain);
+      gain1.connect(masterGain);
 
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
@@ -791,7 +826,7 @@ export class AudioSynthesizer implements IAudioService {
       gain2.gain.setValueAtTime(0.25, now);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
       osc2.connect(gain2);
-      gain2.connect(this.masterGain);
+      gain2.connect(masterGain);
 
       osc1.start(now);
       osc2.start(now);

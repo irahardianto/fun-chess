@@ -1,8 +1,10 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
   LivenessHealthResponse,
   DetailedHealthResponse,
 } from "@fun-chess/shared";
 import { IRoomCountProvider, IAddressingInfoProvider } from "../http.interface.js";
+import { normalizeIp } from "../ip_utils.js";
 
 export interface HealthControllerOptions {
   roomStore: IRoomCountProvider;
@@ -18,35 +20,77 @@ export interface TelemetryAuthParams {
   headers: Record<string, string | string[] | undefined>;
   metricsSecret?: string;
   isProduction: boolean;
+  directSocketIp?: string;
+}
+
+/**
+ * Compares two strings in constant time using SHA-256 digests to prevent timing attacks (MIN-001).
+ */
+export function timingSafeStringEqual(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") {
+    return false;
+  }
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
+
+function isLoopbackAddress(ip: string | undefined): boolean {
+  if (!ip) return false;
+  const normalized = normalizeIp(ip);
+  return (
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized === "localhost"
+  );
 }
 
 /**
  * Validates whether an incoming HTTP request is authorized to access operational telemetry (/metrics, /health/detail).
- * Access requires loopback IP, valid METRICS_SECRET via header, or non-production environment (MAJ-002).
+ * Access requires direct loopback TCP connection, valid METRICS_SECRET via header, or non-production environment (MAJ-002, CRIT-001, MIN-001).
+ *
+ * Security requirements:
+ * 1. Loopback access is only granted if the physical TCP connection (directSocketIp) is loopback
+ *    AND untrusted forwarded headers (x-forwarded-for, x-real-ip) are absent (CRIT-001).
+ * 2. Secret token matching uses constant-time crypto.timingSafeEqual (MIN-001).
+ * 3. In non-production, access is open only when metricsSecret is not configured.
  */
 export function isTelemetryAuthorized(params: TelemetryAuthParams): boolean {
-  const { clientIp, headers, metricsSecret, isProduction } = params;
+  const { clientIp, headers, metricsSecret, isProduction, directSocketIp } = params;
 
-  // 1. Loopback check
+  // 1. Direct Loopback check
+  const isDirectSocketLoopback =
+    directSocketIp !== undefined ? isLoopbackAddress(directSocketIp) : true;
+
+  // Untrusted forwarded headers without direct socket verification cannot grant loopback access (CRIT-001)
+  const isUntrustedForwarding =
+    directSocketIp === undefined &&
+    Boolean(headers["x-forwarded-for"] || headers["x-real-ip"]);
+
   const isLoopback =
-    clientIp === "127.0.0.1" ||
-    clientIp === "::1" ||
-    clientIp === "::ffff:127.0.0.1";
+    !isUntrustedForwarding &&
+    isLoopbackAddress(clientIp) &&
+    isDirectSocketLoopback;
+
   if (isLoopback) return true;
 
-  // 2. Secret token match
+  // 2. Secret token match (constant-time comparison MIN-001)
   if (metricsSecret) {
     const rawSecretHeader = headers["x-metrics-secret"];
     const secretHeader = Array.isArray(rawSecretHeader)
       ? rawSecretHeader[0]
       : rawSecretHeader;
-    if (secretHeader && secretHeader === metricsSecret) return true;
+    if (typeof secretHeader === "string" && timingSafeStringEqual(secretHeader, metricsSecret)) {
+      return true;
+    }
 
     const rawAuth = headers["authorization"];
     const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
       const token = authHeader.slice(7).trim();
-      if (token === metricsSecret) return true;
+      if (timingSafeStringEqual(token, metricsSecret)) {
+        return true;
+      }
     }
     return false;
   }

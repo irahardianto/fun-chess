@@ -238,6 +238,106 @@ describe('Hardware Platform Abstractions (MAJ-012)', () => {
       vi.unstubAllGlobals();
     });
 
+    it('BrowserWebRtcDiscovery logs start and success telemetry with duration (ENH-010)', async () => {
+      const mockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        child: vi.fn(),
+        getLevel: vi.fn(),
+        setLevel: vi.fn(),
+      };
+
+      class MockRTCPeerConnectionSuccess {
+        onicecandidate: ((event: { candidate?: { candidate: string } }) => void) | null = null;
+        createDataChannel = vi.fn();
+        createOffer = vi.fn().mockResolvedValue({});
+        setLocalDescription = vi.fn().mockImplementation(() => {
+          setTimeout(() => {
+            if (this.onicecandidate) {
+              this.onicecandidate({
+                candidate: {
+                  candidate: 'candidate:1 1 UDP 2122252543 10.0.0.12 54321 typ host',
+                },
+              });
+            }
+          }, 5);
+          return Promise.resolve();
+        });
+        close = vi.fn();
+      }
+
+      vi.stubGlobal('RTCPeerConnection', MockRTCPeerConnectionSuccess);
+
+      const discovery = new BrowserWebRtcDiscovery(mockLogger as unknown as ILogger);
+      const ip = await discovery.discoverLocalIp(500);
+
+      expect(ip).toBe('10.0.0.12');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Starting WebRTC local IP discovery',
+        expect.objectContaining({
+          operation: 'webrtc_discover_ip',
+          timeoutMs: 500,
+        })
+      );
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'WebRTC local IP discovery succeeded',
+        expect.objectContaining({
+          operation: 'webrtc_discover_ip',
+          ip: '10.0.0.12',
+          duration: expect.any(Number),
+        })
+      );
+
+      vi.unstubAllGlobals();
+    });
+
+    it('BrowserWebRtcDiscovery logs iceGatheringState and duration on timeout (ENH-004)', async () => {
+      const mockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        child: vi.fn(),
+        getLevel: vi.fn(),
+        setLevel: vi.fn(),
+      };
+
+      class MockRTCPeerConnectionTimeoutState {
+        onicecandidate: null = null;
+        iceGatheringState = 'gathering';
+        createDataChannel = vi.fn();
+        createOffer = vi.fn().mockResolvedValue({});
+        setLocalDescription = vi.fn().mockResolvedValue(undefined);
+        close = vi.fn();
+      }
+
+      vi.stubGlobal('RTCPeerConnection', MockRTCPeerConnectionTimeoutState);
+
+      const discovery = new BrowserWebRtcDiscovery(mockLogger as unknown as ILogger);
+      const ip = await discovery.discoverLocalIp(20);
+
+      expect(ip).toBeNull();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Starting WebRTC local IP discovery',
+        expect.objectContaining({
+          operation: 'webrtc_discover_ip',
+          timeoutMs: 20,
+        })
+      );
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'WebRTC local IP discovery timed out',
+        expect.objectContaining({
+          operation: 'webrtc_discover_ip',
+          iceGatheringState: 'gathering',
+          duration: expect.any(Number),
+        })
+      );
+
+      vi.unstubAllGlobals();
+    });
+
     it('BrowserWebRtcDiscovery logs debug with operation webrtc_discover_ip on errors [MAJ-010]', async () => {
       const mockLogger = {
         debug: vi.fn(),

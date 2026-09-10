@@ -1,4 +1,3 @@
-import { getCurrentInstance } from 'vue';
 import { Chess } from 'chess.js';
 import type {
   PieceColor,
@@ -14,12 +13,6 @@ import {
   STANDARD_PIECE_POINTS,
   PIECE_STANDARD_POINTS,
 } from '@fun-chess/shared';
-import { useInjectLogger } from '@/platform/di';
-import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
-
-function getEffectiveLogger(custom?: ILogger): ILogger {
-  return custom ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
-}
 
 export {
   calculateBoardMaterial,
@@ -32,8 +25,7 @@ export {
 /**
  * Counts total centipawn material on board for a specific color (excluding king).
  */
-export function calculateColorMaterial(fen: string, color: PieceColor, customLogger?: ILogger): number {
-  const logger = getEffectiveLogger(customLogger);
+export function calculateColorMaterial(fen: string, color: PieceColor, _customLogger?: unknown): number {
   if (!isValidFen(fen)) return 0;
   try {
     const chess = createSafeChess(fen);
@@ -46,13 +38,7 @@ export function calculateColorMaterial(fen: string, color: PieceColor, customLog
       }
     }
     return total;
-  } catch (err) {
-    logger.debug('Failed to calculate color material from FEN', {
-      operation: 'calculate_color_material',
-      fen,
-      color,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return 0;
   }
 }
@@ -60,21 +46,14 @@ export function calculateColorMaterial(fen: string, color: PieceColor, customLog
 /**
  * Counts piece occurrences for a given color.
  */
-export function getPieceCounts(fen: string, color: PieceColor, customLogger?: ILogger): Record<PieceType, number> {
-  const logger = getEffectiveLogger(customLogger);
+export function getPieceCounts(fen: string, color: PieceColor, _customLogger?: unknown): Record<PieceType, number> {
   const counts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
   if (!isValidFen(fen)) return counts;
   try {
     const chess = createSafeChess(fen);
     const summary = calculateBoardMaterial(chess);
     return { ...(color === 'w' ? summary.whiteCounts : summary.blackCounts) };
-  } catch (err) {
-    logger.debug('Failed to count pieces from FEN, returning zero counts', {
-      operation: 'get_piece_counts',
-      fen,
-      color,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return counts;
   }
 }
@@ -230,13 +209,7 @@ export function calculateMaterialDelta(
   try {
     chessInit = createSafeChess(initialFen);
     chessFinal = createSafeChess(finalFen);
-  } catch (err: unknown) {
-    getEffectiveLogger().debug('Invalid FEN in evaluateMaterialAdvantageDelta', {
-      operation: 'eval_material_delta_fen_parse',
-      initialFen,
-      finalFen,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return {
       netCentipawns: 0,
       netPoints: 0,

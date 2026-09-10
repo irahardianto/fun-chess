@@ -6,7 +6,7 @@ import { analyzePuzzleSolution } from '@/features/puzzles/engine/puzzle_analysis
 import { MinimaxEngine } from '@/features/ai/engine/minimax_engine';
 import { LocalStorageUnifiedStore } from '@/features/portability/store/local_storage_unified.store';
 import { useAiWorker } from '@/features/ai/composables/useAiWorker';
-import { LocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_store';
+import { LocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_progress.store';
 import { useCameraStream, stopMediaStreamTracks } from '@/features/portability/composables/useCameraStream';
 import { useQrDecoder } from '@/features/portability/composables/useQrDecoder';
 import { useAiBoardState } from '@/features/ai/composables/useAiBoardState';

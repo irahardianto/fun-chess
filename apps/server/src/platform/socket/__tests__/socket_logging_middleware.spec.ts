@@ -6,6 +6,9 @@ import {
   checkSocketRateLimit,
   validateSocketPayload,
   formatSocketErrorResponse,
+  safeDispatchResponse,
+  withCorrelation,
+  withLogging,
 } from "../socket_logging_middleware.js";
 import { NullLogger } from "../../logger/null_logger.js";
 import { AppError, RoomCapacityExceededError } from "../../../features/rooms/room.errors.js";
@@ -634,6 +637,102 @@ describe("wrapSocketHandler", () => {
 
       const startLog = logger.infoLogs.find((l) => l.message === "Operation started");
       expect(startLog?.context?.["payload"]).toEqual({ action: "ping" });
+    });
+  });
+
+  describe("safeDispatchResponse & Pipeline Stages (ENH-010, MAJ-021)", () => {
+    it("safely catches and logs errors when client acknowledgment callback throws", () => {
+      const logger = new NullLogger();
+      const faultyCallback = () => {
+        throw new Error("Client callback exploded");
+      };
+
+      expect(() => {
+        safeDispatchResponse(
+          faultyCallback,
+          undefined,
+          true,
+          { ok: true },
+          logger,
+          { operationName: "test:faulty_cb", correlationId: "c-cb-1", socketId: "s-cb-1" },
+        );
+      }).not.toThrow();
+
+      expect(logger.warnLogs).toHaveLength(1);
+      expect(logger.warnLogs[0].message).toBe("Socket acknowledgment callback threw an error");
+      expect(logger.warnLogs[0].context?.["operation"]).toBe("test:faulty_cb");
+      expect(logger.warnLogs[0].context?.["socketId"]).toBe("s-cb-1");
+    });
+
+    it("customizes rate limit error message via function formatter", async () => {
+      const logger = new NullLogger();
+      const rateLimiter = new SocketRateLimiter({ maxRequests: 1, windowMs: 10_000 });
+      rateLimiter.consume("127.0.0.1");
+
+      const wrapped = wrapSocketHandler({
+        logger,
+        operationName: "room:create",
+        socket: {
+          id: "sock_custom_rl",
+          handshake: { address: "127.0.0.1" },
+        },
+        rateLimiter,
+        rateLimitErrorMessage: (op, desc) => `Custom limited: ${op} -> ${desc}`,
+        handler: async () => ({ ok: true }),
+      });
+
+      let cbPayload: { success?: boolean; error?: { message?: string } } | undefined;
+      await wrapped({}, (res) => {
+        cbPayload = res as typeof cbPayload;
+      });
+
+      expect(cbPayload?.success).toBe(false);
+      expect(cbPayload?.error?.message).toContain("Custom limited: room:create ->");
+    });
+
+    it("withCorrelation sets up pipeline context and extracts user and IP", () => {
+      const mockSocket = {
+        id: "s-pipe-1",
+        handshake: {
+          address: "127.0.0.1",
+          headers: { "x-forwarded-for": "203.0.113.195" },
+        },
+        data: { userId: "user-pipe-99" },
+      };
+
+      const ctx = withCorrelation(
+        mockSocket,
+        { data: "raw", token: "secret" },
+        "pipe:op",
+        true,
+        true,
+      );
+
+      expect(ctx.socketId).toBe("s-pipe-1");
+      expect(ctx.correlationId).toBeDefined();
+      expect(ctx.userId).toBe("user-pipe-99");
+      expect(ctx.clientIp).toBe("203.0.113.195");
+      expect(ctx.sanitizedPayload).toEqual({ data: "raw", token: "[REDACTED]" });
+      expect(ctx.startTime).toBeTypeOf("number");
+    });
+
+    it("withLogging logs start, success, and error correctly", () => {
+      const logger = new NullLogger();
+      const ctx = withCorrelation("s-log-1", {}, "test:log_pipe");
+      const logging = withLogging(logger, ctx);
+
+      logging.logStart();
+      expect(logger.infoLogs).toHaveLength(1);
+      expect(logger.infoLogs[0].message).toBe("Operation started");
+
+      logging.logSuccess({ score: 100 });
+      expect(logger.infoLogs).toHaveLength(2);
+      expect(logger.infoLogs[1].message).toBe("Operation succeeded");
+
+      const errResult = logging.logError(new CustomTestError());
+      expect(errResult.errorPayload.code).toBe("ERR_INVALID_MOVE");
+      expect(logger.warnLogs).toHaveLength(1);
+      expect(logger.warnLogs[0].message).toBe("Operation rejected");
     });
   });
 });

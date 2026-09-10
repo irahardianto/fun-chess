@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { LocalStorageProgressStore } from '../local_storage_progress.store';
+import {
+  LocalStorageProgressStore,
+  createLocalStorageProgressStore,
+  getDefaultLocalStorageProgressStore,
+  defaultLocalStorageProgressStore,
+} from '../local_storage_progress.store';
 import { safeLocalStorage } from '@/platform/storage';
 
 describe('LocalStorageProgressStore', () => {
@@ -200,6 +205,33 @@ describe('LocalStorageProgressStore', () => {
 
       const retrieved = await fallbackStore.getProgress('offline-lesson');
       expect(retrieved?.starsEarned).toBe(3);
+    });
+  });
+
+  describe('Constructor Options Object & Factories (MIN-004, MIN-015)', () => {
+    it('accepts options object in constructor (MIN-004)', async () => {
+      const customStore = new LocalStorageProgressStore({
+        storageKey: 'custom_options_key',
+      });
+      const progress = await customStore.getProgress('test-scenario');
+      expect(progress).toBeNull();
+    });
+
+    it('creates store via createLocalStorageProgressStore factory (MIN-015)', async () => {
+      const factoryStore = createLocalStorageProgressStore({
+        storageKey: 'factory_key',
+      });
+      expect(factoryStore).toBeInstanceOf(LocalStorageProgressStore);
+    });
+
+    it('provides lazy singleton via getDefaultLocalStorageProgressStore and defaultLocalStorageProgressStore (MIN-015)', async () => {
+      const store1 = getDefaultLocalStorageProgressStore();
+      const store2 = getDefaultLocalStorageProgressStore();
+      expect(store1).toBe(store2);
+
+      // Access through defaultLocalStorageProgressStore proxy
+      const map = await defaultLocalStorageProgressStore.getProgressMap();
+      expect(map).toBeDefined();
     });
   });
 });

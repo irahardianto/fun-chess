@@ -65,6 +65,7 @@ import {
   createValidationError,
   getSavedSession,
   saveSession,
+  registerSessionResetHook,
 } from './room_session_state';
 
 export type OpponentMoveCallback = (data: { move: MoveResult; gameState: GameState }) => void;
@@ -588,26 +589,6 @@ export function declineRematch(
   respondRematch(roomCode, false, callback);
 }
 
-let leaveRoomResolver: ((roomCode: string, callback?: (res: { success: boolean }) => void) => Promise<boolean>) | null = null;
-
-export function setLeaveRoomResolver(resolver: typeof leaveRoomResolver): void {
-  leaveRoomResolver = resolver;
-}
-
-/**
- * Leaves the active multiplayer room, delegating to useRoomSession.
- */
-export async function leaveRoom(
-  roomCode: string,
-  callback?: (res: { success: boolean }) => void
-): Promise<boolean> {
-  if (leaveRoomResolver) {
-    return leaveRoomResolver(roomCode, callback);
-  }
-  const { leaveRoom: sessionLeaveRoom } = await import('./useRoomSession');
-  return sessionLeaveRoom(roomCode, callback);
-}
-
 /**
  * Resets in-game reactive states and subscribers.
  * Defaults to preserving external subscribers (like audio listeners) across match resets,
@@ -625,6 +606,9 @@ export function resetGameActionsState(preserveSubscribers = true): void {
   customLogger = null;
   initGameActionsListeners();
 }
+
+// Automatically subscribe action state reset to room session reset events (MAJ-009)
+registerSessionResetHook(resetGameActionsState);
 
 /**
  * Primary composable exposing game action controls and in-game state.
@@ -655,8 +639,6 @@ export function useGameActions(options?: { logger?: ILogger }) {
     respondRematch,
     acceptRematch,
     declineRematch,
-    leaveRoom,
-    setLeaveRoomResolver,
     resetGameActionsState,
     initGameActionsListeners,
   };

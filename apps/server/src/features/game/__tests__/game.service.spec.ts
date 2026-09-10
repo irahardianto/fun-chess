@@ -948,5 +948,123 @@ describe("GameService", () => {
         }),
       );
     });
+
+    it("propagates correlationId into logs and roomAdapter calls across all operations", async () => {
+      const debugSpy = vi.spyOn(logger, "debug");
+      const infoSpy = vi.spyOn(logger, "info");
+      const getRoomSpy = vi.spyOn(store, "getRoom");
+
+      const room = createActiveGameRoom("CORR1");
+      await store.save(room);
+
+      // 1. makeMove
+      await service.makeMove(
+        { roomCode: "CORR1", move: { from: "e2", to: "e4" } },
+        "sock_white",
+        "test-corr-1",
+      );
+      expect(debugSpy).toHaveBeenCalledWith(
+        "Applying chess move",
+        expect.objectContaining({ correlationId: "test-corr-1" }),
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Chess move applied",
+        expect.objectContaining({ correlationId: "test-corr-1" }),
+      );
+      expect(getRoomSpy).toHaveBeenCalledWith("CORR1", "test-corr-1");
+
+      // 2. offerDraw
+      await service.offerDraw("CORR1", "sock_white", "test-corr-2");
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Draw offer processed",
+        expect.objectContaining({ correlationId: "test-corr-2" }),
+      );
+
+      // 3. respondDraw (decline)
+      await service.respondDraw("CORR1", "sock_black", false, "test-corr-3");
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Draw offer processed",
+        expect.objectContaining({ correlationId: "test-corr-3" }),
+      );
+
+      // 4. resign
+      await service.resign("CORR1", "sock_white", "test-corr-4");
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Player resigned",
+        expect.objectContaining({ correlationId: "test-corr-4" }),
+      );
+
+      // 5. requestRematch
+      await service.requestRematch("CORR1", "sock_white", "test-corr-5");
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Rematch action processed",
+        expect.objectContaining({ correlationId: "test-corr-5" }),
+      );
+
+      // 6. respondRematch (accepted)
+      await service.respondRematch("CORR1", "sock_black", true, "test-corr-6");
+      expect(infoSpy).toHaveBeenCalledWith(
+        "Rematch action processed",
+        expect.objectContaining({ correlationId: "test-corr-6" }),
+      );
+    });
+
+    it("logs error with serializeError when roomAdapter throws during game operations", async () => {
+      const errorSpy = vi.spyOn(logger, "error");
+      const room = createActiveGameRoom("ERR1");
+      await store.save(room);
+
+      vi.spyOn(store, "applyGameMove").mockRejectedValueOnce(
+        new Error("Database lock timeout"),
+      );
+
+      await expect(
+        service.makeMove(
+          { roomCode: "ERR1", move: { from: "e2", to: "e4" } },
+          "sock_white",
+          "err-corr-1",
+        ),
+      ).rejects.toThrow("Database lock timeout");
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Chess move failed",
+        expect.objectContaining({
+          operation: "game_move",
+          correlationId: "err-corr-1",
+          error: expect.objectContaining({ message: "Database lock timeout" }),
+        }),
+      );
+    });
+
+    it("handles edge cases for rematch: unknown socket, rematch_pending, and disconnected player", async () => {
+      const room = createActiveGameRoom("REMEDGE");
+      room.status = "game_over";
+      await store.save(room);
+
+      // Unknown socket requesting rematch
+      await expect(
+        service.requestRematch("REMEDGE", "sock_unknown"),
+      ).rejects.toBeInstanceOf(PlayerNotInRoomError);
+
+      // Valid request rematch
+      await service.requestRematch("REMEDGE", "sock_white");
+
+      // Request rematch when status is rematch_pending (allowed to update request)
+      await service.requestRematch("REMEDGE", "sock_white");
+
+      // Unknown socket responding rematch
+      await expect(
+        service.respondRematch("REMEDGE", "sock_unknown", true),
+      ).rejects.toBeInstanceOf(PlayerNotInRoomError);
+
+      // When one player is disconnected
+      const roomWithDisc = await store.getRoom("REMEDGE");
+      roomWithDisc!.blackPlayer!.isConnected = false;
+      await store.save(roomWithDisc!);
+
+      await expect(
+        service.respondRematch("REMEDGE", "sock_black", true),
+      ).rejects.toThrow(GameNotActiveError);
+    });
   });
 });

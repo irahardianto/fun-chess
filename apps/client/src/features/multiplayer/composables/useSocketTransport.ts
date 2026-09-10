@@ -6,7 +6,7 @@
  * Adheres to Architectural Patterns Rule 1 (I/O Isolation) and Findings CRIT-005, MAJ-017, MAJ-020.
  */
 
-import { ref, shallowRef } from 'vue';
+import { ref, shallowRef, hasInjectionContext, inject } from 'vue';
 import { z } from 'zod';
 import {
   GameOverReasonSchema,
@@ -18,8 +18,10 @@ import {
   type SocketErrorPayload,
 } from '@fun-chess/shared';
 import { createSocketClient, type TypedSocket } from '@/platform/socket/socket_client';
-import { resolveLogger } from '@/platform/di';
+import { resolveLogger, SOCKET_CLIENT_KEY } from '@/platform/di';
 import { generateCorrelationId, type ILogger } from '@/platform/telemetry';
+
+export { SOCKET_CLIENT_KEY };
 
 let customLogger: ILogger | null = null;
 export function setSocketTransportLogger(logger: ILogger | null): void {
@@ -394,7 +396,7 @@ export interface InboundHandlerConfig<T, TDispatched = T> {
   schema: z.ZodType<T>;
   logMessage: string;
   operation: string;
-  logLevel?: 'info' | 'warn';
+  logLevel?: 'info' | 'warn' | 'error' | ((data: T) => 'info' | 'warn' | 'error');
   getContext?: (data: T) => Record<string, unknown>;
   transform?: (data: T) => TDispatched;
   onValid?: (data: T) => void;
@@ -441,7 +443,10 @@ export function createInboundHandler<T, TDispatched = T>(
       ...(getContext ? getContext(data) : {}),
     };
 
-    if (logLevel === 'warn') {
+    const resolvedLogLevel = typeof logLevel === 'function' ? logLevel(data) : logLevel;
+    if (resolvedLogLevel === 'error') {
+      logger.error(logMessage, context);
+    } else if (resolvedLogLevel === 'warn') {
       logger.warn(logMessage, context);
     } else {
       logger.info(logMessage, context);
@@ -643,7 +648,8 @@ const handleError = createInboundHandler({
   schema: InboundErrorPayloadSchema,
   logMessage: 'Socket error payload received',
   operation: 'socket_event_error',
-  logLevel: 'warn',
+  logLevel: (err: { code: string; message: string }) =>
+    err.code === 'ERR_INTERNAL_SERVER' ? 'error' : 'warn',
   getContext: (err: { code: string; message: string }) => ({
     errorCode: err.code,
     errorMessage: err.message,
@@ -815,9 +821,57 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
   return new Promise<TRes>((resolve, reject) => {
     let settled = false;
 
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (typeof (targetSocket as unknown as { off?: (e: string, fn: (...args: unknown[]) => void) => void }).off === 'function') {
+        (targetSocket as unknown as { off: (e: string, fn: (...args: unknown[]) => void) => void }).off('disconnect', onDisconnect);
+      }
+    };
+
+    const onDisconnect = (reason?: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      const duration = Date.now() - startTime;
+      latencyMs.value = duration;
+
+      const err: SocketErrorPayload = {
+        code: 'ERR_SOCKET_DISCONNECTED',
+        message: 'Socket disconnected while operation was in flight',
+        correlationId,
+      };
+      lastError.value = err;
+
+      logger.warn('Socket operation aborted due to unexpected disconnect', {
+        operation,
+        correlationId,
+        duration,
+        durationMs: duration,
+        event,
+        error: err,
+        reason,
+      });
+
+      options.onError?.(err);
+      const res = { success: false, error: err } as unknown as TRes;
+      if (callback) {
+        callback(res);
+      }
+      if (options.rejectOnError) {
+        reject(err);
+      } else {
+        resolve(res);
+      }
+    };
+
+    if (typeof (targetSocket as unknown as { once?: (e: string, fn: (...args: unknown[]) => void) => void }).once === 'function') {
+      (targetSocket as unknown as { once: (e: string, fn: (...args: unknown[]) => void) => void }).once('disconnect', onDisconnect);
+    }
+
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
+      cleanup();
       const duration = Date.now() - startTime;
       latencyMs.value = duration;
 
@@ -852,7 +906,7 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
     (targetSocket as unknown as { emit: (e: string, p: unknown, cb: (r: TRes) => void) => void }).emit(event, payload, (res: TRes) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cleanup();
       const duration = Date.now() - startTime;
       latencyMs.value = duration;
 
@@ -877,14 +931,25 @@ export function emitWithTimeout<TReq, TRes extends { success: boolean; error?: S
         };
         lastError.value = errPayload;
 
-        logger.warn('Socket operation failed with failure', {
-          operation,
-          correlationId,
-          duration,
-          durationMs: duration,
-          event,
-          error: errPayload,
-        });
+        if (errPayload.code === 'ERR_INTERNAL_SERVER') {
+          logger.error('Socket operation failed with failure', {
+            operation,
+            correlationId,
+            duration,
+            durationMs: duration,
+            event,
+            error: errPayload,
+          });
+        } else {
+          logger.warn('Socket operation failed with failure', {
+            operation,
+            correlationId,
+            duration,
+            durationMs: duration,
+            event,
+            error: errPayload,
+          });
+        }
         options.onError?.(errPayload);
         if (callback) {
           callback(res);
@@ -927,15 +992,17 @@ export function useSocketTransport(
   if (options?.logger) {
     customLogger = options.logger;
   }
-  if (injectedSocket) {
-    if (socket.value && socket.value !== injectedSocket) {
+  const diSocket = !injectedSocket && hasInjectionContext() ? inject(SOCKET_CLIENT_KEY, null) : null;
+  const effectiveSocket = injectedSocket || diSocket;
+  if (effectiveSocket) {
+    if (socket.value && socket.value !== effectiveSocket) {
       detachSocketListeners(socket.value);
       resetTransportState();
     }
-    socket.value = injectedSocket;
-    attachSocketListeners(injectedSocket);
-    isConnected.value = injectedSocket.connected;
-    socketId.value = injectedSocket.id || '';
+    socket.value = effectiveSocket;
+    attachSocketListeners(effectiveSocket);
+    isConnected.value = effectiveSocket.connected;
+    socketId.value = effectiveSocket.id || '';
   }
 
   return {

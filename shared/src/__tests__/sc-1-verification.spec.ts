@@ -9,6 +9,12 @@ import type {
   UnifiedProgressPayload,
   UnifiedProgressEnvelope,
   ChessLogger,
+  MovePayload,
+  ReconnectAckPayload,
+  ReconnectSuccessAck,
+  ReconnectErrorAck,
+  IClock,
+  SerializedError,
 } from "../index.js";
 import {
   // Errors
@@ -19,6 +25,7 @@ import {
   MakeMoveRequestSchema,
   MovePayloadSchema,
   PromotionPieceSchema,
+  PlayerSchema,
   UnifiedProgressPayloadSchema,
   UnifiedProgressEnvelopeSchema,
   // Utils & Algorithms
@@ -31,6 +38,22 @@ import {
   bytesToBase64Url,
   base64UrlToBytes,
   safeLoadFen,
+  // SC-1 Remediated Contracts & Utilities
+  PUZZLE_THEMES,
+  generateSessionToken,
+  verifySessionToken,
+  isValidSessionToken,
+  maskToken,
+  tokenFingerprint,
+  canonicalJsonStringify,
+  MAX_CANONICAL_JSON_DEPTH,
+  serializeError,
+  toErrorMessage,
+  safeNormalizeUrl,
+  safeParseUrl,
+  SystemClock,
+  systemClock,
+  MockClock,
 } from "../index.js";
 
 describe("SC-1 Acceptance Criteria Verification Suite", () => {
@@ -245,6 +268,8 @@ describe("SC-1 Acceptance Criteria Verification Suite", () => {
         isHost: true,
         isConnected: true,
         connectedAt: 1700000000000,
+        createdAt: 1700000000000,
+        updatedAt: 1700000000000,
         avatar: "🦁",
       };
 
@@ -770,6 +795,277 @@ describe("SC-1 Acceptance Criteria Verification Suite", () => {
     it("returns false safely when chess instance is null or undefined", () => {
       const result = safeLoadFen(null as unknown as Chess, "8/8/8/8/8/8/8/8 w - - 0 1");
       expect(result).toBe(false);
+    });
+  });
+
+  /**
+   * 11. MAJ-008: Circular dependency in shared contracts & MovePayload / themes.ts
+   */
+  describe("11. MAJ-008: Circular dependency resolution & themes.ts export", () => {
+    it("exports PUZZLE_THEMES from @fun-chess/shared without circular import errors", () => {
+      expect(Array.isArray(PUZZLE_THEMES)).toBe(true);
+      expect(PUZZLE_THEMES.length).toBeGreaterThan(50);
+      expect(PUZZLE_THEMES).toContain("fork");
+      expect(PUZZLE_THEMES).toContain("pin");
+      expect(PUZZLE_THEMES).toContain("legals_trap");
+    });
+
+    it("verifies MovePayload interface contract can be instantiated directly", () => {
+      const move: MovePayload = {
+        from: "e2",
+        to: "e4",
+        promotion: undefined,
+      };
+      expect(move.from).toBe("e2");
+      expect(move.to).toBe("e4");
+    });
+  });
+
+  /**
+   * 12. MAJ-004: HMAC-SHA256 session token generation and verification
+   */
+  describe("12. MAJ-004: HMAC-SHA256 session token generation and verification", () => {
+    const testSecret = ["fun", "chess", "test", "secret", "32chars"].join("-");
+    const testUuid = "123e4567-e89b-12d3-a456-426614174000";
+
+    it("generates a 101-character HMAC-SHA256 signed token and verifies it", () => {
+      const token = generateSessionToken(testUuid, testSecret);
+      expect(token).toHaveLength(101);
+
+      const verification = verifySessionToken(token, testSecret);
+      expect(verification.valid).toBe(true);
+      expect(verification.uuid).toBe(testUuid);
+      expect(isValidSessionToken(token, testSecret)).toBe(true);
+    });
+
+    it("rejects forged or modified tokens with invalid_signature", () => {
+      const token = generateSessionToken(testUuid, testSecret);
+      const forgedToken = token.slice(0, -1) + (token.endsWith("0") ? "1" : "0");
+
+      const verification = verifySessionToken(forgedToken, testSecret);
+      expect(verification.valid).toBe(false);
+      expect(verification.reason).toBe("invalid_signature");
+      expect(isValidSessionToken(forgedToken, testSecret)).toBe(false);
+    });
+
+    it("redacts tokens for secure logging via maskToken and tokenFingerprint", () => {
+      const token = generateSessionToken(testUuid, testSecret);
+      const masked = maskToken(token);
+      expect(masked).toBe(`${token.slice(0, 8)}...${token.slice(-6)}`);
+      expect(masked).not.toContain(token);
+
+      const fp = tokenFingerprint(token);
+      expect(fp).toHaveLength(10);
+      expect(fp).toMatch(/^[0-9a-f]{10}$/);
+    });
+  });
+
+  /**
+   * 13. MAJ-006: canonicalJsonStringify WeakSet cycle tracking and depth ceiling
+   */
+  describe("13. MAJ-006: canonicalJsonStringify cycle tracking and depth ceiling", () => {
+    it("rejects circular references with TypeError", () => {
+      const cycle: Record<string, unknown> = { key: "val" };
+      cycle.self = cycle;
+
+      expect(() => canonicalJsonStringify(cycle)).toThrow(TypeError);
+    });
+
+    it("rejects nesting deeper than 64 levels with RangeError", () => {
+      expect(MAX_CANONICAL_JSON_DEPTH).toBe(64);
+
+      let deepObj: Record<string, unknown> = { end: true };
+      for (let i = 0; i < 64; i++) {
+        deepObj = { child: deepObj };
+      }
+
+      expect(() => canonicalJsonStringify(deepObj)).toThrow(RangeError);
+    });
+  });
+
+  /**
+   * 14. MAJ-022: serializeError and toErrorMessage
+   */
+  describe("14. MAJ-022: serializeError and toErrorMessage", () => {
+    it("standardizes Error instances into SerializedError structures", () => {
+      const err = new Error("Network timeout occurred");
+      const serialized: SerializedError = serializeError(err);
+
+      expect(serialized.name).toBe("Error");
+      expect(serialized.message).toBe("Network timeout occurred");
+      expect(serialized.stack).toBeDefined();
+    });
+
+    it("extracts human-readable messages with fallback handling via toErrorMessage", () => {
+      expect(toErrorMessage(new Error("Connection reset"))).toBe("Connection reset");
+      expect(toErrorMessage("  Malformed frame  ")).toBe("Malformed frame");
+      expect(toErrorMessage({ message: "Game not found" })).toBe("Game not found");
+      expect(toErrorMessage(null, "Default fallback")).toBe("Default fallback");
+    });
+  });
+
+  /**
+   * 15. MIN-017: safeNormalizeUrl and safeParseUrl
+   */
+  describe("15. MIN-017: safeNormalizeUrl and safeParseUrl", () => {
+    it("normalizes localhost and remote URLs consistently", () => {
+      expect(safeNormalizeUrl("localhost:3000")).toBe("http://localhost:3000");
+      expect(safeNormalizeUrl("chess.example.com")).toBe("https://chess.example.com");
+      expect(safeNormalizeUrl("//assets.chess.com/pack")).toBe("https://assets.chess.com/pack");
+      expect(safeNormalizeUrl("https://fun-chess.com")).toBe("https://fun-chess.com");
+    });
+
+    it("safely parses valid URLs into URL instances and returns undefined for invalid strings", () => {
+      const parsed = safeParseUrl("chess.example.com/lobby");
+      expect(parsed).toBeInstanceOf(URL);
+      expect(parsed?.hostname).toBe("chess.example.com");
+      expect(safeParseUrl("http://:invalid")).toBeUndefined();
+      expect(safeParseUrl("")).toBeUndefined();
+    });
+  });
+
+  /**
+   * 16. MIN-024: room:reconnect acknowledgment payload types
+   */
+  describe("16. MIN-024: room:reconnect acknowledgment payload types", () => {
+    it("verifies ReconnectSuccessAck and ReconnectAckPayload type contracts", () => {
+      const mockPlayer: Player = {
+        id: "44d2d46e-1d6f-4796-9818-682226fc96ea",
+        socketId: "sock-abc",
+        name: "ReconnectedPlayer",
+        color: "w",
+        isHost: true,
+        isConnected: true,
+        connectedAt: 1700000000000,
+        createdAt: 1700000000000,
+        updatedAt: 1700000000000,
+        avatar: "🦁",
+      };
+
+      const mockRoom: RoomState = {
+        roomCode: "ABCD",
+        status: "playing",
+        players: [mockPlayer],
+        spectators: [],
+        createdAt: 1700000000000,
+        updatedAt: 1700000000000,
+        version: 2,
+      };
+
+      const successAck: ReconnectSuccessAck = {
+        success: true,
+        room: mockRoom,
+        player: mockPlayer,
+        roomStatus: "playing",
+        sessionToken: "session-token-12345",
+      };
+
+      const errorAck: ReconnectErrorAck = {
+        success: false,
+        error: {
+          code: "ERR_UNAUTHORIZED",
+          message: "Invalid session token",
+        },
+      };
+
+      const handler: ClientToServerEvents["room:reconnect"] = (req, callback) => {
+        expect(req.roomCode).toBe("ABCD");
+        callback?.(successAck);
+      };
+
+      let ackCalled = false;
+      handler(
+        {
+          roomCode: "ABCD",
+          playerId: mockPlayer.id,
+          sessionToken: "session-token-12345",
+        },
+        (res: ReconnectAckPayload) => {
+          ackCalled = true;
+          if (res.success) {
+            expect(res.roomStatus).toBe("playing");
+            expect(res.sessionToken).toBe("session-token-12345");
+          } else {
+            throw new Error("Expected success response");
+          }
+        },
+      );
+
+      expect(ackCalled).toBe(true);
+      expect(errorAck.success).toBe(false);
+    });
+  });
+
+  /**
+   * 17. MIN-025: Player createdAt and updatedAt audit timestamps
+   */
+  describe("17. MIN-025: Player createdAt and updatedAt audit timestamps", () => {
+    it("validates PlayerSchema with non-negative createdAt and updatedAt", () => {
+      const now = 1700000000000;
+      const valid = PlayerSchema.parse({
+        id: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+        name: "AuditPlayer",
+        color: "w",
+        isHost: true,
+        isConnected: true,
+        connectedAt: now,
+        createdAt: now,
+        updatedAt: now + 5000,
+      });
+
+      expect(valid.createdAt).toBe(now);
+      expect(valid.updatedAt).toBe(now + 5000);
+    });
+
+    it("rejects player payload where updatedAt is earlier than createdAt", () => {
+      expect(() =>
+        PlayerSchema.parse({
+          id: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+          name: "InvalidAuditPlayer",
+          color: "w",
+          isHost: true,
+          isConnected: true,
+          connectedAt: 1700000000000,
+          createdAt: 1700000010000,
+          updatedAt: 1700000000000, // Earlier than createdAt
+        }),
+      ).toThrow("updatedAt must be greater than or equal to createdAt");
+    });
+
+    it("preprocesses legacy player payload missing createdAt/updatedAt by falling back to connectedAt", () => {
+      const now = 1700000000000;
+      const legacyPlayer = {
+        id: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+        name: "LegacyPlayer",
+        color: "b",
+        isHost: false,
+        isConnected: true,
+        connectedAt: now,
+      };
+
+      const parsed = PlayerSchema.parse(legacyPlayer);
+      expect(parsed.createdAt).toBe(now);
+      expect(parsed.updatedAt).toBe(now);
+    });
+  });
+
+  /**
+   * 18. ENH-005: Canonical SystemClock, systemClock, and MockClock
+   */
+  describe("18. ENH-005: Canonical SystemClock, systemClock, and MockClock", () => {
+    it("verifies SystemClock and systemClock provide deterministic time access", () => {
+      const clock: IClock = new SystemClock();
+      expect(typeof clock.now()).toBe("number");
+      expect(systemClock).toBeInstanceOf(SystemClock);
+    });
+
+    it("verifies MockClock allows deterministic time advancement without sleep delays", () => {
+      const mock = new MockClock(1000);
+      expect(mock.now()).toBe(1000);
+      mock.advance(500);
+      expect(mock.now()).toBe(1500);
+      mock.setTime(9999);
+      expect(mock.now()).toBe(9999);
     });
   });
 });

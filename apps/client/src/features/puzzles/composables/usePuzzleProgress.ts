@@ -8,7 +8,7 @@ import type {
   AdaptiveRatingState,
   ThemeMasteryProgress,
 } from '@fun-chess/shared';
-import { defaultLocalStoragePuzzleProgressStore } from '../store/local_storage_puzzle_store';
+import { defaultLocalStoragePuzzleProgressStore } from '../store/local_storage_puzzle_progress.store';
 
 /**
  * Reactive Pinia/Vue 3 composable for synchronizing with the PuzzleProgressStore.

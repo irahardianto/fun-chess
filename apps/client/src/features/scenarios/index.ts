@@ -11,7 +11,9 @@ export * from './ScenarioArena.vue';
 export {
   LocalStorageProgressStore,
   InMemoryProgressStore,
+  createLocalStorageProgressStore,
   createDefaultLocalStorageProgressStore,
+  getDefaultLocalStorageProgressStore,
   defaultLocalStorageProgressStore,
   SCENARIO_PROGRESS_STORAGE_KEY,
 } from './store';

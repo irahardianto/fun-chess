@@ -8,6 +8,8 @@ import {
   RoomState,
   normalizeRoomCode,
   validatePlayerName,
+  serializeError,
+  toErrorMessage,
   type IClock,
   type IIdGenerator,
 } from "@fun-chess/shared";
@@ -89,6 +91,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   public async createRoom(
     req: CreateRoomRequest,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }> {
     const startTime = this.clock.now();
 
@@ -98,13 +101,14 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     } catch (err) {
       throw new InvalidPayloadError(
         "playerName",
-        err instanceof Error ? err.message : "Invalid player name",
+        toErrorMessage(err),
       );
     }
 
     this.logger.info("Creating room", {
       operation: "room_create",
       playerName: rawName,
+      ...(correlationId ? { correlationId } : {}),
     });
 
     try {
@@ -127,6 +131,8 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         isHost: true,
         isConnected: true,
         connectedAt: now,
+        createdAt: now,
+        updatedAt: now,
       };
 
       let createdRoom!: RoomState;
@@ -142,7 +148,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         });
 
         try {
-          await this.store.createIfAbsent(candidateRoom);
+          await this.store.createIfAbsent(candidateRoom, { correlationId });
           createdRoom = candidateRoom;
           created = true;
           break;
@@ -151,6 +157,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
             this.logger.warn("Room code collision, generating fallback", {
               operation: "room_code_collision_retry",
               attempts: attempt + 1,
+              ...(correlationId ? { correlationId } : {}),
             });
             continue;
           }
@@ -167,7 +174,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
           createdAt: now,
         });
         try {
-          await this.store.createIfAbsent(createdRoom);
+          await this.store.createIfAbsent(createdRoom, { correlationId });
           created = true;
         } catch (err) {
           if (err instanceof RoomAlreadyExistsError) {
@@ -177,13 +184,16 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         }
       }
 
-      const sessionRecord = await this.sessionRegistry.createSession({
-        playerId,
-        roomCode: createdRoom.roomCode,
-        color: hostColor,
-        isHost: true,
-        socketId,
-      });
+      const sessionRecord = await this.sessionRegistry.createSession(
+        {
+          playerId,
+          roomCode: createdRoom.roomCode,
+          color: hostColor,
+          isHost: true,
+          socketId,
+        },
+        { correlationId },
+      );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Room created", {
@@ -192,6 +202,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         playerId,
         duration,
         durationMs: duration,
+        ...(correlationId ? { correlationId } : {}),
       });
 
       return {
@@ -205,10 +216,8 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         operation: "room_create",
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
+        ...(correlationId ? { correlationId } : {}),
       });
       throw err;
     }
@@ -220,6 +229,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   public async joinRoom(
     req: JoinRoomRequest,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }> {
     const startTime = this.clock.now();
     const normalizedCode = normalizeRoomCode(req.roomCode || "");
@@ -233,7 +243,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     } catch (err) {
       throw new InvalidPayloadError(
         "playerName",
-        err instanceof Error ? err.message : "Invalid player name",
+        toErrorMessage(err),
       );
     }
 
@@ -241,6 +251,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       operation: "room_join",
       roomCode: normalizedCode,
       playerName: rawName,
+      ...(correlationId ? { correlationId } : {}),
     });
 
     try {
@@ -256,36 +267,45 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         isHost: false,
         isConnected: true,
         connectedAt: now,
+        createdAt: now,
+        updatedAt: now,
       };
 
-      const result = await this.store.mutate(normalizedCode, async (room) => {
-        const { nextRoom, assignedColor } = addPlayerToRoom(
-          room,
-          playerCandidate,
-          false,
-          this.clock.now(),
-        );
+      const result = await this.store.mutate(
+        normalizedCode,
+        async (room) => {
+          const { nextRoom, assignedColor } = addPlayerToRoom(
+            room,
+            playerCandidate,
+            false,
+            this.clock.now(),
+          );
 
-        const assignedPlayer =
-          assignedColor === "w" ? nextRoom.whitePlayer! : nextRoom.blackPlayer!;
+          const assignedPlayer =
+            assignedColor === "w" ? nextRoom.whitePlayer! : nextRoom.blackPlayer!;
 
-        return {
-          updatedRoom: nextRoom,
-          result: {
-            room: nextRoom,
-            player: assignedPlayer,
-            assignedColor: assignedColor!,
-          },
-        };
-      });
+          return {
+            updatedRoom: nextRoom,
+            result: {
+              room: nextRoom,
+              player: assignedPlayer,
+              assignedColor: assignedColor!,
+            },
+          };
+        },
+        correlationId,
+      );
 
-      const sessionRecord = await this.sessionRegistry.createSession({
-        playerId,
-        roomCode: normalizedCode,
-        color: result.assignedColor,
-        isHost: false,
-        socketId,
-      });
+      const sessionRecord = await this.sessionRegistry.createSession(
+        {
+          playerId,
+          roomCode: normalizedCode,
+          color: result.assignedColor,
+          isHost: false,
+          socketId,
+        },
+        { correlationId },
+      );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Room joined", {
@@ -295,6 +315,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         role: "player",
         duration,
         durationMs: duration,
+        ...(correlationId ? { correlationId } : {}),
       });
 
       return {
@@ -310,10 +331,8 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         playerName: rawName,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
+        ...(correlationId ? { correlationId } : {}),
       });
       throw err;
     }
@@ -325,6 +344,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   public async reconnect(
     req: ReconnectRequest,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }> {
     const startTime = this.clock.now();
 
@@ -350,6 +370,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       operation: "room_reconnect",
       roomCode: normalizedCode,
       playerId: req.playerId,
+      ...(correlationId ? { correlationId } : {}),
     });
 
     try {
@@ -362,29 +383,39 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         req.sessionToken,
         normalizedCode,
         req.playerId,
+        { signal: undefined },
       );
       if (!session) {
         throw new UnauthorizedError("Invalid session token");
       }
 
-      const result = await this.store.mutate(normalizedCode, async (room) => {
-        // Cancel disconnect timer under room lock (MAJ-028)
-        this.timerRegistry.cancel(normalizedCode, req.playerId);
+      const result = await this.store.mutate(
+        normalizedCode,
+        async (room) => {
+          // Cancel disconnect timer under room lock (MAJ-028)
+          this.timerRegistry.cancel(normalizedCode, req.playerId);
 
-        const { nextRoom, player } = reconnectPlayerTransition(
-          room,
-          req.playerId,
-          socketId,
-          this.clock.now(),
-        );
+          const { nextRoom, player } = reconnectPlayerTransition(
+            room,
+            req.playerId,
+            socketId,
+            this.clock.now(),
+          );
 
-        return {
-          updatedRoom: nextRoom,
-          result: { room: nextRoom, player },
-        };
-      });
+          return {
+            updatedRoom: nextRoom,
+            result: { room: nextRoom, player },
+          };
+        },
+        correlationId,
+      );
 
-      await this.sessionRegistry.touchSession(req.sessionToken, socketId);
+      await this.sessionRegistry.touchSession(
+        req.sessionToken,
+        socketId,
+        undefined,
+        { correlationId },
+      );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Player reconnected", {
@@ -393,6 +424,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         playerId: req.playerId,
         duration,
         durationMs: duration,
+        ...(correlationId ? { correlationId } : {}),
       });
 
       return {
@@ -407,10 +439,8 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         playerId: req.playerId,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
+        ...(correlationId ? { correlationId } : {}),
       });
       throw err;
     }
@@ -422,6 +452,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   public async leaveRoom(
     roomCode: string,
     socketId: string,
+    correlationId?: string,
   ): Promise<{
     room: RoomState;
     player: Player;
@@ -435,61 +466,69 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       operation: "room_leave",
       roomCode: normalizedCode,
       socketId,
+      ...(correlationId ? { correlationId } : {}),
     });
 
     try {
-      const result = await this.store.withLock(normalizedCode, async () => {
-        const room = await this.store.findByCode(normalizedCode);
-        if (!room) {
-          throw new RoomNotFoundError(normalizedCode);
-        }
+      const result = await this.store.withLock(
+        normalizedCode,
+        async () => {
+          const room = await this.store.findByCode(normalizedCode);
+          if (!room) {
+            throw new RoomNotFoundError(normalizedCode);
+          }
 
-        let leavingPlayer: Player | null;
-        if (room.whitePlayer?.socketId === socketId) {
-          leavingPlayer = room.whitePlayer;
-        } else if (room.blackPlayer?.socketId === socketId) {
-          leavingPlayer = room.blackPlayer;
-        } else {
-          leavingPlayer =
-            room.spectators.find((s) => s.socketId === socketId) ?? null;
-        }
+          let leavingPlayer: Player | null;
+          if (room.whitePlayer?.socketId === socketId) {
+            leavingPlayer = room.whitePlayer;
+          } else if (room.blackPlayer?.socketId === socketId) {
+            leavingPlayer = room.blackPlayer;
+          } else {
+            leavingPlayer =
+              room.spectators.find((s) => s.socketId === socketId) ?? null;
+          }
 
-        if (!leavingPlayer) {
-          throw new PlayerNotInRoomError(socketId);
-        }
+          if (!leavingPlayer) {
+            throw new PlayerNotInRoomError(socketId);
+          }
 
-        // Cancel disconnect timer for leaving player under room lock (MAJ-028)
-        this.timerRegistry.cancel(normalizedCode, leavingPlayer.id);
+          // Cancel disconnect timer for leaving player under room lock (MAJ-028)
+          this.timerRegistry.cancel(normalizedCode, leavingPlayer.id);
 
-        const now = this.clock.now();
-        const { nextRoom, shouldDelete, gameOverPayload } = leaveRoomTransition(
-          room,
-          leavingPlayer.id,
-          now,
-        );
-
-        if (shouldDelete || gameOverPayload) {
-          this.timerRegistry.cancelAllForRoom(normalizedCode);
-        }
-
-        if (shouldDelete) {
-          await this.store.delete(normalizedCode);
-          await this.sessionRegistry.deleteSessionsForRoom(normalizedCode);
-        } else {
-          await this.store.save(nextRoom);
-          await this.sessionRegistry.deleteSessionForPlayer(
-            normalizedCode,
+          const now = this.clock.now();
+          const { nextRoom, shouldDelete, gameOverPayload } = leaveRoomTransition(
+            room,
             leavingPlayer.id,
+            now,
           );
-        }
 
-        return {
-          room: nextRoom,
-          player: leavingPlayer,
-          shouldDelete,
-          gameOverPayload,
-        };
-      });
+          if (shouldDelete || gameOverPayload) {
+            this.timerRegistry.cancelAllForRoom(normalizedCode);
+          }
+
+          if (shouldDelete) {
+            await this.store.delete(normalizedCode, { correlationId });
+            await this.sessionRegistry.deleteSessionsForRoom(normalizedCode, {
+              correlationId,
+            });
+          } else {
+            await this.store.save(nextRoom, undefined, { correlationId });
+            await this.sessionRegistry.deleteSessionForPlayer(
+              normalizedCode,
+              leavingPlayer.id,
+              { correlationId },
+            );
+          }
+
+          return {
+            room: nextRoom,
+            player: leavingPlayer,
+            shouldDelete,
+            gameOverPayload,
+          };
+        },
+        correlationId,
+      );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Room left", {
@@ -499,6 +538,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         shouldDelete: result.shouldDelete,
         duration,
         durationMs: duration,
+        ...(correlationId ? { correlationId } : {}),
       });
 
       return result;
@@ -509,10 +549,8 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         roomCode: normalizedCode,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
+        ...(correlationId ? { correlationId } : {}),
       });
       throw err;
     }
@@ -581,10 +619,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
           operation: "disconnect_grace_period_abandonment",
           roomCode,
           playerId,
-          error:
-            err instanceof Error
-              ? { name: err.name, message: err.message, stack: err.stack }
-              : { raw: err },
+          error: serializeError(err),
         });
       }
     }, gracePeriodMs);
@@ -608,6 +643,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     ) => void | Promise<void>,
     gracePeriodMs = DISCONNECT_GRACE_PERIOD_MS,
     timerRegistry?: IDisconnectTimerRegistry,
+    correlationId?: string,
   ): Promise<{
     room: RoomState;
     player: Player;
@@ -619,65 +655,70 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     const { room: matchedRoom, playerId } = match;
     const targetTimerRegistry = timerRegistry ?? this.timerRegistry;
 
-    return this.store.withLock(matchedRoom.roomCode, async () => {
-      const room = await this.store.findByCode(matchedRoom.roomCode);
-      if (!room) return null;
+    return this.store.withLock(
+      matchedRoom.roomCode,
+      async () => {
+        const room = await this.store.findByCode(matchedRoom.roomCode);
+        if (!room) return null;
 
-      // CRIT-001: verify under lock that player's current socket matches the disconnecting socket
-      const currentPlayer =
-        room.whitePlayer?.id === playerId
-          ? room.whitePlayer
-          : room.blackPlayer?.id === playerId
-            ? room.blackPlayer
-            : (room.spectators.find((s) => s.id === playerId) ?? null);
+        // CRIT-001: verify under lock that player's current socket matches the disconnecting socket
+        const currentPlayer =
+          room.whitePlayer?.id === playerId
+            ? room.whitePlayer
+            : room.blackPlayer?.id === playerId
+              ? room.blackPlayer
+              : (room.spectators.find((s) => s.id === playerId) ?? null);
 
-      if (!currentPlayer) return null;
+        if (!currentPlayer) return null;
 
-      if (currentPlayer.socketId !== socketId) {
-        this.logger.debug("Stale disconnect event ignored", {
-          operation: "handle_disconnect",
-          roomCode: matchedRoom.roomCode,
+        if (currentPlayer.socketId !== socketId) {
+          this.logger.debug("Stale disconnect event ignored", {
+            operation: "handle_disconnect",
+            roomCode: matchedRoom.roomCode,
+            playerId,
+            expectedSocketId: currentPlayer.socketId,
+            actualSocketId: socketId,
+            ...(correlationId ? { correlationId } : {}),
+          });
+          return null;
+        }
+
+        const now = this.clock.now();
+        const { nextRoom, paused, droppedPlayer } = disconnectPlayerTransition(
+          room,
           playerId,
-          expectedSocketId: currentPlayer.socketId,
-          actualSocketId: socketId,
-        });
-        return null;
-      }
-
-      const now = this.clock.now();
-      const { nextRoom, paused, droppedPlayer } = disconnectPlayerTransition(
-        room,
-        playerId,
-        now,
-      );
-
-      if (!droppedPlayer) return null;
-
-      await this.store.save(nextRoom);
-
-      if (paused) {
-        // Clear any previous timer under lock and install new timer under lock (MAJ-028, MAJ-012)
-        this.syncTimerRegistries(
-          (reg) => reg.cancel(matchedRoom.roomCode, playerId),
-          targetTimerRegistry,
+          now,
         );
 
-        const timer = this.scheduleAbandonmentTimer(
-          matchedRoom.roomCode,
-          playerId,
-          gracePeriodMs,
-          onForfeit,
-          targetTimerRegistry,
-        );
+        if (!droppedPlayer) return null;
 
-        this.syncTimerRegistries(
-          (reg) => reg.set(matchedRoom.roomCode, playerId, timer),
-          targetTimerRegistry,
-        );
-      }
+        await this.store.save(nextRoom, undefined, { correlationId });
 
-      return { room: nextRoom, player: droppedPlayer, wasActiveGame: paused };
-    });
+        if (paused) {
+          // Clear any previous timer under lock and install new timer under lock (MAJ-028, MAJ-012)
+          this.syncTimerRegistries(
+            (reg) => reg.cancel(matchedRoom.roomCode, playerId),
+            targetTimerRegistry,
+          );
+
+          const timer = this.scheduleAbandonmentTimer(
+            matchedRoom.roomCode,
+            playerId,
+            gracePeriodMs,
+            onForfeit,
+            targetTimerRegistry,
+          );
+
+          this.syncTimerRegistries(
+            (reg) => reg.set(matchedRoom.roomCode, playerId, timer),
+            targetTimerRegistry,
+          );
+        }
+
+        return { room: nextRoom, player: droppedPlayer, wasActiveGame: paused };
+      },
+      correlationId,
+    );
   }
 
   /**
@@ -689,6 +730,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   public async handleAbandonmentForfeit(
     roomCode: string,
     disconnectedPlayerId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload } | null> {
     const normalizedCode = normalizeRoomCode(roomCode);
     const startTime = this.clock.now();
@@ -697,6 +739,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
       operation: "room_abandonment_forfeit",
       roomCode: normalizedCode,
       disconnectedPlayerId,
+      ...(correlationId ? { correlationId } : {}),
     });
 
     try {
@@ -719,6 +762,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
             },
           };
         },
+        correlationId,
       );
 
       const duration = this.clock.now() - startTime;
@@ -730,6 +774,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
           winner: outcome.gameOverPayload.winner,
           duration,
           durationMs: duration,
+          ...(correlationId ? { correlationId } : {}),
         });
       } else {
         this.logger.info(
@@ -740,6 +785,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
             disconnectedPlayerId,
             duration,
             durationMs: duration,
+            ...(correlationId ? { correlationId } : {}),
           },
         );
       }
@@ -754,6 +800,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
           disconnectedPlayerId,
           duration,
           durationMs: duration,
+          ...(correlationId ? { correlationId } : {}),
         });
         return null;
       }
@@ -765,10 +812,8 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         disconnectedPlayerId,
         duration,
         durationMs: duration,
-        error:
-          error instanceof Error
-            ? { name: error.name, message: error.message, stack: error.stack }
-            : { raw: error },
+        error: serializeError(error),
+        ...(correlationId ? { correlationId } : {}),
       });
       throw error;
     }
@@ -777,7 +822,10 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   /**
    * Finds a room by code.
    */
-  public async getRoom(roomCode: string): Promise<RoomState | null> {
+  public async getRoom(
+    roomCode: string,
+    _correlationId?: string,
+  ): Promise<RoomState | null> {
     return this.store.findByCode(normalizeRoomCode(roomCode));
   }
 
@@ -786,9 +834,10 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
    */
   public async cleanupAbandonedRooms(
     maxAgeMs = 10 * 60 * 1000,
+    correlationId?: string,
   ): Promise<number> {
     // PERF: Also evict expired sessions across all rooms to prevent memory leaks
-    await this.sessionRegistry.cleanupExpiredSessions();
+    await this.sessionRegistry.cleanupExpiredSessions({ correlationId });
 
     const rooms = await this.store.listActiveRooms();
     const now = this.clock.now();
@@ -799,17 +848,17 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
         try {
           // MIN-006: Cancel disconnect timers when cleaning up abandoned rooms
           this.timerRegistry.cancelAllForRoom(room.roomCode);
-          await this.store.delete(room.roomCode);
-          await this.sessionRegistry.deleteSessionsForRoom(room.roomCode);
+          await this.store.delete(room.roomCode, { correlationId });
+          await this.sessionRegistry.deleteSessionsForRoom(room.roomCode, {
+            correlationId,
+          });
           cleaned++;
         } catch (error) {
           this.logger.error("Failed to cleanup abandoned room", {
             operation: "room_cleanup_abandoned_error",
             roomCode: room.roomCode,
-            error:
-              error instanceof Error
-                ? { name: error.name, message: error.message, stack: error.stack }
-                : { raw: error },
+            error: serializeError(error),
+            ...(correlationId ? { correlationId } : {}),
           });
         }
       }
@@ -835,28 +884,33 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     roomCode: string,
     nextGameState: GameState,
     gameOverPayload?: GameOverPayload,
+    correlationId?: string,
   ): Promise<RoomState> {
     const code = normalizeRoomCode(roomCode);
-    return this.store.mutate(code, async (room) => {
-      if (room.status !== "playing") {
-        throw new GameNotActiveError(room.status);
-      }
-      if (nextGameState.moveCount <= room.game.moveCount) {
-        throw new OptimisticLockConflictError(
-          room.roomCode,
-          nextGameState.moveCount - 1,
-          room.game.moveCount,
+    return this.store.mutate(
+      code,
+      async (room) => {
+        if (room.status !== "playing") {
+          throw new GameNotActiveError(room.status);
+        }
+        if (nextGameState.moveCount <= room.game.moveCount) {
+          throw new OptimisticLockConflictError(
+            room.roomCode,
+            nextGameState.moveCount - 1,
+            room.game.moveCount,
+          );
+        }
+        const now = this.clock.now();
+        const updated = applyGameMoveTransition(
+          room,
+          nextGameState,
+          gameOverPayload,
+          now,
         );
-      }
-      const now = this.clock.now();
-      const updated = applyGameMoveTransition(
-        room,
-        nextGameState,
-        gameOverPayload,
-        now,
-      );
-      return { updatedRoom: updated, result: updated };
-    });
+        return { updatedRoom: updated, result: updated };
+      },
+      correlationId,
+    );
   }
 
   /**
@@ -865,19 +919,24 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   public async finalizeGame(
     roomCode: string,
     gameOverPayload: GameOverPayload,
+    correlationId?: string,
   ): Promise<RoomState> {
     const code = normalizeRoomCode(roomCode);
-    return this.store.mutate(code, async (room) => {
-      if (room.status !== "playing") {
-        throw new GameNotActiveError(room.status);
-      }
-      if (gameOverPayload.reason === "draw_agreement" && !room.drawOffer) {
-        throw new GameNotActiveError("No draw offer is currently pending");
-      }
-      const now = this.clock.now();
-      const updated = finalizeGameTransition(room, gameOverPayload, now);
-      return { updatedRoom: updated, result: updated };
-    });
+    return this.store.mutate(
+      code,
+      async (room) => {
+        if (room.status !== "playing") {
+          throw new GameNotActiveError(room.status);
+        }
+        if (gameOverPayload.reason === "draw_agreement" && !room.drawOffer) {
+          throw new GameNotActiveError("No draw offer is currently pending");
+        }
+        const now = this.clock.now();
+        const updated = finalizeGameTransition(room, gameOverPayload, now);
+        return { updatedRoom: updated, result: updated };
+      },
+      correlationId,
+    );
   }
 
   /**
@@ -886,13 +945,18 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
   public async updateDrawOffer(
     roomCode: string,
     drawOffer: RoomState["drawOffer"],
+    correlationId?: string,
   ): Promise<RoomState> {
     const code = normalizeRoomCode(roomCode);
-    return this.store.mutate(code, async (room) => {
-      const now = this.clock.now();
-      const updated = updateDrawOfferTransition(room, drawOffer, now);
-      return { updatedRoom: updated, result: updated };
-    });
+    return this.store.mutate(
+      code,
+      async (room) => {
+        const now = this.clock.now();
+        const updated = updateDrawOfferTransition(room, drawOffer, now);
+        return { updatedRoom: updated, result: updated };
+      },
+      correlationId,
+    );
   }
 
   /**
@@ -903,19 +967,24 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
     rematch: RoomState["rematch"],
     newGameState?: GameState,
     players?: { whitePlayer: Player | null; blackPlayer: Player | null },
+    correlationId?: string,
   ): Promise<RoomState> {
     const code = normalizeRoomCode(roomCode);
-    const result = await this.store.mutate(code, async (room) => {
-      const now = this.clock.now();
-      const updated = updateRematchTransition(
-        room,
-        rematch,
-        newGameState,
-        now,
-        players,
-      );
-      return { updatedRoom: updated, result: updated };
-    });
+    const result = await this.store.mutate(
+      code,
+      async (room) => {
+        const now = this.clock.now();
+        const updated = updateRematchTransition(
+          room,
+          rematch,
+          newGameState,
+          now,
+          players,
+        );
+        return { updatedRoom: updated, result: updated };
+      },
+      correlationId,
+    );
 
     if (rematch?.status === "accepted") {
       if (result.whitePlayer) {
@@ -923,6 +992,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
           code,
           result.whitePlayer.id,
           "w",
+          { correlationId },
         );
       }
       if (result.blackPlayer) {
@@ -930,6 +1000,7 @@ export class RoomService implements IRoomService, IRoomGameAdapter {
           code,
           result.blackPlayer.id,
           "b",
+          { correlationId },
         );
       }
     }

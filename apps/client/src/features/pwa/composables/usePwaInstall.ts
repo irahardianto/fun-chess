@@ -1,7 +1,8 @@
-import { ref, computed, getCurrentScope, onScopeDispose, getCurrentInstance } from 'vue';
-import { useInjectLogger, useInjectStorage } from '@/platform/di';
+import { ref, computed, getCurrentScope, onScopeDispose, getCurrentInstance, hasInjectionContext, inject } from 'vue';
+import { useInjectLogger, useInjectStorage, CLOCK_KEY } from '@/platform/di';
 import { safeLocalStorage, type KeyValueStorage } from '@/platform/storage';
 import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
+import { systemClock, type IClock } from '@fun-chess/shared';
 
 export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -22,6 +23,7 @@ let listenerCount = 0;
 let initialized = false;
 let customStorage: KeyValueStorage | null = null;
 let customLogger: ILogger | null = null;
+let customClock: IClock | null = null;
 
 export function setPwaInstallStorage(storage: KeyValueStorage | null): void {
   customStorage = storage;
@@ -29,6 +31,10 @@ export function setPwaInstallStorage(storage: KeyValueStorage | null): void {
 
 export function setPwaInstallLogger(logger: ILogger | null): void {
   customLogger = logger;
+}
+
+export function setPwaInstallClock(clock: IClock | null): void {
+  customClock = clock;
 }
 
 function getEffectiveStorage(custom?: KeyValueStorage): KeyValueStorage {
@@ -39,14 +45,19 @@ function getEffectiveLogger(custom?: ILogger): ILogger {
   return custom ?? customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
 }
 
-function checkSnoozeStatus(customStorage?: KeyValueStorage, customLogger?: ILogger): boolean {
+function getEffectiveClock(custom?: IClock): IClock {
+  return custom ?? customClock ?? (hasInjectionContext() ? inject(CLOCK_KEY, systemClock) : systemClock);
+}
+
+function checkSnoozeStatus(customStorage?: KeyValueStorage, customLogger?: ILogger, customClockInstance?: IClock): boolean {
   void snoozeTrigger.value; // reactive dependency
   try {
     const storage = getEffectiveStorage(customStorage);
     const snoozedUntil = storage.getItem(SNOOZE_STORAGE_KEY);
     if (!snoozedUntil) return false;
     const until = Number(snoozedUntil);
-    return !isNaN(until) && until > Date.now();
+    const clock = getEffectiveClock(customClockInstance);
+    return !isNaN(until) && until > clock.now();
   } catch (err) {
     getEffectiveLogger(customLogger).warn('Failed to read PWA snooze status from storage', {
       operation: 'pwa_check_snooze_status',
@@ -114,11 +125,13 @@ export function resetPwaInstallState(): void {
   initialized = false;
   customStorage = null;
   customLogger = null;
+  customClock = null;
 }
 
 export interface UsePwaInstallOptions {
   storage?: KeyValueStorage;
   logger?: ILogger;
+  clock?: IClock;
 }
 
 /**
@@ -130,6 +143,7 @@ export function usePwaInstall(options?: UsePwaInstallOptions) {
 
   const effectiveStorage = getEffectiveStorage(options?.storage);
   const effectiveLogger = getEffectiveLogger(options?.logger);
+  const effectiveClock = getEffectiveClock(options?.clock);
 
   const isStandalone = computed<boolean>(() => {
     return checkStandalone();
@@ -149,7 +163,7 @@ export function usePwaInstall(options?: UsePwaInstallOptions) {
 
   const isIos = isIosSafari;
 
-  const isSnoozed = computed<boolean>(() => checkSnoozeStatus(options?.storage, options?.logger));
+  const isSnoozed = computed<boolean>(() => checkSnoozeStatus(options?.storage, options?.logger, options?.clock));
 
   const hasInstallPrompt = computed<boolean>(() => deferredPrompt.value !== null);
 
@@ -207,7 +221,7 @@ export function usePwaInstall(options?: UsePwaInstallOptions) {
   function snoozePrompt(days: number = DEFAULT_SNOOZE_DAYS): void {
     const validDays =
       typeof days === 'number' && !isNaN(days) && days > 0 ? days : DEFAULT_SNOOZE_DAYS;
-    const until = Date.now() + validDays * 24 * 60 * 60 * 1000;
+    const until = effectiveClock.now() + validDays * 24 * 60 * 60 * 1000;
     try {
       effectiveStorage.setItem(SNOOZE_STORAGE_KEY, until.toString());
     } catch (err) {

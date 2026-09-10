@@ -12,7 +12,6 @@ import {
   defaultProgressCodec,
   defaultProgressMergeEngine,
   defaultSchemaValidator,
-  FUN_CHESS_PAYLOAD_MAGIC_PREFIX,
 } from '@fun-chess/shared';
 import {
   type IProgressFileService,
@@ -23,6 +22,12 @@ import { defaultLocalStorageProgressStore } from '@/features/scenarios';
 import { defaultLocalStoragePuzzleProgressStore } from '@/features/puzzles';
 import { useInjectLogger, useInjectProgressStorage, PROGRESS_STORAGE_KEY } from '@/platform/di';
 import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
+import { useProgressSyncModal } from './useProgressSyncModal';
+import { useProgressDiff } from './useProgressDiff';
+import { validateAndDecodePayload } from '../engine/sync_validator';
+
+export * from './useProgressSyncModal';
+export * from './useProgressDiff';
 
 export interface UseProgressSyncOptions {
   storage?: ProgressStorage;
@@ -68,9 +73,9 @@ function unwrapPayload(val: UnifiedProgressPayload, log: ILogger = defaultLogger
 }
 
 /**
- * High-level coordinator composable for Progress Portability & Device Sync.
- * Manages loading, exporting (JSON / QR), importing, diff calculation,
- * and smart conflict resolution.
+ * High-level coordinator composable for Progress Portability & Device Sync (MAJ-021).
+ * Decomposed into modular sub-composables for presentation modal state and diff management,
+ * and pure engine functions for payload validation.
  */
 export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgressSyncReturn {
   const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
@@ -99,6 +104,7 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
   function getStorage(): ProgressStorage {
     return storage;
   }
+
   const codec = options.codec || defaultProgressCodec;
   const mergeEngine = options.mergeEngine || defaultProgressMergeEngine;
   const validator = options.schemaValidator || defaultSchemaValidator;
@@ -107,36 +113,41 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
   const isLoading = ref(false);
   const syncError = ref<string | null>(null);
   const currentProgress = ref<UnifiedProgressPayload | null>(null);
-  const incomingPayload = ref<UnifiedProgressPayload | null>(null);
-  const diffPreview = ref<ProgressDiffPreview | null>(null);
-  const isConflictModalOpen = ref(false);
-  const isSyncModalOpen = ref(false);
+
+  // Sub-composable for diffing state (MAJ-021)
+  const {
+    incomingPayload,
+    diffPreview,
+    calculateAndSetDiff,
+    clearDiff,
+  } = useProgressDiff();
 
   function clearError(): void {
     syncError.value = null;
   }
 
-  function openSyncModal(): void {
-    isSyncModalOpen.value = true;
-    clearError();
-    loadCurrentProgress().catch((err: unknown) => {
-      logger.warn('Failed to refresh current progress on open', {
-        operation: 'progress_sync_open_modal',
-        error: err instanceof Error ? err.message : String(err),
+  // Sub-composable for modal dialog presentation state (MAJ-021)
+  const {
+    isSyncModalOpen,
+    isConflictModalOpen,
+    openSyncModal: baseOpenSyncModal,
+    closeSyncModal,
+    openConflictModal,
+    closeConflictModal,
+  } = useProgressSyncModal({
+    onOpenSyncModal: () => {
+      clearError();
+      loadCurrentProgress().catch((err: unknown) => {
+        logger.warn('Failed to refresh current progress on open', {
+          operation: 'progress_sync_open_modal',
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
-    });
-  }
+    },
+  });
 
-  function closeSyncModal(): void {
-    isSyncModalOpen.value = false;
-  }
-
-  function openConflictModal(): void {
-    isConflictModalOpen.value = true;
-  }
-
-  function closeConflictModal(): void {
-    isConflictModalOpen.value = false;
+  function openSyncModal(): void {
+    baseOpenSyncModal();
   }
 
   async function loadCurrentProgress(): Promise<UnifiedProgressPayload> {
@@ -283,36 +294,18 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
     clearError();
 
     try {
-      if (!rawStringOrJson || typeof rawStringOrJson !== 'string') {
-        throw new Error('Select a valid save file (.json) or scan a QR code.');
-      }
-
-      if (rawStringOrJson.length > 2 * 1024 * 1024) {
-        throw new Error('Save data exceeds maximum allowed size of 2MB.');
-      }
-
-      const trimmed = rawStringOrJson.trim();
-      let decoded: UnifiedProgressPayload;
-
-      if (trimmed.startsWith(FUN_CHESS_PAYLOAD_MAGIC_PREFIX)) {
-        decoded = await codec.decodeFromQrString(trimmed);
-      } else if (trimmed.startsWith('{') && trimmed.includes('FC_PROGRESS_V1')) {
-        decoded = codec.decodeFromEnvelopeJson(trimmed);
-      } else if (trimmed.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(trimmed);
-          decoded = validator.assertValid(parsed);
-        } catch (parseErr: unknown) {
-          logger.warn('JSON parse failed on import payload', {
+      // Pure validation & decoding delegation (MAJ-021)
+      const decoded = await validateAndDecodePayload(rawStringOrJson, {
+        codec,
+        validator,
+        onWarn: (msg, meta) => {
+          logger.warn(msg, {
             operation: 'progress_sync_import_parse',
             correlationId,
-            error: parseErr instanceof Error ? parseErr.message : String(parseErr),
+            ...meta,
           });
-          throw new Error('Invalid JSON format in save data.');
-        }
-      } else {
-        throw new Error('Unrecognized save data format. Scan a Fun Chess QR code or select a funchess-save.json file.');
-      }
+        },
+      });
 
       let local = currentProgress.value;
       if (!local) {
@@ -323,9 +316,8 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       const rawLocal = unwrapPayload(local, logger);
       const rawDecoded = unwrapPayload(decoded, logger);
 
-      const diff = mergeEngine.calculateDiff(rawLocal, rawDecoded);
-      incomingPayload.value = rawDecoded;
-      diffPreview.value = diff;
+      // Delegated diff comparison state management (MAJ-021)
+      const diff = calculateAndSetDiff(rawLocal, rawDecoded, mergeEngine);
 
       const durationMs = Math.round(performance.now() - startTime);
       logger.info('Progress payload imported successfully', {
@@ -337,16 +329,14 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
       });
 
       if (diff.hasDifferences) {
-        isConflictModalOpen.value = true;
+        openConflictModal();
         return false;
       } else {
-        // Automatically execute smart merge if no conflicts or identical
         await executeMerge('smart_merge');
         return true;
       }
     } catch (err: unknown) {
       const durationMs = Math.round(performance.now() - startTime);
-      // MIN-016: Log user validation rejections at WARN level instead of ERROR
       logger.warn('Import validation failed', {
         operation: 'progress_sync_import',
         correlationId,
@@ -354,7 +344,9 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
         durationMs,
         error: err instanceof Error ? err.message : String(err),
       });
-      syncError.value = (err instanceof Error ? err.message : null) || 'Failed to import save data. Check your QR code or save file.';
+      syncError.value =
+        (err instanceof Error ? err.message : null) ||
+        'Failed to import save data. Check your QR code or save file.';
       return false;
     } finally {
       isLoading.value = false;
@@ -404,11 +396,9 @@ export function useProgressSync(options: UseProgressSyncOptions = {}): UseProgre
 
       await getStorage().saveUnifiedProgress(merged);
       currentProgress.value = merged;
-      incomingPayload.value = null;
-      diffPreview.value = null;
-      isConflictModalOpen.value = false;
+      clearDiff();
+      closeConflictModal();
 
-      // Celebrate successful sync if celebration handler provided
       if (strategy !== 'keep_local') {
         try {
           if (options.onMergeCelebration) {

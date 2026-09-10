@@ -458,4 +458,74 @@ describe('useAppNavigation composable', () => {
       }
     });
   });
+
+  // ==========================================================================
+  // 8. Single-Responsibility Navigators (MIN-014)
+  // ==========================================================================
+  describe('Single-Responsibility Navigators (MIN-014)', () => {
+    it('syncRoomCodeFromUrl parses and synchronizes room code independently', () => {
+      const nav = useAppNavigation({
+        storage: mockStorage,
+        apiClient: mockApiClient,
+        logger: mockLogger,
+      });
+
+      const parsed = nav.syncRoomCodeFromUrl('?join=k9m2');
+      expect(parsed).toBe('K9M2');
+      expect(nav.initialRoomCode.value).toBe('K9M2');
+    });
+
+    it('loadLanInfo fetches LAN info and handles network errors independently', async () => {
+      const nav = useAppNavigation({
+        storage: mockStorage,
+        apiClient: mockApiClient,
+        logger: mockLogger,
+      });
+
+      const info = await nav.loadLanInfo();
+      expect(info).toEqual({
+        ip: '192.168.1.100',
+        port: 3000,
+        url: 'http://192.168.1.100:3000',
+      });
+      expect(nav.lanInfo.value).toEqual(info);
+
+      vi.mocked(mockApiClient.getLanInfo).mockRejectedValueOnce(new Error('LAN timeout'));
+      const failed = await nav.loadLanInfo();
+      expect(failed).toBeNull();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to fetch server LAN info'),
+        expect.objectContaining({ operation: 'app_fetch_lan_info' })
+      );
+    });
+
+    it('syncScenarioProgress synchronizes scenario progress independently', async () => {
+      const nav = useAppNavigation({
+        storage: mockStorage,
+        apiClient: mockApiClient,
+        logger: mockLogger,
+      });
+
+      expect(nav.lobbyActiveMode.value).toBe('academy');
+
+      const mockProgressStore = {
+        getProgressMap: vi.fn().mockResolvedValue({
+          'scen-10': { starsEarned: 3 },
+        }),
+      };
+
+      await nav.syncScenarioProgress(mockProgressStore);
+      expect(nav.lobbyActiveMode.value).toBe('multiplayer_lan');
+
+      // Error handling test
+      const failingStore = {
+        getProgressMap: vi.fn().mockRejectedValue(new Error('Corrupt DB')),
+      };
+      await nav.syncScenarioProgress(failingStore);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to load scenario progress map'),
+        expect.objectContaining({ operation: 'app_mount_scenario_progress' })
+      );
+    });
+  });
 });

@@ -4,12 +4,15 @@
  */
 export {
   RelayAddressService,
-  MockRelayAddressService,
+  SystemNetworkInterfaceProvider,
+  StaticNetworkInterfaceProvider,
   normalizePublicUrl,
   extractHostnameFromUrl,
 } from "./relay_address.service.js";
+export { MockRelayAddressService } from "./mock_relay_address.service.js";
 export type {
   IRelayAddressService,
+  INetworkInterfaceProvider,
   RelayAddressConfig,
   LanInfoResponse,
 } from "./relay_address.service.js";

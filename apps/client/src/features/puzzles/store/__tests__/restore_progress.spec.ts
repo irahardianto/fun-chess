@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InMemoryPuzzleProgressStore } from '../in_memory_puzzle_progress.store';
-import { LocalStoragePuzzleProgressStore } from '../local_storage_puzzle_store';
+import { LocalStoragePuzzleProgressStore } from '../local_storage_puzzle_progress.store';
 import { storageAlertDispatcher } from '@/platform/storage/storage_alert';
 import type { PuzzleProgress, PuzzleProgressStore } from '@fun-chess/shared';
 

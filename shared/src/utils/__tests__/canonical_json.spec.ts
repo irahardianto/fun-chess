@@ -148,4 +148,74 @@ describe("canonicalJsonStringify (RFC 8785)", () => {
       expect(crc32Checksum.toHex(crcA)).toBe(crc32Checksum.toHex(crcB));
     });
   });
+
+  describe("MAJ-006: Cycle detection and recursion depth ceiling", () => {
+    it("throws TypeError when serializing direct circular object references", () => {
+      const circular: Record<string, unknown> = { name: "loop" };
+      circular.self = circular;
+
+      expect(() => canonicalJsonStringify(circular)).toThrow(TypeError);
+      expect(() => canonicalJsonStringify(circular)).toThrow(
+        "Converting circular structure to JSON in canonicalJsonStringify",
+      );
+    });
+
+    it("throws TypeError when serializing indirect circular object references", () => {
+      const objA: Record<string, unknown> = { id: "a" };
+      const objB: Record<string, unknown> = { id: "b", a: objA };
+      objA.b = objB;
+
+      expect(() => canonicalJsonStringify(objA)).toThrow(TypeError);
+      expect(() => canonicalJsonStringify(objB)).toThrow(TypeError);
+    });
+
+    it("throws TypeError when serializing circular array references", () => {
+      const arr: unknown[] = [1, 2];
+      arr.push(arr);
+
+      expect(() => canonicalJsonStringify(arr)).toThrow(TypeError);
+    });
+
+    it("correctly serializes non-circular DAG structures with shared object references", () => {
+      const sharedLeaf = { value: "shared", count: 42 };
+      const dag = {
+        branchA: sharedLeaf,
+        branchB: sharedLeaf,
+      };
+
+      const result = canonicalJsonStringify(dag);
+      expect(result).toBe('{"branchA":{"count":42,"value":"shared"},"branchB":{"count":42,"value":"shared"}}');
+    });
+
+    it("serializes nested objects up to the 64-level depth ceiling successfully", () => {
+      // Build an object exactly 64 levels deep
+      let current: Record<string, unknown> = { leaf: "value" };
+      for (let i = 0; i < 63; i++) {
+        current = { next: current };
+      }
+
+      expect(() => canonicalJsonStringify(current)).not.toThrow();
+    });
+
+    it("throws RangeError when object nesting exceeds the 64-level depth ceiling", () => {
+      // Build an object 65 levels deep
+      let current: Record<string, unknown> = { leaf: "deep" };
+      for (let i = 0; i < 64; i++) {
+        current = { next: current };
+      }
+
+      expect(() => canonicalJsonStringify(current)).toThrow(RangeError);
+      expect(() => canonicalJsonStringify(current)).toThrow("Maximum canonical JSON depth of 64 exceeded");
+    });
+
+    it("throws RangeError when array nesting exceeds the 64-level depth ceiling", () => {
+      let currentArr: unknown[] = [1];
+      for (let i = 0; i < 64; i++) {
+        currentArr = [currentArr];
+      }
+
+      expect(() => canonicalJsonStringify(currentArr)).toThrow(RangeError);
+      expect(() => canonicalJsonStringify(currentArr)).toThrow("Maximum canonical JSON depth of 64 exceeded");
+    });
+  });
 });

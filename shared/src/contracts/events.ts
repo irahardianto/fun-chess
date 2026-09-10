@@ -150,6 +150,21 @@ export interface ServerToClientEvents {
   error: (error: SocketErrorPayload) => void;
 }
 
+export interface ReconnectSuccessAck {
+  success: true;
+  room: RoomState;
+  player: Player;
+  roomStatus: RoomStatus;
+  sessionToken: string;
+}
+
+export interface ReconnectErrorAck {
+  success: false;
+  error: SocketErrorPayload;
+}
+
+export type ReconnectAckPayload = ReconnectSuccessAck | ReconnectErrorAck;
+
 /**
  * Contract defining all events sent from Client to Server via Socket.io.
  */
@@ -188,20 +203,10 @@ export interface ClientToServerEvents {
         | { success: false; error: SocketErrorPayload },
     ) => void,
   ) => void;
-  /** Re-authenticates an interrupted session using private credentials */
+  /** Re-authenticates an interrupted session using private credentials (MIN-024) */
   "room:reconnect": (
     req: ReconnectRequest,
-    callback?: (
-      res:
-        | {
-            success: true;
-            room: RoomState;
-            player: Player;
-            roomStatus: RoomStatus;
-            sessionToken?: string;
-          }
-        | { success: false; error: SocketErrorPayload },
-    ) => void,
+    callback?: (res: ReconnectAckPayload) => void,
   ) => void;
   /** Voluntarily leaves a room */
   "room:leave": (

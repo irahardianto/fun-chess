@@ -926,7 +926,7 @@ describe("Game Socket Handlers", () => {
     it("does not directly invoke sessionRegistry.touchSession in the socket handler on game:move (F-04)", async () => {
       await setupActiveRoom("SESS");
       const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
-      const mockSessionRegistry = {
+      const _mockSessionRegistry = {
         touchSession: touchSessionSpy,
       } as unknown as import("../../rooms/index.js").SessionRegistry;
 
@@ -943,8 +943,6 @@ describe("Game Socket Handlers", () => {
         service,
         logger,
         rateLimiter,
-        undefined,
-        mockSessionRegistry,
       );
 
       let ack: SocketAckResponse | undefined;
@@ -964,7 +962,7 @@ describe("Game Socket Handlers", () => {
       await setupActiveRoom("SES2");
       const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
       const getSessionTokenSpy = vi.fn().mockReturnValue("token-lookup-456");
-      const mockSessionRegistry = {
+      const _mockSessionRegistry = {
         touchSession: touchSessionSpy,
         getSessionTokenForPlayer: getSessionTokenSpy,
       } as unknown as import("../../rooms/index.js").SessionRegistry;
@@ -981,8 +979,6 @@ describe("Game Socket Handlers", () => {
         service,
         logger,
         rateLimiter,
-        undefined,
-        mockSessionRegistry,
       );
 
       let ack: SocketAckResponse | undefined;
@@ -1041,7 +1037,7 @@ describe("Game Socket Handlers", () => {
     it("does not call touchSession when no sessionToken or userId is present", async () => {
       await setupActiveRoom("SES4");
       const touchSessionSpy = vi.fn().mockResolvedValue(undefined);
-      const mockSessionRegistry = {
+      const _mockSessionRegistry = {
         touchSession: touchSessionSpy,
       } as unknown as import("../../rooms/index.js").SessionRegistry;
 
@@ -1054,8 +1050,6 @@ describe("Game Socket Handlers", () => {
         service,
         logger,
         rateLimiter,
-        undefined,
-        mockSessionRegistry,
       );
 
       let ack: SocketAckResponse | undefined;
@@ -1069,6 +1063,150 @@ describe("Game Socket Handlers", () => {
 
       expect(ack?.success).toBe(true);
       expect(touchSessionSpy).not.toHaveBeenCalled();
+    });
+
+    it("emits game:check when move puts opponent king in check", async () => {
+      // Mock gameService.makeMove to return checkInfo
+      const mockGameService = {
+        makeMove: vi.fn().mockResolvedValue({
+          room: { roomCode: "CHK1", status: "playing" },
+          moveResult: { from: "d1", to: "h5", san: "Qh5+" },
+          gameState: { turn: "b", fen: "fen-check" },
+          checkInfo: { inCheck: "b", kingSquare: "e8" },
+        }),
+      } as unknown as GameService;
+
+      const checkSocket = new TestSocket("sock_check");
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        checkSocket as unknown as Socket,
+        mockGameService,
+        logger,
+        rateLimiter,
+      );
+
+      let ack: SocketAckResponse | undefined;
+      await checkSocket.trigger(
+        "game:move",
+        { roomCode: "CHK1", move: { from: "d1", to: "h5" } },
+        (res) => {
+          ack = res as SocketAckResponse;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      const checkEmit = io.toEmits.find((e) => e.event === "game:check");
+      expect(checkEmit).toBeDefined();
+      expect((checkEmit?.payload as { inCheck?: string })?.inCheck).toBe("b");
+    });
+
+    it("propagates context.correlationId to all gameService operations from socket handlers", async () => {
+      const mockGameService = {
+        makeMove: vi.fn().mockResolvedValue({
+          room: { roomCode: "COR2", status: "playing" },
+          moveResult: { from: "e2", to: "e4", san: "e4" },
+          gameState: { turn: "b" },
+        }),
+        resign: vi.fn().mockResolvedValue({
+          room: { roomCode: "COR2", status: "game_over" },
+          gameOverPayload: { winner: "b", reason: "resignation" },
+        }),
+        offerDraw: vi.fn().mockResolvedValue({
+          room: { roomCode: "COR2", status: "playing" },
+          fromPlayer: { id: "p1", name: "Alice" },
+          opponentPlayer: { socketId: "sock_opp" },
+        }),
+        respondDraw: vi.fn().mockResolvedValue({
+          room: { roomCode: "COR2", status: "playing" },
+          accept: false,
+          byPlayerId: "p2",
+        }),
+        requestRematch: vi.fn().mockResolvedValue({
+          room: { roomCode: "COR2", status: "rematch_pending" },
+          requestedBy: "p1",
+          requesterName: "Alice",
+        }),
+        respondRematch: vi.fn().mockResolvedValue({
+          room: { roomCode: "COR2", status: "game_over" },
+          accept: false,
+          byPlayerId: "p2",
+        }),
+      } as unknown as GameService;
+
+      const sock = new TestSocket("sock_corr_ops");
+      registerGameSocketHandlers(
+        io as unknown as TypedSocketServer,
+        sock as unknown as Socket,
+        mockGameService,
+        logger,
+        rateLimiter,
+      );
+
+      // 1. game:move
+      await sock.trigger(
+        "game:move",
+        { roomCode: "COR2", move: { from: "e2", to: "e4" } },
+        () => {},
+      );
+      expect(mockGameService.makeMove).toHaveBeenCalledWith(
+        expect.anything(),
+        sock.id,
+        expect.any(String),
+      );
+
+      // 2. game:resign
+      await sock.trigger("game:resign", { roomCode: "COR2" }, () => {});
+      expect(mockGameService.resign).toHaveBeenCalledWith(
+        "COR2",
+        sock.id,
+        expect.any(String),
+      );
+
+      // 3. game:offer_draw
+      await sock.trigger("game:offer_draw", { roomCode: "COR2" }, () => {});
+      expect(mockGameService.offerDraw).toHaveBeenCalledWith(
+        "COR2",
+        sock.id,
+        expect.any(String),
+      );
+
+      // 4. game:respond_draw
+      await sock.trigger(
+        "game:respond_draw",
+        { roomCode: "COR2", accept: false },
+        () => {},
+      );
+      expect(mockGameService.respondDraw).toHaveBeenCalledWith(
+        "COR2",
+        sock.id,
+        false,
+        expect.any(String),
+      );
+
+      // 5. game:request_rematch
+      await sock.trigger(
+        "game:request_rematch",
+        { roomCode: "COR2" },
+        () => {},
+      );
+      expect(mockGameService.requestRematch).toHaveBeenCalledWith(
+        "COR2",
+        sock.id,
+        expect.any(String),
+      );
+
+      // 6. game:respond_rematch
+      await sock.trigger(
+        "game:respond_rematch",
+        { roomCode: "COR2", accept: false },
+        () => {},
+      );
+      expect(mockGameService.respondRematch).toHaveBeenCalledWith(
+        "COR2",
+        sock.id,
+        false,
+        expect.any(String),
+      );
     });
   });
 });

@@ -12,16 +12,16 @@ import type {
   PuzzleAnalysisResult,
   IClock,
 } from '@fun-chess/shared';
-import { createSafeChess } from '@fun-chess/shared';
+import { createSafeChess, SystemClock } from '@fun-chess/shared';
 import { validatePuzzleMove } from '../engine/puzzle_validator';
 import { calculatePuzzleStars } from '../engine/star_calculator';
 import { analyzePuzzleSolution } from '../engine/puzzle_analysis_engine';
 import { usePuzzleHints } from './usePuzzleHints';
 import { usePuzzleReplay, type ReplayStep } from './usePuzzleReplay';
+import { usePuzzleAnimationState } from './usePuzzleAnimationState';
 import { useAudio } from '../../../composables/useAudio';
-import { logger } from '../../../platform/telemetry/index.js';
-import { useInjectClock } from '../../../platform/di';
-import { SystemClock } from '../../../platform/time';
+import { logger } from '@/platform/telemetry';
+import { useInjectClock } from '@/platform/di';
 
 export type { ReplayStep };
 
@@ -38,7 +38,7 @@ export interface UsePuzzleRunnerOptions {
 
 /**
  * Primary game loop orchestrator for puzzle gameplay sessions.
- * Decomposed and composed using `usePuzzleHints` and `usePuzzleReplay`.
+ * Decomposed and composed using `usePuzzleHints`, `usePuzzleReplay`, and `usePuzzleAnimationState` (MAJ-021).
  */
 export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
   const clock = options.clock ?? (getCurrentInstance() ? useInjectClock() : new SystemClock());
@@ -57,33 +57,19 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
 
   const isCompleted = ref<boolean>(false);
   const isSolvedSuccessfully = ref<boolean>(false);
-  const isWaitingForBot = ref<boolean>(false);
-  const isShaking = ref<boolean>(false);
 
   const mistakesCount = ref<number>(0);
   const feedbackMessage = ref<string | null>(null);
   const lastMistakeRefutation = ref<PlayerMistakeRefutation | null>(null);
   const attemptResult = ref<PuzzleAttemptResult>('unsolved');
 
-  // Timers
-  let botTimer: ReturnType<typeof setTimeout> | null = null;
-  let shakeTimer: ReturnType<typeof setTimeout> | null = null;
-
-  function clearTimers(): void {
-    if (botTimer) {
-      clearTimeout(botTimer);
-      botTimer = null;
-    }
-    if (shakeTimer) {
-      clearTimeout(shakeTimer);
-      shakeTimer = null;
-    }
-  }
+  // Composed Subsystems
+  const anim = usePuzzleAnimationState();
 
   const playerColor = computed<PieceColor>(() => currentPuzzle.value?.playerColor || 'w');
 
   const isPlayerTurn = computed<boolean>(() => {
-    return !isCompleted.value && !isWaitingForBot.value;
+    return !isCompleted.value && !anim.isWaitingForBot.value;
   });
 
   const analysis = computed<PuzzleAnalysisResult | null>(() => {
@@ -91,14 +77,12 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     return analyzePuzzleSolution(currentPuzzle.value);
   });
 
-  // Composed: Progressive Hints Subsystem
   const hints = usePuzzleHints({
     puzzle: currentPuzzle,
     currentMoveIndex,
     currentFen,
   });
 
-  // Composed: Move Replay & Board Inspection Subsystem
   const replay = usePuzzleReplay({
     puzzle: currentPuzzle,
     analysis,
@@ -127,6 +111,10 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     return lastMove.value;
   });
 
+  function clearTimers(): void {
+    anim.clearAnimationTimers();
+  }
+
   function recalculateLegalMoves(fenStr: string, sq: Square | null): Square[] {
     if (!sq) return [];
     try {
@@ -154,18 +142,17 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     lastMove.value = null;
     isCompleted.value = false;
     isSolvedSuccessfully.value = false;
-    isWaitingForBot.value = false;
-    isShaking.value = false;
     mistakesCount.value = 0;
     feedbackMessage.value = null;
     lastMistakeRefutation.value = null;
     attemptResult.value = 'unsolved';
+    anim.resetAnimationState();
     replay.resetReplay();
     hints.resetHints();
   }
 
   function selectSquare(sq: Square) {
-    if (isCompleted.value || isWaitingForBot.value) return;
+    if (isCompleted.value || anim.isWaitingForBot.value) return;
 
     if (selectedSquare.value === sq) {
       selectedSquare.value = null;
@@ -178,7 +165,6 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
       return;
     }
 
-    // Check if clicked square has player's piece
     try {
       const chess = createSafeChess(currentFen.value);
       const piece = chess.get(sq as ChessSquare);
@@ -204,23 +190,13 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
 
   function handleFailedPuzzleMove(outcome: MoveValidationOutcome): void {
     mistakesCount.value += 1;
-    isShaking.value = true;
     feedbackMessage.value = outcome.feedback;
     lastMistakeRefutation.value = outcome.refutation ?? null;
     selectedSquare.value = null;
     legalMoves.value = [];
     if (autoAudio) audio.playError();
+    anim.triggerShake(400);
 
-    if (shakeTimer) {
-      clearTimeout(shakeTimer);
-      shakeTimer = null;
-    }
-    shakeTimer = setTimeout(() => {
-      isShaking.value = false;
-      shakeTimer = null;
-    }, 400);
-
-    // Non-punitive: auto-reveal Tier 1 nudge if child makes 2 mistakes
     if (currentPuzzle.value) {
       hints.checkAutoNudge(
         mistakesCount.value,
@@ -263,17 +239,10 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
   }
 
   function scheduleOpponentReply(outcome: MoveValidationOutcome): void {
-    // Advance to interim FEN immediately so player sees their piece move without visual lag
     if (outcome.intermediateFen) {
       currentFen.value = outcome.intermediateFen;
     }
-    isWaitingForBot.value = true;
-    if (botTimer) {
-      clearTimeout(botTimer);
-      botTimer = null;
-    }
-    botTimer = setTimeout(() => {
-      botTimer = null;
+    anim.scheduleBotReply(() => {
       if (!currentPuzzle.value) return;
       currentFen.value = outcome.nextFen;
       currentMoveIndex.value = outcome.nextMoveIndex;
@@ -281,9 +250,6 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
         lastMove.value = { from: outcome.botReplyMove.from, to: outcome.botReplyMove.to };
         if (autoAudio) audio.playMove();
       }
-      isWaitingForBot.value = false;
-
-      // Reset progressive hint for next user ply
       hints.resetHints();
     }, 450);
   }
@@ -307,7 +273,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
   }
 
   function applyPlayerMove(move: PlayerMoveAction): void {
-    if (!currentPuzzle.value || isCompleted.value || isWaitingForBot.value) return;
+    if (!currentPuzzle.value || isCompleted.value || anim.isWaitingForBot.value) return;
 
     const outcome = validatePuzzleMove(
       currentPuzzle.value,
@@ -343,11 +309,10 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     lastMove.value = null;
     isCompleted.value = false;
     isSolvedSuccessfully.value = false;
-    isWaitingForBot.value = false;
-    isShaking.value = false;
     mistakesCount.value = 0;
     feedbackMessage.value = null;
     lastMistakeRefutation.value = null;
+    anim.resetAnimationState();
     replay.resetReplay();
     hints.resetHints();
   }
@@ -366,7 +331,6 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     });
   }
 
-  // Auto-load initial puzzle if supplied
   if (targetInitialPuzzle) {
     loadPuzzle(targetInitialPuzzle);
   }
@@ -383,9 +347,9 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     displayedLastMove: readonly(displayedLastMove),
     isCompleted: readonly(isCompleted),
     isSolvedSuccessfully: readonly(isSolvedSuccessfully),
-    isWaitingForBot: readonly(isWaitingForBot),
+    isWaitingForBot: anim.isWaitingForBot,
     isPlayerTurn,
-    isShaking: readonly(isShaking),
+    isShaking: anim.isShaking,
     mistakesCount: readonly(mistakesCount),
     feedbackMessage: readonly(feedbackMessage),
     lastMistakeRefutation: readonly(lastMistakeRefutation),
@@ -416,6 +380,7 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     setReplayStep: replay.goToReplayStep,
     toggleInspectBoard: replay.toggleInspectBoard,
     replay,
+    animation: anim,
     clock,
     clearTimers,
     loadPuzzle,
@@ -428,3 +393,5 @@ export function usePuzzleRunner(options: UsePuzzleRunnerOptions = {}) {
     reset,
   };
 }
+
+export type UsePuzzleRunnerReturn = ReturnType<typeof usePuzzleRunner>;

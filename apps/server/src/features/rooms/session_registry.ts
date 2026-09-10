@@ -1,4 +1,5 @@
 import { PieceColor } from "@fun-chess/shared";
+import type { StorageQueryOptions, StorageMutationOptions } from "./room.store.js";
 
 /**
  * Server-private session record.
@@ -28,19 +29,23 @@ export interface SessionRecord {
 /**
  * Interface contract for server-side private session storage.
  * Adheres to Architectural Patterns Rule 1: I/O Isolation.
+ * Supports AbortSignal query cancellation across all asynchronous methods (ENH-015).
  */
 export interface SessionRegistry {
   /**
    * Creates and registers a new private session token for a player in a room.
    */
-  createSession(params: {
-    playerId: string;
-    roomCode: string;
-    color: PieceColor;
-    isHost: boolean;
-    socketId: string;
-    ttlMs?: number;
-  }): Promise<SessionRecord>;
+  createSession(
+    params: {
+      playerId: string;
+      roomCode: string;
+      color: PieceColor;
+      isHost: boolean;
+      socketId: string;
+      ttlMs?: number;
+    },
+    options?: StorageMutationOptions,
+  ): Promise<SessionRecord>;
 
   /**
    * Validates a session token for reconnection.
@@ -50,13 +55,17 @@ export interface SessionRegistry {
     sessionToken: string,
     roomCode: string,
     playerId: string,
+    options?: StorageQueryOptions,
   ): Promise<SessionRecord | null>;
 
   /**
    * Retrieves an active session record by its token.
    * Returns null if the session does not exist or has expired.
    */
-  getSessionByToken(sessionToken: string): Promise<SessionRecord | null>;
+  getSessionByToken(
+    sessionToken: string,
+    options?: StorageQueryOptions,
+  ): Promise<SessionRecord | null>;
 
   /**
    * Retrieves the active session token for a player in a room.
@@ -65,6 +74,7 @@ export interface SessionRegistry {
   getSessionTokenForPlayer(
     roomCode: string,
     playerId: string,
+    options?: StorageQueryOptions,
   ): Promise<string | null>;
 
   /**
@@ -75,29 +85,42 @@ export interface SessionRegistry {
     sessionToken: string,
     newSocketId: string,
     extensionTtlMs?: number,
+    options?: StorageMutationOptions,
   ): Promise<void>;
 
   /**
    * Revokes and deletes a specific session token.
    */
-  deleteSession(sessionToken: string): Promise<boolean>;
+  deleteSession(
+    sessionToken: string,
+    options?: StorageMutationOptions,
+  ): Promise<boolean>;
 
   /**
    * Deletes a player's session token from a specific room (e.g. when a guest leaves).
    * Returns true if a session was found and deleted, false otherwise.
    */
-  deleteSessionForPlayer(roomCode: string, playerId: string): Promise<boolean>;
+  deleteSessionForPlayer(
+    roomCode: string,
+    playerId: string,
+    options?: StorageMutationOptions,
+  ): Promise<boolean>;
 
   /**
    * Deletes all sessions associated with a specific room code (cascade delete on room destruction).
    * Returns the count of deleted sessions.
    */
-  deleteSessionsForRoom(roomCode: string): Promise<number>;
+  deleteSessionsForRoom(
+    roomCode: string,
+    options?: StorageMutationOptions,
+  ): Promise<number>;
 
   /**
    * Purges all expired sessions past their expiresAt threshold.
    */
-  cleanupExpiredSessions(): Promise<number>;
+  cleanupExpiredSessions(
+    options?: StorageMutationOptions,
+  ): Promise<number>;
 
   /**
    * Updates the assigned piece color for a player's session (e.g. on rematch color inversion).
@@ -106,12 +129,15 @@ export interface SessionRegistry {
     roomCode: string,
     playerId: string,
     newColor: PieceColor,
+    options?: StorageMutationOptions,
   ): Promise<void>;
 
   /**
    * Completely clears all sessions (for graceful shutdown and test isolation).
    */
-  clear(): Promise<void>;
+  clear(
+    options?: StorageMutationOptions,
+  ): Promise<void>;
 }
 
 export type ISessionRegistry = SessionRegistry;

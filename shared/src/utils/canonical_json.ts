@@ -7,6 +7,11 @@
  */
 
 /**
+ * Maximum recursion depth ceiling for canonical JSON serialization to prevent call stack exhaustion (MAJ-006).
+ */
+export const MAX_CANONICAL_JSON_DEPTH = 64;
+
+/**
  * Serializes any JavaScript value to a deterministic, canonical JSON string
  * conforming to RFC 8785 (JSON Canonicalization Scheme).
  *
@@ -17,22 +22,25 @@
  * 4. In arrays, serialize undefined/symbol/function as null.
  * 5. Format Date instances deterministically as ISO strings (JSON.stringify(d.toISOString())).
  * 6. Deterministic primitive formatting.
+ * 7. WeakSet cycle tracking to detect and reject circular references with TypeError (MAJ-006).
+ * 8. Recursion depth ceiling (64 levels) to reject deeply nested payloads with RangeError (MAJ-006).
  *
  * @param value - Arbitrary JavaScript value to serialize
  * @returns Deterministic, canonical JSON string
  */
 export function canonicalJsonStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value) ?? "null";
+  return stringifyInternal(value, 0, new WeakSet<object>());
+}
+
+function stringifyInternal(value: unknown, depth: number, seen: WeakSet<object>): string {
+  if (depth > MAX_CANONICAL_JSON_DEPTH) {
+    throw new RangeError(
+      `Maximum canonical JSON depth of ${MAX_CANONICAL_JSON_DEPTH} exceeded in canonicalJsonStringify`,
+    );
   }
 
-  if (Array.isArray(value)) {
-    const elements = value.map((item) =>
-      item === undefined || typeof item === "symbol" || typeof item === "function"
-        ? "null"
-        : canonicalJsonStringify(item),
-    );
-    return `[${elements.join(",")}]`;
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
   }
 
   // Handle Date objects deterministically as ISO string
@@ -40,21 +48,41 @@ export function canonicalJsonStringify(value: unknown): string {
     return JSON.stringify(value.toISOString());
   }
 
-  // Object key sorting in lexicographical Unicode order
-  const obj = value as Record<string, unknown>;
-  const sortedKeys = Object.keys(obj).sort();
-
-  const pairs: string[] = [];
-  for (const key of sortedKeys) {
-    const val = obj[key];
-    // Skip undefined, functions, and symbols per JSON Canonicalization Scheme
-    if (val === undefined || typeof val === "function" || typeof val === "symbol") {
-      continue;
-    }
-    const serializedKey = JSON.stringify(key);
-    const serializedVal = canonicalJsonStringify(val);
-    pairs.push(`${serializedKey}:${serializedVal}`);
+  // WeakSet cycle tracking to prevent unbounded recursion
+  if (seen.has(value)) {
+    throw new TypeError("Converting circular structure to JSON in canonicalJsonStringify");
   }
 
-  return `{${pairs.join(",")}}`;
+  seen.add(value);
+
+  try {
+    if (Array.isArray(value)) {
+      const elements = value.map((item) =>
+        item === undefined || typeof item === "symbol" || typeof item === "function"
+          ? "null"
+          : stringifyInternal(item, depth + 1, seen),
+      );
+      return `[${elements.join(",")}]`;
+    }
+
+    // Object key sorting in lexicographical Unicode order
+    const obj = value as Record<string, unknown>;
+    const sortedKeys = Object.keys(obj).sort();
+
+    const pairs: string[] = [];
+    for (const key of sortedKeys) {
+      const val = obj[key];
+      // Skip undefined, functions, and symbols per JSON Canonicalization Scheme
+      if (val === undefined || typeof val === "function" || typeof val === "symbol") {
+        continue;
+      }
+      const serializedKey = JSON.stringify(key);
+      const serializedVal = stringifyInternal(val, depth + 1, seen);
+      pairs.push(`${serializedKey}:${serializedVal}`);
+    }
+
+    return `{${pairs.join(",")}}`;
+  } finally {
+    seen.delete(value);
+  }
 }

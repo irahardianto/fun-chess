@@ -1,5 +1,6 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
+import { serializeError } from "@fun-chess/shared";
 import { Logger } from "../logger/logger.interface.js";
 import { IFileStorage, NodeFileStorage } from "./file_storage.js";
 import { extractClientIp } from "./ip_utils.js";
@@ -41,12 +42,14 @@ export { extractClientIp };
 /**
  * Checks for path traversal sequences, URL encoding bypasses (%2e%2e),
  * null byte injections (%00, \0), and directory escape boundaries (CRIT-008, MAJ-034).
+ * Propagates correlationId into security warning logs (MIN-009).
  */
 export function checkPathTraversal(
   rootDir: string,
   urlPath: string,
   logger?: Logger,
   clientIp?: string,
+  correlationId?: string,
 ): boolean {
   if (urlPath.includes("\0") || urlPath.toLowerCase().includes("%00")) {
     return true;
@@ -63,6 +66,7 @@ export function checkPathTraversal(
         operation: "static_serve_decode_error",
         path: urlPath,
         clientIp,
+        correlationId,
         error: secErr instanceof Error ? secErr.message : String(secErr),
       });
     }
@@ -72,6 +76,7 @@ export function checkPathTraversal(
       operation: "static_serve_decode_error",
       path: urlPath,
       clientIp,
+      correlationId,
       error: err instanceof Error ? err.message : String(err),
     });
     decodedPath = urlPath;
@@ -103,8 +108,9 @@ export function resolveCandidatePath(
   urlPath: string,
   logger?: Logger,
   clientIp?: string,
+  correlationId?: string,
 ): { sanitizedPath: string; targetFilePath: string; isTraversal: boolean } {
-  const isTraversal = checkPathTraversal(rootDir, urlPath, logger, clientIp);
+  const isTraversal = checkPathTraversal(rootDir, urlPath, logger, clientIp, correlationId);
   const sanitizedPath = path.normalize(urlPath);
   const targetFilePath = path.join(
     rootDir,
@@ -298,12 +304,13 @@ function sendFallbackOrMiss(
     isHead: boolean;
     correlationId?: string;
     acceptHeader: string;
+    startTime: number;
   },
   targetFilePath: string,
   readError: unknown,
   logger?: Logger,
 ): boolean {
-  const { urlPath, isHead, correlationId, acceptHeader } = context;
+  const { urlPath, isHead, correlationId, acceptHeader, startTime } = context;
   const ext = path.extname(urlPath).toLowerCase();
 
   if (
@@ -323,24 +330,27 @@ function sendFallbackOrMiss(
       );
       return true;
     } catch (fallbackErr: unknown) {
+      const duration = Math.round(performance.now() - startTime);
       logger?.error("Failed to send fallback HTML response", {
         operation: "http_request",
         correlationId,
         path: urlPath,
-        error:
-          fallbackErr instanceof Error
-            ? { name: fallbackErr.name, message: fallbackErr.message }
-            : { raw: fallbackErr },
+        duration,
+        durationMs: duration,
+        error: serializeError(fallbackErr),
       });
       return handleServerError(res, isHead);
     }
   }
 
+  const duration = Math.round(performance.now() - startTime);
   logger?.debug("Static file not found and no fallback provided", {
     operation: "http_request",
     targetFilePath,
     correlationId,
-    error: readError instanceof Error ? readError.message : String(readError),
+    duration,
+    durationMs: duration,
+    error: serializeError(readError),
   });
 
   return false;
@@ -356,10 +366,11 @@ async function readAndSendStaticFile(
     isHead: boolean;
     correlationId?: string;
     acceptHeader: string;
+    startTime: number;
   },
   logger?: Logger,
 ): Promise<boolean> {
-  const { urlPath, isHead, correlationId } = context;
+  const { urlPath, isHead, correlationId, startTime } = context;
 
   try {
     const content = await fileStorage.readFile(targetFilePath);
@@ -371,33 +382,29 @@ async function readAndSendStaticFile(
       sendAssetResponse(res, content, contentType, isIndex, isHead);
       return true;
     } catch (sendErr: unknown) {
+      const duration = Math.round(performance.now() - startTime);
       logger?.error("Failed to send static asset response", {
         operation: "http_request",
         correlationId,
         path: urlPath,
-        error:
-          sendErr instanceof Error
-            ? {
-                name: sendErr.name,
-                message: sendErr.message,
-                stack: sendErr.stack,
-              }
-            : { raw: sendErr },
+        duration,
+        durationMs: duration,
+        error: serializeError(sendErr),
       });
       return handleServerError(res, isHead);
     }
   } catch (err: unknown) {
     const errCode = (err as { code?: string })?.code;
     if (errCode && errCode !== "ENOENT") {
+      const duration = Math.round(performance.now() - startTime);
       logger?.error("Failed to read static file", {
         operation: "http_request",
         correlationId,
         path: urlPath,
         targetFilePath,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        duration,
+        durationMs: duration,
+        error: serializeError(err),
       });
       return handleServerError(res, isHead);
     }
@@ -443,7 +450,7 @@ export async function serveStaticFile(
     sanitizedPath,
     targetFilePath: initialTarget,
     isTraversal,
-  } = resolveCandidatePath(rootDir, urlPath, logger, clientIp);
+  } = resolveCandidatePath(rootDir, urlPath, logger, clientIp, correlationId);
 
   if (isTraversal) {
     const duration = Math.round(performance.now() - startTime);
@@ -470,19 +477,15 @@ export async function serveStaticFile(
   );
 
   if (statResult.status === "error") {
+    const duration = Math.round(performance.now() - startTime);
     logger?.error("Failed to stat static file", {
       operation: "http_request",
       correlationId,
       path: urlPath,
       targetFilePath: initialTarget,
-      error:
-        statResult.error instanceof Error
-          ? {
-              name: statResult.error.name,
-              message: statResult.error.message,
-              stack: statResult.error.stack,
-            }
-          : { raw: statResult.error },
+      duration,
+      durationMs: duration,
+      error: serializeError(statResult.error),
     });
     return handleServerError(res, isHead);
   }
@@ -516,19 +519,15 @@ export async function serveStaticFile(
   }
 
   if (canonicalResult.status === "error") {
+    const duration = Math.round(performance.now() - startTime);
     logger?.error("Failed to resolve canonical path for static file", {
       operation: "http_request",
       correlationId,
       path: urlPath,
       targetFilePath,
-      error:
-        canonicalResult.error instanceof Error
-          ? {
-              name: canonicalResult.error.name,
-              message: canonicalResult.error.message,
-              stack: canonicalResult.error.stack,
-            }
-          : { raw: canonicalResult.error },
+      duration,
+      durationMs: duration,
+      error: serializeError(canonicalResult.error),
     });
     return handleServerError(res, isHead);
   }
@@ -539,7 +538,7 @@ export async function serveStaticFile(
     fileStorage,
     targetFilePath,
     options,
-    { urlPath, isHead, correlationId, acceptHeader },
+    { urlPath, isHead, correlationId, acceptHeader, startTime },
     logger,
   );
 }

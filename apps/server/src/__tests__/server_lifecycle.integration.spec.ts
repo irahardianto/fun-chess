@@ -5,8 +5,8 @@ import { createHttpServer } from "../platform/http/http_server.js";
 import { ShutdownCoordinator } from "../platform/lifecycle/shutdown_coordinator.js";
 import { NullLogger } from "../platform/logger/null_logger.js";
 import { TypedSocketServer } from "../platform/socket/socket_server.js";
-import { MockRoomStore } from "../features/rooms/mock_room.store.js";
-import { RelayAddressService } from "../features/lan/relay_address.service.js";
+import { MockRoomStore } from "../features/rooms/index.js";
+import { RelayAddressService } from "../features/lan/index.js";
 
 interface ErrorResponseBody {
   status: string;

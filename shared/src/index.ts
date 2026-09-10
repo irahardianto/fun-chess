@@ -15,6 +15,7 @@ export * from "./contracts/rating_engine.js";
 export * from "./contracts/sync.js";
 export * from "./contracts/avatar.js";
 export * from "./contracts/system.js";
+export * from "./contracts/themes.js";
 
 // Sync Codec & Algorithm Utilities
 export * from "./utils/checksum_crc32.js";
@@ -31,3 +32,6 @@ export * from "./utils/star_calculator.js";
 export * from "./utils/coordinates.js";
 export * from "./utils/system_clock.js";
 export * from "./utils/normalization.js";
+export * from "./utils/session_token.js";
+export * from "./utils/error_utils.js";
+export * from "./utils/url.js";

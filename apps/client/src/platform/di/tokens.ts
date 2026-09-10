@@ -3,7 +3,8 @@ import type { IApiClient } from '../api/api_client.interface';
 import type { KeyValueStorage } from '../storage/key_value_storage';
 import type { IAudioService } from '../audio/audio.interface';
 import type { ILogger } from '../telemetry';
-import type { IFileDownloader, IHapticsService, IWebRtcDiscovery, IClipboardService, ICameraService } from '../hardware';
+import type { IFileDownloader, IHapticsService, IWebRtcDiscovery, IClipboardService, ICameraService, INetworkMonitor } from '../hardware';
+import type { TypedSocket } from '../socket/socket_client';
 import type { ScenarioProgressStore, PuzzleProgressStore, ProgressStorage, IClock } from '@fun-chess/shared';
 
 export interface AudioContextValue {
@@ -31,6 +32,8 @@ export type {
   IWebRtcDiscovery,
   IClipboardService,
   ICameraService,
+  INetworkMonitor,
+  TypedSocket,
   IClock,
 };
 
@@ -51,4 +54,6 @@ export const HAPTICS_KEY: InjectionKey<IHapticsService> = Symbol('HAPTICS');
 export const WEBRTC_DISCOVERY_KEY: InjectionKey<IWebRtcDiscovery> = Symbol('WEBRTC_DISCOVERY');
 export const CLIPBOARD_SERVICE_KEY: InjectionKey<IClipboardService> = Symbol('CLIPBOARD_SERVICE');
 export const CAMERA_SERVICE_KEY: InjectionKey<ICameraService> = Symbol('CAMERA_SERVICE');
+export const NETWORK_MONITOR_KEY: InjectionKey<INetworkMonitor> = Symbol('NETWORK_MONITOR');
+export const SOCKET_CLIENT_KEY: InjectionKey<TypedSocket> = Symbol('SOCKET_CLIENT');
 

@@ -10,7 +10,6 @@ import {
   calculateMaterialAndCaptures,
   getKingSquare,
 } from "@fun-chess/shared";
-import { type Logger, defaultLogger } from "../../platform/logger/index.js";
 
 export interface ValidationSuccess {
   success: true;
@@ -51,20 +50,11 @@ export class ChessEngine {
     currentFen: string,
     move: MovePayload,
     expectedTurn: PieceColor,
-    logger: Logger = defaultLogger,
   ): MoveValidationResult {
     let chess: Chess;
     try {
       chess = new Chess(currentFen);
-    } catch (err) {
-      logger.debug("FEN parsing failed during move validation", {
-        operation: "chess_engine_validate_move_fen",
-        currentFen,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message }
-            : { raw: err },
-      });
+    } catch {
       return { success: false, error: "Invalid board FEN string" };
     }
 
@@ -85,14 +75,6 @@ export class ChessEngine {
 
       return { success: true, chess, moveResultObj: result };
     } catch (err: unknown) {
-      logger.debug("Move application threw exception in chess.js", {
-        operation: "chess_engine_move_exception",
-        move,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message }
-            : { raw: err },
-      });
       return {
         success: false,
         error: (err as Error).message || "Invalid move coordinates",
@@ -328,12 +310,7 @@ export class ChessEngine {
     try {
       const chess = new Chess(fen);
       return this.getKingSquare(chess, color);
-    } catch (err) {
-      defaultLogger.debug("FEN parse failure in findKingSquare", {
-        operation: "chess_find_king_square",
-        color,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
       return null;
     }
   }

@@ -163,4 +163,39 @@ describe('usePuzzleRush Composable', () => {
     expect(endCall![1].correlationId).toBe(correlationId);
     expect(typeof endCall![1].durationMs).toBe('number');
   });
+
+  it('uses injected IClock for elapsed calculations and timing (MAJ-012)', async () => {
+    let mockCurrentTime = 1000000;
+    const mockClock = {
+      now: vi.fn(() => mockCurrentTime),
+    };
+
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      fatal: vi.fn(),
+      child: vi.fn(),
+    };
+
+    const rush = usePuzzleRush({
+      customStore: memoryStore,
+      clock: mockClock,
+      logger: mockLogger as any,
+    });
+
+    rush.startRun('puzzle_rush');
+    mockCurrentTime += 3000; // 3 seconds elapsed
+
+    await rush.handleRunnerSolved();
+    const solveCall = mockLogger.info.mock.calls.find(
+      (c) => c[0] === 'Puzzle solved during rush run'
+    );
+    expect(solveCall).toBeDefined();
+    expect(solveCall![1].solveDurationMs).toBe(3000);
+    expect(solveCall![1].durationMs).toBe(3000);
+
+    rush.stopRun();
+  });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   LocalStoragePuzzleProgressStore,
   PUZZLE_PROGRESS_STORAGE_KEY,
-} from '../local_storage_puzzle_store';
+} from '../local_storage_puzzle_progress.store';
 
 describe('LocalStoragePuzzleProgressStore', () => {
   let store: LocalStoragePuzzleProgressStore;

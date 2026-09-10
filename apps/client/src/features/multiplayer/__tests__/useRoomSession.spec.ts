@@ -51,6 +51,7 @@ describe('useRoomSession composable', () => {
   }
 
   function createTestPlayer(overrides: Partial<Player> = {}): Player {
+    const now = Date.now();
     return {
       id: UUID_P1,
       socketId: 'mock_sock_p1',
@@ -59,7 +60,9 @@ describe('useRoomSession composable', () => {
       color: 'w',
       isHost: true,
       isConnected: true,
-      connectedAt: Date.now(),
+      connectedAt: now,
+      createdAt: now,
+      updatedAt: now,
       ...overrides,
     };
   }
@@ -511,7 +514,7 @@ describe('useRoomSession composable', () => {
       expect(session.isSpectator.value).toBe(false);
 
       // Spectator
-      const spectator: Player = {
+      const spectator: Player = createTestPlayer({
         id: UUID_SPEC,
         socketId: 'mock_spec_1',
         name: 'Charlie',
@@ -519,8 +522,7 @@ describe('useRoomSession composable', () => {
         color: 'w',
         isHost: false,
         isConnected: true,
-        connectedAt: Date.now(),
-      };
+      });
       room.spectators.push(spectator);
       session.currentPlayer.value = spectator;
 
@@ -565,7 +567,7 @@ describe('useRoomSession composable', () => {
     it('does NOT transition room status to paused_disconnect when spectator drops', () => {
       const session = useRoomSession();
       const room = createTestRoom({ status: 'playing' });
-      const spectator: Player = {
+      const spectator: Player = createTestPlayer({
         id: UUID_SPEC,
         socketId: 'mock_spec_1',
         name: 'Charlie',
@@ -573,8 +575,7 @@ describe('useRoomSession composable', () => {
         color: 'w',
         isHost: false,
         isConnected: true,
-        connectedAt: Date.now(),
-      };
+      });
       room.spectators.push(spectator);
       session.currentRoom.value = room;
       session.currentPlayer.value = room.whitePlayer;

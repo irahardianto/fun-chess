@@ -849,7 +849,12 @@ describe('QrCodeModal.vue', () => {
   describe('Responsive Design for Narrow Screens (UX-WARN-04)', () => {
     it('defines responsive styles with flex-wrap: wrap on .ip-input-row for viewports <= 480px', () => {
       const sfcPath = path.resolve(__dirname, '../QrCodeModal.vue');
-      const content = fs.readFileSync(sfcPath, 'utf-8');
+      let content = fs.readFileSync(sfcPath, 'utf-8');
+      const srcMatch = content.match(/<style[^>]*src=["']([^"']+)["']/);
+      if (srcMatch && srcMatch[1]) {
+        const cssPath = path.resolve(path.dirname(sfcPath), srcMatch[1]);
+        content = fs.readFileSync(cssPath, 'utf-8');
+      }
 
       expect(content).toContain('@media (max-width: 480px)');
       expect(content).toMatch(/@media\s*\(max-width:\s*480px\)\s*\{[^}]*\.ip-input-row\s*\{[^}]*flex-wrap:\s*wrap;/s);
@@ -871,6 +876,28 @@ describe('QrCodeModal.vue', () => {
       const applyBtn = ipRow?.querySelector('button');
       expect(applyBtn).not.toBeNull();
       expect(applyBtn?.textContent).toContain('Apply IP');
+    });
+
+    it('enforces defensive controls and screen-reader accessibility on IP input (ENH-002)', async () => {
+      wrapper = mount(QrCodeModal, {
+        props: {
+          modelValue: true,
+          roomCode: 'DFNS',
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+      const input = document.body.querySelector('[data-testid="qr-custom-ip-input"]') as HTMLInputElement;
+      expect(input).not.toBeNull();
+      expect(input.getAttribute('maxlength')).toBe('15');
+      expect(input.getAttribute('inputmode')).toBe('decimal');
+      expect(input.getAttribute('autocomplete')).toBe('off');
+      expect(input.getAttribute('spellcheck')).toBe('false');
+
+      const label = document.body.querySelector('label[for="qr-custom-ip-input"]');
+      expect(label).not.toBeNull();
+      expect(label?.classList.contains('sr-only')).toBe(true);
+      expect(label?.textContent?.trim()).toBe('Enter host Wi-Fi IP address');
     });
   });
 });

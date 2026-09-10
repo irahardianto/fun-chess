@@ -1,7 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Chess } from 'chess.js';
 import type { Puzzle, PuzzleAnalysisResult } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry';
 import {
   THEME_RULES_OF_THUMB,
   PIECE_DISPLAY_NAMES,
@@ -90,19 +89,11 @@ describe('Pedagogical Rules of Thumb & Mistake Refutations', () => {
     });
 
     it('handles corrupt move coordinates and engine exceptions gracefully without throwing', () => {
-      const debugSpy = vi.spyOn(logger, 'debug');
       const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       // Completely corrupt square coordinates that bypass TypeScript at runtime
       expect(generateMistakeRefutation(fen, { from: 'z9' as any, to: 'z10' as any })).toBeNull();
-      expect(debugSpy).toHaveBeenCalledWith(
-        'Illegal player move in generateMistakeRefutation',
-        expect.objectContaining({
-          operation: 'refutation_player_move',
-        })
-      );
       // Illegal move in position
       expect(generateMistakeRefutation(fen, { from: 'e1', to: 'e8' })).toBeNull();
-      debugSpy.mockRestore();
     });
 
     it('returns checkmate refutation for blunders allowing checkmate', () => {
@@ -156,7 +147,6 @@ describe('Pedagogical Rules of Thumb & Mistake Refutations', () => {
     });
 
     it('handles corrupt or illegal moves in puzzle solution gracefully', () => {
-      const debugSpy = vi.spyOn(logger, 'debug');
       const corruptMovesPuzzle: Puzzle = {
         ...samplePuzzle,
         moves: ['z9z8', 'e1e8'],
@@ -166,14 +156,6 @@ describe('Pedagogical Rules of Thumb & Mistake Refutations', () => {
       expect(steps[0]?.moveSan).toBe('z9z8');
       expect(steps[0]?.moveUci).toBe('z9z8');
       expect(steps[0]?.explanation).toBeDefined();
-      expect(debugSpy).toHaveBeenCalledWith(
-        'Illegal solution move in generateStepBreakdowns',
-        expect.objectContaining({
-          operation: 'step_breakdowns_move',
-          moveUci: 'z9z8',
-        })
-      );
-      debugSpy.mockRestore();
     });
 
     it('synthesizes step explanations for player checkmate', () => {

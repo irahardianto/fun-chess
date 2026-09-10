@@ -176,10 +176,18 @@ export class FetchApiClient implements IApiClient {
       try {
         return await response.json();
       } catch (err) {
-        this.logger.warn('Failed to parse JSON response body', {
+        this.logger.warn('Failed to parse JSON response body, attempting raw text fallback', {
           operation: 'http_parse_body',
           error: err instanceof Error ? err.message : String(err),
         });
+        if (typeof (response as { text?: () => Promise<string> }).text === 'function') {
+          try {
+            const rawText = await (response as { text: () => Promise<string> }).text();
+            return (rawText ?? null) as T;
+          } catch {
+            return null as T;
+          }
+        }
         return null as T;
       }
     }

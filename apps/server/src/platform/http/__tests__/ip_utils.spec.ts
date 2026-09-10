@@ -13,10 +13,10 @@ describe("ip_utils", () => {
       expect(normalizeIp("  192.168.1.10  ")).toBe("192.168.1.10");
     });
 
-    it("falls back to 127.0.0.1 on undefined or empty inputs", () => {
-      expect(normalizeIp(undefined)).toBe("127.0.0.1");
-      expect(normalizeIp("")).toBe("127.0.0.1");
-      expect(normalizeIp("   ")).toBe("127.0.0.1");
+    it("fails closed to unknown on undefined or empty inputs (CRIT-001)", () => {
+      expect(normalizeIp(undefined)).toBe("unknown");
+      expect(normalizeIp("")).toBe("unknown");
+      expect(normalizeIp("   ")).toBe("unknown");
     });
 
     it("leaves standard IPv4 and IPv6 addresses intact", () => {
@@ -24,11 +24,11 @@ describe("ip_utils", () => {
       expect(normalizeIp("2001:db8::1")).toBe("2001:db8::1");
     });
 
-    it("falls back to 127.0.0.1 for invalid IP syntax via net.isIP (MIN-002)", () => {
-      expect(normalizeIp("invalid.ip.string")).toBe("127.0.0.1");
-      expect(normalizeIp("999.999.999.999")).toBe("127.0.0.1");
-      expect(normalizeIp("1.2.3.4.5")).toBe("127.0.0.1");
-      expect(normalizeIp("hello world")).toBe("127.0.0.1");
+    it("fails closed to unknown for invalid IP syntax via net.isIP (MIN-002, CRIT-001)", () => {
+      expect(normalizeIp("invalid.ip.string")).toBe("unknown");
+      expect(normalizeIp("999.999.999.999")).toBe("unknown");
+      expect(normalizeIp("1.2.3.4.5")).toBe("unknown");
+      expect(normalizeIp("hello world")).toBe("unknown");
     });
   });
 
@@ -103,9 +103,9 @@ describe("ip_utils", () => {
       expect(ip).toBe("203.0.113.88");
     });
 
-    it("returns 127.0.0.1 safely on null or empty source", () => {
-      expect(extractClientIp(null)).toBe("127.0.0.1");
-      expect(extractClientIp({})).toBe("127.0.0.1");
+    it("fails closed to unknown on null or empty source (CRIT-001)", () => {
+      expect(extractClientIp(null)).toBe("unknown");
+      expect(extractClientIp({})).toBe("unknown");
     });
   });
 });

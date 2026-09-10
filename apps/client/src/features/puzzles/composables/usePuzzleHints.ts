@@ -61,17 +61,17 @@ export function usePuzzleHints(options: UsePuzzleHintsOptions = {}) {
     moveIndex?: number,
     fen?: string
   ): ExtendedHintData | null {
-    const p = targetPuzzle !== undefined ? targetPuzzle : options.puzzle?.value;
-    if (!p) return null;
+    const effectivePuzzle = targetPuzzle !== undefined ? targetPuzzle : options.puzzle?.value;
+    if (!effectivePuzzle) return null;
 
-    const mIdx = moveIndex !== undefined ? moveIndex : (options.currentMoveIndex?.value ?? 0);
-    const f = fen !== undefined ? fen : (options.currentFen?.value ?? p.fen);
+    const effectiveMoveIndex = moveIndex !== undefined ? moveIndex : (options.currentMoveIndex?.value ?? 0);
+    const effectiveFen = fen !== undefined ? fen : (options.currentFen?.value ?? effectivePuzzle.fen);
 
     const nextLevel = Math.min(3, currentHintLevel.value + 1) as HintLevel;
     currentHintLevel.value = nextLevel;
     hintsUsedCount.value = Math.max(hintsUsedCount.value, nextLevel);
 
-    const hint = generateProgressiveHint(p, mIdx, f, nextLevel);
+    const hint = generateProgressiveHint(effectivePuzzle, effectiveMoveIndex, effectiveFen, nextLevel);
     activeHint.value = hint;
     return hint;
   }
@@ -116,17 +116,17 @@ export function usePuzzleHints(options: UsePuzzleHintsOptions = {}) {
     moveIndex?: number,
     fen?: string
   ): ExtendedHintData | null {
-    const p = targetPuzzle !== undefined ? targetPuzzle : options.puzzle?.value;
+    const effectivePuzzle = targetPuzzle !== undefined ? targetPuzzle : options.puzzle?.value;
     currentHintLevel.value = level;
     hintsUsedCount.value = Math.max(hintsUsedCount.value, level);
-    if (level === 0 || !p) {
+    if (level === 0 || !effectivePuzzle) {
       activeHint.value = null;
       return null;
     }
 
-    const mIdx = moveIndex !== undefined ? moveIndex : (options.currentMoveIndex?.value ?? 0);
-    const f = fen !== undefined ? fen : (options.currentFen?.value ?? p.fen);
-    const hint = generateProgressiveHint(p, mIdx, f, level);
+    const effectiveMoveIndex = moveIndex !== undefined ? moveIndex : (options.currentMoveIndex?.value ?? 0);
+    const effectiveFen = fen !== undefined ? fen : (options.currentFen?.value ?? effectivePuzzle.fen);
+    const hint = generateProgressiveHint(effectivePuzzle, effectiveMoveIndex, effectiveFen, level);
     activeHint.value = hint;
     return hint;
   }

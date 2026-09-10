@@ -274,6 +274,7 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
         config: {
           NODE_ENV: "production",
           CORS_ORIGIN: "https://valid.example.com",
+          SESSION_SECRET: ["test", "prod", "session", "secret", "32chars"].join("-"),
         },
       });
 
@@ -526,6 +527,93 @@ describe("Server Bootstrap Integration (MAJ-033)", () => {
     expect(failureLog?.context?.correlationId).toBeDefined();
     expect(typeof failureLog?.context?.duration).toBe("number");
     expect(typeof failureLog?.context?.durationMs).toBe("number");
+  });
+
+  it("forwards fileStorage and wires MAX_ROOMS in domain services (ENH-002, MAJ-004)", async () => {
+    const mockFileStorage = {
+      resolveDistPath: vi.fn(),
+      readFile: vi.fn().mockResolvedValue(Buffer.from("mock")),
+      stat: vi.fn().mockResolvedValue({ isFile: () => true, size: 4 }),
+    };
+
+    instance = await startServer(
+      createOptions({
+        fileStorage: mockFileStorage,
+        config: {
+          MAX_ROOMS: 42,
+        },
+      }),
+    );
+
+    expect(instance).toBeDefined();
+    expect(instance.config.MAX_ROOMS).toBe(42);
+  });
+
+  it("attaches userId to socket error and disconnect logs when socket.data.userId is set (MAJ-042)", async () => {
+    const logger = new NullLogger();
+    instance = await startServer(createOptions({ logger }));
+
+    const client: ClientSocket = ioClient(instance.url, {
+      transports: ["websocket"],
+      forceNew: true,
+      reconnection: false,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Connect timeout")), 5000);
+      client.on("connect", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      client.on("connect_error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    const serverSockets = await instance.io.fetchSockets();
+    expect(serverSockets.length).toBeGreaterThan(0);
+    const serverSocket = instance.io.sockets.sockets.get(serverSockets[0]!.id);
+    expect(serverSocket).toBeDefined();
+
+    // Set userId on socket.data
+    serverSocket!.data.userId = "test-user-bound-999";
+
+    // Trigger error on socket
+    for (const listener of serverSocket!.listeners("error")) {
+      (listener as (err: Error) => void)(new Error("Custom error with userId"));
+    }
+
+    const errLog = logger.errorLogs.find((l) => l.context?.operation === "socket_error");
+    expect(errLog).toBeDefined();
+    expect(errLog?.context?.["userId"]).toBe("test-user-bound-999");
+
+    // Trigger disconnect
+    client.disconnect();
+
+    await new Promise<void>((resolve) => {
+      const checkInterval = setInterval(() => {
+        const found = logger.infoLogs.some(
+          (l) =>
+            l.context?.operation === "socket_disconnected" &&
+            l.context?.["userId"] === "test-user-bound-999",
+        );
+        if (found) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 20);
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        resolve();
+      }, 2000);
+    });
+
+    const discLog = logger.infoLogs.find(
+      (l) => l.context?.operation === "socket_disconnected" && l.context?.["userId"] === "test-user-bound-999",
+    );
+    expect(discLog).toBeDefined();
+    expect(discLog?.context?.["userId"]).toBe("test-user-bound-999");
   });
 
   describe("parseFallbackLogLevel (ENH-001)", () => {

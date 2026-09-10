@@ -12,6 +12,7 @@ export interface UseAiWorkerOptions {
   simulateThinkDelay?: boolean;
   logger?: ILogger;
   aiEngine?: ChessAiEngine;
+  randomFn?: () => number;
 }
 
 /**
@@ -22,6 +23,7 @@ export interface UseAiWorkerOptions {
 export function useAiWorker(options: UseAiWorkerOptions = {}) {
   const log = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   const engine = options.aiEngine ?? minimaxEngine;
+  const randomFn = options.randomFn ?? Math.random;
   const isAiThinking = ref<boolean>(false);
   let activeOperationId = 0;
   let thinkTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -80,7 +82,7 @@ export function useAiWorker(options: UseAiWorkerOptions = {}) {
       const [minThinkMs, maxThinkMs] = config.simulatedThinkTimeMs;
       if (maxThinkMs > 0 && options.simulateThinkDelay !== false) {
         const calculationDuration = performance.now() - startTime;
-        const targetThinkMs = minThinkMs + Math.random() * (maxThinkMs - minThinkMs);
+        const targetThinkMs = minThinkMs + randomFn() * (maxThinkMs - minThinkMs);
         const remainingDelay = Math.max(0, targetThinkMs - calculationDuration);
         if (remainingDelay > 0) {
           await new Promise<void>((resolve) => {
@@ -138,7 +140,7 @@ export function useAiWorker(options: UseAiWorkerOptions = {}) {
       // Emergency fallback legal move (random or first valid move) so game never freezes
       const legalMovesList = legalFallbackMoves();
       if (legalMovesList.length > 0) {
-        const fallback = legalMovesList[Math.floor(Math.random() * legalMovesList.length)];
+        const fallback = legalMovesList[Math.floor(randomFn() * legalMovesList.length)];
         if (fallback) {
           const fallbackResult = applyMoveFn({
             from: fallback.from,

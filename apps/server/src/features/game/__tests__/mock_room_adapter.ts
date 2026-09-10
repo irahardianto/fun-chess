@@ -45,7 +45,10 @@ export class MockRoomGameAdapter implements IRoomGameAdapter {
     return this.getRoom(roomCode);
   }
 
-  public async getRoom(roomCode: string): Promise<RoomState | null> {
+  public async getRoom(
+    roomCode: string,
+    _correlationId?: string,
+  ): Promise<RoomState | null> {
     const room = this.rooms.get(roomCode.toUpperCase());
     return room ? structuredClone(room) : null;
   }
@@ -54,6 +57,7 @@ export class MockRoomGameAdapter implements IRoomGameAdapter {
     roomCode: string,
     nextGameState: GameState,
     gameOverPayload?: GameOverPayload,
+    _correlationId?: string,
   ): Promise<RoomState> {
     const code = roomCode.toUpperCase();
     const existing = this.rooms.get(code);
@@ -80,6 +84,7 @@ export class MockRoomGameAdapter implements IRoomGameAdapter {
   public async finalizeGame(
     roomCode: string,
     gameOverPayload: GameOverPayload,
+    _correlationId?: string,
   ): Promise<RoomState> {
     const code = roomCode.toUpperCase();
     const existing = this.rooms.get(code);
@@ -101,6 +106,7 @@ export class MockRoomGameAdapter implements IRoomGameAdapter {
   public async updateDrawOffer(
     roomCode: string,
     drawOffer: RoomState["drawOffer"],
+    _correlationId?: string,
   ): Promise<RoomState> {
     const code = roomCode.toUpperCase();
     const existing = this.rooms.get(code);
@@ -123,6 +129,7 @@ export class MockRoomGameAdapter implements IRoomGameAdapter {
     rematch: RoomState["rematch"],
     nextGameState?: GameState,
     players?: { whitePlayer: Player | null; blackPlayer: Player | null },
+    _correlationId?: string,
   ): Promise<RoomState> {
     const code = roomCode.toUpperCase();
     const existing = this.rooms.get(code);

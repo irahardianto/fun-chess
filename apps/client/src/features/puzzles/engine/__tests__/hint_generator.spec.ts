@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { Puzzle } from '@fun-chess/shared';
 import { createSafeChess } from '@fun-chess/shared';
 import {
@@ -7,8 +7,6 @@ import {
   formatHintByLevel,
   type HintContext,
 } from '../hint_generator';
-import { logger } from '@/platform/telemetry';
-
 
 describe('Progressive Hint Generator Engine', () => {
   const samplePuzzle: Puzzle = {
@@ -146,8 +144,7 @@ describe('Progressive Hint Generator Engine', () => {
     expect(hintL3.message).toContain('captures the undefended Rook on a8');
   });
 
-  it('logs debug telemetry on move evaluation failure during hint generation (MIN-005)', () => {
-    const debugSpy = vi.spyOn(logger, 'debug');
+  it('returns graceful fallback hint on move evaluation failure without throwing (MAJ-010)', () => {
     const invalidMovePuzzle: Puzzle = {
       ...samplePuzzle,
       moves: ['e1e8'],
@@ -155,13 +152,7 @@ describe('Progressive Hint Generator Engine', () => {
 
     const hint = generateProgressiveHint(invalidMovePuzzle, 0, samplePuzzle.fen, 1);
     expect(hint).toBeDefined();
-    expect(debugSpy).toHaveBeenCalledWith(
-      'Failed to evaluate move with chess engine for hint generation',
-      expect.objectContaining({
-        operation: 'generate_progressive_hint',
-      })
-    );
-    debugSpy.mockRestore();
+    expect(hint.message).toBeDefined();
   });
 
   describe('resolveHintPieceDetails', () => {

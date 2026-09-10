@@ -16,6 +16,7 @@ import {
   GameOverPayload,
   normalizeRoomCode,
   validatePlayerName,
+  serializeError,
 } from "@fun-chess/shared";
 import { type Logger } from "../../platform/logger/index.js";
 import {
@@ -181,9 +182,13 @@ export function registerRoomSocketHandlers(
       rateLimiter: createRateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       validatePlayerName(req.playerName);
-      const result = await roomService.createRoom(req, socket.id);
+      const result = await roomService.createRoom(
+        req,
+        socket.id,
+        context.correlationId,
+      );
       if (socket.data) {
         socket.data.userId = result.player.id;
         socket.data.roomCode = result.room.roomCode;
@@ -216,12 +221,13 @@ export function registerRoomSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       validatePlayerName(req.playerName);
       const normalizedCode = normalizeRoomCode(req.roomCode);
       const result = await roomService.joinRoom(
         { ...req, roomCode: normalizedCode },
         socket.id,
+        context.correlationId,
       );
       if (socket.data) {
         socket.data.userId = result.player.id;
@@ -252,7 +258,7 @@ export function registerRoomSocketHandlers(
 
   socket.on("room:join", handleJoin);
 
-  // 3. room:reconnect (MAJ-008: RoomStatus ack type narrowing, MAJ-009, ENH-005, ENH-015)
+  // 3. room:reconnect (MAJ-008: RoomStatus ack type narrowing, MAJ-009, ENH-005, ENH-015, MAJ-025)
   const handleReconnect = createRoomHandler<
     ReconnectRequest,
     {
@@ -271,11 +277,12 @@ export function registerRoomSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       const normalizedCode = normalizeRoomCode(req.roomCode);
       const result = await roomService.reconnect(
         { ...req, roomCode: normalizedCode },
         socket.id,
+        context.correlationId,
       );
       if (socket.data) {
         socket.data.userId = result.player.id;
@@ -294,11 +301,7 @@ export function registerRoomSocketHandlers(
         roomStatus: result.room.status,
       });
 
-      socket.emit("room:reconnected", {
-        room: sanitizePublicRoom(result.room),
-        player: sanitizePublicPlayer(result.player),
-        roomStatus: result.room.status,
-      });
+      // MAJ-025: Dual delivery eliminated. State delivered exclusively via ack callback.
 
       return {
         success: true,
@@ -322,9 +325,13 @@ export function registerRoomSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await roomService.leaveRoom(roomCode, socket.id);
+      const result = await roomService.leaveRoom(
+        roomCode,
+        socket.id,
+        context.correlationId,
+      );
 
       // Cancel disconnect timers for this player
       timerRegistry.cancel(roomCode, result.player.id);
@@ -407,8 +414,19 @@ export async function handleSocketDisconnect(
           ? room.whitePlayer?.id
           : undefined);
 
+    const jobStartTime = Date.now();
+    logger.info("Game forfeit processing started", {
+      operation: "game_abandoned",
+      correlationId: activeJobCorrelationId,
+      roomCode: room.roomCode,
+      winnerColor: gameOverPayload.winner,
+      disconnectedPlayerId,
+      winner: gameOverPayload.winner,
+    });
+
     try {
-      // MIN-011: rename playerId field to winnerColor and emit disconnectedPlayerId
+      io.to(room.roomCode).emit("game:over", gameOverPayload);
+      const durationMs = Date.now() - jobStartTime;
       logger.info("Game forfeited by abandonment", {
         operation: "game_abandoned",
         correlationId: activeJobCorrelationId,
@@ -416,17 +434,18 @@ export async function handleSocketDisconnect(
         winnerColor: gameOverPayload.winner,
         disconnectedPlayerId,
         winner: gameOverPayload.winner,
+        duration: durationMs,
+        durationMs,
       });
-      io.to(room.roomCode).emit("game:over", gameOverPayload);
     } catch (err) {
+      const durationMs = Date.now() - jobStartTime;
       logger.error("Failed to process disconnect grace period abandonment", {
-        operation: "disconnect_grace_period_abandonment",
+        operation: "game_abandoned",
         roomCode: room.roomCode,
         correlationId: activeJobCorrelationId,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        duration: durationMs,
+        durationMs,
+        error: serializeError(err),
       });
       throw err;
     }
@@ -437,6 +456,7 @@ export async function handleSocketDisconnect(
     onForfeit,
     gracePeriodMs,
     timerRegistry,
+    activeCorrelationId,
   );
   if (!result) return;
 

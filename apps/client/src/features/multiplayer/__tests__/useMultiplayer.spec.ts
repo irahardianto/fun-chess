@@ -46,6 +46,7 @@ describe('useMultiplayer composable', () => {
   }
 
   function createTestPlayer(overrides: Partial<Player> = {}): Player {
+    const now = Date.now();
     return {
       id: UUID_P1,
       socketId: 'mock_sock_multi',
@@ -54,7 +55,9 @@ describe('useMultiplayer composable', () => {
       color: 'w',
       isHost: true,
       isConnected: true,
-      connectedAt: Date.now(),
+      connectedAt: now,
+      createdAt: now,
+      updatedAt: now,
       ...overrides,
     };
   }

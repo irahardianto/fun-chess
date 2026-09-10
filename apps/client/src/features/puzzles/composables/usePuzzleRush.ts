@@ -1,12 +1,10 @@
-import { ref, computed, readonly, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope } from 'vue';
-import type {
-  PuzzleProgressStore,
-} from '@fun-chess/shared';
-import { useInjectLogger } from '@/platform/di';
+import { ref, computed, readonly, getCurrentInstance } from 'vue';
+import type { PuzzleProgressStore, IClock } from '@fun-chess/shared';
+import { SystemClock } from '@fun-chess/shared';
+import { useInjectLogger, useInjectClock } from '@/platform/di';
 import { logger as defaultLogger, generateCorrelationId, type ILogger } from '@/platform/telemetry';
 
 import {
-  calculateTimeTick,
   applyRushSolve,
   applyRushStrike,
   applySurvivorSolve,
@@ -15,6 +13,7 @@ import {
 import { getRandomPuzzle } from '../data/puzzle_catalog';
 import { usePuzzleRunner } from './usePuzzleRunner';
 import { usePuzzleProgress } from './usePuzzleProgress';
+import { usePuzzleRushTimer } from './usePuzzleRushTimer';
 
 export interface UsePuzzleRushOptions {
   mode?: 'puzzle_rush' | 'streak_survivor';
@@ -22,9 +21,10 @@ export interface UsePuzzleRushOptions {
   customStore?: PuzzleProgressStore;
   initialDurationSeconds?: number;
   maxStrikes?: number;
+  clock?: IClock;
   logger?: ILogger;
+  randomFn?: () => number;
 }
-
 
 function isPuzzleProgressStore(obj: unknown): obj is PuzzleProgressStore {
   return (
@@ -35,11 +35,17 @@ function isPuzzleProgressStore(obj: unknown): obj is PuzzleProgressStore {
   );
 }
 
+/**
+ * Arcade session composable for Puzzle Rush and Streak Survivor modes (MAJ-012, MAJ-021).
+ */
 export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressStore) {
   let customStore: PuzzleProgressStore | undefined;
   let initialMode: 'puzzle_rush' | 'streak_survivor' = 'puzzle_rush';
   let initialDuration = 180;
   let maxStrikesLimit = 3;
+  let explicitClock: IClock | undefined;
+  let fallbackLogger: ILogger | undefined;
+  let randomFn: (() => number) | undefined;
 
   if (isPuzzleProgressStore(options)) {
     customStore = options;
@@ -48,76 +54,53 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
     initialMode = options.subMode ?? options.mode ?? 'puzzle_rush';
     initialDuration = typeof options.initialDurationSeconds === 'number' ? options.initialDurationSeconds : 180;
     maxStrikesLimit = typeof options.maxStrikes === 'number' ? options.maxStrikes : 3;
+    explicitClock = options.clock;
+    fallbackLogger = options.logger;
+    randomFn = options.randomFn;
   }
 
   const progressStore = usePuzzleProgress(customStore);
-  const fallbackLogger = options && !isPuzzleProgressStore(options) ? options.logger : undefined;
   const logger = fallbackLogger ?? (getCurrentInstance() ? useInjectLogger(fallbackLogger) : defaultLogger) ?? defaultLogger;
+  const clock = explicitClock ?? (getCurrentInstance() ? useInjectClock() : new SystemClock());
 
   const mode = ref<'puzzle_rush' | 'streak_survivor'>(initialMode);
-  const timeRemainingSeconds = ref<number>(initialDuration);
   const score = ref<number>(0);
   const strikes = ref<number>(0);
   const livesRemaining = ref<number>(maxStrikesLimit);
   const currentStreak = ref<number>(0);
   const bestStreak = ref<number>(0);
   const comboMultiplier = ref<number>(1);
-
-  const isTimerRunning = ref<boolean>(false);
   const isGameOver = ref<boolean>(false);
   const isNewHighScore = ref<boolean>(false);
-  const lastTimeBonus = ref<number>(0);
 
-  let timerInterval: ReturnType<typeof setInterval> | null = null;
-  const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
-  let puzzleStartTimeMs = Date.now();
+  let puzzleStartTimeMs = clock.now();
   let runCorrelationId = generateCorrelationId();
-  let runStartTimeMs = Date.now();
+  let runStartTimeMs = clock.now();
 
-  function setTrackedTimeout(fn: () => void, ms: number): ReturnType<typeof setTimeout> {
-    const timer = setTimeout(() => {
-      pendingTimers.delete(timer);
-      fn();
-    }, ms);
-    pendingTimers.add(timer);
-    return timer;
-  }
+  const timer = usePuzzleRushTimer({
+    initialDurationSeconds: initialDuration,
+    clock,
+    onExpire: () => endGame(),
+  });
 
   const runner = usePuzzleRunner({
     autoPlayAudio: true,
+    clock,
     onSolved: () => handleRunnerSolved(),
     onMistake: () => handleRunnerFailed(),
   });
 
   const highScore = computed<number>(() => {
-    if (mode.value === 'puzzle_rush') {
-      return progressStore.rushHighScore.value;
-    }
-    return progressStore.survivorHighScore.value;
+    return mode.value === 'puzzle_rush'
+      ? progressStore.rushHighScore.value
+      : progressStore.survivorHighScore.value;
   });
 
-  function clearTimer(): void {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-    isTimerRunning.value = false;
-  }
-
-  function clearAllTimers(): void {
-    clearTimer();
-    for (const timer of pendingTimers) {
-      clearTimeout(timer);
-    }
-    pendingTimers.clear();
-  }
-
   function startRun(selectedMode: 'puzzle_rush' | 'streak_survivor' = initialMode): void {
-    clearAllTimers();
+    timer.clearAllTimers();
     runCorrelationId = generateCorrelationId();
-    runStartTimeMs = Date.now();
+    runStartTimeMs = clock.now();
     mode.value = selectedMode;
-    timeRemainingSeconds.value = initialDuration;
     score.value = 0;
     strikes.value = 0;
     livesRemaining.value = maxStrikesLimit;
@@ -126,7 +109,6 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
     comboMultiplier.value = 1;
     isGameOver.value = false;
     isNewHighScore.value = false;
-    lastTimeBonus.value = 0;
 
     logger.info('Starting puzzle rush run', {
       operation: 'puzzle_rush_start',
@@ -137,54 +119,35 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       maxStrikes: maxStrikesLimit,
     });
 
-    // Load first puzzle scaled to beginner/intermediate tier
     loadNextPuzzle();
 
     if (selectedMode === 'puzzle_rush') {
-      isTimerRunning.value = true;
-      timerInterval = setInterval(() => {
-        const tick = calculateTimeTick(timeRemainingSeconds.value, 1);
-        timeRemainingSeconds.value = tick.timeRemainingSeconds;
-        if (tick.isExpired) {
-          endGame();
-        }
-      }, 1000);
+      timer.startTimer(initialDuration);
+    } else {
+      timer.resetTimer(initialDuration);
     }
   }
 
   function loadNextPuzzle(): void {
     const targetRating = 600 + Math.min(1000, score.value * 35);
-    const puzzle = getRandomPuzzle(undefined, targetRating);
-    puzzleStartTimeMs = Date.now();
+    const puzzle = getRandomPuzzle(undefined, targetRating, randomFn);
+    puzzleStartTimeMs = clock.now();
     runner.loadPuzzle(puzzle);
   }
 
   async function handleRunnerSolved(): Promise<void> {
     if (isGameOver.value) return;
-    const solveDurationMs = Date.now() - puzzleStartTimeMs;
-    const runDurationMs = Math.round(Date.now() - runStartTimeMs);
+    const solveDurationMs = clock.now() - puzzleStartTimeMs;
+    const runDurationMs = Math.round(clock.now() - runStartTimeMs);
 
     if (mode.value === 'puzzle_rush') {
-      const solveResult = applyRushSolve(
-        score.value,
-        currentStreak.value,
-        highScore.value,
-        solveDurationMs
-      );
-
+      const solveResult = applyRushSolve(score.value, currentStreak.value, highScore.value, solveDurationMs);
       score.value = solveResult.newScore;
       currentStreak.value = solveResult.newStreak;
       comboMultiplier.value = solveResult.comboMultiplier;
-      lastTimeBonus.value = solveResult.timeBonusSeconds;
+      timer.addTimeBonus(solveResult.timeBonusSeconds);
 
-      // Only grant bonus in blitz if solve was fast (<5s)
-      if (solveResult.timeBonusSeconds > 0) {
-        timeRemainingSeconds.value += solveResult.timeBonusSeconds;
-      }
-
-      if (solveResult.isNewHighScore) {
-        isNewHighScore.value = true;
-      }
+      if (solveResult.isNewHighScore) isNewHighScore.value = true;
 
       logger.info('Puzzle solved during rush run', {
         operation: 'puzzle_rush_solve',
@@ -209,19 +172,12 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       });
       await progressStore.saveArcadeResult('puzzle_rush', score.value, currentStreak.value);
     } else {
-      const solveResult = applySurvivorSolve(
-        score.value,
-        currentStreak.value,
-        bestStreak.value
-      );
-
+      const solveResult = applySurvivorSolve(score.value, currentStreak.value, bestStreak.value);
       score.value = solveResult.newScore;
       currentStreak.value = solveResult.newStreak;
       bestStreak.value = solveResult.bestStreak;
 
-      if (solveResult.isNewBestStreak) {
-        isNewHighScore.value = true;
-      }
+      if (solveResult.isNewBestStreak) isNewHighScore.value = true;
 
       logger.info('Puzzle solved during survivor run', {
         operation: 'puzzle_survivor_solve',
@@ -246,16 +202,14 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       await progressStore.saveArcadeResult('streak_survivor', score.value, bestStreak.value);
     }
 
-    setTrackedTimeout(() => {
-      if (!isGameOver.value) {
-        loadNextPuzzle();
-      }
+    timer.setTrackedTimeout(() => {
+      if (!isGameOver.value) loadNextPuzzle();
     }, 400);
   }
 
   function handleRunnerFailed(): void {
     if (isGameOver.value) return;
-    const runDurationMs = Math.round(Date.now() - runStartTimeMs);
+    const runDurationMs = Math.round(clock.now() - runStartTimeMs);
 
     if (mode.value === 'puzzle_rush') {
       const strikeResult = applyRushStrike(strikes.value, maxStrikesLimit);
@@ -276,7 +230,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       if (strikeResult.isGameOver) {
         endGame();
       } else {
-        setTrackedTimeout(() => {
+        timer.setTrackedTimeout(() => {
           if (!isGameOver.value) loadNextPuzzle();
         }, 500);
       }
@@ -300,7 +254,7 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
       if (strikeResult.isGameOver || strikes.value >= maxStrikesLimit) {
         endGame();
       } else {
-        setTrackedTimeout(() => {
+        timer.setTrackedTimeout(() => {
           if (!isGameOver.value) loadNextPuzzle();
         }, 500);
       }
@@ -308,9 +262,9 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   }
 
   function endGame(): void {
-    clearAllTimers();
+    timer.clearAllTimers();
     isGameOver.value = true;
-    const durationMs = Math.round(Date.now() - runStartTimeMs);
+    const durationMs = Math.round(clock.now() - runStartTimeMs);
     logger.info('Ending puzzle rush run', {
       operation: 'puzzle_rush_end',
       correlationId: runCorrelationId,
@@ -323,9 +277,9 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
   }
 
   function stopRun(): void {
-    clearAllTimers();
+    timer.clearAllTimers();
     isGameOver.value = true;
-    const durationMs = Math.round(Date.now() - runStartTimeMs);
+    const durationMs = Math.round(clock.now() - runStartTimeMs);
     logger.info('Stopping puzzle rush run manually', {
       operation: 'puzzle_rush_stop',
       correlationId: runCorrelationId,
@@ -335,31 +289,21 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
     });
   }
 
-  if (getCurrentScope()) {
-    onScopeDispose(() => {
-      clearAllTimers();
-    });
-  } else if (getCurrentInstance()) {
-    onUnmounted(() => {
-      clearAllTimers();
-    });
-  }
-
   return {
     runner,
     correlationId: computed(() => runCorrelationId),
     mode: readonly(mode),
-    timeRemainingSeconds: readonly(timeRemainingSeconds),
+    timeRemainingSeconds: timer.timeRemainingSeconds,
     score: readonly(score),
     strikes: readonly(strikes),
     livesRemaining: readonly(livesRemaining),
     currentStreak: readonly(currentStreak),
     bestStreak: readonly(bestStreak),
     comboMultiplier: readonly(comboMultiplier),
-    isTimerRunning: readonly(isTimerRunning),
+    isTimerRunning: timer.isTimerRunning,
     isGameOver: readonly(isGameOver),
     isNewHighScore: readonly(isNewHighScore),
-    lastTimeBonus: readonly(lastTimeBonus),
+    lastTimeBonus: timer.lastTimeBonus,
     highScore,
     startRun,
     startRush: startRun,
@@ -376,3 +320,5 @@ export function usePuzzleRush(options?: UsePuzzleRushOptions | PuzzleProgressSto
     handleRunnerFailed,
   };
 }
+
+export type UsePuzzleRushReturn = ReturnType<typeof usePuzzleRush>;

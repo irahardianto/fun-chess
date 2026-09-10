@@ -878,5 +878,22 @@ describe("serveStaticFile", () => {
       expect(warnLog?.context?.["clientIp"]).toBe("192.168.1.10");
       expect(warnLog?.context?.["error"]).toBeDefined();
     });
+
+    it("attaches correlationId to malformed URI security warning logs (MIN-009)", () => {
+      const logger = new NullLogger();
+      checkPathTraversal(
+        "/virtual/dist",
+        "/%E0%A4%A",
+        logger,
+        "192.168.1.10",
+        "test-correlation-id-12345",
+      );
+
+      const warnLog = logger.warnLogs.find(
+        (l) => l.context?.["operation"] === "static_serve_decode_error",
+      );
+      expect(warnLog).toBeDefined();
+      expect(warnLog?.context?.["correlationId"]).toBe("test-correlation-id-12345");
+    });
   });
 });

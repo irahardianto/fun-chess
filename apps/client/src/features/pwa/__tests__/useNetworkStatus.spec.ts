@@ -156,4 +156,19 @@ describe('useNetworkStatus Composable', () => {
       expect(status2.isOnline.value).toBe(true);
     });
   });
+
+  describe('MockNetworkMonitor & DI abstraction [MAJ-011]', () => {
+    it('supports injected MockNetworkMonitor without touching browser globals', async () => {
+      const { MockNetworkMonitor } = await import('../composables/useNetworkStatus');
+      const mockMonitor = new MockNetworkMonitor(false);
+      const status = useNetworkStatus(undefined, undefined, mockMonitor);
+
+      expect(status.isOnline.value).toBe(false);
+      expect(status.isOffline.value).toBe(true);
+
+      mockMonitor.setOnlineStatus(true);
+      expect(status.isOnline.value).toBe(true);
+      expect(status.isOffline.value).toBe(false);
+    });
+  });
 });

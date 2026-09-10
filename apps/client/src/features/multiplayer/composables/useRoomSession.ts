@@ -15,6 +15,7 @@ import type {
   RoomState,
   RoomStatus,
   SocketErrorPayload,
+  ReconnectAckPayload,
 } from '@fun-chess/shared';
 import {
   DEFAULT_PLAYER_AVATAR,
@@ -28,12 +29,13 @@ import {
   useSocketTransport,
   registerSocketEventListener,
 } from './useSocketTransport';
-import { resetGameActionsState } from './useGameActions';
 import {
   type UseRoomSessionOptions,
   setRoomSessionStorage,
   setRoomSessionLogger,
   setRoomSessionNavigation,
+  getCustomNavigation,
+  notifySessionReset,
   logger,
   createValidationError,
   getSavedSession,
@@ -68,25 +70,30 @@ function handleRoomPlayerJoined(data: { player: Player; room: RoomState }) {
   currentRoom.value = data.room;
 }
 
+function getActiveNavigation() {
+  return customNavigation || getCustomNavigation();
+}
+
 function handleRoomPlayerLeft(data?: { playerId?: string; playerName?: string; reason?: string }) {
   if (data?.reason === 'host_left' || data?.reason === 'room_closed') {
     currentRoom.value = null;
     currentPlayer.value = null;
     sessionToken.value = null;
     clearSession();
-    resetGameActionsState(true);
-    if (customNavigation?.onRoomClosed) {
+    notifySessionReset(true);
+    const nav = getActiveNavigation();
+    if (nav?.onRoomClosed) {
       try {
-        customNavigation.onRoomClosed();
+        nav.onRoomClosed();
       } catch (err) {
         logger.warn('Error executing onRoomClosed callback', {
           operation: 'socket_room_player_left',
           error: err instanceof Error ? err.message : String(err),
         });
       }
-    } else if (customNavigation?.navigate) {
+    } else if (nav?.navigate) {
       try {
-        customNavigation.navigate('/multiplayer');
+        nav.navigate('/multiplayer');
       } catch (err) {
         logger.warn('Error executing navigate callback', {
           operation: 'socket_room_player_left',
@@ -279,12 +286,34 @@ export function checkAndAutoReconnect(): void {
     currentRoom.value.status === 'paused_disconnect';
 
   if (needsSync) {
-    reconnect(saved.roomCode, saved.playerId, saved.sessionToken).catch((err) => {
-      logger.warn('Auto-reconnect failed', {
-        operation: 'socket_auto_reconnect',
-        error: err instanceof Error ? err.message : String(err),
+    reconnect(saved.roomCode, saved.playerId, saved.sessionToken)
+      .then((res) => {
+        if (!res.success) {
+          if (
+            res.error.code === 'ERR_ROOM_NOT_FOUND' ||
+            res.error.code === 'ERR_UNAUTHORIZED'
+          ) {
+            resetRoomSessionState(true);
+            const nav = getActiveNavigation();
+            if (nav?.onRoomClosed) {
+              try {
+                nav.onRoomClosed();
+              } catch (navErr) {
+                logger.warn('Error executing onRoomClosed callback', {
+                  operation: 'socket_auto_reconnect',
+                  error: navErr instanceof Error ? navErr.message : String(navErr),
+                });
+              }
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        logger.warn('Auto-reconnect failed', {
+          operation: 'socket_auto_reconnect',
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
-    });
   }
 }
 
@@ -430,7 +459,7 @@ export async function reconnect(
   roomCode: string,
   playerId: string,
   token: string
-): Promise<{ success: true; room: RoomState; player: Player } | { success: false; error: SocketErrorPayload }> {
+): Promise<ReconnectAckPayload> {
   const startTime = Date.now();
   const correlationId = generateCorrelationId();
   const transport = useSocketTransport();
@@ -465,7 +494,7 @@ export async function reconnect(
 
   return transport.emitWithTimeout<
     ReconnectRequest,
-    { success: true; room: RoomState; player: Player } | { success: false; error: SocketErrorPayload }
+    ReconnectAckPayload
   >(s, 'room:reconnect', validationResult.data, {
     timeoutMs: 8000,
     timeoutMessage: 'Reconnection timed out.',
@@ -474,11 +503,15 @@ export async function reconnect(
     onSuccess: (res) => {
       currentRoom.value = res.room;
       currentPlayer.value = res.player;
-      sessionToken.value = token;
+      if (res.roomStatus) {
+        currentRoom.value.status = res.roomStatus;
+      }
+      const effectiveToken = res.sessionToken || token;
+      sessionToken.value = effectiveToken;
       saveSession({
         roomCode: res.room.roomCode,
         playerId: res.player.id,
-        sessionToken: token,
+        sessionToken: effectiveToken,
       });
     },
     onError: (err) => {
@@ -486,7 +519,18 @@ export async function reconnect(
         err.code === 'ERR_ROOM_NOT_FOUND' ||
         err.code === 'ERR_UNAUTHORIZED'
       ) {
-        clearSession();
+        resetRoomSessionState(true);
+        const nav = getActiveNavigation();
+        if (nav?.onRoomClosed) {
+          try {
+            nav.onRoomClosed();
+          } catch (navErr) {
+            logger.warn('Error executing onRoomClosed callback', {
+              operation: 'socket_room_reconnect',
+              error: navErr instanceof Error ? navErr.message : String(navErr),
+            });
+          }
+        }
       }
     },
   });
@@ -532,7 +576,7 @@ export async function leaveRoom(
     currentPlayer.value = null;
     sessionToken.value = null;
     clearSession();
-    resetGameActionsState(true);
+    notifySessionReset(true);
     logger.info('Leave room succeeded (socket disconnected)', {
       operation: 'socket_room_leave',
       correlationId,
@@ -553,7 +597,7 @@ export async function leaveRoom(
       currentPlayer.value = null;
       sessionToken.value = null;
       clearSession();
-      resetGameActionsState(true);
+      notifySessionReset(true);
       if (success) {
         logger.info('Leave room succeeded', {
           operation: 'socket_room_leave',
@@ -592,6 +636,7 @@ export function resetRoomSessionState(clearStorage = true): void {
   if (clearStorage) {
     clearSession();
   }
+  notifySessionReset(clearStorage);
   setRoomSessionStorage(null);
   setRoomSessionLogger(null);
   setRoomSessionNavigation(null);

@@ -16,7 +16,7 @@ import {
   LocalStorageUnifiedStore,
   StorageCommitError,
 } from '@/features/portability/store/local_storage_unified.store';
-import { LocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_store';
+import { LocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_progress.store';
 import type {
   ScenarioProgressStore,
   PuzzleProgressStore,
@@ -1004,6 +1004,8 @@ describe('SC-4 Integration & Core Services Test Suite', () => {
           isHost: true,
           isConnected: true,
           connectedAt: 1,
+          createdAt: 1000,
+          updatedAt: 1000,
         },
         blackPlayer: {
           id: 'p2',
@@ -1013,6 +1015,8 @@ describe('SC-4 Integration & Core Services Test Suite', () => {
           isHost: false,
           isConnected: true,
           connectedAt: 2,
+          createdAt: 1000,
+          updatedAt: 1000,
         },
         spectators: [],
         game: {} as any,

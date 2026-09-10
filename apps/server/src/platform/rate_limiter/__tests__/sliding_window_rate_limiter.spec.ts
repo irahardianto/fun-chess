@@ -245,5 +245,16 @@ describe("SlidingWindowRateLimiter", () => {
         vi.useRealTimers();
       }
     });
+
+    it("assigns default name and accepts custom limiter name (MIN-012)", () => {
+      const defaultLimiter = new SlidingWindowRateLimiter({ pruneIntervalMs: 0 });
+      expect(defaultLimiter.name).toBe("sliding_window");
+
+      const customLimiter = new SlidingWindowRateLimiter({
+        name: "socket_connection_limiter",
+        pruneIntervalMs: 0,
+      });
+      expect(customLimiter.name).toBe("socket_connection_limiter");
+    });
   });
 });

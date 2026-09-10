@@ -53,6 +53,36 @@ export function getCustomNavigation() {
   return customNavigation;
 }
 
+export type SessionResetHook = (clearStorage?: boolean) => void;
+const sessionResetHooks = new Set<SessionResetHook>();
+
+/**
+ * Registers a hook to be invoked when a room session departs or resets (MAJ-009).
+ * Decouples useRoomSession from direct static dependencies on useGameActions.
+ */
+export function registerSessionResetHook(hook: SessionResetHook): () => void {
+  sessionResetHooks.add(hook);
+  return () => {
+    sessionResetHooks.delete(hook);
+  };
+}
+
+/**
+ * Notifies all registered reset subscribers that the active session has been torn down.
+ */
+export function notifySessionReset(clearStorage = true): void {
+  sessionResetHooks.forEach((hook) => {
+    try {
+      hook(clearStorage);
+    } catch (err) {
+      logger.warn('Error executing session reset hook', {
+        operation: 'session_reset_hook',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+}
+
 /**
  * Dynamically resolves session storage adapter (safe in browser & test environments).
  */

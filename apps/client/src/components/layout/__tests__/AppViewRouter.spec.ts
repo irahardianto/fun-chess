@@ -14,6 +14,8 @@ describe('AppViewRouter.vue', () => {
     isHost: true,
     avatar: '🦁',
     connectedAt: Date.now(),
+    createdAt: 1000,
+    updatedAt: 1000,
   };
 
   const mockBlackPlayer: Player = {
@@ -25,6 +27,8 @@ describe('AppViewRouter.vue', () => {
     isHost: false,
     avatar: '🐼',
     connectedAt: Date.now(),
+    createdAt: 1000,
+    updatedAt: 1000,
   };
 
   const mockRoom: RoomState = {

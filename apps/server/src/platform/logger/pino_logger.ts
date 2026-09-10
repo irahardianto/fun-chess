@@ -87,7 +87,7 @@ export const DEFAULT_REDACT_PATHS: string[] = [
   "headers.cookie",
   "*.headers.cookie",
 
-  // HTTP Request headers (authorization & telemetry secret guards)
+  // HTTP Request headers (authorization, telemetry secret & session token guards - ENH-007)
   "headers.authorization",
   "*.headers.authorization",
   "req.headers.authorization",
@@ -98,6 +98,16 @@ export const DEFAULT_REDACT_PATHS: string[] = [
   "req.headers['x-metrics-secret']",
   "*.req.headers['x-metrics-secret']",
   "*.*.req.headers['x-metrics-secret']",
+  "headers['x-session-token']",
+  "*.headers['x-session-token']",
+  "req.headers['x-session-token']",
+  "*.req.headers['x-session-token']",
+  "*.*.req.headers['x-session-token']",
+  "headers['session-token']",
+  "*.headers['session-token']",
+  "req.headers['session-token']",
+  "*.req.headers['session-token']",
+  "*.*.req.headers['session-token']",
 ];
 
 /**

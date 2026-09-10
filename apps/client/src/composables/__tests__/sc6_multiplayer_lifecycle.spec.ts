@@ -17,6 +17,8 @@ describe('Scope Card SC-6: Client Multiplayer Connection, Lifecycle & Contract V
       isHost: true,
       isConnected: true,
       connectedAt: 1700000000000,
+      createdAt: 1000,
+      updatedAt: 1000,
       ...overrides,
     };
   }

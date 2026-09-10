@@ -49,6 +49,10 @@ export interface WrapSocketHandlerOptions<TPayload = unknown, TRes = unknown> {
   logPayload?: boolean;
   /** Core socket operation handler function */
   handler?: SocketHandlerFn<TPayload, TRes>;
+  /** Optional custom rate limit error message or message formatter (ENH-006) */
+  rateLimitErrorMessage?:
+    | string
+    | ((operationName: string, defaultLimitDesc: string) => string);
 }
 
 const SENSITIVE_EXACT_KEYS = new Set([
@@ -151,6 +155,9 @@ interface ParsedOptions<TPayload, TRes> {
   trustProxy?: boolean;
   logPayload?: boolean;
   handler: SocketHandlerFn<TPayload, TRes>;
+  rateLimitErrorMessage?:
+    | string
+    | ((operationName: string, defaultLimitDesc: string) => string);
 }
 
 function parseHandlerArguments<TPayload, TRes>(
@@ -187,6 +194,7 @@ function parseHandlerArguments<TPayload, TRes>(
     trustProxy: opts.trustProxy,
     logPayload: opts.logPayload,
     handler: resolvedHandler,
+    rateLimitErrorMessage: opts.rateLimitErrorMessage,
   };
 }
 
@@ -236,25 +244,51 @@ export function buildErrorPayload(err: unknown): {
   };
 }
 
-function dispatchResponse<TRes>(
+/**
+ * Safely dispatches operation response to acknowledgement callback or emits socket error (ENH-010).
+ * Wraps callback invocation in try/catch to protect the server process from faulty client callbacks.
+ */
+export function safeDispatchResponse<TRes>(
   callback: ((res: TRes) => void) | undefined,
   socketObj: SocketLike | undefined,
   success: boolean,
   dataOrError: unknown,
+  logger?: Logger,
+  context?: { operationName?: string; correlationId?: string; socketId?: string },
 ): void {
-  if (typeof callback === "function") {
-    if (success) {
-      callback(dataOrError as TRes);
-    } else {
-      callback({
-        success: false,
-        error: dataOrError,
-      } as unknown as TRes);
+  try {
+    if (typeof callback === "function") {
+      if (success) {
+        callback(dataOrError as TRes);
+      } else {
+        callback({
+          success: false,
+          error: dataOrError,
+        } as unknown as TRes);
+      }
+    } else if (!success && socketObj && typeof socketObj.emit === "function") {
+      socketObj.emit("error", dataOrError);
     }
-  } else if (!success && socketObj && typeof socketObj.emit === "function") {
-    socketObj.emit("error", dataOrError);
+  } catch (dispatchErr: unknown) {
+    if (logger) {
+      logger.warn("Socket acknowledgment callback threw an error", {
+        operation: context?.operationName,
+        correlationId: context?.correlationId,
+        socketId: context?.socketId,
+        error:
+          dispatchErr instanceof Error
+            ? {
+                name: dispatchErr.name,
+                message: dispatchErr.message,
+                stack: dispatchErr.stack,
+              }
+            : { raw: dispatchErr },
+      });
+    }
   }
 }
+
+export const dispatchResponse = safeDispatchResponse;
 
 export interface CheckRateLimitParams {
   rateLimiter?: SocketRateLimiter;
@@ -265,6 +299,9 @@ export interface CheckRateLimitParams {
   userId?: string;
   startTime: number;
   logger: Logger;
+  rateLimitErrorMessage?:
+    | string
+    | ((operationName: string, defaultLimitDesc: string) => string);
 }
 
 export interface CheckRateLimitResult {
@@ -287,6 +324,7 @@ export function checkSocketRateLimit(
     userId,
     startTime,
     logger,
+    rateLimitErrorMessage,
   } = params;
 
   if (!rateLimiter || typeof rateLimiter.consume !== "function") {
@@ -299,10 +337,18 @@ export function checkSocketRateLimit(
   }
 
   const duration = Math.round(performance.now() - startTime);
-  const limitDesc =
+  const defaultLimitDesc =
     typeof rateLimiter.getLimitDescription === "function"
       ? rateLimiter.getLimitDescription()
       : "Rate limit exceeded. Please wait.";
+
+  let limitDesc = defaultLimitDesc;
+  if (typeof rateLimitErrorMessage === "function") {
+    limitDesc = rateLimitErrorMessage(operationName, defaultLimitDesc);
+  } else if (typeof rateLimitErrorMessage === "string") {
+    limitDesc = rateLimitErrorMessage;
+  }
+
   const errorPayload: SocketErrorPayload = {
     code: "ERR_RATE_LIMITED",
     message: limitDesc,
@@ -490,6 +536,153 @@ export function formatSocketErrorResponse(
   return { errorPayload, statusCode };
 }
 
+export interface SocketPipelineContext extends SocketOperationContext {
+  operationName: string;
+  startTime: number;
+  rawReq: unknown;
+  sanitizedPayload: unknown;
+  socketObj?: SocketLike;
+  logPayload?: boolean;
+}
+
+/**
+ * Establishes structured tracing context and payload sanitization for socket operations (MAJ-021).
+ */
+export function withCorrelation(
+  socketParam: SocketLike | string,
+  rawReq: unknown,
+  operationName: string,
+  trustProxy?: boolean,
+  logPayload?: boolean,
+): SocketPipelineContext {
+  const socketId = typeof socketParam === "string" ? socketParam : socketParam.id;
+  const socketObj = typeof socketParam === "object" ? socketParam : undefined;
+  const correlationId = randomUUID();
+  const startTime = performance.now();
+  const userId = extractUserId(rawReq, socketObj);
+  const sanitizedPayload = sanitizePayload(rawReq);
+
+  const effectiveTrustProxy =
+    trustProxy ??
+    (socketObj?.data?.["trustProxy"] as boolean | undefined) ??
+    false;
+
+  const clientIp = socketObj
+    ? extractClientIp(socketObj, effectiveTrustProxy)
+    : undefined;
+
+  return {
+    correlationId,
+    socketId,
+    clientIp,
+    userId,
+    startTime,
+    operationName,
+    rawReq,
+    sanitizedPayload,
+    socketObj,
+    logPayload,
+  };
+}
+
+/**
+ * Rate-limiting pipeline stage for socket operations (MAJ-021, ENH-006).
+ */
+export function withRateLimit(
+  params: CheckRateLimitParams,
+): CheckRateLimitResult {
+  return checkSocketRateLimit(params);
+}
+
+/**
+ * Ingress schema validation pipeline stage for socket operations (MAJ-021).
+ */
+export function withValidation<TReq>(
+  params: ValidatePayloadParams<TReq>,
+): ValidatePayloadResult<TReq> {
+  return validateSocketPayload(params);
+}
+
+export function logOperationStart(
+  logger: Logger,
+  ctx: SocketPipelineContext,
+): void {
+  const startContext: Record<string, unknown> = {
+    operation: ctx.operationName,
+    correlationId: ctx.correlationId,
+    socketId: ctx.socketId,
+    ...(ctx.clientIp ? { clientIp: ctx.clientIp } : {}),
+    ...(ctx.userId ? { userId: ctx.userId } : {}),
+  };
+
+  if (ctx.logPayload === true) {
+    startContext["payload"] = ctx.sanitizedPayload;
+  }
+
+  logger.info("Operation started", startContext);
+  logger.debug("Operation payload details", {
+    operation: ctx.operationName,
+    correlationId: ctx.correlationId,
+    payload: ctx.sanitizedPayload,
+  });
+}
+
+export function logOperationSuccess(
+  logger: Logger,
+  ctx: SocketPipelineContext,
+  result: unknown,
+): void {
+  const duration = Math.round(performance.now() - ctx.startTime);
+  const resultUserId =
+    typeof result === "object" && result !== null
+      ? (result as { player?: { id?: string } }).player?.id ||
+        (result as { userId?: string }).userId
+      : undefined;
+  const resolvedUserId =
+    (ctx.socketObj?.data?.["userId"] as string) || resultUserId || ctx.userId;
+
+  logger.info("Operation succeeded", {
+    operation: ctx.operationName,
+    correlationId: ctx.correlationId,
+    socketId: ctx.socketId,
+    ...(ctx.clientIp ? { clientIp: ctx.clientIp } : {}),
+    ...(resolvedUserId ? { userId: resolvedUserId } : {}),
+    duration,
+    durationMs: duration,
+    status: "success",
+  });
+}
+
+export interface SocketLoggingStage {
+  logStart: () => void;
+  logSuccess: (result: unknown) => void;
+  logError: (err: unknown) => FormatSocketErrorResult;
+}
+
+/**
+ * Structured logging pipeline stage providing start, success, and error logging (MAJ-021).
+ */
+export function withLogging(
+  logger: Logger,
+  ctx: SocketPipelineContext,
+): SocketLoggingStage {
+  return {
+    logStart: () => logOperationStart(logger, ctx),
+    logSuccess: (result: unknown) => logOperationSuccess(logger, ctx, result),
+    logError: (err: unknown) =>
+      formatSocketErrorResponse({
+        err,
+        operationName: ctx.operationName,
+        correlationId: ctx.correlationId,
+        socketId: ctx.socketId,
+        clientIp: ctx.clientIp,
+        userId: ctx.userId,
+        startTime: ctx.startTime,
+        logger,
+      }),
+  };
+}
+
 /**
  * Higher-order interceptor providing 3-point automated structured logging
  * (start, success, failure) with correlation IDs, latency tracking, and structured error responses.
@@ -552,6 +745,10 @@ export function wrapSocketHandler<TPayload = unknown, TRes = unknown>(
   let trustProxy: boolean | undefined;
   let logPayload: boolean | undefined;
   let handler: SocketHandlerFn<TPayload, TRes>;
+  let rateLimitErrorMessage:
+    | string
+    | ((operationName: string, defaultLimitDesc: string) => string)
+    | undefined;
 
   const isUnifiedOptions =
     typeof loggerOrOptions === "object" &&
@@ -578,6 +775,7 @@ export function wrapSocketHandler<TPayload = unknown, TRes = unknown>(
     trustProxy = opts.trustProxy;
     logPayload = opts.logPayload;
     handler = opts.handler;
+    rateLimitErrorMessage = opts.rateLimitErrorMessage;
   } else {
     logger = loggerOrOptions as Logger;
     operationName = rawOperationName!;
@@ -592,149 +790,111 @@ export function wrapSocketHandler<TPayload = unknown, TRes = unknown>(
     trustProxy = parsed.trustProxy;
     logPayload = parsed.logPayload;
     handler = parsed.handler;
+    rateLimitErrorMessage = parsed.rateLimitErrorMessage;
   }
-
-  const socketId = typeof socketParam === "string" ? socketParam : socketParam.id;
-  const socketObj = typeof socketParam === "object" ? socketParam : undefined;
-
-  const defaultTrustProxy =
-    trustProxy ??
-    (socketObj?.data?.["trustProxy"] as boolean | undefined) ??
-    false;
-
-  const defaultRateLimiter =
-    rateLimiter ??
-    (socketObj?.data?.["rateLimiter"] as SocketRateLimiter | undefined);
 
   return async (
     rawReq: unknown,
     callback?: (res: TRes) => void,
   ): Promise<TRes | undefined> => {
-    const correlationId = randomUUID();
-    const startTime = performance.now();
-    const userId = extractUserId(rawReq, socketObj);
-    const sanitizedPayload = sanitizePayload(rawReq);
+    const ctx = withCorrelation(
+      socketParam,
+      rawReq,
+      operationName,
+      trustProxy,
+      logPayload,
+    );
 
-    const effectiveTrustProxy =
-      trustProxy ??
-      (socketObj?.data?.["trustProxy"] as boolean | undefined) ??
-      defaultTrustProxy;
+    const logging = withLogging(logger, ctx);
+    logging.logStart();
+
+    const dispatchContext = {
+      operationName,
+      correlationId: ctx.correlationId,
+      socketId: ctx.socketId,
+    };
 
     const effectiveRateLimiter =
       rateLimiter ??
-      (socketObj?.data?.["rateLimiter"] as SocketRateLimiter | undefined) ??
-      defaultRateLimiter;
+      (ctx.socketObj?.data?.["rateLimiter"] as SocketRateLimiter | undefined);
 
-    const clientIp = socketObj
-      ? extractClientIp(socketObj, effectiveTrustProxy)
-      : undefined;
-
-    const startContext: Record<string, unknown> = {
-      operation: operationName,
-      correlationId,
-      socketId,
-      ...(clientIp ? { clientIp } : {}),
-      ...(userId ? { userId } : {}),
-    };
-
-    if (logPayload === true) {
-      startContext["payload"] = sanitizedPayload;
-    }
-
-    logger.info("Operation started", startContext);
-    logger.debug("Operation payload details", {
-      operation: operationName,
-      correlationId,
-      payload: sanitizedPayload,
-    });
-
-    // 1. Rate Limiting Pre-check (CRIT-001, MAJ-001, MAJ-003, MAJ-021)
-    const rateLimitResult = checkSocketRateLimit({
+    // 1. Rate Limiting Pre-check (CRIT-001, MAJ-001, MAJ-003, MAJ-021, ENH-006)
+    const rateLimitResult = withRateLimit({
       rateLimiter: effectiveRateLimiter,
-      clientIp,
-      socketId,
-      operationName,
-      correlationId,
-      userId,
-      startTime,
+      clientIp: ctx.clientIp,
+      socketId: ctx.socketId,
+      operationName: ctx.operationName,
+      correlationId: ctx.correlationId,
+      userId: ctx.userId,
+      startTime: ctx.startTime,
       logger,
+      rateLimitErrorMessage,
     });
     if (!rateLimitResult.allowed) {
-      dispatchResponse(
+      safeDispatchResponse(
         callback,
-        socketObj,
+        ctx.socketObj,
         false,
         rateLimitResult.errorPayload,
+        logger,
+        dispatchContext,
       );
       return undefined;
     }
 
     // 2. Ingress Schema Validation (MAJ-021)
-    const validationResult = validateSocketPayload({
+    const validationResult = withValidation({
       rawReq,
       schema,
-      operationName,
-      correlationId,
-      socketId,
-      clientIp,
-      userId,
-      startTime,
+      operationName: ctx.operationName,
+      correlationId: ctx.correlationId,
+      socketId: ctx.socketId,
+      clientIp: ctx.clientIp,
+      userId: ctx.userId,
+      startTime: ctx.startTime,
       logger,
     });
     if (!validationResult.valid) {
-      dispatchResponse(
+      safeDispatchResponse(
         callback,
-        socketObj,
+        ctx.socketObj,
         false,
         validationResult.errorPayload,
+        logger,
+        dispatchContext,
       );
       return undefined;
     }
 
-    // 3. Execution & Result Dispatch (MAJ-021)
+    // 3. Execution & Result Dispatch (MAJ-021, ENH-010)
     try {
       const result = await handler(validationResult.data as TPayload, {
-        correlationId,
-        socketId,
-        clientIp,
-        userId,
-      });
-      const duration = Math.round(performance.now() - startTime);
-
-      const resultUserId =
-        typeof result === "object" && result !== null
-          ? (result as { player?: { id?: string } }).player?.id ||
-            (result as { userId?: string }).userId
-          : undefined;
-      const resolvedUserId =
-        (socketObj?.data?.["userId"] as string) || resultUserId || userId;
-
-      logger.info("Operation succeeded", {
-        operation: operationName,
-        correlationId,
-        socketId,
-        ...(clientIp ? { clientIp } : {}),
-        ...(resolvedUserId ? { userId: resolvedUserId } : {}),
-        duration,
-        durationMs: duration,
-        status: "success",
+        correlationId: ctx.correlationId,
+        socketId: ctx.socketId,
+        clientIp: ctx.clientIp,
+        userId: ctx.userId,
       });
 
-      dispatchResponse(callback, socketObj, true, result);
+      logging.logSuccess(result);
+      safeDispatchResponse(
+        callback,
+        ctx.socketObj,
+        true,
+        result,
+        logger,
+        dispatchContext,
+      );
       return result;
     } catch (err: unknown) {
-      const { errorPayload } = formatSocketErrorResponse({
-        err,
-        operationName,
-        correlationId,
-        socketId,
-        clientIp,
-        userId,
-        startTime,
+      const { errorPayload } = logging.logError(err);
+      safeDispatchResponse(
+        callback,
+        ctx.socketObj,
+        false,
+        errorPayload,
         logger,
-      });
-
-      dispatchResponse(callback, socketObj, false, errorPayload);
+        dispatchContext,
+      );
       return undefined;
     }
   };

@@ -17,21 +17,25 @@ export interface IRoomService {
   createRoom(
     req: CreateRoomRequest,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }>;
 
   joinRoom(
     req: JoinRoomRequest,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }>;
 
   reconnect(
     req: ReconnectRequest,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; player: Player; sessionToken: string }>;
 
   leaveRoom(
     roomCode: string,
     socketId: string,
+    correlationId?: string,
   ): Promise<{
     room: RoomState;
     player: Player;
@@ -45,9 +49,11 @@ export interface IRoomService {
       room: RoomState,
       gameOverPayload: GameOverPayload,
       correlationId?: string,
+      playerId?: string,
     ) => void | Promise<void>,
     gracePeriodMs?: number,
     timerRegistry?: IDisconnectTimerRegistry,
+    correlationId?: string,
   ): Promise<{
     room: RoomState;
     player: Player;
@@ -57,11 +63,12 @@ export interface IRoomService {
   handleAbandonmentForfeit(
     roomCode: string,
     disconnectedPlayerId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload } | null>;
 
-  getRoom(roomCode: string): Promise<RoomState | null>;
+  getRoom(roomCode: string, correlationId?: string): Promise<RoomState | null>;
 
-  cleanupAbandonedRooms(maxAgeMs?: number): Promise<number>;
+  cleanupAbandonedRooms(maxAgeMs?: number, correlationId?: string): Promise<number>;
 }
 
 /**
@@ -72,7 +79,7 @@ export interface IRoomGameAdapter {
   /**
    * Retrieves a read-only snapshot of current room state.
    */
-  getRoom(roomCode: string): Promise<RoomState | null>;
+  getRoom(roomCode: string, correlationId?: string): Promise<RoomState | null>;
 
   /**
    * Applies an executed chess move and state update to the room under exclusive lock.
@@ -81,6 +88,7 @@ export interface IRoomGameAdapter {
     roomCode: string,
     nextGameState: GameState,
     gameOverPayload?: GameOverPayload,
+    correlationId?: string,
   ): Promise<RoomState>;
 
   /**
@@ -89,6 +97,7 @@ export interface IRoomGameAdapter {
   finalizeGame(
     roomCode: string,
     gameOverPayload: GameOverPayload,
+    correlationId?: string,
   ): Promise<RoomState>;
 
   /**
@@ -97,6 +106,7 @@ export interface IRoomGameAdapter {
   updateDrawOffer(
     roomCode: string,
     drawOffer: RoomState["drawOffer"],
+    correlationId?: string,
   ): Promise<RoomState>;
 
   /**
@@ -107,5 +117,6 @@ export interface IRoomGameAdapter {
     rematch: RoomState["rematch"],
     newGameState?: GameState,
     players?: { whitePlayer: Player | null; blackPlayer: Player | null },
+    correlationId?: string,
   ): Promise<RoomState>;
 }

@@ -183,6 +183,7 @@ describe("HTTP API Contracts", () => {
           NODE_ENV: "production",
           CORS_ORIGIN: "https://fun-chess.example.com",
           TRUST_PROXY: true,
+          SESSION_SECRET: ["test", "prod", "session", "secret", "32chars"].join("-"),
         } as Partial<ServerEnv>,
       });
 
@@ -287,6 +288,7 @@ describe("HTTP API Contracts", () => {
         env: {
           NODE_ENV: "production",
           CORS_ORIGIN: "https://fun-chess.example.com",
+          SESSION_SECRET: ["test", "prod", "session", "secret", "32chars"].join("-"),
         },
         allowedOrigins: ["https://fun-chess.example.com"],
       });

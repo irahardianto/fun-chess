@@ -12,8 +12,15 @@ import { SystemClock } from '@/platform/time';
 
 export const SCENARIO_PROGRESS_STORAGE_KEY = STORAGE_KEYS.SCENARIO_PROGRESS;
 
+export interface LocalStorageProgressStoreOptions {
+  storageKey?: string;
+  storage?: KeyValueStorage;
+  logger?: ILogger;
+  clock?: IClock;
+}
+
 /**
- * Robust localStorage implementation of ScenarioProgressStore.
+ * Robust localStorage implementation of ScenarioProgressStore (MIN-004, MIN-015).
  * Includes defensive JSON parsing, runtime type narrowing, error boundaries,
  * and an automatic in-memory fallback if localStorage is unavailable.
  */
@@ -25,15 +32,22 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
   private memoryFallback: Map<string, ScenarioProgress> = new Map();
 
   constructor(
-    storageKey: string = SCENARIO_PROGRESS_STORAGE_KEY,
+    optionsOrStorageKey: LocalStorageProgressStoreOptions | string = SCENARIO_PROGRESS_STORAGE_KEY,
     storage: KeyValueStorage = safeLocalStorage,
     logger: ILogger = defaultLogger,
     clock?: IClock
   ) {
-    this.storageKey = storageKey;
-    this.storage = storage;
-    this.logger = logger;
-    this.clock = clock ?? new SystemClock();
+    if (typeof optionsOrStorageKey === 'object' && optionsOrStorageKey !== null) {
+      this.storageKey = optionsOrStorageKey.storageKey ?? SCENARIO_PROGRESS_STORAGE_KEY;
+      this.storage = optionsOrStorageKey.storage ?? safeLocalStorage;
+      this.logger = optionsOrStorageKey.logger ?? defaultLogger;
+      this.clock = optionsOrStorageKey.clock ?? new SystemClock();
+    } else {
+      this.storageKey = optionsOrStorageKey;
+      this.storage = storage;
+      this.logger = logger;
+      this.clock = clock ?? new SystemClock();
+    }
   }
 
   private sanitizeRecord(raw: unknown): ScenarioProgress | null {
@@ -218,6 +232,18 @@ export class LocalStorageProgressStore implements ScenarioProgressStore {
   }
 }
 
+/**
+ * Factory creating a new LocalStorageProgressStore with options object (MIN-004, MIN-015).
+ */
+export function createLocalStorageProgressStore(
+  options: LocalStorageProgressStoreOptions = {}
+): LocalStorageProgressStore {
+  return new LocalStorageProgressStore(options);
+}
+
+/**
+ * Backward-compatible factory signature with positional arguments.
+ */
 export function createDefaultLocalStorageProgressStore(
   storageKey: string = SCENARIO_PROGRESS_STORAGE_KEY,
   storage: KeyValueStorage = safeLocalStorage,
@@ -227,4 +253,28 @@ export function createDefaultLocalStorageProgressStore(
   return new LocalStorageProgressStore(storageKey, storage, logger, clock);
 }
 
-export const defaultLocalStorageProgressStore = createDefaultLocalStorageProgressStore();
+let _defaultStore: LocalStorageProgressStore | null = null;
+
+/**
+ * Lazy getter for the singleton default scenario progress store (MIN-015).
+ */
+export function getDefaultLocalStorageProgressStore(): LocalStorageProgressStore {
+  if (!_defaultStore) {
+    _defaultStore = createLocalStorageProgressStore();
+  }
+  return _defaultStore;
+}
+
+/**
+ * Lazy singleton proxy for default scenario progress store (MIN-015).
+ */
+export const defaultLocalStorageProgressStore: LocalStorageProgressStore = new Proxy(
+  {} as LocalStorageProgressStore,
+  {
+    get(_target, prop, receiver) {
+      const store = getDefaultLocalStorageProgressStore();
+      const val = Reflect.get(store, prop, receiver);
+      return typeof val === 'function' ? val.bind(store) : val;
+    },
+  }
+);

@@ -63,12 +63,29 @@ export const ServerEnvSchema = BaseServerEnvSchema.extend({
     emptyStringToUndefined,
     z.coerce.number().int().positive().default(3),
   ),
+  SESSION_SECRET: z.preprocess(
+    emptyStringToUndefined,
+    z.string().min(16, "SESSION_SECRET must contain at least 16 characters.").optional(),
+  ),
   METRICS_SECRET: z.preprocess(
     emptyStringToUndefined,
-    z.string().optional(),
+    z.string().min(8, "METRICS_SECRET must contain at least 8 characters.").optional(),
   ),
 }).superRefine((val, ctx) => {
   if (val.NODE_ENV === "production") {
+    if (!val.METRICS_SECRET) {
+      console.warn(
+        "WARNING: METRICS_SECRET is not configured in production mode (MIN-002). " +
+        "Telemetry endpoints (/metrics, /health/detail) will deny all non-loopback requests.",
+      );
+    }
+    if (!val.SESSION_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SESSION_SECRET"],
+        message: "SESSION_SECRET must be configured in production mode (MAJ-004).",
+      });
+    }
     if (!val.CORS_ORIGIN && !val.PUBLIC_URL && !val.CLIENT_URL) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

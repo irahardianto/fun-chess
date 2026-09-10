@@ -108,23 +108,24 @@ describe("room.logic pure functions", () => {
       connectedAt: 2000,
     };
 
-    it("adds spectator without occupying player slots", () => {
-      const { nextRoom, isSpectator } = addPlayerToRoom(
+
+
+    it("assigns black color to second player using 3-argument signature (MIN-021)", () => {
+      const { nextRoom, assignedColor, isSpectator } = addPlayerToRoom(
         initialRoom,
         guestPlayer,
-        true,
         2500,
       );
 
-      expect(isSpectator).toBe(true);
-      expect(nextRoom.spectators).toHaveLength(1);
-      expect(nextRoom.spectators[0]?.id).toBe("p_guest_2");
-      expect(nextRoom.blackPlayer).toBeNull();
+      expect(isSpectator).toBe(false);
+      expect(assignedColor).toBe("b");
+      expect(nextRoom.whitePlayer).toEqual(basePlayer);
+      expect(nextRoom.blackPlayer).toEqual({ ...guestPlayer, color: "b" });
+      expect(nextRoom.status).toBe("playing");
       expect(nextRoom.lastActivityAt).toBe(2500);
-      expect(nextRoom.status).toBe("lobby");
     });
 
-    it("assigns black color to second player and transitions room status to playing", () => {
+    it("assigns black color to second player and transitions room status to playing (4-argument signature)", () => {
       const { nextRoom, assignedColor, isSpectator } = addPlayerToRoom(
         initialRoom,
         guestPlayer,
@@ -181,7 +182,7 @@ describe("room.logic pure functions", () => {
       );
     });
 
-    it("throws GameNotActiveError when non-spectator joins a non-lobby room (CRIT-004)", () => {
+    it("throws GameNotActiveError when player joins a non-lobby room (CRIT-004)", () => {
       const statuses = ["playing", "paused_disconnect", "game_over"] as const;
 
       for (const status of statuses) {
@@ -208,31 +209,6 @@ describe("room.logic pure functions", () => {
           addPlayerToRoom(nonLobbyRoom, joiningPlayer, false, 2500),
         ).toThrow(GameNotActiveError);
       }
-    });
-
-    it("allows spectator to join even when room is not in lobby status (CRIT-004)", () => {
-      const playingRoom: RoomState = {
-        ...createInitialRoomState({
-          roomCode: "TEST",
-          hostPlayer: basePlayer,
-          createdAt: 1000,
-        }),
-        status: "playing",
-      };
-
-      const spectator: Player = {
-        id: "p_spec",
-        socketId: "sock_spec",
-        name: "Spectator",
-        color: "w",
-        isHost: false,
-        isConnected: true,
-        connectedAt: 2000,
-      };
-
-      const result = addPlayerToRoom(playingRoom, spectator, true, 2500);
-      expect(result.isSpectator).toBe(true);
-      expect(result.nextRoom.spectators).toHaveLength(1);
     });
   });
 

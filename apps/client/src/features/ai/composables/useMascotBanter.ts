@@ -6,6 +6,8 @@ export interface UseMascotBanterOptions {
   persona?: MaybeRef<MascotPersona>;
   /** Auto-clear dialogue duration in milliseconds (0 to keep until next event, default: 0) */
   autoClearMs?: number;
+  /** Injected random number generator (default: Math.random) (MAJ-013) */
+  randomFn?: () => number;
 }
 
 /**
@@ -30,6 +32,10 @@ export function useMascotBanter(options?: UseMascotBanterOptions | MaybeRef<Masc
   const autoClearMs = (options && !('dialogues' in (toValue(options) as object)))
     ? (options as UseMascotBanterOptions).autoClearMs ?? 0
     : 0;
+
+  const randomFn = (options && typeof options === 'object' && 'randomFn' in options && typeof options.randomFn === 'function')
+    ? options.randomFn
+    : Math.random;
 
   function clearTimers(): void {
     if (clearTimer) {
@@ -60,7 +66,7 @@ export function useMascotBanter(options?: UseMascotBanterOptions | MaybeRef<Masc
       const persona = currentPersona.value;
       const lines = persona?.dialogues?.[trigger];
       if (lines && lines.length > 0) {
-        const randomIndex = Math.floor(Math.random() * lines.length);
+        const randomIndex = Math.floor(randomFn() * lines.length);
         line = lines[randomIndex] ?? lines[0]!;
       } else {
         line = 'Let’s play chess!';

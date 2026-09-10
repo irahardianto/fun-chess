@@ -551,14 +551,11 @@ describe("Room Socket Handlers", () => {
       expect(reconnectedEmit).toBeDefined();
       expect(asRecord(reconnectedEmit?.payload).playerId).toBe(created.hostId);
 
+      // Dual delivery eliminated: room:reconnected is not emitted to the reconnecting socket (MAJ-025)
       const reconnectedSelfEmit = reconnSocket.emittedEvents.find(
         (e) => e.event === "room:reconnected",
       );
-      expect(reconnectedSelfEmit).toBeDefined();
-      const selfPayload = asRecord(reconnectedSelfEmit?.payload);
-      expect((asRecord(selfPayload.player))?.socketId).toBeUndefined();
-      expect((asRecord(asRecord(selfPayload.room).whitePlayer))?.socketId).toBeUndefined();
-      expect((asRecord(asRecord(selfPayload.room).blackPlayer))?.socketId).toBeUndefined();
+      expect(reconnectedSelfEmit).toBeUndefined();
     });
 
     it("rejects room:reconnect with ERR_RATE_LIMITED when rate limit is exceeded (SEC-HIGH-001)", async () => {
@@ -1216,11 +1213,11 @@ describe("Room Socket Handlers", () => {
 
       expect(ackPayload?.roomStatus).toBe("playing");
 
+      // MAJ-025: Dual delivery eliminated, state delivered exclusively in ackPayload
       const reconEvent = reconnectSocket.emittedEvents.find(
         (e) => e.event === "room:reconnected",
       );
-      expect(reconEvent).toBeDefined();
-      expect(asRecord(reconEvent?.payload).roomStatus).toBe("playing");
+      expect(reconEvent).toBeUndefined();
     });
   });
 
@@ -1484,7 +1481,7 @@ describe("Room Socket Handlers", () => {
       );
 
       const errorLogs = failingLogger.errorLogs.filter(
-        (l) => l.context?.operation === "disconnect_grace_period_abandonment",
+        (l) => l.context?.operation === "game_abandoned",
       );
       expect(errorLogs.length).toBeGreaterThan(0);
     });
@@ -1824,6 +1821,360 @@ describe("Room Socket Handlers", () => {
           l.context?.action === "leave",
       );
       expect(warnLog).toBeDefined();
+    });
+
+    it("propagates context.correlationId into roomService methods (MAJ-017)", async () => {
+      const createSpy = vi.spyOn(service, "createRoom");
+      const joinSpy = vi.spyOn(service, "joinRoom");
+      const reconnectSpy = vi.spyOn(service, "reconnect");
+      const leaveSpy = vi.spyOn(service, "leaveRoom");
+
+      let ack: TestAckResponse | undefined;
+      await socket.trigger(
+        "room:create",
+        { playerName: "CorrelationHost", preferredColor: "w" },
+        (res) => {
+          ack = res;
+        },
+      );
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        socket.id,
+        expect.any(String),
+      );
+      const roomCode = ack?.room?.roomCode ?? "";
+
+      const joinSocket = new TestSocket("sock_join_corr");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        joinSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let joinAck: TestAckResponse | undefined;
+      await joinSocket.trigger(
+        "room:join",
+        { roomCode, playerName: "CorrelationGuest" },
+        (res) => {
+          joinAck = res;
+        },
+      );
+      expect(joinSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        joinSocket.id,
+        expect.any(String),
+      );
+
+      await joinSocket.trigger(
+        "room:reconnect",
+        {
+          roomCode,
+          playerId: joinAck?.player?.id ?? "",
+          sessionToken: joinAck?.sessionToken ?? "",
+        },
+        () => {},
+      );
+      expect(reconnectSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        joinSocket.id,
+        expect.any(String),
+      );
+
+      await joinSocket.trigger(
+        "room:leave",
+        { roomCode },
+        () => {},
+      );
+      expect(leaveSpy).toHaveBeenCalledWith(
+        roomCode,
+        joinSocket.id,
+        expect.any(String),
+      );
+    });
+
+    it("logs 3-point lifecycle logs for game_abandoned in handleSocketDisconnect (MAJ-018)", async () => {
+      const customLogger = new NullLogger();
+      const mockService = {
+        handleDisconnect: vi.fn().mockImplementation(
+          async (_sockId, onForfeit) => {
+            await onForfeit(
+              {
+                roomCode: "ABAND1",
+                whitePlayer: { id: "p_white" },
+                blackPlayer: { id: "p_black" },
+              },
+              { winner: "w", reason: "abandonment" },
+              "job-corr-123",
+              "p_black",
+            );
+            return {
+              room: { roomCode: "ABAND1", status: "finished" },
+              player: { id: "p_black", name: "Bob" },
+              wasActiveGame: true,
+            };
+          },
+        ),
+      } as unknown as RoomService;
+
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        "sock_disc_test",
+        mockService,
+        customLogger,
+        60_000,
+        undefined,
+        undefined,
+        "parent-corr-456",
+      );
+
+      const startLog = customLogger.infoLogs.find(
+        (l) =>
+          l.context?.operation === "game_abandoned" &&
+          l.message === "Game forfeit processing started",
+      );
+      expect(startLog).toBeDefined();
+      expect(startLog?.context?.correlationId).toBe("job-corr-123");
+      expect(startLog?.context?.disconnectedPlayerId).toBe("p_black");
+
+      const successLog = customLogger.infoLogs.find(
+        (l) =>
+          l.context?.operation === "game_abandoned" &&
+          l.message === "Game forfeited by abandonment",
+      );
+      expect(successLog).toBeDefined();
+      expect(successLog?.context?.durationMs).toBeDefined();
+
+      expect(mockService.handleDisconnect).toHaveBeenCalledWith(
+        "sock_disc_test",
+        expect.any(Function),
+        60_000,
+        expect.anything(),
+        "parent-corr-456",
+      );
+    });
+
+    it("handles non-Error objects in safeSocketJoin and safeSocketLeave gracefully", async () => {
+      const errSocket = new TestSocket("sock_non_error");
+      vi.spyOn(errSocket, "join").mockRejectedValueOnce("non-error-string");
+      vi.spyOn(errSocket, "leave").mockRejectedValueOnce({ custom: "fail" });
+
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        errSocket as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let createAck: TestAckResponse | undefined;
+      await errSocket.trigger(
+        "room:create",
+        { playerName: "NonErrHost", preferredColor: "w" },
+        (res) => {
+          createAck = res;
+        },
+      );
+      const roomCode = createAck?.room?.roomCode ?? "";
+
+      const joinWarn = logger.warnLogs.find(
+        (l) =>
+          l.context?.operation === "socket_room_membership_error" &&
+          l.context?.action === "join" &&
+          (l.context?.error as { raw?: unknown })?.raw === "non-error-string",
+      );
+      expect(joinWarn).toBeDefined();
+
+      await errSocket.trigger(
+        "room:leave",
+        { roomCode },
+        () => {},
+      );
+
+      const leaveWarn = logger.warnLogs.find(
+        (l) =>
+          l.context?.operation === "socket_room_membership_error" &&
+          l.context?.action === "leave" &&
+          (l.context?.error as { raw?: unknown })?.raw !== undefined,
+      );
+      expect(leaveWarn).toBeDefined();
+    });
+
+    it("handles fetchSockets error on room deletion when host leaves", async () => {
+      const failingIo = {
+        to: () => ({ emit: () => true }),
+        in: () => ({
+          fetchSockets: async () => {
+            throw new Error("Cluster fetchSockets error");
+          },
+        }),
+      } as unknown as TypedSocketServer;
+
+      const { room } = await service.createRoom(
+        { playerName: "HostFetchErr", preferredColor: "w" },
+        "sock_host_fetch_err",
+      );
+
+      const hostSock = new TestSocket("sock_host_fetch_err");
+      registerRoomSocketHandlers(
+        failingIo,
+        hostSock as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let ack: TestAckResponse | undefined;
+      await hostSock.trigger(
+        "room:leave",
+        { roomCode: room.roomCode },
+        (res) => {
+          ack = res;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      const warnLog = logger.warnLogs.find(
+        (l) =>
+          l.context?.operation === "socket_room_membership_error" &&
+          l.context?.action === "fetch_and_leave",
+      );
+      expect(warnLog).toBeDefined();
+    });
+
+    it("evicts all fetched sockets from room when room is deleted on host leave", async () => {
+      const s1 = { id: "s1", leave: vi.fn() };
+      const s2 = { id: "s2", leave: vi.fn() };
+      const multiIo = {
+        to: () => ({ emit: () => true }),
+        in: () => ({
+          fetchSockets: async () => [s1, s2],
+        }),
+      } as unknown as TypedSocketServer;
+
+      const { room } = await service.createRoom(
+        { playerName: "HostEvict", preferredColor: "w" },
+        "sock_host_evict",
+      );
+
+      const hostSock = new TestSocket("sock_host_evict");
+      registerRoomSocketHandlers(
+        multiIo,
+        hostSock as unknown as Socket,
+        service,
+        logger,
+        rateLimiter,
+      );
+
+      let ack: TestAckResponse | undefined;
+      await hostSock.trigger(
+        "room:leave",
+        { roomCode: room.roomCode },
+        (res) => {
+          ack = res;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(s1.leave).toHaveBeenCalledWith(room.roomCode);
+      expect(s2.leave).toHaveBeenCalledWith(room.roomCode);
+    });
+
+    it("evaluates winner === 'b' and undefined when forfeitedPlayerId is omitted in onForfeit", async () => {
+      const customLogger = new NullLogger();
+      let capturedOnForfeit: ((room: RoomState, payload: GameOverPayload) => Promise<void>) | undefined;
+      const mockService = {
+        handleDisconnect: vi.fn().mockImplementation(
+          async (_sockId, onForfeit) => {
+            capturedOnForfeit = onForfeit;
+            return {
+              room: { roomCode: "ROOMB", status: "finished" },
+              player: { id: "p_white", name: "Alice" },
+              wasActiveGame: true,
+            };
+          },
+        ),
+      } as unknown as RoomService;
+
+      await handleSocketDisconnect(
+        io as unknown as TypedSocketServer,
+        "sock_b_test",
+        mockService,
+        customLogger,
+      );
+
+      expect(capturedOnForfeit).toBeDefined();
+
+      // Case 1: winner is "b", whitePlayer forfeited
+      await capturedOnForfeit!(
+        {
+          roomCode: "ROOMB",
+          whitePlayer: { id: "p_white" },
+          blackPlayer: { id: "p_black" },
+        } as unknown as RoomState,
+        { winner: "b", reason: "abandonment" },
+      );
+
+      const logB = customLogger.infoLogs.find(
+        (l) =>
+          l.context?.roomCode === "ROOMB" &&
+          l.context?.disconnectedPlayerId === "p_white",
+      );
+      expect(logB).toBeDefined();
+
+      // Case 2: winner is undefined / draw
+      await capturedOnForfeit!(
+        {
+          roomCode: "ROOMB2",
+          whitePlayer: { id: "p_white" },
+          blackPlayer: { id: "p_black" },
+        } as unknown as RoomState,
+        { winner: undefined, reason: "abandonment" } as unknown as GameOverPayload,
+      );
+
+      const logDraw = customLogger.infoLogs.find(
+        (l) =>
+          l.context?.roomCode === "ROOMB2" &&
+          l.context?.disconnectedPlayerId === undefined,
+      );
+      expect(logDraw).toBeDefined();
+    });
+
+    it("falls back to req.sessionToken in reconnect handler when result.sessionToken is undefined", async () => {
+      const mockService = {
+        reconnect: vi.fn().mockResolvedValue({
+          room: { roomCode: "FALL", status: "playing" },
+          player: { id: "p_recon", name: "Recon" },
+          sessionToken: undefined,
+        }),
+      } as unknown as RoomService;
+
+      const reconnSock = new TestSocket("sock_recon_fallback");
+      registerRoomSocketHandlers(
+        io as unknown as TypedSocketServer,
+        reconnSock as unknown as Socket,
+        mockService,
+        logger,
+        rateLimiter,
+      );
+
+      let ack: TestAckResponse | undefined;
+      await reconnSock.trigger(
+        "room:reconnect",
+        {
+          roomCode: "FALL",
+          playerId: "4e8b6ec1-49b3-4bef-bef0-8eed1df14a50",
+          sessionToken: "client_req_token",
+        },
+        (res) => {
+          ack = res;
+        },
+      );
+
+      expect(ack?.success).toBe(true);
+      expect(ack?.sessionToken).toBe("client_req_token");
+      expect(reconnSock.data.sessionToken).toBe("client_req_token");
     });
   });
 });

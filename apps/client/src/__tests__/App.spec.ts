@@ -100,6 +100,31 @@ describe('App.vue Shell & Navigation Integration', () => {
       }),
     });
 
+    // Stub HTMLCanvasElement getContext to eliminate jsdom 'not implemented' warning log (ENH-018)
+    const mock2dContext = new Proxy(
+      {
+        canvas: {},
+        clearRect: vi.fn(),
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+        getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(1000) })),
+        putImageData: vi.fn(),
+        createImageData: vi.fn().mockReturnValue({ data: new Uint8ClampedArray(1000) }),
+        measureText: vi.fn(() => ({ width: 0 })),
+      },
+      {
+        get(target, prop) {
+          if (prop in target) {
+            return (target as Record<string, unknown>)[prop as string];
+          }
+          return vi.fn();
+        },
+      }
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      mock2dContext as unknown as CanvasRenderingContext2D
+    );
+
     const { resetSnooze, setDeferredPrompt, setInstalled, closeInstallModal } = usePwaInstall();
     resetSnooze();
     setDeferredPrompt(null);

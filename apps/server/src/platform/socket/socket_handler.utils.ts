@@ -24,9 +24,23 @@ export interface FeatureSocketHandlerOptions<TReq> {
 }
 
 /**
+ * Formats operation-specific rate limit error description (ENH-006).
+ */
+export function formatOperationRateLimitMessage(
+  op: string,
+  defaultLimitDesc: string,
+): string {
+  const opDesc = OPERATION_RATE_LIMIT_DESCRIPTIONS[op];
+  if (opDesc) {
+    return `Rate limit exceeded for ${opDesc}. ${defaultLimitDesc}`;
+  }
+  return `Rate limit exceeded for ${op}. ${defaultLimitDesc}`;
+}
+
+/**
  * Reusable strictly typed wrapper for feature socket handlers (MAJ-021).
- * Consolidates rate-limit proxy logging, operation-specific error description customization,
- * and delegates to the platform wrapSocketHandler.
+ * Eliminates ES6 dynamic proxies (ENH-006) by providing custom rate limit error formatting
+ * directly to the platform wrapSocketHandler.
  */
 export function createFeatureSocketHandler<TReq, TRes>(
   logger: Logger,
@@ -35,53 +49,16 @@ export function createFeatureSocketHandler<TReq, TRes>(
   options: FeatureSocketHandlerOptions<TReq>,
   handler: (req: TReq, context: SocketOperationContext) => Promise<TRes>,
 ): (rawReq: unknown, callback?: (res: unknown) => void) => Promise<void> {
-  const getMessage = (op: string): string => {
-    const limitDesc = options.rateLimiter.getLimitDescription();
-    const opDesc = OPERATION_RATE_LIMIT_DESCRIPTIONS[op];
-    if (opDesc) {
-      return `Rate limit exceeded for ${opDesc}. ${limitDesc}`;
-    }
-    return `Rate limit exceeded for ${op}. ${limitDesc}`;
-  };
-
-  const proxiedSocket = new Proxy(socket, {
-    get(target, prop, receiver) {
-      if (prop === "emit") {
-        return (event: string, ...args: unknown[]) => {
-          const firstArg = args[0] as { code?: string; message?: string } | undefined;
-          if (event === "error" && firstArg?.code === "ERR_RATE_LIMITED") {
-            firstArg.message = getMessage(operationName);
-          }
-          return (target as unknown as { emit: (e: string, ...a: unknown[]) => unknown }).emit(
-            event,
-            ...args,
-          );
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-
-  const rateLimitLogger: Logger = new Proxy(logger, {
-    get(target, prop, receiver) {
-      if (prop === "warn") {
-        return (msg: string, meta?: Record<string, unknown>) => {
-          if (msg === "Operation rate limit exceeded" && meta?.operation) {
-            target.warn("Operation rate limit exceeded", meta);
-          } else {
-            target.warn(msg, meta);
-          }
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-
   const wrapped = wrapSocketHandler<TReq, TRes>(
-    rateLimitLogger,
+    logger,
     operationName,
-    proxiedSocket,
-    options,
+    socket,
+    {
+      schema: options.schema,
+      rateLimiter: options.rateLimiter,
+      trustProxy: options.trustProxy,
+      rateLimitErrorMessage: formatOperationRateLimitMessage,
+    },
     handler,
   );
 

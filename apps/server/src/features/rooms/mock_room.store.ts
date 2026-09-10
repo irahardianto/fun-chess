@@ -6,7 +6,12 @@ import {
   type IClock,
 } from "@fun-chess/shared";
 import { SystemClock } from "../../platform/time/index.js";
-import { RoomStore, RoomMutator } from "./room.store.js";
+import {
+  RoomStore,
+  RoomMutator,
+  StorageQueryOptions,
+  StorageMutationOptions,
+} from "./room.store.js";
 import {
   RoomNotFoundError,
   OptimisticLockConflictError,
@@ -33,8 +38,11 @@ export class MockRoomStore implements RoomStore {
     this.clock = clock ?? new SystemClock();
   }
 
-
-  public async save(room: RoomState, expectedVersion?: number): Promise<void> {
+  public async save(
+    room: RoomState,
+    expectedVersion?: number,
+    _options?: StorageMutationOptions,
+  ): Promise<void> {
     const code = room.roomCode.toUpperCase();
     const existing = this.rooms.get(code);
 
@@ -60,7 +68,10 @@ export class MockRoomStore implements RoomStore {
     this.rooms.set(code, roomToSave);
   }
 
-  public async createIfAbsent(room: RoomState): Promise<void> {
+  public async createIfAbsent(
+    room: RoomState,
+    _options?: StorageMutationOptions,
+  ): Promise<void> {
     const code = room.roomCode.toUpperCase();
     await this.withLock(code, async () => {
       if (this.rooms.has(code)) {
@@ -79,6 +90,7 @@ export class MockRoomStore implements RoomStore {
   public async mutate<T>(
     roomCode: string,
     mutator: RoomMutator<T>,
+    _options?: StorageMutationOptions | string,
   ): Promise<T> {
     return this.withLock(roomCode, async () => {
       const code = roomCode.toUpperCase();
@@ -115,11 +127,15 @@ export class MockRoomStore implements RoomStore {
     _roomCode: string,
     action: () => Promise<T>,
     _correlationId?: string,
+    _options?: StorageQueryOptions,
   ): Promise<T> {
     return await action();
   }
 
-  public async findByCode(roomCode: string): Promise<RoomState | null> {
+  public async findByCode(
+    roomCode: string,
+    _options?: StorageQueryOptions,
+  ): Promise<RoomState | null> {
     const code = roomCode.toUpperCase();
     const room = this.rooms.get(code);
     return room ? structuredClone(room) : null;
@@ -127,6 +143,7 @@ export class MockRoomStore implements RoomStore {
 
   public async findBySocketId(
     socketId: string,
+    _options?: StorageQueryOptions,
   ): Promise<{ room: RoomState; playerId: string } | null> {
     for (const room of this.rooms.values()) {
       if (room.whitePlayer?.socketId === socketId) {
@@ -143,21 +160,30 @@ export class MockRoomStore implements RoomStore {
     return null;
   }
 
-  public async delete(roomCode: string): Promise<boolean> {
+  public async delete(
+    roomCode: string,
+    _options?: StorageMutationOptions,
+  ): Promise<boolean> {
     const code = roomCode.toUpperCase();
     this.deleteCalls.push(code);
     return this.rooms.delete(code);
   }
 
-  public async listActiveRooms(): Promise<RoomState[]> {
+  public async listActiveRooms(
+    _options?: StorageQueryOptions,
+  ): Promise<RoomState[]> {
     return Array.from(this.rooms.values()).map((r) => structuredClone(r));
   }
 
-  public async count(): Promise<number> {
+  public async count(
+    _options?: StorageQueryOptions,
+  ): Promise<number> {
     return this.rooms.size;
   }
 
-  public async clear(): Promise<void> {
+  public async clear(
+    _options?: StorageMutationOptions,
+  ): Promise<void> {
     this.rooms.clear();
     this.saveCalls = [];
     this.deleteCalls = [];

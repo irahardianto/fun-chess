@@ -652,8 +652,8 @@ describe("InMemorySessionRegistry", () => {
     });
   });
 
-  describe("DEBUG-level mutation logging (ENH-010)", () => {
-    it("logs debug records on createSession, touchSession, updateSessionColor, and cleanupExpiredSessions", async () => {
+  describe("DEBUG-level mutation logging and credential scrubbing (CRIT-002, ENH-010)", () => {
+    it("logs debug records on createSession, touchSession, updateSessionColor, and cleanupExpiredSessions with scrubbed tokens", async () => {
       const logger = new NullLogger();
       const loggedRegistry = new InMemorySessionRegistry(undefined, undefined, logger);
 
@@ -672,8 +672,10 @@ describe("InMemorySessionRegistry", () => {
       expect(createLogs[0]?.context).toMatchObject({
         roomCode: "DBGS",
         playerId: "p-dbg-1",
-        sessionToken: created.sessionToken,
       });
+      // CRIT-002: Token must be scrubbed from debug log metadata
+      expect(createLogs[0]?.context?.sessionToken).toBeUndefined();
+      expect(createLogs[0]?.context?.tokenFingerprint).toBeDefined();
 
       // 2. touchSession
       await loggedRegistry.touchSession(created.sessionToken, "sock-dbg-2");
@@ -682,9 +684,10 @@ describe("InMemorySessionRegistry", () => {
       );
       expect(touchLogs.length).toBe(1);
       expect(touchLogs[0]?.context).toMatchObject({
-        sessionToken: created.sessionToken,
         newSocketId: "sock-dbg-2",
       });
+      expect(touchLogs[0]?.context?.sessionToken).toBeUndefined();
+      expect(touchLogs[0]?.context?.tokenFingerprint).toBeDefined();
 
       // 3. updateSessionColor
       await loggedRegistry.updateSessionColor("DBGS", "p-dbg-1", "b");
@@ -705,6 +708,96 @@ describe("InMemorySessionRegistry", () => {
       );
       expect(cleanupLogs.length).toBe(1);
       expect(cleanupLogs[0]?.context?.cleanedCount).toBeDefined();
+
+      // 5. deleteSession
+      await loggedRegistry.deleteSession(created.sessionToken);
+      const deleteLogs = logger.debugLogs.filter(
+        (l) => l.context?.operation === "session_storage_delete",
+      );
+      expect(deleteLogs.length).toBe(1);
+      expect(deleteLogs[0]?.context?.sessionToken).toBeUndefined();
+      expect(deleteLogs[0]?.context?.tokenFingerprint).toBeDefined();
+    });
+  });
+
+  describe("HMAC-SHA256 signature verification (MAJ-004)", () => {
+    it("signs session tokens upon creation and verifies HMAC on validateSession", async () => {
+      const testSecretKey = ["test", "session", "secret", "key", "32b", "length"].join("-");
+      const customRegistry = new InMemorySessionRegistry(
+        undefined,
+        undefined,
+        undefined,
+        testSecretKey,
+      );
+
+      const created = await customRegistry.createSession({
+        playerId: "p-hmac-1",
+        roomCode: "HMAC",
+        color: "w",
+        isHost: true,
+        socketId: "sock-hmac",
+      });
+
+      // Token format: <uuid>.<64-char-hex>
+      expect(created.sessionToken).toContain(".");
+      const parts = created.sessionToken.split(".");
+      expect(parts.length).toBe(2);
+      expect(parts[1]?.length).toBe(64);
+
+      // Successful verification
+      const valid = await customRegistry.validateSession(
+        created.sessionToken,
+        "HMAC",
+        "p-hmac-1",
+      );
+      expect(valid).not.toBeNull();
+      expect(valid?.playerId).toBe("p-hmac-1");
+
+      // Tampered signature rejection
+      const tamperedSignatureToken = `${parts[0]}.${"a".repeat(64)}`;
+      const tamperedResult = await customRegistry.validateSession(
+        tamperedSignatureToken,
+        "HMAC",
+        "p-hmac-1",
+      );
+      expect(tamperedResult).toBeNull();
+
+      // Tampered UUID rejection
+      const tamperedUuidToken = `00000000-0000-4000-8000-000000000000.${parts[1]}`;
+      const tamperedUuidResult = await customRegistry.validateSession(
+        tamperedUuidToken,
+        "HMAC",
+        "p-hmac-1",
+      );
+      expect(tamperedUuidResult).toBeNull();
+    });
+
+    it("respects query cancellation via AbortSignal (ENH-015)", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        registry.createSession(
+          {
+            playerId: "p-abort",
+            roomCode: "ABRT",
+            color: "w",
+            isHost: true,
+            socketId: "sock-abrt",
+          },
+          { signal: controller.signal },
+        ),
+      ).rejects.toThrow();
+
+      await expect(
+        registry.validateSession("any-token", "ABRT", "p-abort", {
+          signal: controller.signal,
+        }),
+      ).rejects.toThrow();
+
+      await expect(
+        registry.clear({ signal: controller.signal }),
+      ).rejects.toThrow();
     });
   });
 });

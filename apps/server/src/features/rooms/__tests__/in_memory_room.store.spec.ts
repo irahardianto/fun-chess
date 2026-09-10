@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { InMemoryRoomStore } from "../in_memory_room.store.js";
+import { InMemoryRoomStore, deepFreeze } from "../in_memory_room.store.js";
 import { RoomState } from "@fun-chess/shared";
 import {
   RoomNotFoundError,
@@ -8,16 +8,20 @@ import {
   LockExecutionTimeoutError,
   RoomCapacityExceededError,
   RoomBusyError,
+  StaleLockExecutionError,
 } from "../room.errors.js";
 import { NullLogger } from "../../../platform/logger/null_logger.js";
 import type { Logger } from "../../../platform/logger/index.js";
 
 interface TestableStore {
+  rooms: Map<string, unknown>;
   lockQueues: Map<string, unknown>;
+  socketIndex: Map<string, unknown>;
   LOCK_TIMEOUT_MS: number;
   EXECUTION_TIMEOUT_MS: number;
   cancelledTickets: Set<number>;
   trackCancelledTicket(ticket: number): void;
+  assertTicketValid(code: string, explicitContext?: unknown): void;
 }
 
 function testStore(s: InMemoryRoomStore): TestableStore {
@@ -152,14 +156,19 @@ describe("InMemoryRoomStore", () => {
       expect(await store.count()).toBe(3);
     });
 
-    it("guarantees deep immutability so external mutations do not contaminate store", async () => {
+    it("guarantees deep immutability so external mutations do not contaminate store (ENH-013)", async () => {
       const room = createDummyRoom("SAFE");
       await store.save(room);
 
       const fetched = await store.findByCode("SAFE");
-      if (fetched && fetched.whitePlayer) {
-        fetched.whitePlayer.name = "HACKED_NAME";
-      }
+      expect(fetched).not.toBeNull();
+      expect(Object.isFrozen(fetched)).toBe(true);
+      expect(Object.isFrozen(fetched?.whitePlayer)).toBe(true);
+      expect(() => {
+        if (fetched && fetched.whitePlayer) {
+          (fetched.whitePlayer as any).name = "HACKED_NAME";
+        }
+      }).toThrow(TypeError);
 
       const reFetched = await store.findByCode("SAFE");
       expect(reFetched?.whitePlayer?.name).toBe("Player White");
@@ -794,6 +803,352 @@ describe("InMemoryRoomStore", () => {
         return `outer_${nested}`;
       });
       expect(result).toBe("outer_nested_success");
+    });
+  });
+
+  describe("deepFreeze utility (ENH-013)", () => {
+    it("returns primitives and null as-is", () => {
+      expect(deepFreeze(null)).toBeNull();
+      expect(deepFreeze(undefined)).toBeUndefined();
+      expect(deepFreeze(42)).toBe(42);
+      expect(deepFreeze("str")).toBe("str");
+      expect(deepFreeze(true)).toBe(true);
+    });
+
+    it("deeply freezes nested objects and arrays", () => {
+      const complex = {
+        level1: {
+          level2: {
+            items: [1, 2, { name: "nested" }],
+          },
+        },
+      };
+      const frozen = deepFreeze(complex);
+      expect(Object.isFrozen(frozen)).toBe(true);
+      expect(Object.isFrozen(frozen.level1)).toBe(true);
+      expect(Object.isFrozen(frozen.level1.level2)).toBe(true);
+      expect(Object.isFrozen(frozen.level1.level2.items)).toBe(true);
+      expect(Object.isFrozen(frozen.level1.level2.items[2])).toBe(true);
+
+      expect(() => {
+        (frozen.level1 as any).foo = "bar";
+      }).toThrow(TypeError);
+    });
+
+    it("safely handles objects where sub-properties are already frozen", () => {
+      const sub = Object.freeze({ child: 1 });
+      const parent = { sub };
+      const frozen = deepFreeze(parent);
+      expect(Object.isFrozen(frozen)).toBe(true);
+      expect(frozen.sub.child).toBe(1);
+    });
+  });
+
+  describe("AbortSignal cancellation (ENH-015)", () => {
+    it("rejects read queries immediately when signal is already aborted", async () => {
+      const ac = new AbortController();
+      ac.abort();
+
+      await expect(store.findByCode("TEST", { signal: ac.signal })).rejects.toThrow();
+      await expect(store.findBySocketId("sock_1", { signal: ac.signal })).rejects.toThrow();
+      await expect(store.listActiveRooms({ signal: ac.signal })).rejects.toThrow();
+      await expect(store.count({ signal: ac.signal })).rejects.toThrow();
+    });
+
+    it("rejects mutations immediately when signal is already aborted", async () => {
+      const ac = new AbortController();
+      ac.abort();
+      const room = createDummyRoom("ABRT");
+
+      await expect(store.save(room, undefined, { signal: ac.signal })).rejects.toThrow();
+      await expect(store.createIfAbsent(room, { signal: ac.signal })).rejects.toThrow();
+      await expect(store.delete("ABRT", { signal: ac.signal })).rejects.toThrow();
+      await expect(store.clear({ signal: ac.signal })).rejects.toThrow();
+      await expect(
+        store.mutate("ABRT", (r) => ({ updatedRoom: r, result: 1 }), { signal: ac.signal }),
+      ).rejects.toThrow();
+      await expect(
+        store.withLock("ABRT", async () => 1, undefined, { signal: ac.signal }),
+      ).rejects.toThrow();
+    });
+
+    it("aborts in-flight withLock waiting in lock queue when signal fires", async () => {
+      const code = "ABQT";
+      let releaseHolder!: () => void;
+      const holderBlocker = new Promise<void>((r) => {
+        releaseHolder = r;
+      });
+
+      // 1. Holder holds lock
+      const holder = store.withLock(code, async () => {
+        await holderBlocker;
+        return "holder_done";
+      });
+
+      // Allow holder to acquire
+      await new Promise((r) => setTimeout(r, 10));
+
+      // 2. Waiter queued with AbortSignal
+      const ac = new AbortController();
+      const waiter = store.withLock(
+        code,
+        async () => "waiter_done",
+        undefined,
+        { signal: ac.signal },
+      );
+
+      // Give waiter a moment to enter queue
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Abort waiter
+      ac.abort();
+
+      await expect(waiter).rejects.toThrow();
+
+      // Release holder and confirm holder completes normally
+      releaseHolder();
+      expect(await holder).toBe("holder_done");
+    });
+  });
+
+  describe("Secondary socket index self-healing & fallback re-indexing (MIN-028)", () => {
+    it("re-indexes sockets into primary index when fallback search finds white player", async () => {
+      const room = createDummyRoom("REIX");
+      await store.save(room);
+
+      // Simulate index desync: clear socketIndex while room is still in rooms map
+      testStore(store).socketIndex.clear();
+      expect(testStore(store).socketIndex.size).toBe(0);
+
+      // Fallback search should find room by white player's socketId
+      const found = await store.findBySocketId("sock_white");
+      expect(found).not.toBeNull();
+      expect(found?.playerId).toBe("p_white");
+
+      // Verify that socketIndex was healed and re-populated
+      expect(testStore(store).socketIndex.has("sock_white")).toBe(true);
+      expect(testStore(store).socketIndex.has("sock_black")).toBe(true);
+      expect(testStore(store).socketIndex.has("sock_spec")).toBe(true);
+    });
+
+    it("re-indexes sockets into primary index when fallback search finds black player", async () => {
+      const room = createDummyRoom("REBK");
+      await store.save(room);
+
+      testStore(store).socketIndex.clear();
+
+      const found = await store.findBySocketId("sock_black");
+      expect(found).not.toBeNull();
+      expect(found?.playerId).toBe("p_black");
+
+      expect(testStore(store).socketIndex.has("sock_black")).toBe(true);
+    });
+
+    it("re-indexes sockets into primary index when fallback search finds spectator", async () => {
+      const room = createDummyRoom("RESP");
+      await store.save(room);
+
+      testStore(store).socketIndex.clear();
+
+      const found = await store.findBySocketId("sock_spec");
+      expect(found).not.toBeNull();
+      expect(found?.playerId).toBe("p_spec");
+
+      expect(testStore(store).socketIndex.has("sock_spec")).toBe(true);
+    });
+
+    it("cleans up stale socket index entry if room no longer contains socketId", async () => {
+      const room = createDummyRoom("STAL");
+      await store.save(room);
+
+      // Manually insert an obsolete entry into socketIndex
+      testStore(store).socketIndex.set("sock_obsolete", {
+        roomCode: "STAL",
+        playerId: "p_unknown",
+      });
+
+      const found = await store.findBySocketId("sock_obsolete");
+      expect(found).toBeNull();
+      expect(testStore(store).socketIndex.has("sock_obsolete")).toBe(false);
+    });
+  });
+
+  describe("Constructor Overloads and Options Parsing", () => {
+    it("handles InMemoryRoomStoreOptions object configuration", () => {
+      const s = new InMemoryRoomStore({
+        maxRooms: 50,
+        maxCancelledTickets: 100,
+        lockTimeoutMs: 1234,
+        executionTimeoutMs: 4321,
+        maxQueueDepth: 10,
+      });
+
+      expect(s.maxRooms).toBe(50);
+      expect(s.MAX_CANCELLED_TICKETS).toBe(100);
+      expect(s.LOCK_TIMEOUT_MS).toBe(1234);
+      expect(s.EXECUTION_TIMEOUT_MS).toBe(4321);
+      expect(s.maxQueueDepth).toBe(10);
+    });
+
+    it("handles positional logger and options parameter configuration", () => {
+      const logger = new NullLogger();
+      const s = new InMemoryRoomStore(logger, undefined, {
+        lockTimeoutMs: 2000,
+        executionTimeoutMs: 3000,
+        maxRooms: 500,
+        maxCancelledTickets: 250,
+        maxQueueDepth: 25,
+      });
+
+      expect(s.LOCK_TIMEOUT_MS).toBe(2000);
+      expect(s.EXECUTION_TIMEOUT_MS).toBe(3000);
+      expect(s.maxRooms).toBe(500);
+      expect(s.MAX_CANCELLED_TICKETS).toBe(250);
+      expect(s.maxQueueDepth).toBe(25);
+    });
+
+    it("handles 4th argument options", () => {
+      const logger = new NullLogger();
+      const s = new InMemoryRoomStore(
+        undefined,
+        undefined,
+        logger,
+        {
+          lockTimeoutMs: 999,
+          executionTimeoutMs: 888,
+          maxRooms: 777,
+          maxCancelledTickets: 666,
+          maxQueueDepth: 55,
+        },
+      );
+
+      expect(s.LOCK_TIMEOUT_MS).toBe(999);
+      expect(s.EXECUTION_TIMEOUT_MS).toBe(888);
+      expect(s.maxRooms).toBe(777);
+      expect(s.MAX_CANCELLED_TICKETS).toBe(666);
+      expect(s.maxQueueDepth).toBe(55);
+    });
+  });
+
+  describe("assertTicketValid Edge Cases", () => {
+    it("ignores assertTicketValid when context roomCode does not match", () => {
+      expect(() => {
+        testStore(store).assertTicketValid("CODE_A", {
+          roomCode: "CODE_B",
+          ticket: 1,
+          isCancelled: () => false,
+        });
+      }).not.toThrow();
+    });
+
+    it("throws StaleLockExecutionError when ticket is cancelled or active ticket does not match", () => {
+      testStore(store).trackCancelledTicket(99);
+
+      expect(() => {
+        testStore(store).assertTicketValid("TICK", {
+          roomCode: "TICK",
+          ticket: 99,
+          isCancelled: () => true,
+        });
+      }).toThrow(StaleLockExecutionError);
+    });
+  });
+
+  describe("Additional Branch Coverage (MAJ-001)", () => {
+    it("handles rooms with spectators without socketIds and players without socketIds", async () => {
+      const room = createDummyRoom("NOSOCK");
+      room.whitePlayer = undefined;
+      room.blackPlayer = undefined;
+      room.spectators = [
+        {
+          id: "p_spec_nosock",
+          name: "NoSockSpec",
+          color: "w",
+          isHost: false,
+          isConnected: false,
+          connectedAt: Date.now(),
+        },
+      ];
+
+      await store.save(room);
+      const found = await store.findByCode("NOSOCK");
+      expect(found).not.toBeNull();
+      expect(await store.findBySocketId("sock_none")).toBeNull();
+    });
+
+    it("absorbs non-Error rejection from orphaned lock action without unhandled rejection", async () => {
+      const warnLogs: { msg: string; meta?: Record<string, unknown> }[] = [];
+      const mockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn((msg: string, meta?: Record<string, unknown>) => {
+          warnLogs.push({ msg, meta });
+        }),
+        error: vi.fn(),
+        child: () => mockLogger as unknown as Logger,
+      } as unknown as Logger;
+
+      const customStore = new InMemoryRoomStore({
+        executionTimeoutMs: 15,
+        logger: mockLogger,
+      });
+
+      let orphanedActionResolve!: () => void;
+      const blocker = new Promise<void>((resolve) => {
+        orphanedActionResolve = resolve;
+      });
+
+      const timedOutPromise = customStore.withLock("RAWERR", async () => {
+        await blocker;
+        // Throw non-Error primitive
+        throw "string_error_from_orphaned_action";
+      });
+
+      await expect(timedOutPromise).rejects.toThrow(LockExecutionTimeoutError);
+
+      orphanedActionResolve();
+      await new Promise((resolve) => setTimeout(resolve, 25));
+
+      const postTimeoutWarn = warnLogs.find(
+        (log) => log.msg === "Orphaned lock action rejected after execution timeout",
+      );
+      expect(postTimeoutWarn).toBeDefined();
+      expect(postTimeoutWarn?.meta?.error).toEqual({
+        raw: "string_error_from_orphaned_action",
+      });
+    });
+
+    it("returns false when deleting a non-existent room", async () => {
+      const deleted = await store.delete("NONEXIST");
+      expect(deleted).toBe(false);
+    });
+
+    it("preserves explicitly mutated lastActivityAt during mutate", async () => {
+      const room = createDummyRoom("ACTV");
+      await store.save(room);
+
+      const customTime = 1234567890;
+      await store.mutate("ACTV", (r) => {
+        r.lastActivityAt = customTime;
+        return { updatedRoom: r, result: "ok" };
+      });
+
+      const updated = await store.findByCode("ACTV");
+      expect(updated?.lastActivityAt).toBe(customTime);
+    });
+
+    it("chains subsequent lock acquisition when previous waiter in tail rejects", async () => {
+      const code = "TAILREJ";
+      // First action throws an error
+      await expect(
+        store.withLock(code, async () => {
+          throw new Error("Action failed");
+        }),
+      ).rejects.toThrow("Action failed");
+
+      // Next action should still acquire successfully
+      const res = await store.withLock(code, async () => "next_ok");
+      expect(res).toBe("next_ok");
     });
   });
 });

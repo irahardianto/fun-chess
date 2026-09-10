@@ -5,4 +5,6 @@ export * from './usePuzzleHints';
 export * from './usePuzzleReplay';
 export * from './useAdaptiveLadder';
 export * from './usePuzzleRush';
+export * from './usePuzzleRushTimer';
+export * from './usePuzzleAnimationState';
 export * from './useThemedDrills';

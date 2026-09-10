@@ -12,6 +12,8 @@ describe('GameHud.vue', () => {
     isConnected: true,
     isHost: true,
     connectedAt: Date.now(),
+    createdAt: 1000,
+    updatedAt: 1000,
   };
 
   const mockBlackPlayer: Player = {
@@ -22,6 +24,8 @@ describe('GameHud.vue', () => {
     isConnected: true,
     isHost: false,
     connectedAt: Date.now(),
+    createdAt: 1000,
+    updatedAt: 1000,
   };
 
   const mockGameState: GameState = {

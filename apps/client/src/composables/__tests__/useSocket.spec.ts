@@ -64,6 +64,8 @@ describe('useSocket composable', () => {
         isHost: true,
         isConnected: true,
         connectedAt: Date.now(),
+        createdAt: 1000,
+        updatedAt: 1000,
       },
       blackPlayer: null,
       spectators: [],
@@ -107,6 +109,8 @@ describe('useSocket composable', () => {
       isHost: false,
       isConnected: true,
       connectedAt: Date.now(),
+      createdAt: 1000,
+      updatedAt: 1000,
     };
 
     const mockJoinedRoom: RoomState = {
@@ -159,6 +163,8 @@ describe('useSocket composable', () => {
       isHost: true,
       isConnected: true,
       connectedAt: Date.now(),
+      createdAt: 1000,
+      updatedAt: 1000,
     };
 
     const mockRoom: RoomState = {
@@ -483,6 +489,8 @@ describe('useSocket composable', () => {
       isHost: true,
       isConnected: true,
       connectedAt: Date.now(),
+      createdAt: 1000,
+      updatedAt: 1000,
     };
 
     const initialBlackPlayer: Player = {
@@ -493,6 +501,8 @@ describe('useSocket composable', () => {
       isHost: false,
       isConnected: true,
       connectedAt: Date.now(),
+      createdAt: 1000,
+      updatedAt: 1000,
     };
 
     currentRoom.value = {
@@ -584,6 +594,8 @@ describe('useSocket composable', () => {
         isConnected: true,
         socketId: 'old_sock_1',
         connectedAt: Date.now(),
+        createdAt: 1000,
+        updatedAt: 1000,
       },
       blackPlayer: null,
       spectators: [],
@@ -657,6 +669,8 @@ describe('useSocket composable', () => {
       isHost: true,
       isConnected: true,
       connectedAt: Date.now(),
+      createdAt: 1000,
+      updatedAt: 1000,
     };
 
     currentRoom.value = {
@@ -839,9 +853,9 @@ describe('useSocket composable', () => {
   it('should handle room:player_left by clearing departed player from room state (MAJ-021)', () => {
     const { currentRoom, currentPlayer } = useSocket(mockSocket);
 
-    const whiteP: Player = { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 };
-    const blackP: Player = { id: 'p2', socketId: 's2', name: 'P2', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 };
-    const specP: Player = { id: 'p3', socketId: 's3', name: 'P3', color: 'w', isHost: false, isConnected: true, connectedAt: 1000 };
+    const whiteP: Player = { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 };
+    const blackP: Player = { id: 'p2', socketId: 's2', name: 'P2', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 };
+    const specP: Player = { id: 'p3', socketId: 's3', name: 'P3', color: 'w', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 };
 
     const dummyRoom: RoomState = {
       roomCode: 'JOIN1',
@@ -1382,6 +1396,8 @@ describe('useSocket composable', () => {
         isHost: true,
         isConnected: true,
         connectedAt: 1000,
+        createdAt: 1000,
+        updatedAt: 1000,
       };
 
       const blackPlayer: Player = {
@@ -1392,6 +1408,8 @@ describe('useSocket composable', () => {
         isHost: false,
         isConnected: true,
         connectedAt: 1000,
+        createdAt: 1000,
+        updatedAt: 1000,
       };
 
       currentRoom.value = {
@@ -1436,6 +1454,8 @@ describe('useSocket composable', () => {
           isHost: true,
           isConnected: false,
           connectedAt: 1000,
+          createdAt: 1000,
+          updatedAt: 1000,
         },
         blackPlayer: {
           id: 'p2',
@@ -1445,6 +1465,8 @@ describe('useSocket composable', () => {
           isHost: false,
           isConnected: false,
           connectedAt: 1000,
+          createdAt: 1000,
+          updatedAt: 1000,
         },
         spectators: [],
         game: {} as GameState,
@@ -1456,16 +1478,16 @@ describe('useSocket composable', () => {
       // White player reconnects
       eventHandlers['room:player_reconnected']({ playerId: 'p1', playerName: 'WhitePlayer' });
 
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(true);
       // Status remains paused_disconnect since blackPlayer is still disconnected
-      expect(currentRoom.value.status).toBe('paused_disconnect');
+      expect(currentRoom.value!.status).toBe('paused_disconnect');
 
       // Black player reconnects
       eventHandlers['room:player_reconnected']({ playerId: 'p2', playerName: 'BlackPlayer' });
 
-      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.blackPlayer?.isConnected).toBe(true);
       // Status returns to playing
-      expect(currentRoom.value.status).toBe('playing');
+      expect(currentRoom.value!.status).toBe('playing');
     });
 
     it('should only transition status to paused_disconnect if previous status was playing (MAJ-001)', () => {
@@ -1476,7 +1498,7 @@ describe('useSocket composable', () => {
         roomCode: 'LOBY',
         status: 'lobby',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         blackPlayer: null,
         spectators: [],
         game: {} as GameState,
@@ -1486,19 +1508,19 @@ describe('useSocket composable', () => {
       };
 
       eventHandlers['room:player_disconnected']({ playerId: 'p1', gracePeriodMs: 60000 });
-      expect(currentRoom.value.status).toBe('lobby');
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+      expect(currentRoom.value!.status).toBe('lobby');
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(false);
 
       // Case 2: In game_over, player disconnects -> status stays 'game_over'
       currentRoom.value = {
         ...currentRoom.value,
         status: 'game_over',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'P1', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
       };
 
       eventHandlers['room:player_disconnected']({ playerId: 'p1', gracePeriodMs: 60000 });
-      expect(currentRoom.value.status).toBe('game_over');
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+      expect(currentRoom.value!.status).toBe('game_over');
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(false);
     });
 
     it('should mark spectator isConnected = false on spectator disconnect but NOT change room status to paused_disconnect (room stays playing)', () => {
@@ -1512,6 +1534,8 @@ describe('useSocket composable', () => {
         isHost: false,
         isConnected: true,
         connectedAt: 1000,
+        createdAt: 1000,
+        updatedAt: 1000,
       };
 
       const spectator2: Player = {
@@ -1522,14 +1546,16 @@ describe('useSocket composable', () => {
         isHost: false,
         isConnected: true,
         connectedAt: 1000,
+        createdAt: 1000,
+        updatedAt: 1000,
       };
 
       currentRoom.value = {
         roomCode: 'PLAY',
         status: 'playing',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
-        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         spectators: [spectator1, spectator2],
         game: {} as GameState,
         rematch: null,
@@ -1540,19 +1566,19 @@ describe('useSocket composable', () => {
       // Disconnect spectator1 via playerId
       eventHandlers['room:player_disconnected']({ playerId: 'spec_1', gracePeriodMs: 60000 });
 
-      expect(currentRoom.value.status).toBe('playing');
-      expect(currentRoom.value.spectators[0]!.isConnected).toBe(false);
-      expect(currentRoom.value.spectators[1]!.isConnected).toBe(true);
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
-      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.status).toBe('playing');
+      expect(currentRoom.value!.spectators[0]!.isConnected).toBe(false);
+      expect(currentRoom.value!.spectators[1]!.isConnected).toBe(true);
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.blackPlayer?.isConnected).toBe(true);
 
       // Disconnect spectator2 via player object
       eventHandlers['room:player_disconnected']({ player: spectator2, gracePeriodMs: 60000 });
 
-      expect(currentRoom.value.status).toBe('playing');
-      expect(currentRoom.value.spectators[1]!.isConnected).toBe(false);
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
-      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.status).toBe('playing');
+      expect(currentRoom.value!.spectators[1]!.isConnected).toBe(false);
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.blackPlayer?.isConnected).toBe(true);
     });
 
     it('should transition room status to paused_disconnect on white player disconnect', () => {
@@ -1562,8 +1588,8 @@ describe('useSocket composable', () => {
         roomCode: 'PLAY',
         status: 'playing',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
-        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         spectators: [],
         game: {} as GameState,
         rematch: null,
@@ -1573,9 +1599,9 @@ describe('useSocket composable', () => {
 
       eventHandlers['room:player_disconnected']({ playerId: 'p1', gracePeriodMs: 60000 });
 
-      expect(currentRoom.value.status).toBe('paused_disconnect');
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
-      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.status).toBe('paused_disconnect');
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(false);
+      expect(currentRoom.value!.blackPlayer?.isConnected).toBe(true);
     });
 
     it('should transition room status to paused_disconnect on black player disconnect', () => {
@@ -1585,8 +1611,8 @@ describe('useSocket composable', () => {
         roomCode: 'PLAY',
         status: 'playing',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
-        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         spectators: [],
         game: {} as GameState,
         rematch: null,
@@ -1596,9 +1622,9 @@ describe('useSocket composable', () => {
 
       eventHandlers['room:player_disconnected']({ playerId: 'p2', gracePeriodMs: 60000 });
 
-      expect(currentRoom.value.status).toBe('paused_disconnect');
-      expect(currentRoom.value.blackPlayer?.isConnected).toBe(false);
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.status).toBe('paused_disconnect');
+      expect(currentRoom.value!.blackPlayer?.isConnected).toBe(false);
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(true);
     });
 
     it('should NOT transition room status to paused_disconnect when room status is waiting', () => {
@@ -1608,7 +1634,7 @@ describe('useSocket composable', () => {
         roomCode: 'WAIT',
         status: 'waiting' as any,
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         blackPlayer: null,
         spectators: [],
         game: {} as GameState,
@@ -1619,8 +1645,8 @@ describe('useSocket composable', () => {
 
       eventHandlers['room:player_disconnected']({ playerId: 'p1', gracePeriodMs: 60000 });
 
-      expect(currentRoom.value.status).toBe('waiting');
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+      expect(currentRoom.value!.status).toBe('waiting');
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(false);
     });
 
     it('should handle reconnection for white, black, and spectators properly', () => {
@@ -1634,6 +1660,8 @@ describe('useSocket composable', () => {
         isHost: false,
         isConnected: false,
         connectedAt: 1000,
+        createdAt: 1000,
+        updatedAt: 1000,
       };
 
       // 1. Room is paused_disconnect because white is disconnected, black is connected
@@ -1641,8 +1669,8 @@ describe('useSocket composable', () => {
         roomCode: 'RECON',
         status: 'paused_disconnect',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: false, connectedAt: 1000 },
-        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: false, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         spectators: [{ ...spectator }],
         game: {} as GameState,
         rematch: null,
@@ -1652,27 +1680,27 @@ describe('useSocket composable', () => {
 
       // White reconnects -> status becomes 'playing'
       eventHandlers['room:player_reconnected']({ playerId: 'p1', playerName: 'White' });
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
-      expect(currentRoom.value.status).toBe('playing');
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.status).toBe('playing');
 
       // 2. Black disconnects -> room pauses
       eventHandlers['room:player_disconnected']({ playerId: 'p2', gracePeriodMs: 60000 });
-      expect(currentRoom.value.status).toBe('paused_disconnect');
-      expect(currentRoom.value.blackPlayer?.isConnected).toBe(false);
+      expect(currentRoom.value!.status).toBe('paused_disconnect');
+      expect(currentRoom.value!.blackPlayer?.isConnected).toBe(false);
 
       // Black reconnects -> status becomes 'playing'
       eventHandlers['room:player_reconnected']({ playerId: 'p2', playerName: 'Black' });
-      expect(currentRoom.value.blackPlayer?.isConnected).toBe(true);
-      expect(currentRoom.value.status).toBe('playing');
+      expect(currentRoom.value!.blackPlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.status).toBe('playing');
 
       // 3. Spectator reconnects while room is playing -> status stays 'playing', spectator.isConnected becomes true
       eventHandlers['room:player_reconnected']({ playerId: 'spec_1', playerName: 'Watcher' });
-      expect(currentRoom.value.spectators[0]!.isConnected).toBe(true);
-      expect(currentRoom.value.status).toBe('playing');
+      expect(currentRoom.value!.spectators[0]!.isConnected).toBe(true);
+      expect(currentRoom.value!.status).toBe('playing');
 
       // 4. Reconnection with authoritative roomStatus provided in payload
       eventHandlers['room:player_reconnected']({ playerId: 'p1', playerName: 'White', roomStatus: 'game_over' });
-      expect(currentRoom.value.status).toBe('game_over');
+      expect(currentRoom.value!.status).toBe('game_over');
     });
 
     it('should reconcile authoritative roomStatus from server during disconnect', () => {
@@ -1682,9 +1710,9 @@ describe('useSocket composable', () => {
         roomCode: 'AUTH',
         status: 'playing',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
-        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
-        spectators: [{ id: 'spec_1', socketId: 's_s', name: 'Spec', color: 'w', isHost: false, isConnected: true, connectedAt: 1000 }],
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
+        spectators: [{ id: 'spec_1', socketId: 's_s', name: 'Spec', color: 'w', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 }],
         game: {} as GameState,
         rematch: null,
         createdAt: 1000,
@@ -1693,14 +1721,14 @@ describe('useSocket composable', () => {
 
       // Server sends roomStatus: 'abandoned'
       eventHandlers['room:player_disconnected']({ playerId: 'p1', roomStatus: 'abandoned' });
-      expect(currentRoom.value.status).toBe('abandoned');
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(false);
+      expect(currentRoom.value!.status).toBe('abandoned');
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(false);
 
       // Spectator disconnect with roomStatus: 'paused_disconnect' should NOT pause
-      currentRoom.value.status = 'playing';
+      currentRoom.value!.status = 'playing';
       eventHandlers['room:player_disconnected']({ playerId: 'spec_1', roomStatus: 'paused_disconnect' });
-      expect(currentRoom.value.status).toBe('playing');
-      expect(currentRoom.value.spectators[0]!.isConnected).toBe(false);
+      expect(currentRoom.value!.status).toBe('playing');
+      expect(currentRoom.value!.spectators[0]!.isConnected).toBe(false);
     });
 
     it('should safely no-op disconnect and reconnect handlers when currentRoom is null or ID is missing', () => {
@@ -1717,7 +1745,7 @@ describe('useSocket composable', () => {
         roomCode: 'NOID',
         status: 'playing',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         blackPlayer: null,
         spectators: [],
         game: {} as GameState,
@@ -1727,8 +1755,8 @@ describe('useSocket composable', () => {
       };
 
       eventHandlers['room:player_disconnected']({});
-      expect(currentRoom.value.status).toBe('playing');
-      expect(currentRoom.value.whitePlayer?.isConnected).toBe(true);
+      expect(currentRoom.value!.status).toBe('playing');
+      expect(currentRoom.value!.whitePlayer?.isConnected).toBe(true);
     });
 
     it('should handle room:reconnected event directly updating currentRoom and currentPlayer', () => {
@@ -1738,8 +1766,8 @@ describe('useSocket composable', () => {
         roomCode: 'RREC',
         status: 'playing',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
-        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         spectators: [],
         game: {} as GameState,
         rematch: null,
@@ -1755,6 +1783,8 @@ describe('useSocket composable', () => {
         isHost: true,
         isConnected: true,
         connectedAt: 1000,
+        createdAt: 1000,
+        updatedAt: 1000,
       };
 
       eventHandlers['room:reconnected']({
@@ -1778,6 +1808,8 @@ describe('useSocket composable', () => {
         isHost: true,
         isConnected: true,
         connectedAt: 1000,
+        createdAt: 1000,
+        updatedAt: 1000,
       };
 
       const guestPlayer: Player = {
@@ -1788,6 +1820,8 @@ describe('useSocket composable', () => {
         isHost: false,
         isConnected: true,
         connectedAt: 1000,
+        createdAt: 1000,
+        updatedAt: 1000,
       };
 
       // Case 1: Reconnecting as White (p1) while Black (p2) has active draw and rematch offers
@@ -2056,28 +2090,28 @@ describe('useSocket composable', () => {
     it('should handle player left for blackPlayer, spectator, and currentPlayer', () => {
       const { currentRoom, currentPlayer } = useSocket(mockSocket);
 
-      const spectator = { id: 'spec_1', socketId: 's3', name: 'Spec', color: 'w', isHost: false, isConnected: true, connectedAt: 1000 };
+      const spectator = { id: 'spec_1', socketId: 's3', name: 'Spec', color: 'w', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 };
       currentRoom.value = {
         roomCode: 'LEFT',
         status: 'playing',
         hostId: 'p1',
-        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000 },
-        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 },
+        whitePlayer: { id: 'p1', socketId: 's1', name: 'White', color: 'w', isHost: true, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
+        blackPlayer: { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 },
         spectators: [spectator as any],
         game: {} as GameState,
         rematch: null,
         createdAt: 1000,
         lastActivityAt: 1000,
       };
-      currentPlayer.value = { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000 };
+      currentPlayer.value = { id: 'p2', socketId: 's2', name: 'Black', color: 'b', isHost: false, isConnected: true, connectedAt: 1000, createdAt: 1000, updatedAt: 1000 };
 
       // Spectator leaves
       eventHandlers['room:player_left']({ playerId: 'spec_1', playerName: 'Spec', reason: 'left' });
-      expect(currentRoom.value.spectators).toHaveLength(0);
+      expect(currentRoom.value!.spectators).toHaveLength(0);
 
       // Black player (current player) leaves
       eventHandlers['room:player_left']({ playerId: 'p2', playerName: 'Black', reason: 'left' });
-      expect(currentRoom.value.blackPlayer).toBeNull();
+      expect(currentRoom.value!.blackPlayer).toBeNull();
       expect(currentPlayer.value).toBeNull();
     });
 

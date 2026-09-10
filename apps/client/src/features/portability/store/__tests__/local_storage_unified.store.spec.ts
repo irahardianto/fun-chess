@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LocalStorageUnifiedStore } from '../local_storage_unified.store';
 import { LocalStorageProgressStore } from '@/features/scenarios/store/local_storage_progress.store';
-import { LocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_store';
+import { LocalStoragePuzzleProgressStore } from '@/features/puzzles/store/local_storage_puzzle_progress.store';
 import { InMemoryUnifiedStoreMock, createEmptyUnifiedProgress } from '../in_memory_unified.store.mock';
 import type { UnifiedProgressPayload } from '@fun-chess/shared';
 

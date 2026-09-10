@@ -32,6 +32,13 @@ describe('useSocketTransport composable', () => {
       on: vi.fn((event: string, handler: Function) => {
         eventHandlers[event] = handler;
       }),
+      once: vi.fn((event: string, handler: Function) => {
+        const wrapped = (...args: any[]) => {
+          delete eventHandlers[event];
+          handler(...args);
+        };
+        eventHandlers[event] = wrapped;
+      }),
       off: vi.fn((event: string, handler: Function) => {
         if (eventHandlers[event] === handler) {
           delete eventHandlers[event];
@@ -399,6 +406,8 @@ describe('useSocketTransport composable', () => {
       isHost: true,
       isConnected: true,
       connectedAt: 1000,
+      createdAt: 1000,
+      updatedAt: 1000,
     };
 
     const validGameState: GameState = {
@@ -649,6 +658,29 @@ describe('useSocketTransport composable', () => {
 
       expect(result.success).toBe(false);
       expect(transport.lastError.value?.code).toBe('ERR_INTERNAL_SERVER');
+    });
+
+    it('aborts immediately with ERR_SOCKET_DISCONNECTED when socket disconnects during in-flight operation (Gap 4)', async () => {
+      const transport = useSocketTransport(mockSocket);
+      mockSocket.emit.mockImplementation(() => {});
+
+      const onError = vi.fn();
+      const promise = emitWithTimeout(mockSocket, 'room:create', {}, {
+        operation: 'test_disconnect_in_flight',
+        timeoutMs: 8000,
+        timeoutMessage: 'Timed out',
+        onError,
+      });
+
+      // Simulate unexpected disconnect before 8s timeout
+      mockSocket.disconnect();
+
+      const result = await promise;
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('ERR_SOCKET_DISCONNECTED');
+      expect(result.error?.message).toContain('Socket disconnected while operation was in flight');
+      expect(transport.lastError.value?.code).toBe('ERR_SOCKET_DISCONNECTED');
+      expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'ERR_SOCKET_DISCONNECTED' }));
     });
 
     it('rejects promise when rejectOnError is true on timeout (MIN-003)', async () => {

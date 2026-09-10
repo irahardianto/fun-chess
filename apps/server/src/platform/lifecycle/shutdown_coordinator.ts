@@ -1,6 +1,7 @@
 import { Server as HttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
+import { serializeError } from "@fun-chess/shared";
 import { TypedSocketServer } from "../socket/socket_server.js";
 import { Logger } from "../logger/logger.interface.js";
 
@@ -103,19 +104,28 @@ export class ShutdownCoordinator {
         this.cleanupInterval = undefined;
       }
 
-      // 2. Run additional cleanup tasks in isolated try/catch blocks (MAJ-002)
+      // 2. Run additional cleanup tasks in isolated try/catch blocks with latency measurement (ENH-009, MAJ-002)
       for (const cleanup of this.additionalCleanups) {
+        const taskStartTime = performance.now();
         try {
           await cleanup();
+          const duration = Math.round(performance.now() - taskStartTime);
+          this.logger.debug("Shutdown cleanup task completed", {
+            operation: "server_shutdown",
+            status: "cleanup_task_success",
+            correlationId: corrId,
+            duration,
+            durationMs: duration,
+          });
         } catch (err) {
+          const duration = Math.round(performance.now() - taskStartTime);
           this.logger.error("Error during shutdown cleanup task", {
             operation: "server_shutdown",
             status: "cleanup_error",
             correlationId: corrId,
-            error:
-              err instanceof Error
-                ? { name: err.name, message: err.message, stack: err.stack }
-                : { raw: err },
+            duration,
+            durationMs: duration,
+            error: serializeError(err),
           });
         }
       }

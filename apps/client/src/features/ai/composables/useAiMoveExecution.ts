@@ -5,7 +5,6 @@ import type {
   PieceType,
   PromotionPiece,
   MascotPersona,
-  GameOverPayload,
   MoveResult,
   IClock,
 } from '@fun-chess/shared';
@@ -14,13 +13,15 @@ import { useInjectLogger, useInjectClock } from '@/platform/di';
 import { SystemClock } from '@/platform/time';
 import {
   logger as defaultLogger,
-  generateCorrelationId,
   type ILogger,
 } from '@/platform/telemetry';
 import type { UseAiBoardStateReturn } from './useAiBoardState.js';
 import type { useAiWorker } from './useAiWorker.js';
 import type { useTakebackHistory } from './useTakebackHistory.js';
 import type { useMascotBanter } from './useMascotBanter.js';
+import { useAiGameOver, type GameCompletionOutcomeEvent } from './useAiGameOver';
+
+export type { GameCompletionOutcomeEvent };
 
 export interface MoveOutcomeEvent {
   type: 'move';
@@ -30,13 +31,6 @@ export interface MoveOutcomeEvent {
   isCheck: boolean;
   isCheckmate: boolean;
   isDraw: boolean;
-}
-
-export interface GameCompletionOutcomeEvent {
-  type: 'game_over';
-  winner: 'w' | 'b' | 'draw';
-  reason: 'checkmate' | 'stalemate' | 'resignation' | 'timeout' | 'agreement';
-  isLocalPlayerWinner: boolean;
 }
 
 export interface UseAiMoveExecutionOptions {
@@ -54,9 +48,9 @@ export interface UseAiMoveExecutionOptions {
 }
 
 /**
- * useAiMoveExecution composable (MIN-023).
+ * useAiMoveExecution composable (MAJ-021, MAJ-023, MIN-023).
  * Encapsulates move execution, AI reply dispatch, game-over evaluation,
- * and resignation.
+ * and resignation. Decomposed with useAiGameOver.
  */
 export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
   const logger = options.logger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
@@ -73,82 +67,24 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
     onClearHint,
   } = options;
 
-  const { chess, turn, playerColor, aiColor, isGameOver, lastGameOver } = boardState;
+  const { chess, turn, playerColor, aiColor, isGameOver } = boardState;
 
   const lastMoveOutcome = ref<MoveOutcomeEvent | null>(null);
-  const lastGameCompletion = ref<GameCompletionOutcomeEvent | null>(null);
-  let matchStartTime = clock.now();
+
+  // Sub-composable managing game-over logic and resignation (MAJ-021, MAJ-023)
+  const gameOverHandler = useAiGameOver({
+    boardState,
+    history,
+    banter,
+    mascot,
+    onGameCompletion,
+    clock,
+    logger,
+  });
 
   function resetExecution(): void {
     lastMoveOutcome.value = null;
-    lastGameCompletion.value = null;
-    matchStartTime = clock.now();
-  }
-
-  function checkAndHandleGameOver(): boolean {
-    if (!chess.isGameOver()) return false;
-
-    isGameOver.value = true;
-    const durationSeconds = Math.max(1, Math.round((clock.now() - matchStartTime) / 1000));
-    const totalMoves = history.moveHistory.value.length;
-
-    let payload: GameOverPayload;
-
-    if (chess.isCheckmate()) {
-      const winnerColor: PieceColor = chess.turn() === 'w' ? 'b' : 'w';
-      const isPlayerWin = winnerColor === playerColor.value;
-      const winnerName = isPlayerWin ? 'You' : mascot.value.name;
-
-      payload = {
-        winner: winnerColor,
-        winnerName,
-        reason: 'checkmate',
-        message: isPlayerWin
-          ? `Checkmate! You defeated ${mascot.value.name}! 🏆`
-          : `Checkmate! ${mascot.value.name} won this game!`,
-        finalFen: chess.fen(),
-        totalMoves,
-        durationSeconds,
-      };
-
-      if (isPlayerWin) {
-        banter.triggerBanter('player_win');
-      } else {
-        banter.triggerBanter('ai_win');
-      }
-    } else {
-      let reason: GameOverPayload['reason'] = 'draw_agreement';
-      if (chess.isStalemate()) reason = 'stalemate';
-      else if (chess.isThreefoldRepetition()) reason = 'threefold_repetition';
-      else if (chess.isInsufficientMaterial()) reason = 'insufficient_material';
-
-      payload = {
-        winner: 'draw',
-        reason,
-        message: 'The match ended in a draw! ⚖️',
-        finalFen: chess.fen(),
-        totalMoves,
-        durationSeconds,
-      };
-
-      banter.triggerBanter('draw');
-    }
-
-    lastGameOver.value = payload;
-
-    const completionOutcome: GameCompletionOutcomeEvent = {
-      type: 'game_over',
-      winner: payload.winner,
-      reason:
-        payload.reason === 'draw_agreement'
-          ? 'agreement'
-          : (payload.reason as GameCompletionOutcomeEvent['reason']),
-      isLocalPlayerWinner: payload.winner === playerColor.value,
-    };
-    lastGameCompletion.value = completionOutcome;
-    onGameCompletion?.(completionOutcome);
-
-    return true;
+    gameOverHandler.resetMatchTimer();
   }
 
   function applyAiMoveResult(result: Move, isBlunder = false): void {
@@ -182,7 +118,7 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
     onMoveOutcome?.(moveOutcome);
 
     // Check for Game Over after AI move
-    if (checkAndHandleGameOver()) {
+    if (gameOverHandler.checkAndHandleGameOver()) {
       return;
     }
 
@@ -289,7 +225,7 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
       onMoveOutcome?.(outcomeEvent);
 
       // Check Game Over after player move
-      if (checkAndHandleGameOver()) {
+      if (gameOverHandler.checkAndHandleGameOver()) {
         return true;
       }
 
@@ -316,78 +252,13 @@ export function useAiMoveExecution(options: UseAiMoveExecutionOptions) {
   }
 
   function resign(): void {
-    if (isGameOver.value) return;
-
-    const correlationId = generateCorrelationId();
-    const startTime = clock.now();
-
-    // 1. Operation Start
-    logger.info('Resigning AI game', {
-      operation: 'ai_resign',
-      correlationId,
-      playerColor: playerColor.value,
-      aiColor: aiColor.value,
-    });
-
-    try {
-      aiWorker.cancelCalculation();
-      isGameOver.value = true;
-
-      const durationSeconds = Math.max(1, Math.round((clock.now() - matchStartTime) / 1000));
-      const payload: GameOverPayload = {
-        winner: aiColor.value,
-        winnerName: mascot.value.name,
-        reason: 'resignation',
-        message: `You resigned. ${mascot.value.name} won! 🏳️`,
-        finalFen: chess.fen(),
-        totalMoves: history.moveHistory.value.length,
-        durationSeconds,
-      };
-
-      lastGameOver.value = payload;
-      banter.triggerBanter('ai_win');
-
-      const completionOutcome: GameCompletionOutcomeEvent = {
-        type: 'game_over',
-        winner: aiColor.value,
-        reason: 'resignation',
-        isLocalPlayerWinner: false,
-      };
-      lastGameCompletion.value = completionOutcome;
-      onGameCompletion?.(completionOutcome);
-
-      const durationMs = Math.round(clock.now() - startTime);
-
-      // 2. Operation Success
-      logger.info('Resignation completed successfully', {
-        operation: 'ai_resign',
-        correlationId,
-        status: 'success',
-        duration: durationMs,
-        durationMs,
-        winner: aiColor.value,
-        totalMoves: payload.totalMoves,
-      });
-    } catch (err) {
-      const durationMs = Math.round(clock.now() - startTime);
-
-      // 3. Operation Failure
-      logger.error('Resignation failed', {
-        operation: 'ai_resign',
-        correlationId,
-        status: 'failed',
-        duration: durationMs,
-        durationMs,
-        error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { raw: err },
-      });
-      throw err;
-    }
+    gameOverHandler.resign(() => aiWorker.cancelCalculation());
   }
 
   return {
     lastMoveOutcome,
-    lastGameCompletion,
-    checkAndHandleGameOver,
+    lastGameCompletion: gameOverHandler.lastGameCompletion,
+    checkAndHandleGameOver: () => gameOverHandler.checkAndHandleGameOver(),
     applyAiMoveResult,
     dispatchAiMove,
     applyPlayerMove,

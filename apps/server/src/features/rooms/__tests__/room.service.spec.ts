@@ -1467,4 +1467,176 @@ describe("RoomService", () => {
       });
     });
   });
+
+  describe("Forfeit Error Handling & finalizeGame Edge Branches (MAJ-028)", () => {
+    it("throws GameNotActiveError in finalizeGame when room is not playing", async () => {
+      const { room } = await service.createRoom(
+        { playerName: "WhitePlayer" },
+        "sock_1",
+      );
+      // Room is still in lobby
+      await expect(
+        service.finalizeGame(room.roomCode, {
+          reason: "resignation",
+          winner: "w",
+          winnerName: "WhitePlayer",
+          message: "Resignation",
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("throws GameNotActiveError in finalizeGame when reason is draw_agreement but no drawOffer exists", async () => {
+      const { room } = await service.createRoom(
+        { playerName: "WhitePlayer" },
+        "sock_1",
+      );
+      await service.joinRoom(
+        { roomCode: room.roomCode, playerName: "BlackPlayer" },
+        "sock_2",
+      );
+
+      await expect(
+        service.finalizeGame(room.roomCode, {
+          reason: "draw_agreement",
+          winner: "draw",
+          message: "Draw agreement",
+        }),
+      ).rejects.toThrow(/No draw offer is currently pending/);
+    });
+
+    it("successfully finalizes game with draw_agreement when draw offer exists", async () => {
+      const { room } = await service.createRoom(
+        { playerName: "WhitePlayer" },
+        "sock_1",
+      );
+      await service.joinRoom(
+        { roomCode: room.roomCode, playerName: "BlackPlayer" },
+        "sock_2",
+      );
+
+      // Offer draw
+      await service.updateDrawOffer(room.roomCode, {
+        offeredBy: "w",
+        offeredAt: Date.now(),
+      });
+
+      const finalized = await service.finalizeGame(room.roomCode, {
+        reason: "draw_agreement",
+        winner: "draw",
+        message: "Draw agreed",
+      });
+
+      expect(finalized.status).toBe("game_over");
+      expect(finalized.rematch).toBeNull();
+    });
+
+    it("throws OptimisticLockConflictError in applyGameMove when moveCount is not strictly increasing", async () => {
+      const { room } = await service.createRoom(
+        { playerName: "WhitePlayer" },
+        "sock_1",
+      );
+      await service.joinRoom(
+        { roomCode: room.roomCode, playerName: "BlackPlayer" },
+        "sock_2",
+      );
+
+      const staleGameState = {
+        ...room.game,
+        moveCount: 0, // current moveCount is 0, not > 0
+      };
+
+      await expect(
+        service.applyGameMove(room.roomCode, staleGameState),
+      ).rejects.toThrow();
+    });
+
+    it("rethrows and logs error when handleAbandonmentForfeit encounters unexpected mutation error", async () => {
+      const logger = new NullLogger();
+      const loggedService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        undefined,
+        logger,
+      );
+
+      const { room } = await loggedService.createRoom(
+        { playerName: "WhitePlayer" },
+        "sock_1",
+      );
+
+      vi.spyOn(store, "mutate").mockRejectedValueOnce(
+        new Error("Unexpected DB crash"),
+      );
+
+      await expect(
+        loggedService.handleAbandonmentForfeit(room.roomCode, room.hostId),
+      ).rejects.toThrow("Unexpected DB crash");
+
+      const errLogs = logger.errorLogs.filter(
+        (l) => l.context?.operation === "room_abandonment_forfeit",
+      );
+      expect(errLogs.length).toBe(1);
+    });
+
+    it("propagates correlationId across service operations", async () => {
+      const logger = new NullLogger();
+      const loggedService = new RoomService(
+        store,
+        sessionRegistry,
+        undefined,
+        undefined,
+        undefined,
+        logger,
+      );
+
+      const cid = "test-corr-id-12345";
+      const { room, sessionToken } = await loggedService.createRoom(
+        { playerName: "WhitePlayer" },
+        "sock_1",
+        cid,
+      );
+
+      const createLogs = logger.infoLogs.filter(
+        (l) => l.context?.operation === "room_create",
+      );
+      expect(createLogs.some((l) => l.context?.correlationId === cid)).toBe(true);
+
+      const joinResult = await loggedService.joinRoom(
+        { roomCode: room.roomCode, playerName: "BlackPlayer" },
+        "sock_2",
+        cid,
+      );
+      expect(joinResult.room.status).toBe("playing");
+
+      const joinLogs = logger.infoLogs.filter(
+        (l) => l.context?.operation === "room_join",
+      );
+      expect(joinLogs.some((l) => l.context?.correlationId === cid)).toBe(true);
+
+      // Reconnect
+      await loggedService.reconnect(
+        {
+          roomCode: room.roomCode,
+          playerId: room.hostId,
+          sessionToken,
+        },
+        "sock_1_new",
+        cid,
+      );
+
+      const reconnectLogs = logger.infoLogs.filter(
+        (l) => l.context?.operation === "room_reconnect",
+      );
+      expect(reconnectLogs.some((l) => l.context?.correlationId === cid)).toBe(true);
+
+      // Leave room
+      await loggedService.leaveRoom(room.roomCode, "sock_1_new", cid);
+      const leaveLogs = logger.infoLogs.filter(
+        (l) => l.context?.operation === "room_leave",
+      );
+      expect(leaveLogs.some((l) => l.context?.correlationId === cid)).toBe(true);
+    });
+  });
 });

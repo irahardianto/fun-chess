@@ -19,6 +19,7 @@ import {
   systemClock,
   type IClock,
   type IIdGenerator,
+  serializeError,
 } from "@fun-chess/shared";
 import { randomUUID } from "node:crypto";
 import type { IRoomGameAdapter, ISessionRegistry } from "../rooms/index.js";
@@ -91,9 +92,10 @@ export class GameService implements IGameService {
   private async validateMoveIngress(
     req: MakeMoveRequest,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; player: Player }> {
     const roomCode = normalizeRoomCode(req.roomCode);
-    const room = await this.roomAdapter.getRoom(roomCode);
+    const room = await this.roomAdapter.getRoom(roomCode, correlationId);
 
     if (!room) {
       throw new RoomNotFoundError(roomCode);
@@ -255,12 +257,27 @@ export class GameService implements IGameService {
     roomCode: string,
     playerId: string,
     socketId: string,
+    correlationId?: string,
   ): Promise<void> {
     if (!this.sessionRegistry) return;
     if (typeof this.sessionRegistry.getSessionTokenForPlayer === "function") {
-      const token = await this.sessionRegistry.getSessionTokenForPlayer(roomCode, playerId);
+      const opts = correlationId !== undefined ? { correlationId } : undefined;
+      const token = opts
+        ? await this.sessionRegistry.getSessionTokenForPlayer(
+            roomCode,
+            playerId,
+            opts,
+          )
+        : await this.sessionRegistry.getSessionTokenForPlayer(
+            roomCode,
+            playerId,
+          );
       if (token) {
-        await this.sessionRegistry.touchSession(token, socketId);
+        if (opts) {
+          await this.sessionRegistry.touchSession(token, socketId, undefined, opts);
+        } else {
+          await this.sessionRegistry.touchSession(token, socketId);
+        }
       }
     }
   }
@@ -272,15 +289,21 @@ export class GameService implements IGameService {
   public async makeMove(
     req: MakeMoveRequest,
     socketId: string,
+    correlationId?: string,
   ): Promise<MoveApplicationResult> {
     const startTime = this.clock.now();
     const roomCode = normalizeRoomCode(req.roomCode);
 
     try {
-      const { room, player } = await this.validateMoveIngress(req, socketId);
+      const { room, player } = await this.validateMoveIngress(
+        req,
+        socketId,
+        correlationId,
+      );
 
       this.logger.debug("Applying chess move", {
         operation: "game_move",
+        correlationId,
         roomCode,
         playerId: player.id,
         move: req.move,
@@ -291,6 +314,7 @@ export class GameService implements IGameService {
         const duration = this.clock.now() - startTime;
         this.logger.info("Chess move applied", {
           operation: "game_move",
+          correlationId,
           roomCode,
           playerId: player.id,
           san: replayResult.moveResult.san,
@@ -305,6 +329,7 @@ export class GameService implements IGameService {
         const duration = this.clock.now() - startTime;
         this.logger.warn("Invalid move rejected", {
           operation: "game_move_rejected",
+          correlationId,
           roomCode,
           playerId: player.id,
           reason: "Not your turn",
@@ -326,6 +351,7 @@ export class GameService implements IGameService {
         const duration = this.clock.now() - startTime;
         this.logger.warn("Invalid move rejected", {
           operation: "game_move_rejected",
+          correlationId,
           roomCode,
           playerId: player.id,
           reason: outcome.error,
@@ -345,13 +371,20 @@ export class GameService implements IGameService {
         room.roomCode,
         outcome.nextState,
         gameOverPayload,
+        correlationId,
       );
 
-      await this.touchPlayerSession(room.roomCode, player.id, socketId);
+      await this.touchPlayerSession(
+        room.roomCode,
+        player.id,
+        socketId,
+        correlationId,
+      );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Chess move applied", {
         operation: "game_move",
+        correlationId,
         roomCode,
         playerId: player.id,
         san: outcome.moveResult.san,
@@ -375,13 +408,11 @@ export class GameService implements IGameService {
         const duration = this.clock.now() - startTime;
         this.logger.error("Chess move failed", {
           operation: "game_move",
+          correlationId,
           roomCode,
           duration,
           durationMs: duration,
-          error:
-            err instanceof Error
-              ? { name: err.name, message: err.message, stack: err.stack }
-              : { raw: err },
+          error: serializeError(err),
         });
       }
       throw err;
@@ -394,12 +425,13 @@ export class GameService implements IGameService {
   public async resign(
     roomCode: string,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; gameOverPayload: GameOverPayload }> {
     const startTime = this.clock.now();
     const code = normalizeRoomCode(roomCode);
 
     try {
-      const room = await this.roomAdapter.getRoom(code);
+      const room = await this.roomAdapter.getRoom(code, correlationId);
 
       if (!room) {
         throw new RoomNotFoundError(code);
@@ -432,11 +464,13 @@ export class GameService implements IGameService {
       const updatedRoom = await this.roomAdapter.finalizeGame(
         code,
         gameOverPayload,
+        correlationId,
       );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Player resigned", {
         operation: "game_resign",
+        correlationId,
         roomCode: code,
         playerId: player.id,
         winnerColor,
@@ -449,13 +483,11 @@ export class GameService implements IGameService {
       const duration = this.clock.now() - startTime;
       this.logger.error("Player resignation failed", {
         operation: "game_resign",
+        correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
       });
       throw err;
     }
@@ -467,6 +499,7 @@ export class GameService implements IGameService {
   public async offerDraw(
     roomCode: string,
     socketId: string,
+    correlationId?: string,
   ): Promise<{
     room: RoomState;
     fromPlayer: Player;
@@ -476,7 +509,7 @@ export class GameService implements IGameService {
     const code = normalizeRoomCode(roomCode);
 
     try {
-      const room = await this.roomAdapter.getRoom(code);
+      const room = await this.roomAdapter.getRoom(code, correlationId);
 
       if (!room) {
         throw new RoomNotFoundError(code);
@@ -491,16 +524,22 @@ export class GameService implements IGameService {
         throw new PlayerNotInRoomError(socketId);
       }
 
-      const opponent = player.color === "w" ? room.blackPlayer : room.whitePlayer;
+      const opponent =
+        player.color === "w" ? room.blackPlayer : room.whitePlayer;
 
-      const updatedRoom = await this.roomAdapter.updateDrawOffer(code, {
-        offeredBy: player.id,
-        offeredAt: this.clock.now(),
-      });
+      const updatedRoom = await this.roomAdapter.updateDrawOffer(
+        code,
+        {
+          offeredBy: player.id,
+          offeredAt: this.clock.now(),
+        },
+        correlationId,
+      );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Draw offer processed", {
         operation: "game_draw_action",
+        correlationId,
         roomCode: code,
         playerId: player.id,
         action: "offer",
@@ -517,13 +556,11 @@ export class GameService implements IGameService {
       const duration = this.clock.now() - startTime;
       this.logger.error("Draw offer failed", {
         operation: "game_draw_action",
+        correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
       });
       throw err;
     }
@@ -536,6 +573,7 @@ export class GameService implements IGameService {
     roomCode: string,
     socketId: string,
     accept: boolean,
+    correlationId?: string,
   ): Promise<{
     room: RoomState;
     accept: boolean;
@@ -546,7 +584,7 @@ export class GameService implements IGameService {
     const code = normalizeRoomCode(roomCode);
 
     try {
-      const room = await this.roomAdapter.getRoom(code);
+      const room = await this.roomAdapter.getRoom(code, correlationId);
 
       if (!room) {
         throw new RoomNotFoundError(code);
@@ -575,10 +613,15 @@ export class GameService implements IGameService {
       const action = accept ? "accept" : "decline";
 
       if (!accept) {
-        const updatedRoom = await this.roomAdapter.updateDrawOffer(code, null);
+        const updatedRoom = await this.roomAdapter.updateDrawOffer(
+          code,
+          null,
+          correlationId,
+        );
         const duration = this.clock.now() - startTime;
         this.logger.info("Draw offer processed", {
           operation: "game_draw_action",
+          correlationId,
           roomCode: code,
           playerId: player.id,
           action,
@@ -604,11 +647,13 @@ export class GameService implements IGameService {
       const updatedRoom = await this.roomAdapter.finalizeGame(
         code,
         gameOverPayload,
+        correlationId,
       );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Draw offer processed", {
         operation: "game_draw_action",
+        correlationId,
         roomCode: code,
         playerId: player.id,
         action,
@@ -626,13 +671,11 @@ export class GameService implements IGameService {
       const duration = this.clock.now() - startTime;
       this.logger.error("Draw response failed", {
         operation: "game_draw_action",
+        correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
       });
       throw err;
     }
@@ -644,12 +687,13 @@ export class GameService implements IGameService {
   public async requestRematch(
     roomCode: string,
     socketId: string,
+    correlationId?: string,
   ): Promise<{ room: RoomState; requestedBy: string; requesterName: string }> {
     const startTime = this.clock.now();
     const code = normalizeRoomCode(roomCode);
 
     try {
-      const room = await this.roomAdapter.getRoom(code);
+      const room = await this.roomAdapter.getRoom(code, correlationId);
 
       if (!room) {
         throw new RoomNotFoundError(code);
@@ -666,15 +710,22 @@ export class GameService implements IGameService {
         throw new PlayerNotInRoomError(socketId);
       }
 
-      const updatedRoom = await this.roomAdapter.updateRematch(code, {
-        requestedBy: player.id,
-        requestedAt: this.clock.now(),
-        status: "pending",
-      });
+      const updatedRoom = await this.roomAdapter.updateRematch(
+        code,
+        {
+          requestedBy: player.id,
+          requestedAt: this.clock.now(),
+          status: "pending",
+        },
+        undefined,
+        undefined,
+        correlationId,
+      );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Rematch action processed", {
         operation: "game_rematch_action",
+        correlationId,
         roomCode: code,
         playerId: player.id,
         status: "pending",
@@ -691,13 +742,11 @@ export class GameService implements IGameService {
       const duration = this.clock.now() - startTime;
       this.logger.error("Rematch request failed", {
         operation: "game_rematch_action",
+        correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
       });
       throw err;
     }
@@ -710,6 +759,7 @@ export class GameService implements IGameService {
     roomCode: string,
     socketId: string,
     accept: boolean,
+    correlationId?: string,
   ): Promise<{
     room: RoomState;
     accept: boolean;
@@ -720,7 +770,7 @@ export class GameService implements IGameService {
     const code = normalizeRoomCode(roomCode);
 
     try {
-      const room = await this.roomAdapter.getRoom(code);
+      const room = await this.roomAdapter.getRoom(code, correlationId);
 
       if (!room) {
         throw new RoomNotFoundError(code);
@@ -747,14 +797,21 @@ export class GameService implements IGameService {
       const status = accept ? "accepted" : "declined";
 
       if (!accept) {
-        const updatedRoom = await this.roomAdapter.updateRematch(code, {
-          ...room.rematch,
-          status: "declined",
-        });
+        const updatedRoom = await this.roomAdapter.updateRematch(
+          code,
+          {
+            ...room.rematch,
+            status: "declined",
+          },
+          undefined,
+          undefined,
+          correlationId,
+        );
 
         const duration = this.clock.now() - startTime;
         this.logger.info("Rematch action processed", {
           operation: "game_rematch_action",
+          correlationId,
           roomCode: code,
           playerId: player.id,
           status,
@@ -796,11 +853,13 @@ export class GameService implements IGameService {
         },
         nextGameState,
         { whitePlayer: swappedWhite, blackPlayer: swappedBlack },
+        correlationId,
       );
 
       const duration = this.clock.now() - startTime;
       this.logger.info("Rematch action processed", {
         operation: "game_rematch_action",
+        correlationId,
         roomCode: code,
         playerId: player.id,
         status,
@@ -818,13 +877,11 @@ export class GameService implements IGameService {
       const duration = this.clock.now() - startTime;
       this.logger.error("Rematch response failed", {
         operation: "game_rematch_action",
+        correlationId,
         roomCode: code,
         duration,
         durationMs: duration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
       });
       throw err;
     }

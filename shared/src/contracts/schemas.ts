@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { PUZZLE_THEMES } from "./puzzle.js";
+import { PUZZLE_THEMES } from "./themes.js";
+import { normalizeUrlString } from "../utils/url.js";
 
 /**
  * 4-letter alphanumeric room code schema.
@@ -71,17 +72,41 @@ export type PromotionPieceDto = z.infer<typeof PromotionPieceSchema>;
 /**
  * Public player representation schema.
  * All Player objects are strictly free of private credentials (CRIT-001)
- * and raw transport socket identifiers (ENH-001).
+ * and raw transport socket identifiers in client broadcasts (ENH-001).
+ * Enforces non-negative epoch milliseconds for audit timestamps (MIN-025).
  */
-export const PlayerSchema = z.object({
-  id: z.string().uuid("Player ID must be a valid UUID"),
-  name: PlayerNameSchema,
-  avatar: AvatarEmojiSchema,
-  color: PieceColorSchema,
-  isHost: z.boolean(),
-  isConnected: z.boolean(),
-  connectedAt: z.number().nonnegative(),
-});
+export const PlayerSchema = z.preprocess(
+  (val: unknown) => {
+    if (val && typeof val === "object") {
+      const candidate = { ...(val as Record<string, unknown>) };
+      if (candidate.createdAt === undefined && typeof candidate.connectedAt === "number") {
+        candidate.createdAt = candidate.connectedAt;
+      }
+      if (candidate.updatedAt === undefined && typeof candidate.connectedAt === "number") {
+        candidate.updatedAt = candidate.createdAt ?? candidate.connectedAt;
+      }
+      return candidate;
+    }
+    return val;
+  },
+  z
+    .object({
+      id: z.string().uuid("Player ID must be a valid UUID"),
+      name: PlayerNameSchema,
+      avatar: AvatarEmojiSchema.optional(),
+      color: PieceColorSchema,
+      isHost: z.boolean(),
+      isConnected: z.boolean(),
+      connectedAt: z.number().nonnegative("connectedAt must be a non-negative epoch timestamp"),
+      createdAt: z.number().nonnegative("createdAt must be a non-negative epoch timestamp"),
+      updatedAt: z.number().nonnegative("updatedAt must be a non-negative epoch timestamp"),
+    })
+    .refine((data) => data.updatedAt >= data.createdAt, {
+      message: "updatedAt must be greater than or equal to createdAt",
+      path: ["updatedAt"],
+    }),
+);
+export type PlayerDto = z.infer<typeof PlayerSchema>;
 
 /**
  * Executed move result schema.
@@ -308,7 +333,7 @@ export const MovePayloadSchema = z.object({
   to: ChessSquareSchema,
   promotion: PromotionPieceSchema.optional(),
 });
-export type MovePayload = z.infer<typeof MovePayloadSchema>;
+export type MovePayloadDto = z.infer<typeof MovePayloadSchema>;
 
 /**
  * Socket request schema for submitting a move in an active game room.
@@ -457,51 +482,6 @@ export type HttpErrorEnvelope = z.infer<typeof HttpErrorEnvelopeSchema>;
 
 const emptyStringToUndefined = (val: unknown): unknown =>
   typeof val === "string" && val.trim() === "" ? undefined : val;
-
-/**
- * Normalizes a URL string by prepending a protocol if omitted (MIN-001).
- * - Trims leading/trailing whitespace
- * - Turns empty string into undefined
- * - Protocol-relative URL (`//example.com`) -> `https://example.com`
- * - Missing protocol: `localhost` or `127.0.0.1` -> `http://...`, other hostnames -> `https://...`
- *
- * @param val - Input value to normalize
- * @returns Normalized URL string or undefined
- */
-export function normalizeUrlString(val: unknown): unknown {
-  if (typeof val !== "string") return val;
-  const trimmed = val.trim();
-  if (trimmed === "") return undefined;
-  if (trimmed.startsWith("//")) {
-    return `https:${trimmed}`;
-  }
-  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) {
-    const isLocal = /^(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(trimmed);
-    return `${isLocal ? "http://" : "https://"}${trimmed}`;
-  }
-  return trimmed;
-}
-
-/**
- * Safely parses and normalizes a URL string (MIN-001).
- * If protocol is missing, prepends https:// (or http:// for localhost/127.0.0.1).
- * Returns URL object if valid, or undefined if invalid.
- *
- * @param input - URL string to parse
- * @returns Parsed URL instance or undefined
- */
-export function safeParseUrl(input: string | undefined): URL | undefined {
-  if (!input || typeof input !== "string") return undefined;
-  const normalized = normalizeUrlString(input);
-  if (!normalized || typeof normalized !== "string") return undefined;
-  try {
-    const parsed = new URL(normalized);
-    if (!parsed.hostname) return undefined;
-    return parsed;
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * Validates and normalizes URLs, prepending https:// (or http://) if protocol is omitted (MIN-001).

@@ -15,6 +15,43 @@ export interface LanInfoResponse extends BaseLanInfoResponse {
 }
 
 /**
+ * Abstraction provider for operating system network interface discovery.
+ * Enables deterministic testing and eliminates direct OS coupling (MAJ-016).
+ */
+export interface INetworkInterfaceProvider {
+  /**
+   * Returns a dictionary of network interfaces indexed by interface name.
+   */
+  getNetworkInterfaces(): NodeJS.Dict<NetworkInterfaceInfo[]>;
+}
+
+/**
+ * Production implementation backed by node:os.networkInterfaces().
+ */
+export class SystemNetworkInterfaceProvider
+  implements INetworkInterfaceProvider
+{
+  public getNetworkInterfaces(): NodeJS.Dict<NetworkInterfaceInfo[]> {
+    return os.networkInterfaces();
+  }
+}
+
+/**
+ * In-memory implementation holding static network interfaces for unit testing.
+ */
+export class StaticNetworkInterfaceProvider
+  implements INetworkInterfaceProvider
+{
+  constructor(
+    private readonly interfaces: NodeJS.Dict<NetworkInterfaceInfo[]> = {},
+  ) {}
+
+  public getNetworkInterfaces(): NodeJS.Dict<NetworkInterfaceInfo[]> {
+    return this.interfaces;
+  }
+}
+
+/**
  * Configuration options for RelayAddressService.
  */
 export interface RelayAddressConfig {
@@ -30,19 +67,19 @@ export interface RelayAddressConfig {
   readonly hostIp?: string;
   /** Optional logger for diagnostics (ENH-005) */
   readonly logger?: Logger;
+  /** Optional network interface provider (defaults to SystemNetworkInterfaceProvider) (MAJ-016) */
+  readonly networkInterfaceProvider?: INetworkInterfaceProvider;
 }
 
 /**
  * Interface contract for RelayAddressService to enable I/O isolation and test mocking.
+ * Updated to eliminate leaked test parameters (MAJ-016) and support tracing (ENH-008).
  */
 export interface IRelayAddressService {
   /**
    * Resolves comprehensive LAN / Cloud addressing info.
    */
-  getAddressingInfo(
-    port?: number,
-    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-  ): LanInfoResponse;
+  getAddressingInfo(port?: number, correlationId?: string): LanInfoResponse;
 
   /**
    * Generates a game room invitation URL for QR code generation or player sharing.
@@ -50,7 +87,7 @@ export interface IRelayAddressService {
   generateJoinUrl(
     port?: number,
     roomCode?: string,
-    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
+    correlationId?: string,
   ): string;
 
   /**
@@ -61,14 +98,12 @@ export interface IRelayAddressService {
   /**
    * Returns the primary LAN IP or public hostname.
    */
-  getLocalLanIp(customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>): string;
+  getLocalLanIp(correlationId?: string): string;
 
   /**
    * Retrieves all detected physical/configured IPv4 interfaces.
    */
-  getAllLanInterfaces(
-    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-  ): string[];
+  getAllLanInterfaces(correlationId?: string): string[];
 }
 
 /**
@@ -76,9 +111,14 @@ export interface IRelayAddressService {
  *
  * @param rawUrl - Raw URL string (e.g. "https://fun-chess.a.run.app/" or "http://example.com:80")
  * @param logger - Optional logger for structured diagnostics (ENH-005)
+ * @param correlationId - Optional correlation ID for distributed tracing (ENH-008)
  * @returns Normalized URL string
  */
-export function normalizePublicUrl(rawUrl: string, logger?: Logger): string {
+export function normalizePublicUrl(
+  rawUrl: string,
+  logger?: Logger,
+  correlationId?: string,
+): string {
   const trimmed = rawUrl.trim();
   if (!trimmed) {
     return "";
@@ -107,6 +147,7 @@ export function normalizePublicUrl(rawUrl: string, logger?: Logger): string {
       "Failed to normalize public URL, falling back to trimmed string",
       {
         operation: "normalize_public_url",
+        correlationId,
         rawUrl: trimmed,
         error: error instanceof Error ? error.message : String(error),
       },
@@ -120,11 +161,13 @@ export function normalizePublicUrl(rawUrl: string, logger?: Logger): string {
  *
  * @param publicUrl - Public URL string
  * @param logger - Optional logger for structured diagnostics (ENH-005)
+ * @param correlationId - Optional correlation ID for distributed tracing (ENH-008)
  * @returns Hostname string or fallback to raw string
  */
 export function extractHostnameFromUrl(
   publicUrl: string,
   logger?: Logger,
+  correlationId?: string,
 ): string {
   const trimmed = publicUrl.trim();
   if (!trimmed) {
@@ -138,6 +181,7 @@ export function extractHostnameFromUrl(
   } catch (error) {
     logger?.debug("Failed to parse hostname from URL, using regex fallback", {
       operation: "extract_hostname_from_url",
+      correlationId,
       rawUrl: trimmed,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -150,7 +194,12 @@ export function extractHostnameFromUrl(
  * and game room join URL generation.
  */
 export class RelayAddressService implements IRelayAddressService {
-  constructor(private readonly config: RelayAddressConfig = {}) {}
+  private readonly networkInterfaceProvider: INetworkInterfaceProvider;
+
+  constructor(private readonly config: RelayAddressConfig = {}) {
+    this.networkInterfaceProvider =
+      config.networkInterfaceProvider ?? new SystemNetworkInterfaceProvider();
+  }
 
   /**
    * Checks whether the service is operating in Cloud Relay mode.
@@ -164,23 +213,19 @@ export class RelayAddressService implements IRelayAddressService {
   /**
    * Returns the normalized public base URL if configured, or undefined.
    */
-  public getPublicUrl(): string | undefined {
+  public getPublicUrl(correlationId?: string): string | undefined {
     const publicUrl = this.config.publicUrl;
     if (!publicUrl || !publicUrl.trim()) {
       return undefined;
     }
-    return normalizePublicUrl(publicUrl, this.config.logger);
+    return normalizePublicUrl(publicUrl, this.config.logger, correlationId);
   }
 
   /**
    * Retrieves all non-internal IPv4 network interface addresses.
    * Includes manual LAN IP overrides if configured.
-   *
-   * @param customInterfaces - Optional network interfaces dictionary for pure testability
    */
-  public getAllLanInterfaces(
-    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-  ): string[] {
+  public getAllLanInterfaces(correlationId?: string): string[] {
     const addresses: string[] = [];
 
     const manualIp = this.config.lanIp ?? this.config.hostIp;
@@ -192,24 +237,21 @@ export class RelayAddressService implements IRelayAddressService {
     }
 
     let interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>;
-    if (customInterfaces) {
-      interfaces = customInterfaces;
-    } else {
-      try {
-        interfaces = os.networkInterfaces();
-      } catch (err) {
-        this.config.logger?.warn(
-          "Failed to retrieve network interfaces from OS, falling back to localhost",
-          {
-            operation: "get_all_lan_interfaces",
-            error: err instanceof Error ? err.message : String(err),
-          },
-        );
-        if (!addresses.includes("127.0.0.1")) {
-          addresses.push("127.0.0.1");
-        }
-        return addresses;
+    try {
+      interfaces = this.networkInterfaceProvider.getNetworkInterfaces();
+    } catch (err) {
+      this.config.logger?.warn(
+        "Failed to retrieve network interfaces from provider, falling back to localhost",
+        {
+          operation: "get_all_lan_interfaces",
+          correlationId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      );
+      if (!addresses.includes("127.0.0.1")) {
+        addresses.push("127.0.0.1");
       }
+      return addresses;
     }
 
     for (const name of Object.keys(interfaces)) {
@@ -226,6 +268,12 @@ export class RelayAddressService implements IRelayAddressService {
       }
     }
 
+    this.config.logger?.debug("Retrieved LAN network interfaces", {
+      operation: "get_all_lan_interfaces",
+      correlationId,
+      interfaceCount: addresses.length,
+    });
+
     return addresses;
   }
 
@@ -236,17 +284,17 @@ export class RelayAddressService implements IRelayAddressService {
    * 2. Manual LAN IP override (config.lanIp or process.env.LAN_IP / HOST_IP)
    * 3. Discovered local IPv4 interface (192.168.x.x -> 10.x.x.x -> 172.16-31.x.x -> first address)
    * 4. Fallback to 127.0.0.1
-   *
-   * @param customInterfaces - Optional network interfaces dictionary for pure testability
    */
-  public getLocalLanIp(
-    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
-  ): string {
+  public getLocalLanIp(correlationId?: string): string {
     // 1. Cloud Relay Priority
     if (this.isCloudRelay()) {
-      const publicUrl = this.getPublicUrl();
+      const publicUrl = this.getPublicUrl(correlationId);
       if (publicUrl) {
-        return extractHostnameFromUrl(publicUrl, this.config.logger);
+        return extractHostnameFromUrl(
+          publicUrl,
+          this.config.logger,
+          correlationId,
+        );
       }
     }
 
@@ -257,7 +305,7 @@ export class RelayAddressService implements IRelayAddressService {
     }
 
     // 3. Discovered local IPv4 interface
-    const addresses = this.getAllLanInterfaces(customInterfaces);
+    const addresses = this.getAllLanInterfaces(correlationId);
 
     if (addresses.length === 0) {
       return "127.0.0.1";
@@ -290,23 +338,21 @@ export class RelayAddressService implements IRelayAddressService {
    *
    * @param port - Port number (default: configured port or 3000)
    * @param roomCode - Optional room code to encode into query string
-   * @param customInterfaces - Optional network interfaces dictionary for pure testability
+   * @param correlationId - Optional correlation ID for tracing
    */
   public generateJoinUrl(
     port?: number,
     roomCode?: string,
-    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
+    correlationId?: string,
   ): string {
     const effectivePort = port ?? this.config.port ?? 3000;
 
     let base: string;
 
     if (this.isCloudRelay()) {
-      // Safe non-null assertion: isCloudRelay() verifies config.publicUrl is non-empty string,
-      // guaranteeing getPublicUrl() returns a normalized URL string (F-08).
-      base = this.getPublicUrl()!;
+      base = this.getPublicUrl(correlationId)!;
     } else {
-      const lanIp = this.getLocalLanIp(customInterfaces);
+      const lanIp = this.getLocalLanIp(correlationId);
       const portSuffix = effectivePort === 80 ? "" : `:${effectivePort}`;
       base = `http://${lanIp}${portSuffix}`;
     }
@@ -322,26 +368,36 @@ export class RelayAddressService implements IRelayAddressService {
    * Generates comprehensive LAN / Cloud addressing info response structure.
    *
    * @param port - Active listening port
-   * @param customInterfaces - Optional network interfaces dictionary for pure testability
+   * @param correlationId - Optional correlation ID for tracing (ENH-008)
    */
   public getAddressingInfo(
     port?: number,
-    customInterfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>,
+    correlationId?: string,
   ): LanInfoResponse {
     const effectivePort = port ?? this.config.port ?? 3000;
-    const lanIp = this.getLocalLanIp(customInterfaces);
-    const rawInterfaces = this.getAllLanInterfaces(customInterfaces);
+    const lanIp = this.getLocalLanIp(correlationId);
+    const rawInterfaces = this.getAllLanInterfaces(correlationId);
     const interfaces = rawInterfaces.length > 0 ? rawInterfaces : [lanIp];
     const localUrl = `http://localhost:${effectivePort}`;
 
     if (this.isCloudRelay()) {
-      // Safe non-null assertion: isCloudRelay() verifies config.publicUrl is non-empty string,
-      // guaranteeing getPublicUrl() returns a normalized URL string (F-08).
-      const publicUrl = this.getPublicUrl()!;
+      const publicUrl = this.getPublicUrl(correlationId)!;
       const joinUrl = publicUrl;
 
-      // In production cloud relay (no custom test interfaces injected), suppress internal network topology (MIN-004)
-      const cloudInterfaces = customInterfaces !== undefined ? interfaces : [];
+      // In production cloud relay (using SystemNetworkInterfaceProvider), suppress internal network topology (MIN-004).
+      // If a StaticNetworkInterfaceProvider is explicitly provided in tests, preserve interfaces.
+      const cloudInterfaces =
+        this.networkInterfaceProvider instanceof StaticNetworkInterfaceProvider
+          ? interfaces
+          : [];
+
+      this.config.logger?.debug("Resolved Cloud Relay addressing info", {
+        operation: "get_addressing_info",
+        correlationId,
+        relayMode: "cloud",
+        publicUrl,
+        interfaceCount: cloudInterfaces.length,
+      });
 
       return {
         lanIp,
@@ -358,8 +414,17 @@ export class RelayAddressService implements IRelayAddressService {
     const joinUrl = this.generateJoinUrl(
       effectivePort,
       undefined,
-      customInterfaces,
+      correlationId,
     );
+
+    this.config.logger?.debug("Resolved LAN addressing info", {
+      operation: "get_addressing_info",
+      correlationId,
+      relayMode: "lan",
+      lanIp,
+      port: effectivePort,
+      interfaceCount: interfaces.length,
+    });
 
     return {
       lanIp,
@@ -370,51 +435,5 @@ export class RelayAddressService implements IRelayAddressService {
       relayMode: "lan",
       isCloudRelay: false,
     };
-  }
-}
-
-/**
- * In-memory test double adapter for RelayAddressService.
- * Enables zero-I/O testing in other modules without mocking node:os or process.env.
- */
-export class MockRelayAddressService implements IRelayAddressService {
-  constructor(
-    private readonly mockInfo: Partial<LanInfoResponse> = {},
-    private readonly cloudRelay: boolean = false,
-  ) {}
-
-  public isCloudRelay(): boolean {
-    return this.mockInfo.isCloudRelay ?? this.cloudRelay;
-  }
-
-  public getAddressingInfo(port: number = 3000): LanInfoResponse {
-    return {
-      lanIp: this.mockInfo.lanIp ?? "127.0.0.1",
-      port: this.mockInfo.port ?? port,
-      localUrl: this.mockInfo.localUrl ?? `http://localhost:${port}`,
-      joinUrl: this.mockInfo.joinUrl ?? `http://127.0.0.1:${port}`,
-      interfaces: this.mockInfo.interfaces ?? ["127.0.0.1"],
-      relayMode: this.mockInfo.relayMode ?? (this.cloudRelay ? "cloud" : "lan"),
-      isCloudRelay: this.mockInfo.isCloudRelay ?? this.cloudRelay,
-      publicUrl: this.mockInfo.publicUrl,
-    };
-  }
-
-  public generateJoinUrl(port: number = 3000, roomCode?: string): string {
-    const base = this.mockInfo.joinUrl ?? `http://127.0.0.1:${port}`;
-    if (roomCode && roomCode.trim()) {
-      return `${base}?room=${encodeURIComponent(roomCode.trim().toUpperCase())}`;
-    }
-    return base;
-  }
-
-  public getLocalLanIp(): string {
-    return this.mockInfo.lanIp ?? "127.0.0.1";
-  }
-
-  public getAllLanInterfaces(): string[] {
-    return this.mockInfo.interfaces
-      ? [...this.mockInfo.interfaces]
-      : ["127.0.0.1"];
   }
 }

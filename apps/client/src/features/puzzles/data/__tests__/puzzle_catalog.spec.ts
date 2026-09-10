@@ -134,6 +134,17 @@ describe('puzzle_catalog query & metadata functions', () => {
       expect(ratedPuzzle).toBeDefined();
       expect(ratedPuzzle.rating).toBeGreaterThan(0);
     });
+
+    it('uses injected randomFn for deterministic puzzle selection (MAJ-013, MIN-023)', () => {
+      const deterministicRandom = () => 0; // Always pick index 0
+      const puzzle1 = getRandomPuzzle('fork', undefined, deterministicRandom);
+      const puzzle2 = getRandomPuzzle('fork', undefined, deterministicRandom);
+      expect(puzzle1.id).toBe(puzzle2.id);
+
+      const rated1 = getRandomPuzzle('fork', 800, deterministicRandom);
+      const rated2 = getRandomPuzzle('fork', 800, deterministicRandom);
+      expect(rated1.id).toBe(rated2.id);
+    });
   });
 
   describe('getPuzzlePackMetadata', () => {

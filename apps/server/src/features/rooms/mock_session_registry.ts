@@ -1,5 +1,6 @@
 import type { PieceColor, IClock, IIdGenerator } from "@fun-chess/shared";
 import type { SessionRecord, SessionRegistry } from "./session_registry.js";
+import type { StorageQueryOptions, StorageMutationOptions } from "./room.store.js";
 import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
 
 export interface MockSessionRegistryOptions {
@@ -39,14 +40,17 @@ export class MockSessionRegistry implements SessionRegistry {
     this.defaultTtlMs = options.defaultTtlMs ?? 2 * 60 * 60 * 1000;
   }
 
-  public async createSession(params: {
-    playerId: string;
-    roomCode: string;
-    color: PieceColor;
-    isHost: boolean;
-    socketId: string;
-    ttlMs?: number;
-  }): Promise<SessionRecord> {
+  public async createSession(
+    params: {
+      playerId: string;
+      roomCode: string;
+      color: PieceColor;
+      isHost: boolean;
+      socketId: string;
+      ttlMs?: number;
+    },
+    _options?: StorageMutationOptions,
+  ): Promise<SessionRecord> {
     this.createCalls.push({ ...params });
 
     const code = params.roomCode.toUpperCase();
@@ -84,6 +88,7 @@ export class MockSessionRegistry implements SessionRegistry {
     sessionToken: string,
     roomCode: string,
     playerId: string,
+    _options?: StorageQueryOptions,
   ): Promise<SessionRecord | null> {
     const record = this.sessions.get(sessionToken);
     if (!record) return null;
@@ -105,6 +110,7 @@ export class MockSessionRegistry implements SessionRegistry {
 
   public async getSessionByToken(
     sessionToken: string,
+    _options?: StorageQueryOptions,
   ): Promise<SessionRecord | null> {
     const record = this.sessions.get(sessionToken);
     if (!record) return null;
@@ -120,6 +126,7 @@ export class MockSessionRegistry implements SessionRegistry {
   public async getSessionTokenForPlayer(
     roomCode: string,
     playerId: string,
+    _options?: StorageQueryOptions,
   ): Promise<string | null> {
     const code = roomCode.toUpperCase();
     const token = this.playerIndex.get(`${code}:${playerId}`);
@@ -143,6 +150,7 @@ export class MockSessionRegistry implements SessionRegistry {
     sessionToken: string,
     newSocketId: string,
     extensionTtlMs?: number,
+    _options?: StorageMutationOptions,
   ): Promise<void> {
     this.touchCalls.push({ sessionToken, newSocketId, extensionTtlMs });
 
@@ -159,6 +167,7 @@ export class MockSessionRegistry implements SessionRegistry {
     roomCode: string,
     playerId: string,
     newColor: PieceColor,
+    _options?: StorageMutationOptions,
   ): Promise<void> {
     const code = roomCode.toUpperCase();
     const token = this.playerIndex.get(`${code}:${playerId}`);
@@ -171,7 +180,10 @@ export class MockSessionRegistry implements SessionRegistry {
     }
   }
 
-  public async deleteSession(sessionToken: string): Promise<boolean> {
+  public async deleteSession(
+    sessionToken: string,
+    _options?: StorageMutationOptions,
+  ): Promise<boolean> {
     this.deleteCalls.push(sessionToken);
 
     const record = this.sessions.get(sessionToken);
@@ -192,6 +204,7 @@ export class MockSessionRegistry implements SessionRegistry {
   public async deleteSessionForPlayer(
     roomCode: string,
     playerId: string,
+    _options?: StorageMutationOptions,
   ): Promise<boolean> {
     this.deleteForPlayerCalls.push({ roomCode, playerId });
 
@@ -201,7 +214,10 @@ export class MockSessionRegistry implements SessionRegistry {
     return this.deleteSession(token);
   }
 
-  public async deleteSessionsForRoom(roomCode: string): Promise<number> {
+  public async deleteSessionsForRoom(
+    roomCode: string,
+    _options?: StorageMutationOptions,
+  ): Promise<number> {
     this.deleteForRoomCalls.push(roomCode);
 
     const code = roomCode.toUpperCase();
@@ -221,7 +237,9 @@ export class MockSessionRegistry implements SessionRegistry {
     return deleted;
   }
 
-  public async cleanupExpiredSessions(): Promise<number> {
+  public async cleanupExpiredSessions(
+    _options?: StorageMutationOptions,
+  ): Promise<number> {
     const now = this.clock.now();
     const expiredTokens: string[] = [];
     for (const [token, record] of this.sessions.entries()) {
@@ -240,7 +258,9 @@ export class MockSessionRegistry implements SessionRegistry {
     return cleaned;
   }
 
-  public async clear(): Promise<void> {
+  public async clear(
+    _options?: StorageMutationOptions,
+  ): Promise<void> {
     this.sessions.clear();
     this.roomIndex.clear();
     this.playerIndex.clear();

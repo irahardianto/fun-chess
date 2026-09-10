@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import { Chess } from "chess.js";
 import type { MoveResult, Square } from "@fun-chess/shared";
 import { ChessEngine } from "../chess_engine.js";
-import { defaultLogger } from "../../../platform/logger/index.js";
 
 describe("ChessEngine", () => {
   it("extracts correct initial game state from a fresh chess board", () => {
@@ -610,37 +609,20 @@ describe("ChessEngine", () => {
       expect(ChessEngine.findKingSquare(fen, "w")).toBe("e1");
       expect(ChessEngine.findKingSquare(fen, "b")).toBe("e8");
 
-      const debugSpy = vi.spyOn(defaultLogger, "debug");
       expect(ChessEngine.findKingSquare("invalid-fen", "w")).toBeNull();
-      expect(debugSpy).toHaveBeenCalledWith(
-        "FEN parse failure in findKingSquare",
-        expect.objectContaining({
-          operation: "chess_find_king_square",
-          color: "w",
-        }),
-      );
-      debugSpy.mockRestore();
     });
 
-    it("logs debug details with structured context when validateMove catches errors (MAJ-017)", () => {
-      const debugSpy = vi.fn();
-      const mockLogger = { debug: debugSpy } as unknown as import("../../../platform/logger/index.js").Logger;
-
+    it("returns pure validation failure outcome without side effects when validateMove catches errors", () => {
       const outcome = ChessEngine.validateMove(
         "invalid-fen-string",
         { from: "e2", to: "e4" },
         "w",
-        mockLogger,
       );
 
       expect(outcome.success).toBe(false);
-      expect(debugSpy).toHaveBeenCalledWith(
-        "FEN parsing failed during move validation",
-        expect.objectContaining({
-          operation: "chess_engine_validate_move_fen",
-          currentFen: "invalid-fen-string",
-        }),
-      );
+      if (!outcome.success) {
+        expect(outcome.error).toBe("Invalid board FEN string");
+      }
     });
   });
 });

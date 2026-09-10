@@ -13,7 +13,11 @@ import {
   runLoggedJob,
   defaultLogger,
 } from "./platform/logger/index.js";
-import { createHttpServer, type HttpRateLimiter } from "./platform/http/index.js";
+import {
+  createHttpServer,
+  type HttpRateLimiter,
+  type IFileStorage,
+} from "./platform/http/index.js";
 import {
   createSocketServer,
   createSocketRateLimiter,
@@ -28,7 +32,11 @@ import {
   SystemClock,
   UuidGenerator,
 } from "./platform/time/index.js";
-import type { IClock, IIdGenerator } from "@fun-chess/shared";
+import {
+  type IClock,
+  type IIdGenerator,
+  serializeError,
+} from "@fun-chess/shared";
 import {
   InMemoryRoomStore,
   type RoomStore,
@@ -66,6 +74,7 @@ export interface StartServerOptions {
   idGenerator?: IIdGenerator;
   sessionRegistry?: SessionRegistry;
   distPath?: string;
+  fileStorage?: IFileStorage;
   autoListen?: boolean;
   timerRegistry?: IDisconnectTimerRegistry;
   onExit?: (code: number) => void;
@@ -120,13 +129,14 @@ export function setupDomainServices(
   const clock = options.clock ?? new SystemClock();
   const idGenerator = options.idGenerator ?? new UuidGenerator();
   const sessionRegistry =
-    options.sessionRegistry ?? new InMemorySessionRegistry(clock, idGenerator);
+    options.sessionRegistry ??
+    new InMemorySessionRegistry(clock, idGenerator, resolvedLogger, env.SESSION_SECRET);
   const roomStore =
     options.roomStore ??
     new InMemoryRoomStore({
       clock,
       logger: resolvedLogger,
-      maxRooms: MAX_ROOMS,
+      maxRooms: env.MAX_ROOMS ?? MAX_ROOMS,
       maxCancelledTickets: 5_000,
     });
   const roomService = new RoomService(
@@ -194,14 +204,13 @@ export function setupSocketGateway(
     });
 
     socket.on("error", (err: Error) => {
+      const socketUserId = (socket.data as Record<string, unknown> | undefined)?.userId as string | undefined;
       logger.error("Client socket transport error", {
         operation: "socket_error",
         correlationId: connectionCorrelationId,
         socketId: socket.id,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        ...(socketUserId ? { userId: socketUserId } : {}),
+        error: serializeError(err),
       });
     });
 
@@ -228,6 +237,7 @@ export function setupSocketGateway(
 
     // Wrap async disconnect listener in try/catch with structured error log
     socket.on("disconnect", async (reason) => {
+      const socketUserId = (socket.data as Record<string, unknown> | undefined)?.userId as string | undefined;
       const disconnectCorrelationId = randomUUID();
       const startTime = performance.now();
       logger.info("Client socket disconnected", {
@@ -235,6 +245,7 @@ export function setupSocketGateway(
         correlationId: disconnectCorrelationId,
         socketId: socket.id,
         reason,
+        ...(socketUserId ? { userId: socketUserId } : {}),
       });
 
       try {
@@ -257,6 +268,7 @@ export function setupSocketGateway(
           duration,
           durationMs: duration,
           status: "success",
+          ...(socketUserId ? { userId: socketUserId } : {}),
         });
       } catch (err: unknown) {
         const duration = Math.round(performance.now() - startTime);
@@ -268,10 +280,8 @@ export function setupSocketGateway(
           reason,
           duration,
           durationMs: duration,
-          error:
-            err instanceof Error
-              ? { name: err.name, message: err.message, stack: err.stack }
-              : { raw: err },
+          error: serializeError(err),
+          ...(socketUserId ? { userId: socketUserId } : {}),
         });
       }
     });
@@ -296,10 +306,7 @@ export function setupBackgroundJobs(
         logger.error("Scheduled room_cleanup caught rejection", {
           operation: "room_cleanup",
           correlationId: randomUUID(),
-          error:
-            err instanceof Error
-              ? { name: err.name, message: err.message, stack: err.stack }
-              : { raw: err },
+          error: serializeError(err),
         });
       }
     },
@@ -309,13 +316,24 @@ export function setupBackgroundJobs(
   return cleanupInterval;
 }
 
+export interface ServerBootstrapConfig {
+  env: ServerEnv;
+  allowedOrigins: string[];
+  logger: Logger;
+  port: number;
+  host: string;
+  isProduction: boolean;
+  distPath: string;
+  bootstrapCorrelationId: string;
+  startTime: number;
+}
+
 /**
- * Main application bootstrap function.
- * Wires storage adapters, business logic services, HTTP/SPA routing, and Socket.io ingress.
- * Returns running ServerInstance with lifecycle handles (MAJ-033, MAJ-031).
+ * Resolves and validates environment configuration for server bootstrapping (MAJ-015, SEC-RT-003).
  */
-export async function startServer(options: StartServerOptions = {}): Promise<ServerInstance> {
-  // 1. Centralized Fail-Fast Environment Validation (MAJ-015, MAJ-016, MAJ-004, MAJ-001, SEC-RT-003)
+export function resolveServerBootstrapConfig(
+  options: StartServerOptions,
+): ServerBootstrapConfig {
   const rawMerged: Record<string, unknown> = {
     ...process.env,
     ...(options.config || {}),
@@ -330,7 +348,6 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
 
   const env: ServerEnv = validateServerConfig(rawMerged);
   const allowedOrigins = options.allowedOrigins ?? resolveAllowedOrigins(env);
-
   const logger =
     options.logger ??
     new PinoLogger({
@@ -345,54 +362,86 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
 
   const bootstrapCorrelationId = randomUUID();
   const startTime = performance.now();
-  logger.info("Initializing Fun Chess server bootstrap...", {
-    operation: "server_bootstrap",
-    correlationId: bootstrapCorrelationId,
+
+  return {
+    env,
+    allowedOrigins,
+    logger,
     port,
     host,
-    nodeEnv: env.NODE_ENV,
-    logLevel: env.LOG_LEVEL,
-    trustProxy: env.TRUST_PROXY,
-  });
+    isProduction,
+    distPath,
+    bootstrapCorrelationId,
+    startTime,
+  };
+}
 
-  // 2. Instantiate Storage Adapters & Domain Services (MAJ-031)
-  const domainServices = setupDomainServices(options, env, port, logger);
-  const { timerRegistry, roomStore, roomService, gameService, relayAddressService } = domainServices;
+export interface HttpLayerSetupParams {
+  domainServices: DomainServices;
+  bootstrapConfig: ServerBootstrapConfig;
+  fileStorage?: IFileStorage;
+  httpRateLimiter?: HttpRateLimiter;
+  getActiveSocketCount: () => number;
+}
 
-  const ioRef: { current?: TypedSocketServer } = {};
+/**
+ * Configures HTTP server with API routes, rate limiting, and SPA static handling (MAJ-003, MIN-005).
+ */
+export function setupHttpLayer(params: HttpLayerSetupParams): http.Server {
+  const { domainServices, bootstrapConfig, fileStorage, httpRateLimiter, getActiveSocketCount } = params;
+  const { env, allowedOrigins, logger, port, distPath } = bootstrapConfig;
 
-  // 3. Setup Native HTTP Server with API & SPA Static File Routing (MAJ-003, MAJ-019, MAJ-004)
   const httpHandler = createHttpServer({
-    roomStore,
-    relayAddressService,
+    roomStore: domainServices.roomStore,
+    relayAddressService: domainServices.relayAddressService,
     logger,
     port,
     distPath,
+    fileStorage,
     allowedOrigins,
     env,
     metricsSecret: env.METRICS_SECRET,
-    rateLimiter: options.httpRateLimiter,
-    getActiveSocketCount: () => (ioRef.current ? ioRef.current.sockets.sockets.size : 0),
+    rateLimiter: httpRateLimiter,
+    getActiveSocketCount,
   });
 
   const server = http.createServer(httpHandler);
-
-  // Configure connection timeouts (MIN-007)
   server.requestTimeout = 30_000;
   server.headersTimeout = 31_000;
   server.keepAliveTimeout = 5_000;
 
-  // 4. Setup Typed Socket.io Server with Strict CORS (MAJ-003, CRIT-006, MAJ-022)
+  return server;
+}
+
+export interface SocketLayerSetupParams {
+  server: http.Server;
+  domainServices: DomainServices;
+  bootstrapConfig: ServerBootstrapConfig;
+  socketRateLimiter?: SocketRateLimiter;
+  roomCreateRateLimiter?: SocketRateLimiter;
+}
+
+export interface SocketLayer {
+  io: TypedSocketServer;
+  rateLimiter: SocketRateLimiter;
+  roomCreateRateLimiter: SocketRateLimiter;
+}
+
+/**
+ * Sets up Socket.io server, rate limiting instances, and ingress gateways (MAJ-003, MAJ-031).
+ */
+export function setupSocketLayer(params: SocketLayerSetupParams): SocketLayer {
+  const { server, domainServices, bootstrapConfig, socketRateLimiter, roomCreateRateLimiter: optRoomCreateLimiter } = params;
+  const { allowedOrigins, logger, env } = bootstrapConfig;
+
   const io = createSocketServer(server, {
     allowedOrigins,
     logger,
     env,
   });
-  ioRef.current = io;
 
-  // Shared Socket Rate Limiter singleton (SEC-HIGH-001, MAJ-001, MAJ-003, MAJ-015)
   const rateLimiter =
-    options.socketRateLimiter ??
+    socketRateLimiter ??
     createSocketRateLimiter({
       maxKeys: env.RATE_LIMIT_MAX_KEYS ?? 10_000,
       windowMs: env.RATE_LIMIT_WINDOW_MS ?? 10_000,
@@ -401,22 +450,46 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
     });
 
   const roomCreateRateLimiter =
-    options.roomCreateRateLimiter ??
+    optRoomCreateLimiter ??
     createSocketRateLimiter({
       maxRequests: env.RATE_LIMIT_ROOM_CREATE_MAX,
       windowMs: 60_000,
       logger,
     });
 
-  // 5. Register Feature Socket Ingress Handlers & Transport Error Logging (MAJ-031)
   setupSocketGateway(io, domainServices, rateLimiter, env, logger, roomCreateRateLimiter);
 
-  // 6. Periodic Abandoned Room & Expired Session Cleanup (MAJ-031)
+  return { io, rateLimiter, roomCreateRateLimiter };
+}
+
+export interface LifecycleSetupParams {
+  server: http.Server;
+  io: TypedSocketServer;
+  bootstrapConfig: ServerBootstrapConfig;
+  domainServices: DomainServices;
+  rateLimiter: SocketRateLimiter;
+  roomCreateRateLimiter: SocketRateLimiter;
+  httpRateLimiter?: HttpRateLimiter;
+  onExit?: (code: number) => void;
+}
+
+export interface LifecycleComponents {
+  shutdownCoordinator: ShutdownCoordinator;
+  cleanupInterval: NodeJS.Timeout;
+}
+
+/**
+ * Configures background cleanup tasks and graceful termination coordinator (CRIT-002, MAJ-010).
+ */
+export function setupLifecycle(params: LifecycleSetupParams): LifecycleComponents {
+  const { server, io, bootstrapConfig, domainServices, rateLimiter, roomCreateRateLimiter, httpRateLimiter, onExit: optOnExit } = params;
+  const { logger, env } = bootstrapConfig;
+  const { roomService, timerRegistry } = domainServices;
+
   const cleanupInterval = setupBackgroundJobs(roomService, logger);
 
-  // 7. Graceful Process Termination & Crash Guards (CRIT-002, CRIT-003, ENH-008, ENH-011, MAJ-010, MIN-013)
   const onExit =
-    options.onExit ??
+    optOnExit ??
     (env.NODE_ENV === "test" ? () => {} : (code: number) => process.exit(code));
 
   const coordinatorOptions: ShutdownCoordinatorOptions = {
@@ -432,7 +505,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
         clearAllDisconnectTimers();
       },
       () => {
-        options.httpRateLimiter?.destroy();
+        httpRateLimiter?.destroy();
         rateLimiter.destroy();
         roomCreateRateLimiter.destroy();
       },
@@ -440,87 +513,62 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
   };
 
   const shutdownCoordinator = new ShutdownCoordinator(coordinatorOptions);
-
   if (env.NODE_ENV !== "test") {
     shutdownCoordinator.installProcessHandlers();
   }
 
-  // 8. Bind and Start Server with robust cleanup on bootstrap error (MAJ-009)
-  const autoListen = options.autoListen ?? true;
-  let boundPort = port;
-  let boundUrl = `http://${host}:${port}`;
+  return { shutdownCoordinator, cleanupInterval };
+}
 
-  try {
-    if (autoListen) {
-      await new Promise<void>((resolve, reject) => {
-        server.once("error", reject);
-        server.listen(port, host, () => {
-          server.removeListener("error", reject);
-          const addr = server.address();
-          if (addr && typeof addr === "object") {
-            boundPort = addr.port;
-            boundUrl = `http://${host === "0.0.0.0" ? "127.0.0.1" : host}:${boundPort}`;
-          }
-          resolve();
-        });
-      });
+export interface BindHttpServerParams {
+  server: http.Server;
+  host: string;
+  port: number;
+}
 
-      const addrInfo = relayAddressService.getAddressingInfo(boundPort);
-
-      const duration = Math.round(performance.now() - startTime);
-      logger.info("Fun Chess server started successfully", {
-        operation: "server_bootstrap",
-        correlationId: bootstrapCorrelationId,
-        status: "success",
-        duration,
-        durationMs: duration,
-        port: boundPort,
-        relayMode: addrInfo.relayMode,
-        isCloudRelay: addrInfo.isCloudRelay,
-        lanIp: addrInfo.lanIp,
-        joinUrl: addrInfo.joinUrl,
-        publicUrl: addrInfo.publicUrl,
-        localUrl: addrInfo.localUrl,
-      });
-
-      if (!isProduction && env.NODE_ENV !== "test" && Boolean(process.stdout.isTTY)) {
-        logger.info("Fun Chess server ready", {
-          operation: "server_banner",
-          correlationId: bootstrapCorrelationId,
-          relayMode: addrInfo.relayMode,
-          localUrl: addrInfo.localUrl,
-          joinUrl: addrInfo.joinUrl,
-          publicUrl: addrInfo.publicUrl,
-        });
-      }
-    }
-  } catch (bootstrapError) {
-    const duration = Math.round(performance.now() - startTime);
-    logger.error("Fun Chess server bootstrap failed", {
-      operation: "server_bootstrap",
-      correlationId: bootstrapCorrelationId,
-      status: "failed",
-      duration,
-      durationMs: duration,
-      port,
-      host,
-      error:
-        bootstrapError instanceof Error
-          ? { name: bootstrapError.name, message: bootstrapError.message, stack: bootstrapError.stack }
-          : { raw: bootstrapError },
+/**
+ * Binds HTTP server to target port and host with error listener cleanup (MAJ-009).
+ */
+export async function bindHttpServer(
+  params: BindHttpServerParams,
+): Promise<{ boundPort: number; boundUrl: string }> {
+  const { server, host, port } = params;
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, host, () => {
+      server.removeListener("error", reject);
+      resolve();
     });
-    // Clean up background jobs, rate limiters, and listeners on startup error (MAJ-009)
-    clearInterval(cleanupInterval);
-    timerRegistry.clear();
-    clearAllDisconnectTimers();
-    rateLimiter.destroy();
-    roomCreateRateLimiter.destroy();
-    shutdownCoordinator.dispose();
-    throw bootstrapError;
-  }
+  });
 
-  // Programmatic close with timeout race, connection closing, and error propagation (MAJ-007, MAJ-008)
-  const close = async (): Promise<void> => {
+  const addr = server.address();
+  const boundPort = addr && typeof addr === "object" ? addr.port : port;
+  const boundUrl = `http://${host === "0.0.0.0" ? "127.0.0.1" : host}:${boundPort}`;
+
+  return { boundPort, boundUrl };
+}
+
+export interface CloseHandlerParams {
+  server: http.Server;
+  io: TypedSocketServer;
+  logger: Logger;
+  cleanupInterval: NodeJS.Timeout;
+  timerRegistry: IDisconnectTimerRegistry;
+  shutdownCoordinator: ShutdownCoordinator;
+  rateLimiter: SocketRateLimiter;
+  roomCreateRateLimiter: SocketRateLimiter;
+  httpRateLimiter?: HttpRateLimiter;
+}
+
+/**
+ * Creates programmatic close handle with timeout race and guaranteed timer release (MAJ-008).
+ */
+export function createCloseHandler(
+  params: CloseHandlerParams,
+): () => Promise<void> {
+  const { server, io, logger, cleanupInterval, timerRegistry, shutdownCoordinator, rateLimiter, roomCreateRateLimiter, httpRateLimiter } = params;
+
+  return async (): Promise<void> => {
     const closeCorrelationId = randomUUID();
     const closeStartTime = performance.now();
     logger.info("Fun Chess server closing...", {
@@ -528,12 +576,13 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
       correlationId: closeCorrelationId,
     });
 
+    let timer: NodeJS.Timeout | undefined;
     try {
       const closePromise = (async () => {
         clearInterval(cleanupInterval);
         timerRegistry.clear();
         clearAllDisconnectTimers();
-        options.httpRateLimiter?.destroy();
+        httpRateLimiter?.destroy();
         rateLimiter.destroy();
         roomCreateRateLimiter.destroy();
         shutdownCoordinator.dispose();
@@ -543,10 +592,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
         }
 
         await new Promise<void>((resolve, reject) => {
-          io.close((err) => {
-            if (err) reject(err);
-            else resolve();
-          });
+          io.close((err) => (err ? reject(err) : resolve()));
         });
 
         if (server.listening) {
@@ -554,24 +600,17 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
             closeIdleConnections?: () => void;
             closeAllConnections?: () => void;
           };
-          if (typeof sWithConn.closeIdleConnections === "function") {
-            sWithConn.closeIdleConnections();
-          }
-          if (typeof sWithConn.closeAllConnections === "function") {
-            sWithConn.closeAllConnections();
-          }
+          sWithConn.closeIdleConnections?.();
+          sWithConn.closeAllConnections?.();
 
           await new Promise<void>((resolve, reject) => {
-            server.close((err) => {
-              if (err) reject(err);
-              else resolve();
-            });
+            server.close((err) => (err ? reject(err) : resolve()));
           });
         }
       })();
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        const timer = setTimeout(() => {
+        timer = setTimeout(() => {
           reject(new Error("Server close timed out after 5000ms"));
         }, 5000);
         timer.unref?.();
@@ -595,25 +634,160 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
         status: "failed",
         duration: closeDuration,
         durationMs: closeDuration,
-        error:
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { raw: err },
+        error: serializeError(err),
       });
       throw err;
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
     }
   };
+}
+
+/**
+ * Emits structured logging upon successful server startup (MAJ-031).
+ */
+export function logBootstrapSuccess(
+  bootstrapConfig: ServerBootstrapConfig,
+  relayAddressService: IRelayAddressService,
+  boundPort: number,
+): void {
+  const { logger, bootstrapCorrelationId, startTime, isProduction, env } = bootstrapConfig;
+  const addrInfo = relayAddressService.getAddressingInfo(boundPort);
+  const duration = Math.round(performance.now() - startTime);
+
+  logger.info("Fun Chess server started successfully", {
+    operation: "server_bootstrap",
+    correlationId: bootstrapCorrelationId,
+    status: "success",
+    duration,
+    durationMs: duration,
+    port: boundPort,
+    relayMode: addrInfo.relayMode,
+    isCloudRelay: addrInfo.isCloudRelay,
+    lanIp: addrInfo.lanIp,
+    joinUrl: addrInfo.joinUrl,
+    publicUrl: addrInfo.publicUrl,
+    localUrl: addrInfo.localUrl,
+  });
+
+  if (!isProduction && env.NODE_ENV !== "test" && Boolean(process.stdout.isTTY)) {
+    logger.info("Fun Chess server ready", {
+      operation: "server_banner",
+      correlationId: bootstrapCorrelationId,
+      relayMode: addrInfo.relayMode,
+      localUrl: addrInfo.localUrl,
+      joinUrl: addrInfo.joinUrl,
+      publicUrl: addrInfo.publicUrl,
+    });
+  }
+}
+
+/**
+ * Main application bootstrap function.
+ * Wires storage adapters, business logic services, HTTP/SPA routing, and Socket.io ingress.
+ * Returns running ServerInstance with lifecycle handles (MAJ-033, MAJ-031).
+ */
+export async function startServer(options: StartServerOptions = {}): Promise<ServerInstance> {
+  const bootstrapConfig = resolveServerBootstrapConfig(options);
+  const { logger, bootstrapCorrelationId, env, port, host } = bootstrapConfig;
+
+  logger.info("Initializing Fun Chess server bootstrap...", {
+    operation: "server_bootstrap",
+    correlationId: bootstrapCorrelationId,
+    port,
+    host,
+    nodeEnv: env.NODE_ENV,
+    logLevel: env.LOG_LEVEL,
+    trustProxy: env.TRUST_PROXY,
+  });
+
+  const domainServices = setupDomainServices(options, env, port, logger);
+  const ioRef: { current?: TypedSocketServer } = {};
+
+  const server = setupHttpLayer({
+    domainServices,
+    bootstrapConfig,
+    fileStorage: options.fileStorage,
+    httpRateLimiter: options.httpRateLimiter,
+    getActiveSocketCount: () => (ioRef.current ? ioRef.current.sockets.sockets.size : 0),
+  });
+
+  const { io, rateLimiter, roomCreateRateLimiter } = setupSocketLayer({
+    server,
+    domainServices,
+    bootstrapConfig,
+    socketRateLimiter: options.socketRateLimiter,
+    roomCreateRateLimiter: options.roomCreateRateLimiter,
+  });
+  ioRef.current = io;
+
+  const { shutdownCoordinator, cleanupInterval } = setupLifecycle({
+    server,
+    io,
+    bootstrapConfig,
+    domainServices,
+    rateLimiter,
+    roomCreateRateLimiter,
+    httpRateLimiter: options.httpRateLimiter,
+    onExit: options.onExit,
+  });
+
+  const autoListen = options.autoListen ?? true;
+  let boundPort = port;
+  let boundUrl = `http://${host}:${port}`;
+
+  try {
+    if (autoListen) {
+      const bound = await bindHttpServer({ server, host, port });
+      boundPort = bound.boundPort;
+      boundUrl = bound.boundUrl;
+      logBootstrapSuccess(bootstrapConfig, domainServices.relayAddressService, boundPort);
+    }
+  } catch (bootstrapError) {
+    const duration = Math.round(performance.now() - bootstrapConfig.startTime);
+    logger.error("Fun Chess server bootstrap failed", {
+      operation: "server_bootstrap",
+      correlationId: bootstrapCorrelationId,
+      status: "failed",
+      duration,
+      durationMs: duration,
+      port,
+      host,
+      error: serializeError(bootstrapError),
+    });
+    clearInterval(cleanupInterval);
+    domainServices.timerRegistry.clear();
+    clearAllDisconnectTimers();
+    rateLimiter.destroy();
+    roomCreateRateLimiter.destroy();
+    shutdownCoordinator.dispose();
+    throw bootstrapError;
+  }
+
+  const close = createCloseHandler({
+    server,
+    io,
+    logger,
+    cleanupInterval,
+    timerRegistry: domainServices.timerRegistry,
+    shutdownCoordinator,
+    rateLimiter,
+    roomCreateRateLimiter,
+    httpRateLimiter: options.httpRateLimiter,
+  });
 
   return {
     server,
     io,
     shutdownCoordinator,
-    roomStore,
-    roomService,
-    gameService,
+    roomStore: domainServices.roomStore,
+    roomService: domainServices.roomService,
+    gameService: domainServices.gameService,
     sessionRegistry: domainServices.sessionRegistry,
     relayAddressService: domainServices.relayAddressService,
-    timerRegistry,
+    timerRegistry: domainServices.timerRegistry,
     logger,
     rateLimiter,
     roomCreateRateLimiter,
@@ -664,10 +838,7 @@ if (isMain) {
     fallbackLogger.fatal("Fatal bootstrap error during server startup", {
       operation: "server_bootstrap_fatal",
       correlationId: bootstrapCorrelationId,
-      error:
-        err instanceof Error
-          ? { name: err.name, message: err.message, stack: err.stack }
-          : { raw: err },
+      error: serializeError(err),
     });
     process.exit(1);
   });

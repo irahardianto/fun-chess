@@ -1,4 +1,4 @@
-import { ref, computed, readonly, onUnmounted, getCurrentInstance, onScopeDispose, getCurrentScope } from 'vue';
+import { computed, readonly, getCurrentInstance } from 'vue';
 import type { Move } from 'chess.js';
 import type {
   Square,
@@ -22,6 +22,7 @@ import {
 } from './useScenarioStepNavigation';
 import { useScenarioBot } from './useScenarioBot';
 import { useScenarioHints } from './useScenarioHints';
+import { useScenarioFeedback } from './useScenarioFeedback';
 
 export type { ScenarioStepOutcomeEvent };
 
@@ -32,8 +33,8 @@ export interface UseScenarioRunnerOptions {
 }
 
 /**
- * Orchestrator composable for interactive chess tutorial scenarios (MAJ-030).
- * Composes useScenarioStepNavigation, useScenarioBot, useScenarioHints, and useBoardSelection.
+ * Orchestrator composable for interactive chess tutorial scenarios (MAJ-021, MAJ-030).
+ * Composes useScenarioStepNavigation, useScenarioBot, useScenarioHints, useScenarioFeedback, and useBoardSelection.
  */
 export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScenario) {
   const optionsObj: UseScenarioRunnerOptions =
@@ -51,13 +52,8 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
   // Internal chess.js engine instance
   const chess = createSafeChess(initialFenStr);
 
-  // Attempt statistics & UI animation state
-  const mistakesCurrentAttempt = ref<number>(0);
-  const feedbackMessage = ref<string | null>(null);
-  const isStepSuccess = ref<boolean>(false);
-  const isShaking = ref<boolean>(false);
-  const lastMove = ref<{ from: string; to: string } | null>(null);
-  let shakeTimer: ReturnType<typeof setTimeout> | null = null;
+  // 1. Feedback & UI Animation Sub-Composable (MAJ-021)
+  const feedback = useScenarioFeedback();
 
   function syncEngineFen(fenStr: string): string {
     try {
@@ -73,12 +69,12 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     }
   }
 
-  // 1. Hints Sub-Composable (MAJ-030)
+  // 2. Hints Sub-Composable (MAJ-030)
   const hints = useScenarioHints({
     currentStep: computed(() => nav.currentStep.value),
   });
 
-  // 2. Board Selection State Machine (MIN-010)
+  // 3. Board Selection State Machine (MIN-010)
   const boardSelection = useBoardSelection({
     getPieceAt: (sq) => {
       try {
@@ -100,29 +96,26 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     executeMove: (from, to, promotion) => applyPlayerMove({ from, to, promotion }),
   });
 
-  // 3. Navigation Sub-Composable (MAJ-030)
+  // 4. Navigation Sub-Composable (MAJ-030)
   const nav = useScenarioStepNavigation({
     scenario: initialScenario,
     onStepOutcome: (event) => optionsObj.onStepOutcome?.(event),
     onStepLoaded: () => {
       hints.resetStepHints();
-      feedbackMessage.value = null;
-      isStepSuccess.value = false;
-      isShaking.value = false;
-      lastMove.value = null;
+      feedback.resetStepFeedback();
       boardSelection.clearSelection();
     },
     getStarsAwarded: () => calculatedStars.value,
     syncEngineFen,
   });
 
-  // 4. Bot Counter-Move Sub-Composable (MAJ-030)
+  // 5. Bot Counter-Move Sub-Composable (MAJ-030)
   const bot = useScenarioBot({
     chess,
     logger,
     onBotMoveSuccess: (move, fen) => {
       nav.currentFen.value = fen;
-      lastMove.value = move;
+      feedback.setLastMove(move);
     },
     onBotMoveComplete: (success) => {
       if (success) {
@@ -133,24 +126,17 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
 
   // Derived Performance Metrics
   const calculatedStars = computed<StarRating>(() => {
-    return calculateStars(hints.hintsUsedCurrentAttempt.value, mistakesCurrentAttempt.value);
+    return calculateStars(hints.hintsUsedCurrentAttempt.value, feedback.mistakesCurrentAttempt.value);
   });
 
   const accuracy = computed<number>(() => {
-    return calculateAccuracy(nav.totalSteps.value, mistakesCurrentAttempt.value);
+    return calculateAccuracy(nav.totalSteps.value, feedback.mistakesCurrentAttempt.value);
   });
 
   const isMyTurn = computed<boolean>(() => {
     if (bot.isWaitingForBotResponse.value || nav.isCompleted.value) return false;
     return true;
   });
-
-  function clearShakeTimer(): void {
-    if (shakeTimer) {
-      clearTimeout(shakeTimer);
-      shakeTimer = null;
-    }
-  }
 
   function getLegalMovesForSquare(sq: Square): Square[] {
     try {
@@ -174,18 +160,9 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
   }
 
   function handleFailedPlayerMove(): void {
-    mistakesCurrentAttempt.value++;
-    isShaking.value = true;
-    feedbackMessage.value = 'Not quite! Look for the goal square or tap 💡 Hint for a clue.';
-
+    feedback.recordMistake();
     // Auto-hint reveal after 2 mistakes (SC-4 UX Polish)
-    hints.checkAutoHint(mistakesCurrentAttempt.value, nav.currentStep.value);
-
-    clearShakeTimer();
-    shakeTimer = setTimeout(() => {
-      isShaking.value = false;
-    }, 400);
-
+    hints.checkAutoHint(feedback.mistakesCurrentAttempt.value, nav.currentStep.value);
     boardSelection.clearSelection();
   }
 
@@ -213,7 +190,6 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     }
 
     if (!res) {
-      // Fallback for tutorial board state
       const p = chess.get(move.from as unknown as import('chess.js').Square);
       if (p) {
         chess.remove(move.from as unknown as import('chess.js').Square);
@@ -225,11 +201,10 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     }
 
     nav.currentFen.value = chess.fen();
-    lastMove.value = { from: move.from, to: move.to };
-    isStepSuccess.value = true;
-    feedbackMessage.value = chess.isCheckmate()
+    const successMsg = chess.isCheckmate()
       ? 'Checkmate! Beautiful finish! 🏆'
       : step.explanationOnSuccess;
+    feedback.recordSuccess({ from: move.from, to: move.to }, successMsg);
     boardSelection.clearSelection();
 
     return { isCheckmate: chess.isCheckmate() };
@@ -248,17 +223,14 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       return false;
     }
 
-    // Move is valid for this tutorial step! Execute move
     try {
       const { isCheckmate } = executePlayerMoveOnEngine(step, move);
 
-      // Sound alternative checkmate: if move delivers sound checkmate, accept immediately!
       if (isCheckmate) {
         nav.advanceOrCompleteStep();
         return true;
       }
 
-      // Check if there is an automated opponent response
       if (step.opponentResponse) {
         bot.scheduleOpponentReply(step.opponentResponse);
       } else {
@@ -278,13 +250,11 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
   function selectSquare(sq: Square): void {
     if (bot.isWaitingForBotResponse.value || nav.isCompleted.value) return;
 
-    // If square already selected and clicked square is in legal moves
     if (boardSelection.selectedSquare.value && boardSelection.isLegalTarget(sq)) {
       boardSelection.handleSquareClick(sq);
       return;
     }
 
-    // Check if clicked square has a piece belonging to player or is allowed source for tutorial
     try {
       const piece = chess.get(sq as unknown as import('chess.js').Square);
       const isPieceOfPlayer = piece && piece.color === nav.playerColor.value;
@@ -304,7 +274,6 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
       });
     }
 
-    // Deselect if empty or invalid
     boardSelection.clearSelection();
   }
 
@@ -318,20 +287,9 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
 
   function loadScenario(newScenario: ChessScenario, initialStepIdx = 0): void {
     bot.clearBotTimers();
-    clearShakeTimer();
+    feedback.resetAttempt();
     hints.resetAllHints();
-    mistakesCurrentAttempt.value = 0;
     nav.loadScenario(newScenario, initialStepIdx);
-  }
-
-  if (getCurrentScope()) {
-    onScopeDispose(() => {
-      clearShakeTimer();
-    });
-  } else if (getCurrentInstance()) {
-    onUnmounted(() => {
-      clearShakeTimer();
-    });
   }
 
   return {
@@ -344,21 +302,22 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     totalSteps: nav.totalSteps,
     isCompleted: readonly(nav.isCompleted),
     hintsUsedCurrentAttempt: readonly(hints.hintsUsedCurrentAttempt),
-    mistakesCurrentAttempt: readonly(mistakesCurrentAttempt),
+    mistakesCurrentAttempt: feedback.mistakesCurrentAttempt,
     activeHint: readonly(hints.activeHint),
     hintGlowSquare: readonly(hints.hintGlowSquare),
     hintTargetSquare: readonly(hints.hintTargetSquare),
     isWaitingForBotResponse: readonly(bot.isWaitingForBotResponse),
-    feedbackMessage: readonly(feedbackMessage),
-    isStepSuccess: readonly(isStepSuccess),
-    isShaking: readonly(isShaking),
+    feedbackMessage: feedback.feedbackMessage,
+    isStepSuccess: feedback.isStepSuccess,
+    isShaking: feedback.isShaking,
     calculatedStars,
     accuracy,
     lastStepOutcome: readonly(nav.lastStepOutcome),
     selectedSquare: computed(() => boardSelection.selectedSquare.value),
     legalMoves: computed(() => boardSelection.legalMovesForSelected.value),
-    lastMove: readonly(lastMove),
+    lastMove: feedback.lastMove,
     pendingPromotion: computed(() => boardSelection.pendingPromotion.value),
+    feedback,
     loadScenario,
     loadStep: nav.loadStep,
     selectSquare,
@@ -370,3 +329,5 @@ export function useScenarioRunner(options?: UseScenarioRunnerOptions | ChessScen
     nextStep: nav.nextStep,
   };
 }
+
+export type UseScenarioRunnerReturn = ReturnType<typeof useScenarioRunner>;

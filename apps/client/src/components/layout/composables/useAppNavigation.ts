@@ -105,22 +105,29 @@ export function useAppNavigation(options: AppNavigationOptions) {
   const isActionLoading = ref(false);
   const myPlayerAvatar = ref<string>(getInitialAvatar());
 
-  async function loadInitialNetworkAndProgress(defaultProgressStore?: { getProgressMap: () => Promise<Record<string, { starsEarned?: number }>> }): Promise<void> {
-    const roomParam = parseRoomCodeFromUrl(undefined, logger);
+  function syncRoomCodeFromUrl(search?: string): string {
+    const roomParam = parseRoomCodeFromUrl(search, logger);
     if (roomParam) {
       initialRoomCode.value = roomParam;
     }
+    return roomParam;
+  }
 
+  async function loadLanInfo(): Promise<LanInfoResponse | null> {
     try {
       const info = await apiClient.getLanInfo();
       lanInfo.value = info;
+      return info;
     } catch (err) {
       logger.warn('Failed to fetch server LAN info, using offline fallback', {
         operation: 'app_fetch_lan_info',
         error: err instanceof Error ? err.message : String(err),
       });
+      return null;
     }
+  }
 
+  async function syncScenarioProgress(defaultProgressStore?: { getProgressMap: () => Promise<Record<string, { starsEarned?: number }>> }): Promise<void> {
     if (defaultProgressStore) {
       try {
         const progressMap = await defaultProgressStore.getProgressMap();
@@ -135,6 +142,12 @@ export function useAppNavigation(options: AppNavigationOptions) {
         });
       }
     }
+  }
+
+  async function loadInitialNetworkAndProgress(defaultProgressStore?: { getProgressMap: () => Promise<Record<string, { starsEarned?: number }>> }): Promise<void> {
+    syncRoomCodeFromUrl();
+    await loadLanInfo();
+    await syncScenarioProgress(defaultProgressStore);
   }
 
   function handleNavbarBrandClick(isInRoom: boolean): void {
@@ -212,6 +225,9 @@ export function useAppNavigation(options: AppNavigationOptions) {
     isActionLoading,
     myPlayerAvatar,
     loadInitialNetworkAndProgress,
+    syncRoomCodeFromUrl,
+    loadLanInfo,
+    syncScenarioProgress,
     handleNavbarBrandClick,
     startSoloAi,
     selectScenario,

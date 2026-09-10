@@ -29,6 +29,12 @@ export class BrowserWebRtcDiscovery implements IWebRtcDiscovery {
       return null;
     }
 
+    const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    this.logger.debug('Starting WebRTC local IP discovery', {
+      operation: 'webrtc_discover_ip',
+      timeoutMs,
+    });
+
     return new Promise((resolve) => {
       let pc: RTCPeerConnection | null = null;
       let resolved = false;
@@ -50,6 +56,15 @@ export class BrowserWebRtcDiscovery implements IWebRtcDiscovery {
       const timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
+          const duration = Math.round(
+            (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime
+          );
+          const iceGatheringState = pc ? (pc.iceGatheringState ?? 'unknown') : 'unknown';
+          this.logger.debug('WebRTC local IP discovery timed out', {
+            operation: 'webrtc_discover_ip',
+            iceGatheringState,
+            duration,
+          });
           cleanup();
           resolve(null);
         }
@@ -86,12 +101,20 @@ export class BrowserWebRtcDiscovery implements IWebRtcDiscovery {
           const candidate = event.candidate.candidate;
           // Search for private IPv4 patterns (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
           const match = candidate.match(
-            /\b(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b/
+            /\b(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b/
           );
           if (match && match[0]) {
             if (!resolved) {
               resolved = true;
               clearTimeout(timer);
+              const duration = Math.round(
+                (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime
+              );
+              this.logger.debug('WebRTC local IP discovery succeeded', {
+                operation: 'webrtc_discover_ip',
+                ip: match[0],
+                duration,
+              });
               cleanup();
               resolve(match[0]);
             }

@@ -13,3 +13,4 @@ export * from "./rating_engine.js";
 export * from "./sync.js";
 export * from "./avatar.js";
 export * from "./system.js";
+export * from "./themes.js";

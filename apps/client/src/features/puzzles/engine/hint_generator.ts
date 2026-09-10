@@ -1,4 +1,3 @@
-import { getCurrentInstance } from 'vue';
 import type { Chess, Square as ChessSquare } from 'chess.js';
 import type {
   Puzzle,
@@ -11,8 +10,6 @@ import type {
 import { createSafeChess } from '@fun-chess/shared';
 import { parseUciMove } from './puzzle_validator';
 import { PIECE_DISPLAY_NAMES } from './puzzle_analysis_engine';
-import { useInjectLogger } from '@/platform/di';
-import { logger as defaultLogger, type ILogger } from '@/platform/telemetry';
 
 export const THEME_ICONS: Record<string, string> = {
   fork: '🍴',
@@ -176,9 +173,8 @@ export function generateProgressiveHint(
   currentMoveIndex: number,
   currentFen: string,
   requestedLevel: HintLevel,
-  customLogger?: ILogger
+  _customLogger?: unknown
 ): ExtendedHintData {
-  const logger = customLogger ?? (getCurrentInstance() ? useInjectLogger() : defaultLogger);
   if (requestedLevel === 0 || !puzzle?.moves || currentMoveIndex >= puzzle.moves.length) {
     return {
       level: 0,
@@ -215,13 +211,8 @@ export function generateProgressiveHint(
     if (moveRes) {
       san = moveRes.san;
     }
-  } catch (err) {
-    logger.debug('Failed to evaluate move with chess engine for hint generation', {
-      operation: 'generate_progressive_hint',
-      currentFen,
-      expectedUci,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch (_err) {
+    san = stepExp?.moveSan ?? expectedUci;
   }
 
   const context: HintContext = {

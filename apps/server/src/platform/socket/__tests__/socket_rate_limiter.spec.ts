@@ -178,15 +178,15 @@ describe("SocketRateLimiter & Client IP Extraction", () => {
       expect(extractClientIp(socket as SocketLikeParam, true)).toBe("172.16.0.5");
     });
 
-    it("falls back to '127.0.0.1' when neither header nor address is available", () => {
+    it("fails closed to 'unknown' when neither header nor address is available (CRIT-001)", () => {
       const socket = {
         handshake: {
           headers: {},
         },
       };
 
-      expect(extractClientIp(socket as SocketLikeParam)).toBe("127.0.0.1");
-      expect(extractClientIp({} as SocketLikeParam)).toBe("127.0.0.1");
+      expect(extractClientIp(socket as SocketLikeParam)).toBe("unknown");
+      expect(extractClientIp({} as SocketLikeParam)).toBe("unknown");
     });
   });
 

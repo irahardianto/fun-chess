@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { GameService } from "../../features/game/game.service.js";
+import { GameService, ChessEngine } from "../../features/game/index.js";
 import { MockRoomGameAdapter } from "../../features/game/__tests__/mock_room_adapter.js";
 import {
   type RoomState,
@@ -9,7 +9,6 @@ import {
   GameNotActiveError,
   InvalidPayloadError,
 } from "@fun-chess/shared";
-import { ChessEngine } from "../../features/game/chess_engine.js";
 import { Chess } from "chess.js";
 import { SystemClock, UuidGenerator } from "../../platform/time/index.js";
 import { NullLogger } from "../../platform/logger/null_logger.js";

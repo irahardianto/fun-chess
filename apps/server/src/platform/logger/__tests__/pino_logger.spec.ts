@@ -135,6 +135,53 @@ describe("PinoLogger", () => {
       expect(logs[0]?.msg).toBe("Debug point reached");
       expect(logs[0]?.level).toBe(20);
     });
+
+    it("logs trace messages when log level is trace (MIN-032)", () => {
+      const logger = createCapturingLogger("trace");
+      logger.trace("Trace entry point", {
+        step: "parsing_fen",
+        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      });
+
+      expect(logs).toHaveLength(1);
+      const log = logs[0]!;
+      expect(log.msg).toBe("Trace entry point");
+      expect(log.level).toBe(10); // Pino trace level is 10
+      expect(log.step).toBe("parsing_fen");
+    });
+
+    it("logs trace message without context (MIN-032)", () => {
+      const logger = createCapturingLogger("trace");
+      logger.trace("Trace reached");
+
+      expect(logs).toHaveLength(1);
+      expect(logs[0]?.msg).toBe("Trace reached");
+      expect(logs[0]?.level).toBe(10);
+    });
+
+    it("logs fatal messages with structured context (MIN-032)", () => {
+      const logger = createCapturingLogger("info");
+      logger.fatal("System crash imminent", {
+        reason: "OOM",
+        exitCode: 1,
+      });
+
+      expect(logs).toHaveLength(1);
+      const log = logs[0]!;
+      expect(log.msg).toBe("System crash imminent");
+      expect(log.level).toBe(60); // Pino fatal level is 60
+      expect(log.reason).toBe("OOM");
+      expect(log.exitCode).toBe(1);
+    });
+
+    it("logs fatal message without context (MIN-032)", () => {
+      const logger = createCapturingLogger("info");
+      logger.fatal("Fatal error shutdown");
+
+      expect(logs).toHaveLength(1);
+      expect(logs[0]?.msg).toBe("Fatal error shutdown");
+      expect(logs[0]?.level).toBe(60);
+    });
   });
 
   describe("Log Level Filtering", () => {
@@ -252,11 +299,15 @@ describe("PinoLogger", () => {
       expect(DEFAULT_REDACT_PATHS).toContain("*.authorization");
       expect(DEFAULT_REDACT_PATHS).toContain("*.req.headers.authorization");
       expect(DEFAULT_REDACT_PATHS).toContain("*.req.headers['x-metrics-secret']");
+      expect(DEFAULT_REDACT_PATHS).toContain("headers['x-session-token']");
+      expect(DEFAULT_REDACT_PATHS).toContain("headers['session-token']");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.req.headers['x-session-token']");
+      expect(DEFAULT_REDACT_PATHS).toContain("*.req.headers['session-token']");
       expect(DEFAULT_REDACT_PATHS).toContain("key");
       expect(DEFAULT_REDACT_PATHS).toContain("*.key");
     });
 
-    it("redacts nested sensitive fields including passwords, tokens, secrets, and request headers", () => {
+    it("redacts nested sensitive fields including passwords, tokens, secrets, and request headers (ENH-007)", () => {
       const logger = new PinoLogger({
         level: "info",
         stream: logStream,
@@ -273,6 +324,8 @@ describe("PinoLogger", () => {
           headers: {
             authorization: "Bearer header-token",
             "x-metrics-secret": "telemetry-secret-123",
+            "x-session-token": "secret-session-abc",
+            "session-token": "secret-session-def",
           },
         },
         event: {
@@ -280,6 +333,8 @@ describe("PinoLogger", () => {
             headers: {
               authorization: "Bearer nested-header-token",
               "x-metrics-secret": "nested-telemetry-secret",
+              "x-session-token": "nested-session-token",
+              "session-token": "nested-token-value",
             },
           },
         },
@@ -299,12 +354,16 @@ describe("PinoLogger", () => {
       const reqObj = log["req"] as { headers: Record<string, unknown> };
       expect(reqObj.headers["authorization"]).toBe("[REDACTED]");
       expect(reqObj.headers["x-metrics-secret"]).toBe("[REDACTED]");
+      expect(reqObj.headers["x-session-token"]).toBe("[REDACTED]");
+      expect(reqObj.headers["session-token"]).toBe("[REDACTED]");
 
       const eventReqObj = (
         log["event"] as { req: { headers: Record<string, unknown> } }
       ).req;
       expect(eventReqObj.headers["authorization"]).toBe("[REDACTED]");
       expect(eventReqObj.headers["x-metrics-secret"]).toBe("[REDACTED]");
+      expect(eventReqObj.headers["x-session-token"]).toBe("[REDACTED]");
+      expect(eventReqObj.headers["session-token"]).toBe("[REDACTED]");
     });
   });
 });

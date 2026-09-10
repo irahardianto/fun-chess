@@ -1,7 +1,13 @@
 import { Logger, defaultLogger } from "../logger/index.js";
 import { runLoggedJob } from "../logger/job_runner.js";
+import type { IRateLimiter } from "./rate_limiter.interface.js";
 
 export interface RateLimiterOptions {
+  /**
+   * Limiter identifier used in structured logging and diagnostics (MIN-012).
+   * Default: "sliding_window".
+   */
+  name?: string;
   /**
    * Maximum number of requests allowed within the sliding window.
    * Default: 60 requests.
@@ -33,8 +39,10 @@ export interface RateLimiterOptions {
  * In-memory sliding window rate limiter.
  * Generic transport-agnostic rate limiting mechanism with LRU bounded memory eviction
  * and periodic background pruning of expired entries.
+ * Implements IRateLimiter interface (ENH-006).
  */
-export class SlidingWindowRateLimiter {
+export class SlidingWindowRateLimiter implements IRateLimiter {
+  public readonly name: string;
   private readonly maxRequests: number;
   private readonly windowMs: number;
   private readonly maxKeys: number;
@@ -43,6 +51,7 @@ export class SlidingWindowRateLimiter {
   private pruneTimer?: NodeJS.Timeout;
 
   constructor(options?: RateLimiterOptions) {
+    this.name = options?.name ?? "sliding_window";
     this.maxRequests = options?.maxRequests ?? 60;
     this.windowMs = options?.windowMs ?? 10_000;
     this.maxKeys = options?.maxKeys ?? 10_000;
@@ -52,7 +61,8 @@ export class SlidingWindowRateLimiter {
     if (pruneIntervalMs > 0) {
       this.pruneTimer = setInterval(() => {
         void runLoggedJob(this.logger, "rate_limiter_prune", async () => {
-          return this.prune(Date.now());
+          const deletedCount = this.prune(Date.now());
+          return { limiterName: this.name, deletedCount };
         }).catch(() => {
           // Standard 3-point failure logging is already handled by runLoggedJob
         });

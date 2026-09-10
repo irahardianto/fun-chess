@@ -90,18 +90,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
       // Phase 2: Staged write
       try {
         // 2a. Reset and restore scenario records
-        if (typeof this.scenarioStore.restoreProgressMap === 'function') {
-          await this.scenarioStore.restoreProgressMap(validatedPayload.scenarios);
-        } else {
-          await this.scenarioStore.resetAllProgress();
-          for (const [id, progress] of Object.entries(validatedPayload.scenarios)) {
-            await this.scenarioStore.saveProgress(
-              id,
-              progress.starsEarned,
-              progress.hintsUsedTotal
-            );
-          }
-        }
+        await this.applyScenarioProgress(validatedPayload.scenarios);
 
         // 2b. Write full puzzle state (including themeMastery & arcadeStats)
         await this.puzzleStore.restoreProgress(validatedPayload.puzzles);
@@ -109,18 +98,7 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
         // Compensating Rollback: restore from snapshot
         let rollbackSucceeded = false;
         try {
-          if (typeof this.scenarioStore.restoreProgressMap === 'function') {
-            await this.scenarioStore.restoreProgressMap(snapshot.scenarios);
-          } else {
-            await this.scenarioStore.resetAllProgress();
-            for (const [id, progress] of Object.entries(snapshot.scenarios)) {
-              await this.scenarioStore.saveProgress(
-                id,
-                progress.starsEarned,
-                progress.hintsUsedTotal
-              );
-            }
-          }
+          await this.applyScenarioProgress(snapshot.scenarios);
           await this.puzzleStore.restoreProgress(snapshot.puzzles);
           rollbackSucceeded = true;
         } catch (rollbackErr) {
@@ -175,6 +153,24 @@ export class LocalStorageUnifiedStore implements ProgressStorage {
             : { raw: err },
       });
       throw err;
+    }
+  }
+
+  /**
+   * Helper to write scenario progress records, handling both bulk restore and individual item fallback (MIN-016).
+   */
+  private async applyScenarioProgress(scenarios: ScenarioProgressMap): Promise<void> {
+    if (typeof this.scenarioStore.restoreProgressMap === 'function') {
+      await this.scenarioStore.restoreProgressMap(scenarios);
+    } else {
+      await this.scenarioStore.resetAllProgress();
+      for (const [id, progress] of Object.entries(scenarios)) {
+        await this.scenarioStore.saveProgress(
+          id,
+          progress.starsEarned,
+          progress.hintsUsedTotal
+        );
+      }
     }
   }
 }

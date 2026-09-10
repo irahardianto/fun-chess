@@ -16,17 +16,18 @@ export interface SocketLikeWithHandshake {
  * - Strips IPv4-mapped IPv6 prefix `::ffff:` (ENH-001)
  * - Normalizes `::1` or localhost fallbacks
  * - Trims whitespace
- * - Validates IP syntax via net.isIP() (MIN-002)
+ * - Validates IP syntax via net.isIP() (MIN-002, CRIT-001)
+ * - Fails closed to "unknown" on invalid or unparsable input to prevent privilege escalation (CRIT-001)
  */
 export function normalizeIp(rawIp: string | undefined): string {
-  if (!rawIp || typeof rawIp !== "string") return "127.0.0.1";
+  if (!rawIp || typeof rawIp !== "string") return "unknown";
   let trimmed = rawIp.trim();
   if (trimmed.startsWith("::ffff:")) {
     trimmed = trimmed.slice(7);
   }
-  if (!trimmed) return "127.0.0.1";
+  if (!trimmed) return "unknown";
   if (net.isIP(trimmed) === 0) {
-    return "127.0.0.1";
+    return "unknown";
   }
   return trimmed;
 }
@@ -37,12 +38,13 @@ export function normalizeIp(rawIp: string | undefined): string {
  * to prevent rate limiting bypass and IP spoofing (ENH-002, CRIT-006).
  * Strips IPv4-mapped IPv6 prefix (`::ffff:`) (ENH-001).
  * When trustProxy is false, ignores `x-forwarded-for` to prevent client spoofing (CRIT-001).
+ * Returns "unknown" if no valid address can be extracted (fail-closed, CRIT-001).
  */
 export function extractClientIp(
   source: IncomingMessage | SocketLikeWithHandshake | unknown,
   trustProxy = false,
 ): string {
-  if (!source || typeof source !== "object") return "127.0.0.1";
+  if (!source || typeof source !== "object") return "unknown";
 
   const req = source as IncomingMessage;
   const socket = source as SocketLikeWithHandshake;

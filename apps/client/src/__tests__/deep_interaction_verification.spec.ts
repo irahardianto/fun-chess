@@ -10,7 +10,7 @@ import { useAdaptiveLadder } from '../features/puzzles/composables/useAdaptiveLa
 import { useThemedDrills } from '../features/puzzles/composables/useThemedDrills';
 import { validatePuzzleMove, parseUciMove, formatPlayerMoveToUci } from '../features/puzzles/engine/puzzle_validator';
 import { generateMistakeRefutation } from '../features/puzzles/engine/puzzle_analysis_engine';
-import { LocalStoragePuzzleProgressStore } from '../features/puzzles/store/local_storage_puzzle_store';
+import { LocalStoragePuzzleProgressStore } from '../features/puzzles/store/local_storage_puzzle_progress.store';
 import { InMemoryPuzzleProgressStore } from '../features/puzzles/store/in_memory_puzzle_progress.store';
 
 describe('Deep Interaction & State Machine Verification', () => {

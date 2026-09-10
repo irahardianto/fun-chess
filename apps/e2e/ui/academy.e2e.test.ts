@@ -159,4 +159,74 @@ test.describe('Chess Academy Journey', () => {
     await academyPage.makeMove('a1', 'e1');
     await expect(academyPage.stepPill).toHaveText('Step 2 of 2', { timeout: 10_000 });
   });
+
+  test('customizes player avatar in lobby, verifies persistence across page reload, and reflects chosen avatar in game badge (ENH-017)', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+
+    await lobbyPage.goto();
+    // Default avatar is 🦁
+    const initialAvatar = await lobbyPage.getSelectedAvatar();
+    expect(initialAvatar).toBe('🦁');
+
+    // Select rocket avatar 🚀
+    await lobbyPage.selectAvatar('🚀');
+    const selectedAvatar = await lobbyPage.getSelectedAvatar();
+    expect(selectedAvatar).toBe('🚀');
+
+    // Verify localStorage persistence
+    const storedAvatar = await page.evaluate(() => localStorage.getItem('fun_chess_player_avatar'));
+    expect(storedAvatar).toBe('🚀');
+
+    // Reload page and verify persistence
+    await page.reload();
+    await lobbyPage.goto();
+    const reloadedAvatar = await lobbyPage.getSelectedAvatar();
+    expect(reloadedAvatar).toBe('🚀');
+
+    // Select unicorn avatar 🦄 and launch Solo AI
+    await lobbyPage.selectAvatar('🦄');
+    await lobbyPage.startSoloAi('peanut', 'w');
+
+    // Verify player badge in arena reflects unicorn avatar
+    const playerBadge = page.locator('.player-badge, .player-avatar, [data-testid="player-badge"]').filter({ hasText: '🦄' });
+    await expect(playerBadge).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('navigates multiple curriculum categories, verifies category filtering, and tracks cross-category lesson completion (ENH-017)', async ({ page }) => {
+    const lobbyPage = new LobbyPage(page);
+    const academyPage = new AcademyPage(page);
+
+    await lobbyPage.goto();
+    await lobbyPage.openAcademy();
+    await academyPage.waitForPanel();
+
+    // 1. Fundamentals category
+    await academyPage.selectCategory('fundamentals');
+    await expect(page.locator('.scenario-card').filter({ hasText: /Board Coordinates/ }).first()).toBeVisible({ timeout: 10_000 });
+
+    // Launch and play Board Coordinates
+    await academyPage.selectScenarioByTitle(/Board Coordinates/);
+    await academyPage.waitForArena();
+    await academyPage.makeMove('a1', 'e1');
+    await expect(academyPage.stepPill).toHaveText('Step 2 of 2', { timeout: 10_000 });
+    await academyPage.makeMove('e1', 'e4');
+    await expect(academyPage.completionModal).toBeVisible({ timeout: 10_000 });
+    await academyPage.returnToAcademy();
+
+    // 2. Switch to Endgames category
+    await academyPage.selectCategory('endgame_basics');
+    await expect(page.locator('.scenario-card').filter({ hasText: /King \+ Queen Checkmate/ }).first()).toBeVisible({ timeout: 10_000 });
+
+    // Launch King + Queen Checkmate and complete it
+    await academyPage.selectScenarioByTitle(/King \+ Queen Checkmate/);
+    await academyPage.waitForArena();
+    await academyPage.makeMove('a7', 'g7');
+    await expect(academyPage.feedbackBanner).toBeVisible({ timeout: 10_000 });
+    await expect(academyPage.feedbackBanner).toContainText(/Checkmate!/);
+    await academyPage.returnToAcademy();
+
+    // 3. Switch to All category and verify panel is intact
+    await academyPage.selectCategory('all');
+    await expect(academyPage.academyPanel).toBeVisible();
+  });
 });

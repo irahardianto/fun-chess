@@ -1,6 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { RoomState, IClock, IIdGenerator } from "@fun-chess/shared";
-import { RoomStore, RoomMutator, MAX_ROOMS } from "./room.store.js";
+import {
+  RoomStore,
+  RoomMutator,
+  MAX_ROOMS,
+  type StorageQueryOptions,
+  type StorageMutationOptions,
+} from "./room.store.js";
 import {
   RoomNotFoundError,
   OptimisticLockConflictError,
@@ -15,6 +21,23 @@ import { SystemClock } from "../../platform/time/index.js";
 import { type Logger, defaultLogger } from "../../platform/logger/index.js";
 
 export { MAX_ROOMS };
+
+/**
+ * Recursively freezes an object and its nested properties to enforce immutability (ENH-013).
+ */
+export function deepFreeze<T>(obj: T): Readonly<T> {
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+  Object.freeze(obj);
+  for (const key of Object.keys(obj)) {
+    const val = (obj as Record<string, unknown>)[key];
+    if (val !== null && typeof val === "object" && !Object.isFrozen(val)) {
+      deepFreeze(val);
+    }
+  }
+  return obj as Readonly<T>;
+}
 
 export interface InMemoryRoomStoreOptions {
   clock?: IClock;
@@ -43,7 +66,7 @@ interface LockEntry {
  * and a monotonic ticket sequence model with stale execution rejection (CRIT-002, CRIT-003, CRIT-006).
  */
 export class InMemoryRoomStore implements RoomStore {
-  private readonly rooms = new Map<string, RoomState>();
+  private readonly rooms = new Map<string, Readonly<RoomState>>();
   private readonly lockQueues = new Map<string, LockEntry>();
   // PERF: Reverse index from socketId -> { roomCode, playerId } for O(1) disconnect lookups (HIGH-006)
   private readonly socketIndex = new Map<
@@ -60,6 +83,15 @@ export class InMemoryRoomStore implements RoomStore {
   private readonly lockContextStorage = new AsyncLocalStorage<LockContext>();
 
   public readonly MAX_CANCELLED_TICKETS: number;
+
+  private assertNotAborted(signal?: AbortSignal): void {
+    if (signal?.aborted) {
+      throw (
+        signal.reason ??
+        new DOMException("The operation was aborted", "AbortError")
+      );
+    }
+  }
 
   private trackCancelledTicket(ticket: number): void {
     this.cancelledTickets.add(ticket);
@@ -211,7 +243,7 @@ export class InMemoryRoomStore implements RoomStore {
     this.maxQueueDepth = resolvedMaxQueueDepth;
   }
 
-  private indexSockets(room: RoomState): void {
+  private indexSockets(room: RoomState | Readonly<RoomState>): void {
     const code = room.roomCode.toUpperCase();
     this.unindexSockets(code);
 
@@ -267,15 +299,21 @@ export class InMemoryRoomStore implements RoomStore {
     }
   }
 
-  public async findByCode(roomCode: string): Promise<RoomState | null> {
+  public async findByCode(
+    roomCode: string,
+    options?: StorageQueryOptions,
+  ): Promise<Readonly<RoomState> | null> {
+    this.assertNotAborted(options?.signal);
     const code = roomCode.toUpperCase();
     const room = this.rooms.get(code);
-    return room ? structuredClone(room) : null;
+    return room ?? null;
   }
 
   public async findBySocketId(
     socketId: string,
-  ): Promise<{ room: RoomState; playerId: string } | null> {
+    options?: StorageQueryOptions,
+  ): Promise<{ room: Readonly<RoomState>; playerId: string } | null> {
+    this.assertNotAborted(options?.signal);
     // PERF: O(1) map lookup
     const indexed = this.socketIndex.get(socketId);
     if (indexed) {
@@ -286,7 +324,7 @@ export class InMemoryRoomStore implements RoomStore {
           room.blackPlayer?.socketId === socketId ||
           room.spectators?.some((s) => s.socketId === socketId)
         ) {
-          return { room: structuredClone(room), playerId: indexed.playerId };
+          return { room, playerId: indexed.playerId };
         }
       }
       this.socketIndex.delete(socketId);
@@ -302,14 +340,17 @@ export class InMemoryRoomStore implements RoomStore {
     // Fallback scan across active rooms
     for (const room of this.rooms.values()) {
       if (room.whitePlayer?.socketId === socketId) {
-        return { room: structuredClone(room), playerId: room.whitePlayer.id };
+        this.indexSockets(room);
+        return { room, playerId: room.whitePlayer.id };
       }
       if (room.blackPlayer?.socketId === socketId) {
-        return { room: structuredClone(room), playerId: room.blackPlayer.id };
+        this.indexSockets(room);
+        return { room, playerId: room.blackPlayer.id };
       }
       const spectator = room.spectators?.find((s) => s.socketId === socketId);
       if (spectator) {
-        return { room: structuredClone(room), playerId: spectator.id };
+        this.indexSockets(room);
+        return { room, playerId: spectator.id };
       }
     }
     return null;
@@ -323,7 +364,10 @@ export class InMemoryRoomStore implements RoomStore {
     code: string,
     ticket: number,
     correlationId?: string,
+    signal?: AbortSignal,
   ): Promise<{ acquiredAt: number; releaseSignal: () => void }> {
+    this.assertNotAborted(signal);
+
     let entry = this.lockQueues.get(code);
 
     if (entry && entry.waitersCount >= this.maxQueueDepth) {
@@ -358,23 +402,35 @@ export class InMemoryRoomStore implements RoomStore {
     );
 
     let acquireTimer: NodeJS.Timeout | undefined;
+    let abortListener: (() => void) | undefined;
     try {
-      // 1. Lock Acquisition Race (5000ms acquisition timeout)
-      await Promise.race([
-        prevTail,
-        new Promise<never>((_, reject) => {
-          acquireTimer = setTimeout(() => {
-            this.trackCancelledTicket(ticket);
-            this.logger.warn("Lock acquisition timed out", {
-              operation: "room_lock_acquire_timeout",
-              roomCode: code,
-              ticket,
-              ...(correlationId ? { correlationId } : {}),
-            });
-            reject(new LockTimeoutError(code, this.LOCK_TIMEOUT_MS));
-          }, this.LOCK_TIMEOUT_MS);
-        }),
-      ]);
+      // 1. Lock Acquisition Race (5000ms acquisition timeout or signal abort)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        acquireTimer = setTimeout(() => {
+          this.trackCancelledTicket(ticket);
+          this.logger.warn("Lock acquisition timed out", {
+            operation: "room_lock_acquire_timeout",
+            roomCode: code,
+            ticket,
+            ...(correlationId ? { correlationId } : {}),
+          });
+          reject(new LockTimeoutError(code, this.LOCK_TIMEOUT_MS));
+        }, this.LOCK_TIMEOUT_MS);
+      });
+
+      const abortPromise = new Promise<never>((_, reject) => {
+        if (signal) {
+          abortListener = () => {
+            reject(
+              signal.reason ??
+                new DOMException("The operation was aborted", "AbortError"),
+            );
+          };
+          signal.addEventListener("abort", abortListener, { once: true });
+        }
+      });
+
+      await Promise.race([prevTail, timeoutPromise, abortPromise]);
 
       const acquiredAt = performance.now();
       this.activeTickets.set(code, ticket);
@@ -387,7 +443,7 @@ export class InMemoryRoomStore implements RoomStore {
 
       return { acquiredAt, releaseSignal };
     } catch (err) {
-      // Invalidate ticket on timeout before acquisition (CRIT-002)
+      // Invalidate ticket on timeout or abort before acquisition (CRIT-002)
       this.trackCancelledTicket(ticket);
       prevTail.finally(() => {
         releaseSignal();
@@ -402,6 +458,9 @@ export class InMemoryRoomStore implements RoomStore {
       throw err;
     } finally {
       if (acquireTimer) clearTimeout(acquireTimer);
+      if (signal && abortListener) {
+        signal.removeEventListener("abort", abortListener);
+      }
     }
   }
 
@@ -509,7 +568,9 @@ export class InMemoryRoomStore implements RoomStore {
     roomCode: string,
     action: (context?: LockContext) => Promise<T>,
     correlationId?: string,
+    options?: StorageQueryOptions,
   ): Promise<T> {
+    this.assertNotAborted(options?.signal);
     const code = roomCode.toUpperCase();
     const currentContext = this.lockContextStorage.getStore();
     if (
@@ -535,7 +596,12 @@ export class InMemoryRoomStore implements RoomStore {
       ...(correlationId ? { correlationId } : {}),
     });
 
-    const acquired = await this.acquireLock(code, ticket, correlationId);
+    const acquired = await this.acquireLock(
+      code,
+      ticket,
+      correlationId,
+      options?.signal,
+    );
 
     try {
       return await this.executeWithTimeout(
@@ -560,11 +626,16 @@ export class InMemoryRoomStore implements RoomStore {
   public async mutate<T>(
     roomCode: string,
     mutator: RoomMutator<T>,
-    correlationId?: string,
+    options?: StorageMutationOptions | string,
   ): Promise<T> {
+    const opts: StorageMutationOptions =
+      typeof options === "string" ? { correlationId: options } : options ?? {};
+    this.assertNotAborted(opts.signal);
+
     return this.withLock(
       roomCode,
       async (context) => {
+        this.assertNotAborted(opts.signal);
         const code = roomCode.toUpperCase();
         this.assertTicketValid(code, context);
 
@@ -573,7 +644,7 @@ export class InMemoryRoomStore implements RoomStore {
           throw new RoomNotFoundError(code);
         }
 
-        const clone = structuredClone(existing);
+        const clone = structuredClone(existing) as RoomState;
         const expectedVersion = clone.version || 1;
 
         this.logger?.debug("Room mutation started", {
@@ -581,7 +652,7 @@ export class InMemoryRoomStore implements RoomStore {
           roomCode: code,
           expectedVersion,
           ticket: context?.ticket,
-          ...(correlationId ? { correlationId } : {}),
+          ...(opts.correlationId ? { correlationId: opts.correlationId } : {}),
         });
 
         const { updatedRoom, result } = await mutator(clone);
@@ -606,24 +677,31 @@ export class InMemoryRoomStore implements RoomStore {
               : this.clock.now(),
         };
 
-        this.rooms.set(code, roomToSave);
-        this.indexSockets(roomToSave);
+        const frozen = deepFreeze(roomToSave);
+        this.rooms.set(code, frozen);
+        this.indexSockets(frozen);
 
         this.logger?.debug("Room mutation completed", {
           operation: "room_mutate_completed",
           roomCode: code,
           nextVersion,
           ticket: context?.ticket,
-          ...(correlationId ? { correlationId } : {}),
+          ...(opts.correlationId ? { correlationId: opts.correlationId } : {}),
         });
 
         return result;
       },
-      correlationId,
+      opts.correlationId,
+      opts,
     );
   }
 
-  public async save(room: RoomState, expectedVersion?: number): Promise<void> {
+  public async save(
+    room: RoomState,
+    expectedVersion?: number,
+    options?: StorageMutationOptions,
+  ): Promise<void> {
+    this.assertNotAborted(options?.signal);
     const code = room.roomCode.toUpperCase();
     this.assertTicketValid(code);
 
@@ -653,67 +731,97 @@ export class InMemoryRoomStore implements RoomStore {
       lastActivityAt: room.lastActivityAt ?? this.clock.now(),
     };
 
-    this.rooms.set(code, roomToSave);
-    this.indexSockets(roomToSave);
+    const frozen = deepFreeze(roomToSave);
+    this.rooms.set(code, frozen);
+    this.indexSockets(frozen);
 
     this.logger.debug("Room saved to storage", {
       operation: "room_storage_save",
       roomCode: code,
       version: nextVersion,
+      ...(options?.correlationId ? { correlationId: options.correlationId } : {}),
     });
   }
 
-  public async createIfAbsent(room: RoomState): Promise<void> {
+  public async createIfAbsent(
+    room: RoomState,
+    options?: StorageMutationOptions,
+  ): Promise<void> {
+    this.assertNotAborted(options?.signal);
     const code = room.roomCode.toUpperCase();
-    await this.withLock(code, async () => {
-      if (this.rooms.size >= this.maxRooms) {
-        throw new RoomCapacityExceededError(this.maxRooms);
-      }
-      if (this.rooms.has(code)) {
-        throw new RoomAlreadyExistsError(code);
-      }
-      const roomToSave: RoomState = {
-        ...structuredClone(room),
-        version: room.version || 1,
-        lastActivityAt: room.lastActivityAt ?? this.clock.now(),
-      };
-      this.rooms.set(code, roomToSave);
-      this.indexSockets(roomToSave);
+    await this.withLock(
+      code,
+      async () => {
+        this.assertNotAborted(options?.signal);
+        if (this.rooms.size >= this.maxRooms) {
+          throw new RoomCapacityExceededError(this.maxRooms);
+        }
+        if (this.rooms.has(code)) {
+          throw new RoomAlreadyExistsError(code);
+        }
+        const roomToSave: RoomState = {
+          ...structuredClone(room),
+          version: room.version || 1,
+          lastActivityAt: room.lastActivityAt ?? this.clock.now(),
+        };
+        const frozen = deepFreeze(roomToSave);
+        this.rooms.set(code, frozen);
+        this.indexSockets(frozen);
 
-      this.logger.debug("Room created in storage", {
-        operation: "room_storage_create",
-        roomCode: code,
-        version: roomToSave.version,
-      });
-    });
+        this.logger.debug("Room created in storage", {
+          operation: "room_storage_create",
+          roomCode: code,
+          version: roomToSave.version,
+          ...(options?.correlationId ? { correlationId: options.correlationId } : {}),
+        });
+      },
+      options?.correlationId,
+      options,
+    );
   }
 
-  public async delete(roomCode: string): Promise<boolean> {
+  public async delete(
+    roomCode: string,
+    options?: StorageMutationOptions,
+  ): Promise<boolean> {
+    this.assertNotAborted(options?.signal);
     const code = roomCode.toUpperCase();
-    return this.withLock(code, async () => {
-      this.unindexSockets(code);
-      const existed = this.rooms.delete(code);
-      this.logger.debug("Room deleted from storage", {
-        operation: "room_storage_delete",
-        roomCode: code,
-        existed,
-      });
-      return existed;
-    });
+    return this.withLock(
+      code,
+      async () => {
+        this.assertNotAborted(options?.signal);
+        this.unindexSockets(code);
+        const existed = this.rooms.delete(code);
+        this.logger.debug("Room deleted from storage", {
+          operation: "room_storage_delete",
+          roomCode: code,
+          existed,
+          ...(options?.correlationId ? { correlationId: options.correlationId } : {}),
+        });
+        return existed;
+      },
+      options?.correlationId,
+      options,
+    );
   }
 
-  public async listActiveRooms(): Promise<RoomState[]> {
-    return Array.from(this.rooms.values()).map((r) => structuredClone(r));
+  public async listActiveRooms(
+    options?: StorageQueryOptions,
+  ): Promise<Readonly<RoomState>[]> {
+    this.assertNotAborted(options?.signal);
+    return Array.from(this.rooms.values());
   }
 
-  public async count(): Promise<number> {
+  public async count(options?: StorageQueryOptions): Promise<number> {
+    this.assertNotAborted(options?.signal);
     return this.rooms.size;
   }
 
   /**
    * Helper to clear store, active tickets, and queues in tests or maintenance.
    */
-  public async clear(): Promise<void> {
+  public async clear(options?: StorageMutationOptions): Promise<void> {
+    this.assertNotAborted(options?.signal);
     this.lockQueues.clear();
     this.socketIndex.clear();
     this.roomSockets.clear();

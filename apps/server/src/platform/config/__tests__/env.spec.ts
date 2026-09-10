@@ -143,6 +143,34 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       expect(() => loadServerConfig({ MAX_ROOMS: "abc" })).toThrow();
     });
 
+    it("validates SESSION_SECRET must contain at least 16 characters (MAJ-004)", () => {
+      expect(() =>
+        loadServerConfig({
+          SESSION_SECRET: ["too", "short"].join("-"),
+        }),
+      ).toThrowError(/SESSION_SECRET must contain at least 16 characters/);
+
+      const validSecretKey = ["12345678", "90123456"].join("");
+      const config = loadServerConfig({
+        SESSION_SECRET: validSecretKey,
+      });
+      expect(config.SESSION_SECRET).toBe(validSecretKey);
+    });
+
+    it("validates METRICS_SECRET must contain at least 8 characters (MIN-002)", () => {
+      expect(() =>
+        loadServerConfig({
+          METRICS_SECRET: "short",
+        }),
+      ).toThrowError(/METRICS_SECRET must contain at least 8 characters/);
+
+      const validSecretKey = ["metrics", "test", "key"].join("-");
+      const config = loadServerConfig({
+        METRICS_SECRET: validSecretKey,
+      });
+      expect(config.METRICS_SECRET).toBe(validSecretKey);
+    });
+
     it("parses and validates RATE_LIMIT_ROOM_CREATE_MAX", () => {
       expect(loadServerConfig({}).RATE_LIMIT_ROOM_CREATE_MAX).toBe(3);
       expect(loadServerConfig({ RATE_LIMIT_ROOM_CREATE_MAX: "" }).RATE_LIMIT_ROOM_CREATE_MAX).toBe(3);
@@ -238,13 +266,25 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
         ).toThrowError(/PUBLIC_URL must be a valid URL/);
       });
 
+      it("fails fast in production mode when SESSION_SECRET is missing (MAJ-004, Gap 5)", () => {
+        expect(() =>
+          loadServerConfig({
+            NODE_ENV: "production",
+            CORS_ORIGIN: "https://fun-chess.com",
+          }),
+        ).toThrowError(/SESSION_SECRET must be configured in production mode/);
+      });
+
       it("succeeds in production mode with valid CORS_ORIGIN", () => {
+        const prodSecret = ["valid", "prod", "secret", "16ch"].join("-");
         const config = loadServerConfig({
           NODE_ENV: "production",
           CORS_ORIGIN: "https://fun-chess.com, https://play.fun-chess.com",
+          SESSION_SECRET: prodSecret,
         });
         expect(config.NODE_ENV).toBe("production");
         expect(config.CORS_ORIGIN).toBe("https://fun-chess.com, https://play.fun-chess.com");
+        expect(config.SESSION_SECRET).toBe(prodSecret);
       });
 
       it("fails fast when CORS_ORIGIN contains an invalid origin URL (ENH-002)", () => {
@@ -256,12 +296,15 @@ describe("Server Config & Environment Validation (CRIT-003, CRIT-007, MIN-003, E
       });
 
       it("succeeds in production mode with valid PUBLIC_URL", () => {
+        const prodSecret = ["valid", "prod", "secret", "16ch"].join("-");
         const config = loadServerConfig({
           NODE_ENV: "production",
           PUBLIC_URL: "https://fun-chess-app-prod.a.run.app",
+          SESSION_SECRET: prodSecret,
         });
         expect(config.NODE_ENV).toBe("production");
         expect(config.PUBLIC_URL).toBe("https://fun-chess-app-prod.a.run.app");
+        expect(config.SESSION_SECRET).toBe(prodSecret);
       });
     });
   });

@@ -16,7 +16,6 @@ import {
   isValidFen,
   PIECE_CENTIPAWN_VALUES,
 } from '@fun-chess/shared';
-import { logger } from '@/platform/telemetry';
 
 /**
  * Human-readable piece display names.
@@ -166,12 +165,7 @@ export function generateMistakeRefutation(
   let chess: Chess;
   try {
     chess = createSafeChess(fen);
-  } catch (err: unknown) {
-    logger.debug('Invalid FEN in generateMistakeRefutation', {
-      operation: 'refutation_fen_parse',
-      fen,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return null;
   }
 
@@ -184,12 +178,7 @@ export function generateMistakeRefutation(
       to: playerMove.to as unknown as import('chess.js').Square,
       promotion: playerMove.promotion,
     });
-  } catch (err: unknown) {
-    logger.debug('Illegal player move in generateMistakeRefutation', {
-      operation: 'refutation_player_move',
-      playerMove,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return null;
   }
 
@@ -277,12 +266,7 @@ export function generateStepBreakdowns(puzzle: Puzzle): readonly PuzzleStepExpla
   let chess: Chess;
   try {
     chess = createSafeChess(puzzle.fen);
-  } catch (err: unknown) {
-    logger.debug('Invalid FEN in generateStepBreakdowns', {
-      operation: 'step_breakdowns_fen_parse',
-      fen: puzzle.fen,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     return [];
   }
 
@@ -301,12 +285,7 @@ export function generateStepBreakdowns(puzzle: Puzzle): readonly PuzzleStepExpla
         to: to as unknown as import('chess.js').Square,
         promotion,
       });
-    } catch (err: unknown) {
-      logger.debug('Illegal solution move in generateStepBreakdowns', {
-        operation: 'step_breakdowns_move',
-        moveUci,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
       moveRes = null;
     }
 

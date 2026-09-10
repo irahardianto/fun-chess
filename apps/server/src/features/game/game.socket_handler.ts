@@ -37,37 +37,12 @@ export function registerGameSocketHandlers(
   gameService: IGameService,
   logger: Logger,
   rateLimiter: SocketRateLimiter,
-  timerRegistry?: IDisconnectTimerRegistry,
-  trustProxy?: boolean,
-): void;
-/**
- * @deprecated Legacy signature for interim compatibility prior to SC-5 composition root wiring.
- */
-export function registerGameSocketHandlers(
-  io: TypedSocketServer,
-  socket: Socket,
-  gameService: IGameService,
-  logger: Logger,
-  rateLimiter: SocketRateLimiter,
-  timerRegistry: IDisconnectTimerRegistry,
-  _sessionRegistry: unknown,
-  trustProxy?: boolean,
-): void;
-export function registerGameSocketHandlers(
-  io: TypedSocketServer,
-  socket: Socket,
-  gameService: IGameService,
-  logger: Logger,
-  rateLimiter: SocketRateLimiter,
   timerRegistry: IDisconnectTimerRegistry = defaultDisconnectTimerRegistry,
-  trustProxyOrSessionRegistry?: boolean | unknown,
-  trustProxyLegacy?: boolean,
+  trustProxy: boolean = false,
 ): void {
   const effectiveTrustProxy =
     (socket.data as { trustProxy?: boolean } | undefined)?.trustProxy ??
-    (typeof trustProxyOrSessionRegistry === "boolean"
-      ? trustProxyOrSessionRegistry
-      : (trustProxyLegacy ?? false));
+    trustProxy;
 
   // 1. game:move
   const handleMove = createFeatureSocketHandler<
@@ -82,9 +57,13 @@ export function registerGameSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.makeMove(req, socket.id);
+      const result = await gameService.makeMove(
+        req,
+        socket.id,
+        context.correlationId,
+      );
 
       io.to(roomCode).emit("game:moved", {
         move: result.moveResult,
@@ -122,9 +101,13 @@ export function registerGameSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.resign(roomCode, socket.id);
+      const result = await gameService.resign(
+        roomCode,
+        socket.id,
+        context.correlationId,
+      );
       timerRegistry.cancelAllForRoom(roomCode);
       io.to(roomCode).emit("game:over", result.gameOverPayload);
       return { success: true };
@@ -146,9 +129,13 @@ export function registerGameSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.offerDraw(roomCode, socket.id);
+      const result = await gameService.offerDraw(
+        roomCode,
+        socket.id,
+        context.correlationId,
+      );
       if (result.opponentPlayer?.socketId) {
         io.to(result.opponentPlayer.socketId).emit("game:draw_offered", {
           fromPlayerId: result.fromPlayer.id,
@@ -174,12 +161,13 @@ export function registerGameSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
       const result = await gameService.respondDraw(
         roomCode,
         socket.id,
         req.accept,
+        context.correlationId,
       );
 
       if (result.accept && result.gameOverPayload) {
@@ -210,9 +198,13 @@ export function registerGameSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
-      const result = await gameService.requestRematch(roomCode, socket.id);
+      const result = await gameService.requestRematch(
+        roomCode,
+        socket.id,
+        context.correlationId,
+      );
 
       io.to(roomCode).emit("game:rematch_requested", {
         requestedBy: result.requestedBy,
@@ -238,12 +230,13 @@ export function registerGameSocketHandlers(
       rateLimiter,
       trustProxy: effectiveTrustProxy,
     },
-    async (req) => {
+    async (req, context) => {
       const roomCode = normalizeRoomCode(req.roomCode);
       const result = await gameService.respondRematch(
         roomCode,
         socket.id,
         req.accept,
+        context.correlationId,
       );
 
       if (result.accept && result.nextGameState) {

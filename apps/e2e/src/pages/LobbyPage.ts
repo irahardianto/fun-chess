@@ -49,6 +49,26 @@ export class LobbyPage {
   }
 
   /**
+   * Selects an avatar emoji from the avatar radio group.
+   */
+  async selectAvatar(emoji: string): Promise<void> {
+    const avatarBtn = this.page.locator(`[data-testid="lobby-avatar-option-${emoji}"]`);
+    await expect(avatarBtn).toBeVisible({ timeout: 10_000 });
+    await avatarBtn.click();
+  }
+
+  /**
+   * Retrieves the currently selected avatar emoji.
+   */
+  async getSelectedAvatar(): Promise<string | null> {
+    const selectedBtn = this.page.locator('.avatar-option-btn.is-selected');
+    if ((await selectedBtn.count()) > 0) {
+      return (await selectedBtn.innerText()).trim();
+    }
+    return null;
+  }
+
+  /**
    * Fills host credentials, selects preferred side, and initiates room creation.
    */
   async hostGame(nickname: string, color?: 'w' | 'random' | 'b'): Promise<void> {
