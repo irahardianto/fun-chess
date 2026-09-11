@@ -335,10 +335,7 @@ describe('Deep Interaction & State Machine Verification', () => {
         }
       }
 
-      console.log(`[VERIFY] Dual checkmate cooks detected: ${dualMatePuzzles.length}`);
-      if (dualMatePuzzles.length > 0) {
-        console.log(`[VERIFY] Dual checkmate puzzles list:`, JSON.stringify(dualMatePuzzles, null, 2));
-      }
+      expect(dualMatePuzzles).toHaveLength(0);
     });
 
     it('detects and catalogs all pawn promotions and underpromotions across all puzzles', () => {

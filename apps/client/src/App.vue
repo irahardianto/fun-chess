@@ -128,8 +128,6 @@ defineExpose({
         @prompt-install="promptInstall" @snooze-prompt="snoozePrompt"
         @confirm-proceed="modalManager.handleConfirmProceed" @confirm-cancel="modalManager.handleConfirmCancel"
       />
-      <!-- Contracts: data-testid="app-notification-banner", 'Flip board' 'Offer draw' 'Hide moves' : 'View moves' -->
-      <span class="action-btn--subdued-danger" data-testid="resign-action" style="display:none"></span>
     </div>
   </AppAudioProvider>
 </template>
@@ -154,7 +152,6 @@ defineExpose({
 .nav-install-btn:active { transform: scale(0.96); }
 .nav-icon-btn:active { transform: scale(0.96); }
 .notification-dismiss-btn:active { transform: scale(0.96); }
-.action-btn--subdued-danger { color: var(--color-danger); }
 @media (max-width: 640px) { .app-viewport { padding: var(--space-2); } }
 @media (max-width: 380px) { .app-viewport { padding: var(--space-1); } }
 </style>

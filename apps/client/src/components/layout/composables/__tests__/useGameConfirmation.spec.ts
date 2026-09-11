@@ -230,9 +230,7 @@ describe('useGameConfirmation', () => {
       currentRoom.value = { roomCode: 'ROOM1', status: 'playing' };
       handleLeaveRoom(false);
       expect(lastConfirmationOptions).not.toBeNull();
-      expect(async () => {
-        await lastConfirmationOptions?.onConfirm();
-      }).not.toThrow();
+      await expect(lastConfirmationOptions!.onConfirm()).resolves.toBeUndefined();
     });
 
     it('safely handles async rejection in handleResign without unhandled rejection', async () => {
@@ -247,9 +245,7 @@ describe('useGameConfirmation', () => {
       currentRoom.value = { roomCode: 'ROOM1', status: 'playing' };
       handleResign(false);
       expect(lastConfirmationOptions).not.toBeNull();
-      expect(async () => {
-        await lastConfirmationOptions?.onConfirm();
-      }).not.toThrow();
+      await expect(lastConfirmationOptions!.onConfirm()).resolves.toBeUndefined();
     });
 
     it('safely handles async rejection in handleOfferDraw without unhandled rejection', async () => {
@@ -264,9 +260,7 @@ describe('useGameConfirmation', () => {
       currentRoom.value = { roomCode: 'ROOM1', status: 'playing' };
       handleOfferDraw(false);
       expect(lastConfirmationOptions).not.toBeNull();
-      expect(async () => {
-        await lastConfirmationOptions?.onConfirm();
-      }).not.toThrow();
+      await expect(lastConfirmationOptions!.onConfirm()).resolves.toBeUndefined();
     });
   });
 });

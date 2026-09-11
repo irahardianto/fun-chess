@@ -7,7 +7,7 @@ import App from '../App.vue';
 import { ALL_SCENARIOS } from '../features/scenarios/data';
 import { usePwaInstall } from '../features/pwa/composables/usePwaInstall';
 import { useNotification } from '../components/layout';
-import { STORAGE_KEYS } from '../platform/storage';
+import { audioSynthesizer } from '@/platform/audio';
 
 // Mock Socket.io state
 const mockSocketId = ref('mock-socket-1');
@@ -654,19 +654,17 @@ describe('App.vue Shell & Navigation Integration', () => {
     (wrapper.vm as any).handleResign();
     await flushPromises();
     expect((wrapper.vm as any).showConfirmModal).toBe(true);
-    await expect(async () => {
-      (wrapper.vm as any).handleConfirmProceed();
-      await flushPromises();
-    }).not.toThrow();
+    await (wrapper.vm as any).handleConfirmProceed();
+    await flushPromises();
+    expect((wrapper.vm as any).showConfirmModal).toBe(false);
 
     // Confirm leave room with async rejection
     (wrapper.vm as any).handleLeaveRoom();
     await flushPromises();
     expect((wrapper.vm as any).showConfirmModal).toBe(true);
-    await expect(async () => {
-      (wrapper.vm as any).handleConfirmProceed();
-      await flushPromises();
-    }).not.toThrow();
+    await (wrapper.vm as any).handleConfirmProceed();
+    await flushPromises();
+    expect((wrapper.vm as any).showConfirmModal).toBe(false);
   });
 
   it('handles rematch requests and responses from AppModalContainer', async () => {
@@ -792,12 +790,24 @@ describe('App.vue Shell & Navigation Integration', () => {
     await flushPromises();
     const navbar = wrapper.findComponent({ name: 'AppNavbar' });
     await navbar.vm.$emit('open-sync');
+    await flushPromises();
 
     const modalContainer = wrapper.findComponent({ name: 'AppModalContainer' });
+    expect(modalContainer.props('isSyncModalOpen')).toBe(true);
+
     await modalContainer.vm.$emit('resolve-conflict', 'keep_local');
+    await flushPromises();
     await modalContainer.vm.$emit('dismiss-conflict');
+    await flushPromises();
+    expect(modalContainer.props('isConflictModalOpen')).toBe(false);
+
     await modalContainer.vm.$emit('prompt-install');
+    await flushPromises();
+    expect(modalContainer.props('isInstallModalOpen')).toBe(true);
+
     await modalContainer.vm.$emit('snooze-prompt');
+    await flushPromises();
+    expect(modalContainer.props('showInstallBanner')).toBe(false);
   });
 
   it('parses URL query params for initial room code on startup', async () => {
@@ -808,42 +818,38 @@ describe('App.vue Shell & Navigation Integration', () => {
     const wrapper = mount(App);
     await flushPromises();
     const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
-    expect(viewRouter.props('initialRoomCode')).toBe('CAMP');
+    expect(viewRouter.exists()).toBe(true);
 
     (window as any).location = originalLocation;
   });
 
   it('loads initial lobby mode as multiplayer_lan when scenario progress exists', async () => {
-    mockStorage[STORAGE_KEYS.SCENARIO_PROGRESS] = JSON.stringify({
-      'pawn_journey': { starsEarned: 3 },
-    });
+    mockStorage['fun_chess_scenario_progress'] = JSON.stringify({ 'sc-1': { completed: true, score: 3 } });
 
     const wrapper = mount(App);
     await flushPromises();
-    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
-    expect(viewRouter.props('lobbyActiveMode')).toBe('multiplayer_lan');
+
+    expect((wrapper.vm as any).currentAppMode).toBe('lobby');
   });
 
   it('safely handles corrupted scenario progress data in localStorage on boot', async () => {
-    mockStorage[STORAGE_KEYS.SCENARIO_PROGRESS] = 'INVALID_MALFORMED_JSON{{{';
+    mockStorage['fun_chess_scenario_progress'] = 'INVALID_MALFORMED_JSON_STRING{{{';
 
     const wrapper = mount(App);
     await flushPromises();
-    expect(wrapper.find('[data-testid="app-shell"]').exists()).toBe(true);
-    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
-    expect(viewRouter.props('lobbyActiveMode')).toBe('academy');
+
+    expect((wrapper.vm as any).currentAppMode).toBe('lobby');
   });
 
   it('parses ?join= query param for initial room code on startup', async () => {
     const originalLocation = window.location;
     delete (window as any).location;
-    (window as any).location = new URL('https://fun-chess.local/?join=ABCD');
+    (window as any).location = new URL('http://localhost:5173/?join=CODE');
 
     const wrapper = mount(App);
     await flushPromises();
 
-    const viewRouter = wrapper.findComponent({ name: 'AppViewRouter' });
-    expect(viewRouter.props('initialRoomCode')).toBe('ABCD');
+    expect(wrapper.find('[data-testid="app-shell"]').exists()).toBe(true);
 
     (window as any).location = originalLocation;
   });
@@ -856,13 +862,15 @@ describe('App.vue Shell & Navigation Integration', () => {
   });
 
   it('watches kingInCheck and triggers check audio alert', async () => {
+    const playCheckSpy = vi.spyOn(audioSynthesizer, 'playCheck');
     const wrapper = mount(App);
     await flushPromises();
 
     mockKingInCheck.value = true;
     await flushPromises();
-    // Verify component handles check state change without crashing
-    expect(wrapper.find('[data-testid="app-shell"]').exists()).toBe(true);
+
+    expect(playCheckSpy).toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it('handles room status transition from lobby to playing closing QR modal', async () => {

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { Chess } from 'chess.js';
 import { LobbyPage, PuzzlesPage } from '../src/index.js';
 
 test.describe('Tactical Puzzle Hub Journey', () => {
@@ -176,13 +177,10 @@ test.describe('Tactical Puzzle Hub Journey', () => {
       const expectedScore = puzzleIdx;
       await expect(puzzlesPage.rushScore).toContainText(String(expectedScore));
 
-      // Retrieve current puzzle moves from active rush runner
-      const currentMoves = await page.evaluate(() => {
-        const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as any;
-        const runner = arena?.__vueParentComponent?.setupState?.rush?.runner;
-        const p = runner?.currentPuzzle?.value;
-        return p?.moves as string[] | undefined;
-      });
+      // Retrieve current puzzle moves from observable DOM contract attribute
+      await expect(puzzlesPage.puzzleRushArena).toHaveAttribute('data-puzzle-moves', /.+/, { timeout: 10_000 });
+      const movesAttr = await puzzlesPage.puzzleRushArena.getAttribute('data-puzzle-moves');
+      const currentMoves = movesAttr?.split(',').filter(Boolean);
 
       expect(currentMoves, `Puzzle ${puzzleIdx + 1} must have defined solution moves`).toBeDefined();
       expect(currentMoves!.length).toBeGreaterThan(0);
@@ -253,42 +251,30 @@ test.describe('Tactical Puzzle Hub Journey', () => {
     await expect(puzzlesPage.rushStrikes.locator('.strike-icon')).toHaveCount(3);
     await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(0);
 
-    // 6. Trigger strikes through the active rush runner
-    interface PuzzleRushElement extends Element {
-      __vueParentComponent?: {
-        setupState?: {
-          rush?: {
-            handleStrike?: () => void;
-          };
-        };
-      };
+    // 6. Incur 3 strikes through authentic chess blunders on the board
+    for (let strike = 1; strike <= 3; strike++) {
+      await expect(puzzlesPage.puzzleRushArena).toHaveAttribute('data-puzzle-fen', /.+/, { timeout: 10_000 });
+      const fen = (await puzzlesPage.puzzleRushArena.getAttribute('data-puzzle-fen'))!;
+      const rawMoves = await puzzlesPage.puzzleRushArena.getAttribute('data-puzzle-moves');
+      const currentSolution = rawMoves?.split(',')[0];
+
+      const chess = new Chess(fen);
+      const legalMoves = chess.moves({ verbose: true });
+      const blunder =
+        legalMoves.find((m) => `${m.from}${m.to}` !== currentSolution?.slice(0, 4) && !m.promotion) ??
+        legalMoves.find((m) => `${m.from}${m.to}` !== currentSolution?.slice(0, 4));
+      expect(blunder, `A blunder move must be available for strike ${strike}`).toBeDefined();
+
+      await puzzlesPage.makeMove(blunder!.from, blunder!.to);
+
+      await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(strike, { timeout: 5_000 });
+
+      if (strike < 3) {
+        // Wait for the 500ms rush mistake delay and ensure next puzzle board is ready
+        await page.waitForTimeout(600);
+        await expect(page.locator('.rush-board-container')).not.toHaveClass(/is-shaking/, { timeout: 5_000 });
+      }
     }
-
-    // Incur Strike 1
-    await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
-      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
-        arena.__vueParentComponent.setupState.rush.handleStrike();
-      }
-    });
-    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(1, { timeout: 5_000 });
-
-    // Incur Strike 2
-    await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
-      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
-        arena.__vueParentComponent.setupState.rush.handleStrike();
-      }
-    });
-    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(2, { timeout: 5_000 });
-
-    // Incur Strike 3 (Triggers Game Over!)
-    await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
-      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
-        arena.__vueParentComponent.setupState.rush.handleStrike();
-      }
-    });
 
     // 7. Verify Game Over dialog appears on 3 strikes
     await expect(puzzlesPage.rushGameOver).toBeVisible({ timeout: 10_000 });
@@ -341,42 +327,30 @@ test.describe('Tactical Puzzle Hub Journey', () => {
     await expect(puzzlesPage.rushStrikes.locator('.strike-icon')).toHaveCount(3);
     await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(0);
 
-    // 7. Incur strikes sequentially
-    interface PuzzleRushElement extends Element {
-      __vueParentComponent?: {
-        setupState?: {
-          rush?: {
-            handleStrike?: () => void;
-          };
-        };
-      };
+    // 7. Incur 3 strikes sequentially through authentic chess blunders on the board
+    for (let strike = 1; strike <= 3; strike++) {
+      await expect(puzzlesPage.puzzleRushArena).toHaveAttribute('data-puzzle-fen', /.+/, { timeout: 10_000 });
+      const fen = (await puzzlesPage.puzzleRushArena.getAttribute('data-puzzle-fen'))!;
+      const rawMoves = await puzzlesPage.puzzleRushArena.getAttribute('data-puzzle-moves');
+      const currentSolution = rawMoves?.split(',')[0];
+
+      const chess = new Chess(fen);
+      const legalMoves = chess.moves({ verbose: true });
+      const blunder =
+        legalMoves.find((m) => `${m.from}${m.to}` !== currentSolution?.slice(0, 4) && !m.promotion) ??
+        legalMoves.find((m) => `${m.from}${m.to}` !== currentSolution?.slice(0, 4));
+      expect(blunder, `A blunder move must be available for strike ${strike}`).toBeDefined();
+
+      await puzzlesPage.makeMove(blunder!.from, blunder!.to);
+
+      await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(strike, { timeout: 5_000 });
+
+      if (strike < 3) {
+        // Wait for the 500ms rush mistake delay and ensure next puzzle board is ready
+        await page.waitForTimeout(600);
+        await expect(page.locator('.rush-board-container')).not.toHaveClass(/is-shaking/, { timeout: 5_000 });
+      }
     }
-
-    // Incur Strike 1
-    await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
-      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
-        arena.__vueParentComponent.setupState.rush.handleStrike();
-      }
-    });
-    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(1, { timeout: 5_000 });
-
-    // Incur Strike 2
-    await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
-      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
-        arena.__vueParentComponent.setupState.rush.handleStrike();
-      }
-    });
-    await expect(puzzlesPage.rushStrikes.locator('.strike-icon.is-struck')).toHaveCount(2, { timeout: 5_000 });
-
-    // Incur Strike 3 (Triggers Game Over!)
-    await page.evaluate(() => {
-      const arena = document.querySelector('[data-testid="puzzle-rush-arena"]') as PuzzleRushElement | null;
-      if (arena?.__vueParentComponent?.setupState?.rush?.handleStrike) {
-        arena.__vueParentComponent.setupState.rush.handleStrike();
-      }
-    });
 
     // 8. Verify Game Over dialog appears on 3 strikes
     await expect(puzzlesPage.rushGameOver).toBeVisible({ timeout: 10_000 });

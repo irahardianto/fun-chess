@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import type { Puzzle } from '@fun-chess/shared';
 import PuzzleArena from '../PuzzleArena.vue';
 import { InMemoryPuzzleProgressStore } from '../store/in_memory_puzzle_progress.store';
@@ -491,6 +491,7 @@ describe('PuzzleArena.vue', () => {
 
     it('handles skip in ladder mode by recording skip and picking next ladder puzzle', async () => {
       const store = new InMemoryPuzzleProgressStore();
+      const updateRatingSpy = vi.spyOn(store, 'updateRating');
       const wrapper = mount(PuzzleArena, {
         props: {
           mode: 'adaptive_ladder',
@@ -505,8 +506,10 @@ describe('PuzzleArena.vue', () => {
 
       const skipBtn = wrapper.find('[data-testid="puzzle-skip-btn"]');
       await skipBtn.trigger('click');
+      await flushPromises();
 
-      // Ladder rating/streak should register attempt
+      // Ladder rating/streak registers attempt
+      expect(updateRatingSpy).toHaveBeenCalled();
       expect(wrapper.findComponent(RatingClimbHud).exists()).toBe(true);
     });
   });
@@ -528,21 +531,19 @@ describe('PuzzleArena.vue', () => {
       });
 
       const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
-      const promoModal = wrapper.findComponent(PromotionModal);
+      const promotionModal = wrapper.findComponent(PromotionModal);
 
-      expect(promoModal.props('modelValue')).toBe(false);
+      expect(promotionModal.props('modelValue')).toBe(false);
 
-      // Trigger promotion required from board
-      boardWrapper.vm.$emit('promotionRequired', { from: 'e7', to: 'e8' });
-      await wrapper.vm.$nextTick();
+      await boardWrapper.vm.$emit('promotionRequired', { from: 'e7', to: 'e8' });
+      await flushPromises();
 
-      expect(promoModal.props('modelValue')).toBe(true);
+      expect(promotionModal.props('modelValue')).toBe(true);
 
-      // Select Queen promotion
-      promoModal.vm.$emit('select', 'q');
-      await wrapper.vm.$nextTick();
+      await promotionModal.vm.$emit('select', 'q');
+      await flushPromises();
 
-      expect(promoModal.props('modelValue')).toBe(false);
+      expect(promotionModal.props('modelValue')).toBe(false);
     });
 
     it('closes PromotionModal on cancel without executing move', async () => {
@@ -615,7 +616,7 @@ describe('PuzzleArena.vue', () => {
       expect(wrapper.find('[data-testid="puzzle-why-callout"]').exists()).toBe(true);
     });
 
-    it('passes active puzzle with keySquares and targetSquares to board wrapper', () => {
+    it('initializes board wrapper with active puzzle state', () => {
       const store = new InMemoryPuzzleProgressStore();
       const wrapper = mount(PuzzleArena, {
         props: {
@@ -632,11 +633,11 @@ describe('PuzzleArena.vue', () => {
 
       const boardWrapper = wrapper.findComponent(PuzzleBoardWrapper);
       expect(boardWrapper.exists()).toBe(true);
-      const puzzle = (wrapper.vm as unknown as { activePuzzle: Puzzle }).activePuzzle;
-      expect(puzzle.keySquares).toBeDefined();
-      expect(puzzle.keySquares?.length).toBeGreaterThan(0);
-      expect(puzzle.targetSquares).toBeDefined();
-      expect(puzzle.targetSquares?.length).toBeGreaterThan(0);
+      expect(boardWrapper.props('fen')).toBeDefined();
+      expect(typeof boardWrapper.props('fen')).toBe('string');
+      expect(boardWrapper.props('interactive')).toBe(true);
+      expect(boardWrapper.props('orientation')).toMatch(/^[wb]$/);
+      expect(boardWrapper.props('turn')).toMatch(/^[wb]$/);
     });
   });
 });

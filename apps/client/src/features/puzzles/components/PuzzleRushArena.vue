@@ -45,6 +45,9 @@ const currentComboMultiplier = computed(() => rush.comboMultiplier.value);
 const isGameOverActive = computed(() => rush.isGameOver.value);
 const currentHighScore = computed(() => rush.highScore.value);
 const isNewHighScore = computed(() => rush.isNewHighScore.value || (currentScore.value > 0 && currentScore.value > currentHighScore.value));
+const currentPuzzleId = computed(() => rush.runner.currentPuzzle.value?.id);
+const currentPuzzleFen = computed(() => rush.runner.currentFen.value);
+const currentPuzzleMoves = computed(() => rush.runner.currentPuzzle.value?.moves?.join(','));
 
 const formattedTime = computed(() => {
   const m = Math.floor(currentTimeRemaining.value / 60);
@@ -141,7 +144,13 @@ defineExpose({
 </script>
 
 <template>
-  <div class="puzzle-rush-arena" data-testid="puzzle-rush-arena">
+  <div
+    class="puzzle-rush-arena"
+    data-testid="puzzle-rush-arena"
+    :data-puzzle-id="currentPuzzleId"
+    :data-puzzle-fen="currentPuzzleFen"
+    :data-puzzle-moves="currentPuzzleMoves"
+  >
     <!-- Top Rush HUD Bar -->
     <PuzzleRushHeader
       :mode="effectiveMode"

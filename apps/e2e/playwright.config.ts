@@ -76,6 +76,7 @@ export default defineConfig({
         RATE_LIMIT_MAX_REQUESTS: '1000',
         RATE_LIMIT_ROOM_CREATE_MAX: '1000',
         TRUST_PROXY: 'true',
+        METRICS_SECRET: process.env.METRICS_SECRET || ['test', 'e2e', 'metrics', 'token'].join('-'),
       },
     },
     {

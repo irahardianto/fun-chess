@@ -99,10 +99,10 @@ describe('SC-4 Interface Specifications & UI/UX Conformance Suite', () => {
       expect(aiGameHudSrc).toMatch(/\.action-btn--subdued-danger\s*\{/);
     });
 
-    it('App.vue multiplayer Resign button uses ghost variant with .action-btn--subdued-danger', () => {
-      expect(appVueSrc).toMatch(/class="[^"]*action-btn--subdued-danger[^"]*"/);
-      expect(appVueSrc).toMatch(/data-testid="resign-action"/);
-      expect(appVueSrc).toMatch(/\.action-btn--subdued-danger\s*\{/);
+    it('MultiplayerArena.vue multiplayer Resign button uses ghost variant with .action-btn--subdued-danger', () => {
+      expect(multiplayerArenaSrc).toMatch(/class="[^"]*action-btn--subdued-danger[^"]*"/);
+      expect(multiplayerArenaSrc).toMatch(/data-testid="resign-action"/);
+      expect(multiplayerArenaSrc).toMatch(/\.action-btn--subdued-danger\s*\{/);
     });
   });
 
@@ -122,9 +122,18 @@ describe('SC-4 Interface Specifications & UI/UX Conformance Suite', () => {
       expect(qrScannerViewSrc).toContain("cameraError || 'Camera unavailable. Allow camera access in browser settings or upload a save file below.'");
     });
 
-    it('JoinCard validates empty room code and nickname with clear user messages', () => {
+    it('JoinCard validates empty room code and nickname with clear user messages', async () => {
       const wrapper = mount(JoinCard);
       expect(wrapper.find('[data-testid="join-card"]').exists()).toBe(true);
+
+      const submitBtn = wrapper.find('button[type="submit"]');
+      await submitBtn.trigger('submit');
+      expect(wrapper.text()).toContain('Enter a nickname to join');
+
+      const nameInput = wrapper.find('input');
+      await nameInput.setValue('Player1');
+      await submitBtn.trigger('submit');
+      expect(wrapper.text()).toContain('Room code must be 4 characters.');
     });
   });
 

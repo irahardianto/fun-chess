@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import {
   DetailedHealthResponseSchema,
+  HttpErrorEnvelopeSchema,
   type DetailedHealthResponse,
+  type HttpErrorEnvelope,
 } from '@fun-chess/shared';
 import { getApiBaseUrl, EXPECTED_SECURITY_HEADERS } from './api_test_helper.js';
 
@@ -50,15 +52,17 @@ test.describe('Telemetry API Access Controls (/metrics, /health/detail) (ENH-016
       },
     });
 
-    if (response.status() === 403) {
-      expect(response.headers()['content-type']).toContain('application/json');
-      const body = (await response.json()) as Record<string, unknown>;
-      expect(body['status']).toBe('error');
-      expect(body['code']).toBe('ERR_UNAUTHORIZED');
-      expect(body['message']).toContain('Telemetry access restricted');
-    } else {
-      expect(response.status()).toBe(200);
-    }
+    expect(response.status()).toBe(403);
+    expect(response.headers()['content-type']).toContain('application/json');
+    const body: unknown = await response.json();
+    const parseResult = HttpErrorEnvelopeSchema.safeParse(body);
+    expect(parseResult.success, `Schema validation failed: ${JSON.stringify(parseResult)}`).toBe(true);
+
+    const errorEnvelope = body as HttpErrorEnvelope;
+    expect(errorEnvelope.status).toBe('error');
+    expect(errorEnvelope.code).toBe(403);
+    expect(errorEnvelope.error.code).toBe('ERR_UNAUTHORIZED');
+    expect(errorEnvelope.error.message).toContain('Telemetry access restricted');
   });
 
   test('GET /metrics rejects request with invalid x-metrics-secret header with 403 Forbidden', async ({ request }) => {
@@ -69,14 +73,31 @@ test.describe('Telemetry API Access Controls (/metrics, /health/detail) (ENH-016
       },
     });
 
-    if (response.status() === 403) {
-      expect(response.headers()['content-type']).toContain('application/json');
-      const body = (await response.json()) as Record<string, unknown>;
-      expect(body['status']).toBe('error');
-      expect(body['code']).toBe('ERR_UNAUTHORIZED');
-    } else {
-      expect(response.status()).toBe(200);
-    }
+    expect(response.status()).toBe(403);
+    expect(response.headers()['content-type']).toContain('application/json');
+    const body: unknown = await response.json();
+    const parseResult = HttpErrorEnvelopeSchema.safeParse(body);
+    expect(parseResult.success).toBe(true);
+
+    const errorEnvelope = body as HttpErrorEnvelope;
+    expect(errorEnvelope.status).toBe('error');
+    expect(errorEnvelope.code).toBe(403);
+    expect(errorEnvelope.error.code).toBe('ERR_UNAUTHORIZED');
+  });
+
+  test('GET /metrics allows access for simulated external client when valid x-metrics-secret header is supplied', async ({ request }) => {
+    const response = await request.get(`${baseUrl}/metrics`, {
+      headers: {
+        'x-forwarded-for': '203.0.113.195',
+        'x-metrics-secret': 'test-e2e-metrics-token',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('application/json');
+    const body: unknown = await response.json();
+    const parseResult = DetailedHealthResponseSchema.safeParse(body);
+    expect(parseResult.success).toBe(true);
   });
 
   test('HEAD /metrics responds with 200 OK and headers without leaking metrics body', async ({ request }) => {
