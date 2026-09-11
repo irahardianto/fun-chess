@@ -102,6 +102,11 @@ export function useBoardSelection(options: BoardSelectionOptions) {
     clearSelection();
   }
 
+  function requestPromotion(from: Square, to: Square): void {
+    selectedSquare.value = from;
+    pendingPromotion.value = { from, to };
+  }
+
   return {
     selectedSquare,
     legalMovesForSelected,
@@ -111,5 +116,6 @@ export function useBoardSelection(options: BoardSelectionOptions) {
     handleSquareClick,
     completePromotion,
     cancelPromotion,
+    requestPromotion,
   };
 }

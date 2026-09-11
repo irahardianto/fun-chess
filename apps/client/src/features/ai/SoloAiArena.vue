@@ -16,6 +16,7 @@ import type { MoveOutcomeEvent, GameCompletionOutcomeEvent } from './composables
 interface Props {
   initialMascotId?: MascotId;
   initialPlayerColor?: PieceColor | 'random';
+  initialFen?: string;
   playerName?: string;
   playerAvatar?: string;
 }
@@ -23,6 +24,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   initialMascotId: 'peanut',
   initialPlayerColor: 'w',
+  initialFen: undefined,
   playerName: 'You',
   playerAvatar: '🦁',
 });
@@ -64,6 +66,7 @@ function handleGameCompletion(event: GameCompletionOutcomeEvent) {
 const aiGame = useAiGame({
   mascotId: props.initialMascotId,
   playerColor: props.initialPlayerColor,
+  initialFen: props.initialFen,
   onMoveOutcome: handleMoveOutcome,
   onGameCompletion: handleGameCompletion,
 });
@@ -89,6 +92,7 @@ const {
   applyPlayerMove,
   completePromotion,
   cancelPromotion,
+  requestPromotion,
   capturedWhite,
   capturedBlack,
   materialAdvantage,
@@ -120,6 +124,10 @@ const isDrawResult = computed(() => {
 
 function handleSquareClick(sq: Square) {
   selectSquare(sq);
+}
+
+function handlePromotionRequired(payload: { from: Square; to: Square }) {
+  requestPromotion(payload.from, payload.to);
 }
 
 function handlePromotionSelect(piece: 'q' | 'r' | 'b' | 'n') {
@@ -278,6 +286,7 @@ function handleExit() {
           :interactive="isPlayerTurn"
           @select="handleSquareClick"
           @move="(m) => applyPlayerMove(m.from, m.to, m.promotion)"
+          @promotion-required="handlePromotionRequired"
         />
       </div>
 

@@ -323,6 +323,7 @@ export function useAiGame(options: UseAiGameOptions = {}) {
     completePromotion: (piece: 'q' | 'r' | 'b' | 'n') => boardSelection.completePromotion(piece),
     cancelPromotion: () => boardSelection.cancelPromotion(),
     clearSelection: () => boardSelection.clearSelection(),
+    requestPromotion: (from: Square, to: Square) => boardSelection.requestPromotion(from, to),
 
     // Material & Captured (MIN-009)
     capturedWhite: computed(() => boardState.capturedWhite.value),

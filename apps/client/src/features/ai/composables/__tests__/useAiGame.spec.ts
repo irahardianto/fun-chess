@@ -245,6 +245,20 @@ describe('useAiGame', () => {
       expect(game.selectedSquare.value).toBeNull();
     });
 
+    it('sets pending promotion directly via requestPromotion', () => {
+      const promoFen = '8/4P3/8/8/8/8/8/4K2k w - - 0 1';
+      const game = useAiGame({ initialFen: promoFen, autoStart: false });
+
+      game.requestPromotion('e7', 'e8');
+      expect(game.pendingPromotion.value).toEqual({ from: 'e7', to: 'e8' });
+      expect(game.selectedSquare.value).toBe('e7');
+
+      const completed = game.completePromotion('q');
+      expect(completed).toBe(true);
+      expect(game.pendingPromotion.value).toBeNull();
+      expect(game.moveHistory.value[0]?.san).toBe('e8=Q');
+    });
+
     it('detects checkmate and sets GameOverPayload on player victory', () => {
       // Scholar's Mate setup position: White Q on h5, B on c4, Black king on e8
       const scholarsFen = 'r1bqkb1r/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 1';

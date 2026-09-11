@@ -170,10 +170,18 @@ describe('SoloAiArena.vue', () => {
     });
 
     const hud = wrapper.findComponent({ name: 'AiGameHud' });
+    const board = wrapper.findComponent({ name: 'ChessBoard' });
     expect(hud.exists()).toBe(true);
 
+    // Make a move first
+    await board.vm.$emit('move', { from: 'e2', to: 'e4' });
+    await flushPromises();
+    expect(board.props('lastMove')).toEqual({ from: 'e2', to: 'e4' });
+
+    // Trigger takeback and verify move rolled back
     await hud.vm.$emit('takeback');
     await flushPromises();
+    expect(board.props('lastMove')).toBeNull();
   });
 
   it('handles board flipping when triggered from HUD', async () => {
@@ -224,22 +232,47 @@ describe('SoloAiArena.vue', () => {
     const board = wrapper.findComponent({ name: 'ChessBoard' });
     await board.vm.$emit('select', 'e2');
     await flushPromises();
+    expect(board.props('selectedSquare')).toBe('e2');
 
     await board.vm.$emit('move', { from: 'e2', to: 'e4' });
     await flushPromises();
+    expect(board.props('lastMove')).toEqual({ from: 'e2', to: 'e4' });
   });
 
-  it('forwards pawn promotion selection and cancellation', async () => {
+  it('handles promotion required from ChessBoard and opens PromotionModal', async () => {
     const wrapper = mount(SoloAiArena, {
       props: {
         initialMascotId: 'peanut',
+        initialFen: '8/4P3/8/8/8/8/8/4K2k w - - 0 1',
       },
     });
 
+    const board = wrapper.findComponent({ name: 'ChessBoard' });
     const promotionModal = wrapper.findComponent({ name: 'PromotionModal' });
-    await promotionModal.vm.$emit('select', 'q');
+
+    expect(promotionModal.props('modelValue')).toBe(false);
+
+    // Board emits promotion-required when pawn reaches 8th rank
+    await board.vm.$emit('promotion-required', { from: 'e7', to: 'e8' });
+    await flushPromises();
+
+    expect(promotionModal.props('modelValue')).toBe(true);
+
+    // User cancels promotion
     await promotionModal.vm.$emit('cancel');
     await flushPromises();
+
+    expect(promotionModal.props('modelValue')).toBe(false);
+
+    // Board emits promotion-required again and user selects queen
+    await board.vm.$emit('promotion-required', { from: 'e7', to: 'e8' });
+    await flushPromises();
+    expect(promotionModal.props('modelValue')).toBe(true);
+
+    await promotionModal.vm.$emit('select', 'q');
+    await flushPromises();
+
+    expect(promotionModal.props('modelValue')).toBe(false);
   });
 
   it('handles resign match modal cancellation', async () => {

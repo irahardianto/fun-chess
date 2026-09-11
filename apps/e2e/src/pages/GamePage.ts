@@ -1,13 +1,6 @@
 import type { Page, Locator } from '@playwright/test';
 import { expect } from '@playwright/test';
 
-interface SoloAiArenaElement extends Element {
-  __vueParentComponent?: {
-    setupState?: {
-      selectSquare?: (square: string) => void;
-    };
-  };
-}
 
 /**
  * Page Object Model representing the Fun Chess Game Arena (Multiplayer and Solo AI).
@@ -61,16 +54,9 @@ export class GamePage {
 
     await toSquare.click();
 
-    // If move targets promotion rank in Solo AI arena, ensure destination square is selected
+    // If move targets promotion rank, the piece will appear once promotion piece is selected
     const isPromotionRank = to.endsWith('8') || to.endsWith('1');
-    if (isPromotionRank) {
-      await this.page.evaluate((dest) => {
-        const arena = document.querySelector<SoloAiArenaElement>('[data-testid="solo-ai-arena"]');
-        if (arena?.__vueParentComponent?.setupState?.selectSquare) {
-          arena.__vueParentComponent.setupState.selectSquare(dest);
-        }
-      }, to);
-    } else {
+    if (!isPromotionRank) {
       await expect(toSquare.locator('[data-testid="chess-piece"]')).toBeVisible({ timeout: 10_000 });
     }
   }

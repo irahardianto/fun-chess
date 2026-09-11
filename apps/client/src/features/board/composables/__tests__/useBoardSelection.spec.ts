@@ -192,6 +192,15 @@ describe('useBoardSelection', () => {
       expect(selection.selectedSquare.value).toBeNull();
       expect(selection.legalMovesForSelected.value).toEqual([]);
     });
+
+    it('sets pending promotion and selected square directly with requestPromotion', () => {
+      const selection = useBoardSelection(createOptions());
+
+      selection.requestPromotion('e7', 'e8');
+
+      expect(selection.selectedSquare.value).toBe('e7');
+      expect(selection.pendingPromotion.value).toEqual({ from: 'e7', to: 'e8' });
+    });
   });
 
   describe('clearSelection helper', () => {
